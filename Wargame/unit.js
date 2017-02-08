@@ -1,0 +1,19 @@
+/*
+	Type
+		Infantry
+		Heavy Ground
+		Light Ground
+		Flyer
+		Aquatic
+		Portable
+		Building
+		Infrastructure
+	Mode
+		Deployed
+		Transporting
+		Dug in
+	Mobility Points
+
+	Scout
+		by terrain type
+ */

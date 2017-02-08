@@ -1,0 +1,60 @@
+Standing Resource
+	Name
+	Type
+	(Number)
+	BuildCost (Project)
+	Maintain Cost (Project)
+	Neglect Cost (Project)
+	Abandon Cost (Project)
+
+Numeric Resource
+	POPULATION // raw people 
+	FOOD
+	INDUSTRY
+	RESEARCH
+	CULTURE
+	TRANSPORTATION
+	POLICE
+	
+Technology
+	Name
+	Type
+	Research Cost (Project)
+	Required Techs
+	Results
+
+
+LAND
+	class: ocean, land
+	Geoform: easy, typical, difficult
+	Seasons: wet mild winter, dry mild winter, wet harsh winter, dry harsh winter, tropical wet-dry, tropical, artic
+	Climate: Drenched, Wet, Arid, Dry
+
+LAND IMPROVMENTS
+	WILD (land type)
+	TAMED (land type)
+	FARMED (land type)
+	URBAN (land type)
+
+UNIT
+	attack:1
+	attacks:1
+	armor:0
+	health: 5
+	(generally provides police points)
+
+AGRICULTURE
+	FARMER (land type) (# foods)
+	HERDER (land type) (# foods)
+	HUNTER (land type) (# foods)
+
+TRASH
+	(numeric resource)
+
+FOOD TECH
+	Type: [staple, suplement, spice]
+	Seasons: [as land]
+	class: [as land]
+	climate: [as land]
+
+Need ability to auto generate options

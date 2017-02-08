@@ -1,0 +1,428 @@
+<html>
+<head>
+    <title>Legend</title>
+    <script>
+
+        var Modifier = function (war,attack,defense,fame,culture,craft,riches,decadence)
+        {
+            var self = this;
+
+            self.getFame = function (){return fame};
+
+            self.getWar = function (){return war};
+            self.getAttack = function (){return war+attack};
+            self.getDefense = function (){return war+defense};
+
+            self.getCulture = function (){return culture};
+            self.getCraft = function (){return craft};
+            self.getRiches = function (){return riches};
+
+            self.getDecadence = function (){return decadence};
+        };
+
+        var Hero = function (war,attack,defense,fame,culture,craft,riches,decadence)
+        {
+            var self = this;
+            Modifier.apply(self,[war,attack,defense,fame,culture,craft,riches,decadence]);
+
+            self.age = 0;
+        };
+
+        var Race = function (war,attack,defense,fame,culture,craft,riches,decadence,longevity)
+        {
+            var self = this;
+
+            self.inventions = [];
+            self.base = new Modifier(0,0,0,0,0,0,0);
+
+            self.getLongevity = function (){return longevity + getValue('getLongevity');};
+
+            self.getFame = function (){return fame};
+
+            self.getWar = function (){ return getValue('getWar');};
+            self.getAttack = function (){return getValue('getAttack');};
+            self.getDefense = function (){return getValue('getDefense');};
+
+            self.getCulture = function (){return getValue('getCulture');};
+            self.getCraft = function (){return getValue('getCraft');};
+            self.getRiches = function (){return getValue('getRiches');};
+
+            self.getDecadence = function (){return getValue('getDecadence');};
+
+            var getValue = function (value)
+            {
+                var result = 0;
+
+                for(var i in self.inventions) if(self.inventions[i][value])result+=self.inventions[i][value]();
+                if(self.base[value])result+=self.base[value]();
+
+                return result;
+            }
+        };
+
+        var City = function(race,place)
+        {
+            var self = this;
+
+            var size=1;
+
+            self.monuments = [];
+            self.heroes = [];
+            self.race = race?race:defaultRace;
+            self.place = place?place:defaultPlace;
+
+            self.getFame = function (){return size+ getValue('getFame');};
+
+            self.getWar = function (){ return size+ getValue('getWar');};
+            self.getAttack = function (){return size+ getValue('getAttack');};
+            self.getDefense = function (){return size+ getValue('getDefense');};
+
+            self.getCulture = function (){return size+ getValue('getCulture');};
+            self.getCraft = function (){return size+ getValue('getCraft');};
+            self.getRiches = function (){return size+ getValue('getRiches');};
+
+            self.getDecadence = function (){return getValue('getDecadence');};
+
+            var getValue = function (value)
+            {
+                var result = 0;
+
+                for(var i in self.monuments) if(self.monuments[i][value])result+=self.monuments[i][value]();
+                for(var i in self.heroes) if(self.heroes[i][value])result+=self.monuments[i][value]();
+                if(self.race[i][value])result+=self.race[i][value]();
+                if(self.place[i][value])result+=self.place[i][value]();
+
+                return result;
+            }
+        };
+
+        var defaultRace = new Race(0,0,0,0,0,0,0,3);
+        var defaultPlace = new Modifier(0,0,0,0,0,0,0);
+        var blankModifier = new Modifier(0,0,0,0,0,0,0);
+
+        var validRequirementTypes =
+        {
+            "greater":function (a,b){return a>b},
+            "less":function(a,b){return a<b},
+            "not greater":function (a,b){return a<=b},
+            "not less":function (a,b){return a>=b}
+        };
+
+        var AbsoluteRequirement = function (attribute,num,type)
+        {
+            var self = this;
+
+            self.validate =function (target) {return validRequirementTypes[type](target[attribute],num);}
+        };
+
+        var RelativeRequirement = function (attributeA,attributeB,bonus,type)
+        {
+            var self = this;
+
+            self.validate =function (target) {return validRequirementTypes[type](target[attributeA],target[attributeB]+bonus);}
+        };
+
+        var CompoundRequirement = function (requirementList,joinType)
+        {
+            var self = this;
+
+            self.validate = function (target)
+            {
+                if(joinType=="AND")
+                {
+                    for(var i in requirementList)
+                        if(!requirementList[i].validate(target))return false;
+                    return true;
+                }
+                if(joinType=="OR")
+                {
+                    for(var i in requirementList)
+                        if(requirementList[i].validate(target))return true;
+                    return false;
+                }
+            }
+        };
+
+        var cardTypes = ["global event","founding","founding modifier","community modification","community event","count points"];
+
+        var Card = function(name,type,cost,effect)
+        {
+            var self = this;
+
+            self.name=name;
+            self.type=type;
+            self.cost=cost;
+            self.effect=effect;
+
+        };
+
+        var CommunityModification =function (requirement,effect)
+        {
+            var self = this;
+
+            self.requirement = requirement;
+            self.effect = effect;
+        };
+
+
+        //requirements
+        var alwaysTrue = new AbsoluteRequirement({validate:function (){return true;}});
+
+        //region CARDS
+
+        //foundings
+        var villageFounding = new Card("Start a Village!","founding",2,new Modifier(0,0,0,0,0,0,0,0));
+        var fortFounding = new Card("Build a Fort!","founding",4,new Modifier(1,0,0,0,0,0,0,0));
+        var religiousFounding = new Card("Found a Religious Community!","founding",3,new Modifier(0,0,0,0,0,0,0,-1));
+        var famousFounding = new Card("Refugees find new Home!","founding",5,new Modifier(0,0,0,1,0,0,0,0));
+
+        //places
+        var port = new Card("defensible port","founding modifier",0,new Modifier(0,0,1,0,1,0,1,1));
+        var fertileLand = new Card("Fertile Fields","founding modifier",0,new Modifier(0,0,0,0,0,0,1,0));
+        var landmark = new Card("Notable Landmark","founding modifier",0,new Modifier(0,0,0,1,0,0,0,0));
+        var mines = new Card("Iron Mines","founding modifier",0,new Modifier(0,0,0,0,0,1,1,0));
+        var mysticPool = new Card("Refugees find new Home!","founding modifier",3,new Modifier(0,0,0,1,1,0,1,0));
+
+        //races
+        var elves = new Card("Elves","founding modifier",2,new Race(0,0,0,-2,0,0,0,-2,Math.Infinity));
+        var dwarves = new Card("Dwarves","founding modifier",1,new Race(0,0,0,0,-1,1,1,1,6));
+        var beasts = new Card("Beast Men","founding modifier",0,new Race(1,1,0,0,-1,0,0,1,3));
+        var scholars = new Card("Scholars","founding modifier",0,new Race(-1,0,0,1,1,0,0,-1,3));
+
+        //growth
+        var babyBoom = new Card("Sons Grow to Swell City","community event",4,new CommunityModification(alwaysTrue,{size:1}));
+
+        var refugees = new Card("Refugees join the City","community event",1,new CommunityModification(new AbsoluteRequirement('defense',4,'not less'),{size:1}));
+        var cultureHub = new Card("Cultural Hub Swells in Size","community event",1,new CommunityModification(new AbsoluteRequirement('culture',3,'not less'),{size:1}));
+        var wealthySprawl = new Card("Wealthy City grows past walls","community event",1,new CommunityModification(new AbsoluteRequirement('riches',3,'not less'),{size:1}));
+        var goodsGrowth = new Card("Demand for goods Boosts City","community event",1,new CommunityModification(new AbsoluteRequirement('craft',3,'not less'),{size:1}));
+
+        var secureGrowth = new Card("Secure Community Grows","community event",2,new CommunityModification(new RelativeRequirement('defense','size',1,'not less'),{size:1}));
+        var greatPlace = new Card("Great Place to Live","community event",2,new CommunityModification(new RelativeRequirement('culture','size',1,'not less'),{size:1}));
+        var prosperity = new Card("Prosperous City","community event",2,new CommunityModification(new RelativeRequirement('riches','size',1,'not less'),{size:1}));
+        var industrious = new Card("Industrious People","community event",2,new CommunityModification(new RelativeRequirement('craft','size',1,'not less'),{size:1}));
+
+        //decadence
+        var governmentCorruption = new Card("Bribes become Common","community event",0,new CommunityModification(alwaysTrue,{decadence:1}));
+
+        var troopTrouble = new Card("Troops more loyal to generals than city","community event",0,new CommunityModification(new RelativeRequirement('defense','size',1,'not less'),{decadence:1}));
+        var hypocrisy = new Card("Hypocrisy of Moral Authorities","community event",0,new CommunityModification(new RelativeRequirement('culture','size',1,'not less'),{decadence:1}));
+        var partyAnimals = new Card("Rich Squander Wealth","community event",0,new CommunityModification(new RelativeRequirement('riches','size',1,'not less'),{decadence:1}));
+        var guildsRotten = new Card("Guilds neglect skill for politics","community event",0,new CommunityModification(new RelativeRequirement('riches','size',1,'not less'),{decadence:1}));
+
+        //monuments
+
+        var buildWalls = new Card("Build Walls","community modification",0,new CommunityModification(alwaysTrue,{monument:new Modifier(0,0,1,0,0,0,0,0)}));
+        var buildBarracks = new Card("Build Barracks","community modification",0,new CommunityModification(alwaysTrue,{monument:new Modifier(0,1,0,0,0,0,0,0)}));
+        var buildTheater = new Card("Build Theater","community modification",0,new CommunityModification(alwaysTrue,{monument:new Modifier(0,0,0,0,1,0,0,0)}));
+        var buildOrchards = new Card("Build Orchards","community modification",0,new CommunityModification(alwaysTrue,{monument:new Modifier(0,0,0,0,0,1,0,0)}));
+        var buildShops = new Card("Pottery Works","community modification",0,new CommunityModification(alwaysTrue,{monument:new Modifier(0,0,0,0,0,0,1,0)}));
+        var buildTemple = new Card("Build Religious Edifice","community modification",0,new CommunityModification(alwaysTrue,{monument:new Modifier(0,0,0,0,0,0,0,-1)}));
+
+        var buildMonument = new Card("Wonder of the world","community modification",0,new CommunityModification(new AbsoluteRequirement('size',5,'not less'),{monument:new Modifier(0,0,0,1,0,0,0,0)}));
+
+        //heroes
+
+        var warrior = new Card("Warrior","community modification",0,new CommunityModification(alwaysTrue,{hero:new Hero(1,0,0,2,0,0,0,0)}));
+        var sage = new Card("Sage","community modification",0,new CommunityModification(alwaysTrue,{hero:new Hero(0,0,0,2,1,0,0,0)}));
+        var merchant = new Card("merchant","community modification",0,new CommunityModification(alwaysTrue,{hero:new Hero(0,0,0,2,0,1,0,0)}));
+        var inventor = new Card("inventor","community modification",0,new CommunityModification(alwaysTrue,{hero:new Hero(1,0,0,2,0,0,0,0)}));
+        var reformer = new Card("reformer","community modification",0,new CommunityModification(alwaysTrue,{hero:new Hero(0,0,0,2,0,0,0,-1)}));
+
+        //local disasters
+        var civilTumult = new Card("Civil Tumult","community event",0,new CommunityModification(new RelativeRequirement('war','size',2,'less'),{size:-1}));
+        var foreignCoup = new Card("Foreigners launch Coup","community event",0,new CommunityModification(new RelativeRequirement('culture','size',2,'less'),{size:-1}));
+        var darkPeriod = new Card("Technologically Backward","community event",0,new CommunityModification(new RelativeRequirement('craft','size',2,'less'),{size:-1}));
+        var foodShortage = new Card("Food Shortages","community event",0,new CommunityModification(new RelativeRequirement('riches','size',2,'less'),{size:-1}));
+        var romanRiots = new Card("Rioters demand Bread and Circuses!","community event",0,new CommunityModification(new RelativeRequirement('decadence','size',0,'greater'),{size:-1}));
+
+        var obsolesce = new Card("Technical Secrets stolen!","community event",0,new CommunityModification(new AbsoluteRequirement('craft',5,'not less'),{size:-1}));
+        var dragon = new Card("Dragon","community event",2,new CommunityModification(new AbsoluteRequirement('riches',5,'not less'),{size:-5}));
+        var purge = new Card("Philosophical Purge!","community event",0,new CommunityModification(new AbsoluteRequirement('culture',5,'not less'),{size:-1}));
+        var overTaxed = new Card("Army requires massive taxes","community event",0,new CommunityModification(new AbsoluteRequirement('war',5,'not less'),{size:-1}));
+
+
+        //points
+        var counting = new Card("Count Fame","count points",0,{fame:5});
+        var countCraft = new Card("Count Technology","count points",1,{fame:3,craft:2});
+        var countWealth = new Card("Count Wealth","count points",1,{fame:3,riches:2});
+        var countWar = new Card("Count Military","count points",1,{fame:3,attack:1,defense:1});
+        var countCulture = new Card("Count Philosophy","count points",1,{fame:3,culture:2});
+        var finalCounting = new Card("Final Count","count points",6,{fame:15,end:true});
+
+        //endregion
+
+     var deck =[
+         {card:villageFounding,count:10},
+         {card:fortFounding,count:2},
+         {card:religiousFounding,count:2},
+         {card:famousFounding,count:2},
+
+         {card:port,count:2},
+         {card:fertileLand,count:2},
+         {card:mines,count:2},
+         {card:mysticPool,count:2},
+
+         {card:elves,count:2},
+         {card:dwarves,count:2},
+         {card:beasts,count:2},
+         {card:scholars,count:2000},
+
+         {card:babyBoom,count:10},
+         {card:refugees,count:2},
+         {card:cultureHub,count:2},
+         {card:wealthySprawl,count:2},
+         {card:goodsGrowth,count:2},
+         {card:secureGrowth,count:2},
+         {card:greatPlace,count:2},
+         {card:prosperity,count:2},
+         {card:industrious,count:2},
+
+         {card:governmentCorruption,count:10},
+         {card:troopTrouble,count:10},
+         {card:hypocrisy,count:10},
+         {card:partyAnimals,count:10},
+         {card:guildsRotten,count:10},
+
+         {card:buildWalls,count:2},
+         {card:buildBarracks,count:2},
+         {card:buildTheater,count:2},
+         {card:buildShops,count:2},
+         {card:buildTemple,count:2},
+         {card:buildMonument,count:2},
+
+         {card:warrior,count:3},
+         {card:sage,count:3},
+         {card:merchant,count:3},
+         {card:inventor,count:3},
+         {card:reformer,count:3},
+
+         {card:civilTumult,count:5},
+         {card:foreignCoup,count:5},
+         {card:darkPeriod,count:5},
+         {card:foodShortage,count:5},
+         {card:romanRiots,count:5},
+
+         {card:obsolesce,count:2},
+         {card:dragon,count:2},
+         {card:purge,count:2},
+         {card:overTaxed,count:2},
+
+         {card:counting,count:5},
+         {card:countCraft,count:2},
+         {card:countWealth,count:2},
+         {card:countWar,count:2},
+         {card:countCulture,count:2},
+         {card:finalCounting,count:5}
+
+     ];
+
+    function drawCard()
+    {
+        var total = 0;
+
+        for(var i in deck) total+=deck[i].count;
+
+        var card = Math.floor(Math.random()*total);
+
+        for(var i in deck) if(card<deck[i].count)return deck[i];else card-=deck[i].count;
+    }
+
+    function displayCard(card)
+    {
+        var title = "<b>"+card.name+"</b>";
+        var cost = card.cost?"discard "+card.cost+" cards to use <br>":"";
+        var description = "";
+        var color = "rgba(100,50,0,.5)";
+       if(card.type == "founding")
+       {
+           description="you may found a new city";
+           description+=describeBonuses(card.effect);
+           color = "rgba(240,180,0,.25)";
+       }
+       if(card.type == 'community modification')
+       {
+            if(card.effect.effect.hero)
+            {
+                description="This is a Hero!<br>";
+                description+=describeBonuses(card.effect.effect.hero);
+            }
+            if(card.effect.effect.monument){
+                description="This is a Monument!<br>";
+                description+=describeBonuses(card.effect.effect.monument);
+            }
+           color = "rgba(0,0,100,.5)";
+       }
+       if(card.type == 'community event')
+       {
+           if(card.effect.effect.size)
+           {
+               if(card.effect.effect.size>0){
+                   description="The City Grows in size by "+card.effect.effect.size+"<br>";
+                   color = "rgba(0,100,0,.5)";
+               }
+               else{
+                   description="The City Shrinks in size by "+(-card.effect.effect.size)+"<br>";
+                   color = "rgba(100,0,0,.5)";
+               }
+           }
+           if(card.effect.effect.decadence)
+           {
+               if(card.effect.effect.decadence>0){
+                   description="The City Grows in decadence by "+card.effect.effect.decadence+"<br>";
+                   color = "rgba(50,25,25,.5)";
+               }
+               else {
+                   description="The City Shrinks in decadence by "+(-card.effect.effect.decadence)+"<br>";
+                   color = "rgba(0,100,50,.5)";
+               }
+           }
+       }
+       if(card.type =='founding modifier')
+       {
+           description="play when founding a city";
+           description+=describeBonuses(card.effect);
+           color = "rgba(240,0,240,.35)";
+       }
+
+        var toDisplay = title+"<br>"+cost+description+"<br>";
+        var div = '<div style="width: 180px; float:left;text-align:center; height:120px; background:'+color+'; margin:20px">'+toDisplay+'</div>'
+
+        document.getElementById('display').innerHTML+=div;
+    }
+
+    function describeBonus(object,bonus,func)
+    {
+        if(object[func] && object[func]()!=0)  return  object[func]()+" "+bonus+"<br>";
+        return "";
+    }
+
+    function describeBonuses(modifier)
+    {
+        var result = "";
+        var toGet =[
+            {bonus:"war",accessor:"getWar"},
+            {bonus:"defense",accessor:"getDefense"},
+            {bonus:"attack",accessor:"getAttack"},
+            {bonus:"fame",accessor:"getFame"},
+            {bonus:"riches",accessor:"getRiches"},
+            {bonus:"craft",accessor:"getCraft"},
+            {bonus:"culture",accessor:"getCulture"},
+            {bonus:"decadence",accessor:"getDecadence"},
+            {bonus:"longevity",accessor:"getLongevity"}
+        ];
+
+        for(var i in toGet)result+=describeBonus(modifier,toGet[i].bonus,toGet[i].accessor);
+        return result;
+    }
+
+    </script>
+</head>
+
+<body>
+
+<button onclick="displayCard(drawCard().card)">Draw Card</button><br>
+<div id='display'> </div>
+</body>
+
+</html>

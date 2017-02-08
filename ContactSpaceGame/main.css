@@ -1,0 +1,18 @@
+.Empire div{
+	margin-left: 10px;
+}
+.Colony div{
+	margin-left: 20px;
+}
+
+.Resource div{
+	margin-left: 30px;
+}
+.error{
+	color:red;
+}
+
+.selected{
+	background: #aaffaa;
+	border: solid 5px;
+}

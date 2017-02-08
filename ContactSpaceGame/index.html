@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Contact (The Space Civilization Game)</title>
+	<link href="main.css" rel="stylesheet">
+	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
+	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
+	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+	<script type="text/javascript" src="AlienRaceNames.js"></script>
+	<script type="text/javascript" src="resourceTree.js"></script>
+	<script type="text/javascript" src="main.js"></script>
+	<script>
+
+
+	</script>
+</head>
+<body onload="load()">
+
+	<h1>Contact</h1>
+	<div id="main">
+		<div data-bind="text:id"></div>
+		<div>
+			<div>Game State</div>
+			<div data-bind="foreach:empires" class="Empire" id = "Empire">
+				<div data-bind="css: {selected: selected} ">
+				<div >
+					<span data-bind="text:name"></span>
+					<span data-bind="click:select">Select</span>
+					<span data-bind="ifnot:visible, click:view">View</span>
+					<span data-bind="if:visible, click:hide">Hide</span>
+				</div>
+				<!-- ko if:visible -->
+				<div data-bind="foreach:colonies" class = "Colony">
+					<div data-bind="css: {selected: selected} ">
+					<div >
+						<span data-bind="text:name"></span>
+						<span data-bind="if: $parent.selected, click:select">Select</span>
+						<span data-bind="ifnot:visible, click:view">View</span>
+						<span data-bind="if:visible, click:hide">Hide</span>
+					</div>
+					<!-- ko if:visible -->
+					<!--
+					<div data-bind="foreach:resources">
+						<div class= "Resource">
+							<span data-bind="text:name" ></span>:<span data-bind="text:value"></span>
+						</div>
+					</div>
+					-->
+					<div data-bind="foreach:resourceFlow">
+						<div class= "Resource">
+							<span data-bind="text:name" ></span>
+							:
+							<span data-bind="text:value"></span>
+						</div>
+					</div>
+					<div data-bind="foreach:standingResources">
+						<div>
+							<span data-bind="text:number"></span>
+							<span data-bind="text:id"></span>
+							<span data-bind="ifnot:visible, click:view">View</span>
+							<span data-bind="if:visible, click:hide">Hide</span>
+							<!-- ko if:visible -->
+							<div data-bind="with:maintain">
+								Maintain: 
+								<span data-bind="foreach:inputs">
+									<span data-bind="text:name"></span>
+									<span data-bind="text:value"></span>
+								</span>
+								=>
+								<span data-bind="foreach:outputs">
+									<span data-bind="text:name"></span>
+									<span data-bind="text:value"></span>
+								</span>
+								<button data-bind="click:$parent.setMaintain">Maintain</button>
+							</div>
+							<div data-bind="with:neglect">
+								Neglect: 
+								<span data-bind="foreach:inputs">
+									<span data-bind="text:name"></span>
+									<span data-bind="text:value"></span>
+								</span>
+								=>
+								<span data-bind="foreach:outputs">
+									<span data-bind="text:name"></span>
+									<span data-bind="text:value"></span>
+								</span>
+								<button data-bind="click:$parent.setNeglect">Neglect</button>
+							</div>
+							<div data-bind="with:abandon">
+								Abandon: 
+								<span data-bind="foreach:inputs">
+									<span data-bind="text:name"></span>
+									<span data-bind="text:value"></span>
+								</span>
+								=>
+								<span data-bind="foreach:outputs">
+									<span data-bind="text:name"></span>
+									<span data-bind="text:value"></span>
+								</span>
+								<button data-bind="click:$parent.setAbandon">Abandon</button>
+							</div>
+							<!-- ko if:useInputTypes -->
+							<div data-bind="foreach:useInputTypes">
+								<select data-bind="options:$parents[1].useInputOptions()[$parent.id][$data],
+									optionsText:function (item) { return '('+item.id + ' ' +item.number()+')'}, 
+									value:$parent.useInputs[$index()]"></select>
+							</div>
+							<button data-bind='click:addInputCase'>Confirm</button>
+							<div data-bind="foreach:inputCases">
+								<div>
+									<!-- ko foreach:inputs -->
+										<span data-bind="text:$data.id"></span>
+									<!-- /ko -->
+									<input type="number" min=0 data-bind="value:number,attr:{max: availiableCounts}"></input>
+									*<span data-bind="text:output"></span>=
+									<span data-bind="text:totalOutput"></span>
+									<button data-bind="click:removeInputCase">cancel</button>
+								</div>
+							</div>
+							<!-- /ko -->
+							<!-- /ko -->
+						</div>
+					</div>
+					<!--
+					<div data-bind="foreach:projects">
+						<span data-bind="text:type.name"></span>
+						<input type="number" min="0" data-bind="value:number"></input>
+						<span data-bind="foreach:cost"> 
+							<span data-bind="text:value"></span> 
+							<span data-bind="text:name"></span> 
+						</span>
+						=>
+						<span data-bind="type.result.name"
+						<br>
+					</div>
+					-->
+					<!-- /ko -->
+					</div>
+				</div>
+				<!-- /ko -->
+				</div>
+			</div>
+			<div id="Actions" data-bind="if:currentMode.play">
+				<button data-bind="click:runTurn">Take Turn</button>
+				<button data-bind="click:showAddProject">Add Project</button>
+			</div>
+		</div>
+		<div id = "addProject" class= "Creation" data-bind="if:currentMode.addProject">
+				You are adding a project to
+				<span data-bind="text:currentColony().name"></span>
+				in the
+				<span data-bind="text:currentEmpire().name"></span>
+				Empire <br>
+				<select data-bind="options:validProjectsToAdd, optionsText:'name', value: selectedProject"></select>
+				<button data-bind="click:addProject">Add Project</button>
+		</div>
+		<div id = "CreateColony" class= "Creation" data-bind="if:currentMode.addColony">
+			<div>
+				You are building a colony for
+				<span data-bind="text:currentEmpire().name"></span>.
+				Please Enter its name
+			</div>
+			Name:<input type="text" data-bind="value:name">
+			<button>Accept Data</button>
+			<button>Build This For Me</button>
+		</div>
+		<div  data-bind="visible:currentMode.start, with:startState">
+			<div>Welcome to Contact! (the space game). Start your game</div>
+			<div>Empire Name: <input type = "text" data-bind="value:empireName"></span></div>
+			<div>#Starting Colonies: <input type = "number" data-bind="value:numColonies"></span></div>
+			<div data-bind="foreach:colonyNames">
+				<input type="text" data-bind="value:name"><br>
+			</div>
+			<div data-bind="text:colonyNames()[0].name"></div>
+			<div># Competing Empires: <input type = "number" min="1" max="20" data-bind="value:numEmpires"></span></div>
+			<button data-bind="click:generateGame">Start!</button>
+		</div>
+		<div class="error" data-bind="text:error"></div>
+	</div>
+</body>
+</html>

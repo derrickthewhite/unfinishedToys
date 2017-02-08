@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Contact (The Space Civilization Game)</title>
+	<link href="main.css" rel="stylesheet">
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+	<script type="text/javascript" src="AlienRaceNames.js"></script>
+	<script type="text/javascript" src="resourceTree.js"></script>
+	<script> 
+		function load(){
+		
+			var model = {};
+			var resources = buildStartingResourceSet();
+			model.resources =[];
+			for(var i in resources) model.resources.push(resources[i]);
+			
+			console.log(model);
+			
+			ko.applyBindings(model,document.getElementById('main'));
+		}
+	</script>
+</head>
+<body onload="load()">
+
+	<h1>resourceTree</h1>
+	<div id="main">
+		<div data-bind="foreach:resources">
+			<div>
+				<span data-bind="text:number"></span>
+				<span data-bind="text:id"></span>
+				<div data-bind="with:maintain">
+					Abandon: 
+					<span data-bind="foreach:inputs">
+						<span data-bind="text:name"></span>
+						<span data-bind="text:value"></span>
+					</span>
+					=>
+					<span data-bind="foreach:outputs">
+						<span data-bind="text:name"></span>
+						<span data-bind="text:value"></span>
+					</span>
+				</div>
+				<div data-bind="with:neglect">
+					Neglect: 
+					<span data-bind="foreach:inputs">
+						<span data-bind="text:name"></span>
+						<span data-bind="text:value"></span>
+					</span>
+					=>
+					<span data-bind="foreach:outputs">
+						<span data-bind="text:name"></span>
+						<span data-bind="text:value"></span>
+					</span>
+				</div>
+				<div data-bind="with:abandon">
+					Abandon: 
+					<span data-bind="foreach:inputs">
+						<span data-bind="text:name"></span>
+						<span data-bind="text:value"></span>
+					</span>
+					=>
+					<span data-bind="foreach:outputs">
+						<span data-bind="text:name"></span>
+						<span data-bind="text:value"></span>
+					</span>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

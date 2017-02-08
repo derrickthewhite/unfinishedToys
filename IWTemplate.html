@@ -1,0 +1,177 @@
+<html>
+<head>
+    <title>Detailed Character</title>
+    <script>
+
+        function select(options)
+        {
+            var total = 0;
+            for(var i in options)
+            {
+                total+= options[i].chance;
+                options[i].draw = total;
+            }
+
+            var roll = Math.random()*total;
+
+            for(var i = 0;i<options.length;i++)
+            {
+                if(roll<options[i].draw)return options[i].option;
+            }
+        }
+
+        var background =[
+            {option:'farmer',chance: 20 },
+            {option:'soldier',chance: 20 },
+            {option:'noble',chance: 20 },
+            {option:'enabled',chance: 20 },
+            {option:'service',chance: 10 },
+            {option:'merchant',chance: 10 },
+            {option:'craftsman',chance: 10 },
+            {option:'scholar',chance: 10 },
+            {option:'street rat',chance: 20},
+            {option:'freighter',chance: 10 },
+            {option:'primitive',chance: 20 }
+        ];
+
+        var role =[
+            {option:'melee',chance: 20 },
+            {option:'ranged',chance: 20 },
+            {option:'face man',chance: 20 },
+            {option:'stealth',chance: 20 },
+            {option:'knowledge keeper',chance: 20 }
+        ];
+
+        var superComp =[
+            {option:'Weapon Master',chance: 20 },
+            {option:'Gun Slinger',chance: 20 },
+            {option:'Gadgeteer',chance: 20 },
+            {option:'Super Gadgeteer',chance: 20 }
+        ];
+
+        var universal =[
+            {option:'Likeable',chance: 20 },
+            {option:'Strong',chance: 20 },
+            {option:'Destiny',chance: 20 },
+            {option:'Battle Hardened',chance: 20 }
+        ];
+
+        //region SKILL LISTS
+        var hobbies = [
+            {option:{name:"Artist (Pick one)",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Connoisseur",base:'IQ',skill:2},chance: 20 },
+            {option:{name:"Dancing",base:'DX',skill:1},chance: 20 },
+            {option:{name:"Gambling",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Games (pick sport, classic game, game category, or video games",base:'IQ',skill:2},chance: 20 },
+            {option:{name:"Musical Instument (Pick one)",base:'IQ',skill:0},chance: 20 },
+            {option:{name:"Philosophy",base:'IQ',skill:0},chance: 20 },
+            {option:{name:"Public Speaking",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Singing",base:'HT',skill:1},chance: 20 },
+            {option:{name:"Sport (pick one)",base:'DX',skill:2},chance: 20 },
+            {option:{name:"Theology",base:'IQ',skill:0},chance: 20 }
+        ];
+
+        var agriculture = [
+            {option:{name:"Animal Handling (Pick one)",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Driving (Tractor)",base:'DX',skill:1},chance: 20 },
+            {option:{name:"Farming",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Gardening",base:'IQ',skill:2},chance: 20 },
+            {option:{name:"Mechanic",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Teamster",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Weather Sense",base:'IQ',skill:1},chance: 20 }
+        ];
+
+        var travel = [
+            {option:{name:"Hiking",base:'HT',skill:1},chance: 20 },
+            {option:{name:"Riding",base:'DX',skill:1},chance: 20 },
+            {option:{name:"Driving(pick vehicle)",base:'DX',skill:1},chance: 20 },
+            {option:{name:"Teamster(pick animal and vehicle)",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Boating(pick type)",base:'DX',skill:1},chance: 20 }
+        ];
+
+        var transportation = [
+            {option:{name:"Animal Handling (pick animal)",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Boating (pick type)",base:'DX',skill:1},chance: 20 },
+            {option:{name:"Crewman (pick type)",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Freight Handling",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Packing",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Teamster(pick animal and vehicle)",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Swimming",base:'HT',skill:2},chance: 20 }
+        ];
+
+        var social = [
+            {option:{name:"Acting",base:'per',skill:1},chance: 20 },
+            {option:{name:"Body Language",base:'per',skill:0},chance: 20 },
+            {option:{name:"Carousing",base:'HT',skill:1},chance: 20 },
+            {option:{name:"Detect Lies",base:'per',skill:0},chance: 20 },
+            {option:{name:"Diplomacy",base:'IQ',skill:0},chance: 20 },
+            {option:{name:"Fast Talk",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Intimidation",base:'will',skill:1},chance: 20 },
+            {option:{name:"Saviore Faire",base:'IQ',skill:2},chance: 20 },
+            {option:{name:"Sex Appeal",base:'HT',skill:1},chance: 20 }
+        ];
+
+        var domestic = [
+            {option:{name:"Cooking",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"House Keeping",base:'IQ',skill:1},chance: 20 }
+        ];
+        domestic.concat(social);
+
+        var impersonator =[
+            {option:{name:"Acting",base:'per',skill:1},chance: 20 },
+            {option:{name:"Body Language",base:'per',skill:0},chance: 20 },
+            {option:{name:"Fast Talk",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Forgery",base:'IQ',skill:0},chance: 20 },
+            {option:{name:"Mimicry",base:'IQ',skill:0},chance: 20 },
+            {option:{name:"Psychology",base:'IQ',skill:0},chance: 20 },
+            {option:{name:"Saviore Faire",base:'IQ',skill:2},chance: 20 },
+            {option:{name:"Streetwise",base:'IQ',skill:1},chance: 20 }
+        ];
+
+        var management =[
+            {option:{name:"Administration",base:'per',skill:1},chance: 20 },
+            {option:{name:"Diplomacy",base:'IQ',skill:0},chance: 20 },
+            {option:{name:"LeaderShip",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Public Speaking",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Politics",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Psychology",base:'IQ',skill:0},chance: 20 },
+            {option:{name:"Propaganda",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Saviore Faire",base:'IQ',skill:2},chance: 20 }
+        ];
+
+        var rangedCombat = [
+            {option:{name:"Bolas",base:'DX',skill:1},chance: 20 },
+            {option:{name:"Bow",base:'DX',skill:1},chance: 20 },
+            {option:{name:"FastDraw (arrow, ammo, or pistol)",base:'DX',skill:2},chance: 20 },
+            {option:{name:"Guns(pistol,long arm, or projector)",base:'DX',skill:2},chance: 20 },
+            {option:{name:"Gunner (machine gun or cannon)",base:'DX',skill:2},chance: 20 },
+            {option:{name:"Innate Attack",base:'DX',skill:2},chance: 20 },
+            {option:{name:"Spear Thrower",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Thrown Weapon (spear or stick)",base:'IQ',skill:1},chance: 20 },
+            {option:{name:"Zen archery",base:'IQ',skill:-1},chance: 20 }
+        ];
+
+
+        //end region
+
+
+
+        function displayCharacter(character)
+        {
+
+        }
+
+
+    </script>
+</head>
+
+<body>
+
+<div id='display'> hellow world </div>
+<button onclick='buildCharacter()' >build Character</button>
+
+
+
+</body>
+
+</html>
