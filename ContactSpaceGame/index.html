@@ -8,6 +8,8 @@
 	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
 	<script type="text/javascript" src="AlienRaceNames.js"></script>
 	<script type="text/javascript" src="resourceTree.js"></script>
+	<script type="text/javascript" src="resource.js"></script>
+	<script type="text/javascript" src="colony.js"></script>
 	<script type="text/javascript" src="main.js"></script>
 	<script>
 
@@ -102,7 +104,7 @@
 							<!-- ko if:useInputTypes -->
 							<div data-bind="foreach:useInputTypes">
 								<select data-bind="options:$parents[1].useInputOptions()[$parent.id][$data],
-									optionsText:function (item) { return '('+item.id + ' ' +item.number()+')'}, 
+									optionsText:function (item) { return '('+item.id + ':' +item.number()+')'}, 
 									value:$parent.useInputs[$index()]"></select>
 							</div>
 							<button data-bind='click:addInputCase'>Confirm</button>
