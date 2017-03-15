@@ -140,21 +140,30 @@ function load(){
 			if(!empire.turnReady())obstacles.push(empire);
 			for(var colony of empire.colonies())
 			{
-				if(!colony.turnReady())obstacles.push(colony);
+				console.log(colony.IssuesBeforeValidTurn());
+				if(colony.IssuesBeforeValidTurn().length)
+					obstacles=obstacles.concat(colony.IssuesBeforeValidTurn());
 			}
 		}
+		console.log(obstacles);
+		//TODO: pretty errors
 		if(obstacles.length){
+			console.log(obstacles);
 			var message = obstacles.length + " errors to be resolved. ";
-			for(var i of obstacles) message+="<br/> A problem must be resolved on "+ i.name;
+			for(var i of obstacles) message+=i;
 			game.error(message);
 		}
 		else
 		{
 			for(var empire of game.empires())
 			{
+				//TODO: Empire Level Stuff
 				for(var colony of empire.colonies())
 				{
-					colony.allocateResources(colony.income());
+					//TODO: Colony Level Stuff
+					//TODO: Advance Projects
+					//TODO: apply dillapidation, store things
+					colony.advanceProjects();
 				}
 			}
 		}

@@ -48,9 +48,20 @@ function buildStartingResourceSet (){
 		buildResourceInstance(resourcesList['Populace']['Neolithic'],5);
 	
 	// build Food Producers
+	landIDs.sort((a,b)=>{
+		var aSplit = a.split(' ');
+		var bSplit = b.split(' ');
+		if(aSplit[4]!=bSplit[4])return aSplit[4].localeCompare(bSplit[4]);
+		if(aSplit[6]!=bSplit[6])return aSplit[6].localeCompare(bSplit[6]);
+		if(aSplit[5]!=bSplit[5])return aSplit[5].localeCompare(bSplit[5]);
+		return a.localeCompare(b);
+	});
 	startingResourceIndex['Hunters'] = 
 		buildResourceInstance(resourcesList['Food Production']['Hunter'],5,[startingResourceIndex[landIDs[0]],[]]);
-		
+	
+	// build Culture Producers 
+	startingResourceIndex['elders'] = 
+		buildResourceInstance(resourcesList['Culture Production']['Elders'],1);
 	resources =[];
 		for(var i in startingResourceIndex) resources.push(startingResourceIndex[i]);
 
@@ -107,16 +118,29 @@ var Resources = [
 		abandon: [{},{dilapidation:40}],
 	},
 	{
+		id: function () {return "Elders"},
+		type: "Culture Production",
+		templateName:"Elders",
+		idAutoGens: ['cultureString'],
+		cultureString: cultureString,
+		maintain: [{POPULATION: 1},{CULTURE:10}],
+		neglect: [{POPULATION: .25},{}],
+		abandon: [{},{dilapidation:75}]
+	},
+	{
 		id: function () {return "Population "+Math.floor(Math.random()*1000000);},
 		type: "Populace",
 		templateName:"Neolithic",
 		idAutoGens: ['cultureString'],
 		cultureString: cultureString,
-		maintain: [{FOOD: 10},{POPULATION:1}],
-		neglect: [{FOOD: 9},{}],
-		abandon: [{},{dilapidation:75}]
+		maintain: [{FOOD: 10},{POPULATION:1,CULTURE:1}],
+		neglect: [{FOOD: 8},{}],
+		abandon: [{},{dilapidation:75}],
+		build: [{FOOD:20},{CULTURE:.1}]
 	},
 	{
+		//TODO: Add upgrades!
+		//TODO: mix and match numeric inputs!
 		type:"Food Production",
 		templateName:"Hunter",
 		id: function (instance){return "HUNTER "+instance.land.terrainType+" "+instance.land.season+" H"+instance.land.humidity},
@@ -132,14 +156,15 @@ var Resources = [
 			
 			// need to factor in upgrades at some point
 			// for example to allow fishing
+			//TODO: addFishing!
 			if(Land.season == 'arctic') return false;
-			//if(Land.terrainType == 'seas') return false;
+			if(Land.terrainType == 'seas') return false;
 			return true;
 		},
 
 		use: function (instance, land, improvements)
 		{
-			var result = 10;
+			var result = 11;
 			if(instance.land.humidity != land.humidity) result -= 3;
 			if(instance.land.season != land.season) result -= 3;
 			if(improvements.name == "Farmed") result -=5;
@@ -147,15 +172,14 @@ var Resources = [
 			if(instance.land.terrainType != land.terrainType) result =0;
 			
 			for(var i of instance.upgrades) result = i.alterOutput(instance, land, improvements);
-			
-			return result;
+			return [{POPULATION:1},{FOOD:result}];
 		}
 		//should take multiple land inputs
 	}
 ];
 
 
-function isValidInput(input,type,validation)
+function isValidInputType(input,type,validation)
 {
 	if(input === undefined) return false;
 	if(type == "number"){
@@ -231,6 +255,7 @@ var sampleCrop = {
 //		Altered Base Costs
 // So much comes from crops? 
 // Am I trying to make this too complicated?
+// TODO: Farm Crops!
 
 function farmYeild (land,landImprovement,typeUpgrades,cropArray,modifiers)
 {

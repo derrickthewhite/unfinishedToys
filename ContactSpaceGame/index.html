@@ -6,9 +6,11 @@
 	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
 	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
 	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+	<script type="text/javascript" src="tools.js"></script>
 	<script type="text/javascript" src="AlienRaceNames.js"></script>
 	<script type="text/javascript" src="resourceTree.js"></script>
 	<script type="text/javascript" src="resource.js"></script>
+	<script type="text/javascript" src="resourceUse.js"></script>
 	<script type="text/javascript" src="colony.js"></script>
 	<script type="text/javascript" src="main.js"></script>
 	<script>
@@ -59,64 +61,32 @@
 						<div>
 							<span data-bind="text:number"></span>
 							<span data-bind="text:id"></span>
+							<!-- TODO: Hide Maintainace options if relevant-->
 							<span data-bind="ifnot:visible, click:view">View</span>
 							<span data-bind="if:visible, click:hide">Hide</span>
 							<!-- ko if:visible -->
-							<div data-bind="with:maintain">
-								Maintain: 
-								<span data-bind="foreach:inputs">
-									<span data-bind="text:name"></span>
-									<span data-bind="text:value"></span>
-								</span>
-								=>
-								<span data-bind="foreach:outputs">
-									<span data-bind="text:name"></span>
-									<span data-bind="text:value"></span>
-								</span>
-								<button data-bind="click:$parent.setMaintain">Maintain</button>
-							</div>
-							<div data-bind="with:neglect">
-								Neglect: 
-								<span data-bind="foreach:inputs">
-									<span data-bind="text:name"></span>
-									<span data-bind="text:value"></span>
-								</span>
-								=>
-								<span data-bind="foreach:outputs">
-									<span data-bind="text:name"></span>
-									<span data-bind="text:value"></span>
-								</span>
-								<button data-bind="click:$parent.setNeglect">Neglect</button>
-							</div>
-							<div data-bind="with:abandon">
-								Abandon: 
-								<span data-bind="foreach:inputs">
-									<span data-bind="text:name"></span>
-									<span data-bind="text:value"></span>
-								</span>
-								=>
-								<span data-bind="foreach:outputs">
-									<span data-bind="text:name"></span>
-									<span data-bind="text:value"></span>
-								</span>
-								<button data-bind="click:$parent.setAbandon">Abandon</button>
-							</div>
+							<div data-bind="component: {name:'projectDisplay', params: {project:maintain,observable:actionNumbers['maintain'],max:unassignedNumbers}}"></div>
+							<div data-bind="component: {name:'projectDisplay', params: {project:neglect,observable:actionNumbers['neglect'],max:unassignedNumbers}}"></div>
+							<div data-bind="component: {name:'projectDisplay', params: {project:abandon,observable:actionNumbers['abandon'],max:unassignedNumbers}}"></div>
+							<!-- ko if:hasBuild -->
+							<div data-bind="component: {name:'projectDisplay', params: {project:build,observable:actionNumbers['build']}}"></div>
+							<!-- /ko -->
 							<!-- ko if:useInputTypes -->
 							<div data-bind="foreach:useInputTypes">
-								<select data-bind="options:$parents[1].useInputOptions()[$parent.id][$data],
+								<select data-bind="options:$parents[1].resourcesByType()[$data],
 									optionsText:function (item) { return '('+item.id + ':' +item.number()+')'}, 
 									value:$parent.useInputs[$index()]"></select>
 							</div>
-							<button data-bind='click:addInputCase'>Confirm</button>
-							<div data-bind="foreach:inputCases">
+							<button data-bind='click:$parent.addResourceUse'>Confirm</button>
+							<div data-bind="foreach:$parent.resourceUsesByUsingResourceID()[$data.id]">
 								<div>
 									<!-- ko foreach:inputs -->
 										<span data-bind="text:$data.id"></span>
 									<!-- /ko -->
-									<input type="number" min=0 data-bind="value:number,attr:{max: availiableCounts}"></input>
-									*<span data-bind="text:output"></span>=
-									<span data-bind="text:totalOutput"></span>
-									<button data-bind="click:removeInputCase">cancel</button>
+									<input type="number" min=0 data-bind="value:number,attr:{max: $parents[1].resourcesAvailable($data)}"></input>
+									<button data-bind="click:$parents[1].removeResourceUse">cancel</button>
+									<div data-bind="component: {name:'projectDisplay', params: {project:outputProject(),title:''}}"></div>
+									<div data-bind="component: {name:'projectDisplay', params: {project:totalOutputProject(),title:''}}"></div>
 								</div>
 							</div>
 							<!-- /ko -->
