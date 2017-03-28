@@ -22,10 +22,9 @@ effects.fuel1P = {"name":"1P","action":"consumes","quantity":1,"target":"<Fuel>"
 effects.worthless = {"name":"Worthless","trigger":"score","quantity":-1};
 effects.limit1 = {"name":"Once Per Turn","action":"limits","quantity":1,"trigger":"use"};
 
-effects.automatic = {"name":"Automatic","action":"consumes","quantity":-1,"target":"manipulator","trigger":"use"};
+effects.automatic = {"name":"Automatic","action":"consumes","quantity":-1,"target":"operator","trigger":"use"};
 effects.manipulator = {"name":"Manipulator","action":"produces","quantity":1,"target":"manipulator","trigger":"use","machine":true};
-//TODO: seperate from manipulators: attack, operate, mine, build
-effects.miner = {"name":"Miner","action":"produces","quantity":2,"target":"<Fuel>","trigger":"use","machine":true};
+effects.miner = {"name":"Miner","action":"produces","quantity":2,"target":"miner","trigger":"use","machine":true};
 effects.destroyer = {"name":"Destroyer","action":"destroys","quantity":1,"target":"[object]","trigger":"use","machine":true};
 
 cards.deck.push(new Card("1 <Fuel> to Use",[effects.fuel1A],-2));

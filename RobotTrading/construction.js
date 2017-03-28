@@ -26,9 +26,8 @@
 					}
 					return result;
 				}
-				//TODO: distinguish between building, mining, and operating
-				self.activateRequirements = countRequirements('use','consumes',self.isMachine?{manipulator:1}:{});
-				self.buildRequirements = countRequirements('create','consumes',{manipulator:1});
+				self.activateRequirements = countRequirements('use','consumes',self.isMachine?{'operator':1}:{});
+				self.buildRequirements = countRequirements('create','consumes',self.isMachine?{'builders':1}:{'miners':1});
 				self.maintainRequirements = countRequirements('maintain','consumes',{});
 				self.useOutput = countRequirements('use','produces',{});
 				self.limited = 0;
