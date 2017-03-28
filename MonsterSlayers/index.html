@@ -1,0 +1,155 @@
+<html>
+	<head>
+		<title>Techopoloy</title>
+		<link href="main.css" rel="stylesheet">
+		<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+		<script type="text/javascript" src= "tools.js"></script>
+		<script>
+			
+
+			var unitType = function (name,hitPoints,toughness,armor,strength,size,move,attacks){
+				var unit = {};
+				unit.name = name;
+				unit.hitPoints = hitPoints; // Does the attack make the killing range?
+				unit.toughness = toughness; // HT roll to not die
+				unit.armor=armor; // Damage reduction [4,1,0] suceed by 2 to use the next lower value. If it goes off the chart use the lowest number 
+				unit.strength = strength; // does nothing yet -- will be important later.
+				unit.size = size;
+				unit.move = move;
+				
+				unit.attacks = attacks?attacks:[];
+				return unit;
+			};
+			
+			var unit = function (name,type)
+			{
+				var unit = {};
+				unit.name = ko.observable(name);
+				unit.type = type;
+				unit.wounds = ko.observable("");
+				return unit;
+			};
+			
+			var attack = function (name,accuracy,strength,damageType,attackType,reach,parry,speed)
+			{
+				var attack = {};
+				attack.name = name;
+				
+				attack.accuracy = accuracy;
+				attack.strength = strength;
+				attack.damageType = damageType;
+				attack.attackType = attackType;
+				attack.reach = reach;
+				//attack.parry = parry;  // Todo: figure out how parries effect defense
+				attack.speed = speed; // number of rounds for one attack
+				return attack;
+			}
+			
+			var game = {};
+			game.team = ko.observableArray([]);
+			game.targets = ko.observableArray([]);
+			
+			game.selected = ko.observable(null);
+			game.select = function (target)
+			{
+				game.selected(target);
+			}
+			game.attack = function (defender)
+			{
+				var attacker = game.selected();
+				attack = attacker.type.attacks[0];
+				console.log(attacker.name() +" vs " + defender.name());
+				
+				// Roll to Hit
+				var hit = 10- dice(3)+attack.accuracy+defender.type.size;
+				// Roll to Block
+				var block = 8 -dice(3);
+				// Roll Damage
+				var damage = attack.strength * (dice(2)-2)/5 
+				// Determine DR
+				var armorSlot = Math.floor(hit/2);
+				if(block >= 0) armorSlot = -1;
+				var armor = damage;
+				if(armorSlot >= defender.type.armor.length) armor=defender.type.armor[armor.length-1];
+				else if(armorSlot >=0) effectiveDamage = armor = defender.type.armor[armorSlot];
+
+				// Determine Damage Past Armor
+				
+				var effectiveDamage = damage-armor;
+				// Determine Damage Delt
+				effectiveDamage*=2;
+				// Determine Wound size
+				var woundSize = Math.floor(Math.log(effectiveDamage/defender.type.hitPoints)/Math.log(2));
+				// Roll HT
+				
+				defender.wounds(woundSize+" "+defender.wounds());
+			}
+			
+			function setUpFight()
+			{
+				var pike = attack("pike",0,5,"imp","melee",4,1);
+				var bow = attack("bow",0,3,"imp","ranged",100,4);
+				var crossbow = attack("crossbow",0,5,"imp","ranged",100,20);
+				var spear = attack("spear",1,5,"imp","melee",2,1);
+				var claws = attack("claws",0,4,"slashing","melee",1,1);
+				
+				var archer = unitType("archer",10,10,[4,1,0],10,0,4,[bow]);
+				var pikeman = unitType("pikeman",10,10,[8,1,0],10,0,4,[pike]);
+				var monster = unitType("Bear",20,11,[2,1,1,0],20,0,4,[claws]);
+				
+				var names = ["peter","james","john","andrew","abraham","issac","jacob","joseph"];
+				for(var i = 0;i<4;i++)game.team.push(unit(names[i],pikeman));
+				for(var i = 4;i<8;i++)game.team.push(unit(names[i],archer));
+				
+				game.targets.push(unit("Bear",monster));
+			}
+
+			function load()
+			{
+				setUpFight();
+				ko.applyBindings(game,document.getElementById('main'));
+			}
+		</script>
+	</head>
+	<body onload="load()">
+		<div id="main">
+			<table>
+				<tbody>
+					<tr>
+					<th>Name</th>
+					<th>Type</th>
+					<th>HP</th>
+					</tr>
+			<!-- ko foreach:team -->
+					<tr data-bind="css: {selected: $parent.selected() == $data}">
+					<th data-bind = "text:name"></td>
+					<td data-bind = "text:type.name"></td>
+					<td data-bind = "text:type.hitPoints"></td>
+					<td><button data-bind="click:$parent.select">select</button></td>
+					
+					</tr>
+			<!-- /ko -->
+		</tbody>
+	</table>
+	<table>
+		<tbody>
+			<tr>
+				<th>Name</th>
+				<th>Type</th>
+				<th>HP</th>
+			</tr>
+		<!-- ko foreach:targets -->
+			<tr>
+				<th data-bind = "text:name"></td>
+				<td data-bind = "text:type.name"></td>
+				<td data-bind = "text:type.hitPoints"></td>
+				<td data-bind = "text:wounds"></td>
+				<td><button data-bind="click:$parent.attack">attack</button></td>
+			</tr>
+		<!-- /ko -->
+		</tbody>
+	</table>
+
+		</div>
+	</body>
+<html>
