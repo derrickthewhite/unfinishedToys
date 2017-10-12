@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Contact (The Space Civilization Game)</title>
+	<!--<link href="main.css" rel="stylesheet">-->
+	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
+	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
+	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+	<script>
+		var game = {};
+		//	2 Canidates
+		//	7 Electors
+		//	5 Disputes
+		//	3 issues
+		
+		var numElectors = 7;
+		
+		var ids = [];
+		function generateID(){
+			do var result = "uid"+Math.floor(Math.random()*100000);
+			while (ids[result]);
+			ids[result]=true;
+			return result;
+		}
+		
+		var IssueCard = function (values)
+		{
+			var issueCard = this;
+			issueCard.id = generateID();
+			issueCard.values = values;
+		}
+		
+		var Elector = function (issues,position)
+		{
+			var elector = this;
+			elector.id = generateID();
+			elector.issues = [];
+			elector.position = position;
+		}
+		
+		var issueCards = [];
+		var numIssues = 3;
+		var issuesSoFar = [[]];
+		for(var positionFilled = 0;positionFilled<numIssues;positionFilled++)
+		{
+			var issuesGenerated = [];
+			for(var partialIssue of issuesSoFar)
+				for(var i = 1;i<=numIssues;i++)
+					if(partialIssue.map(Math.abs).indexOf(i) ==-1){
+					issuesGenerated.push(partialIssue.concat(i));
+					issuesGenerated.push(partialIssue.concat(-i));
+				}
+			issuesSoFar= issuesGenerated;
+		}
+		var issues = issuesSoFar;
+		var drawnCards = [];
+		function drawIssueCard()
+		{
+			do var card = Math.floor(Math.random()*issues.length);
+			while (drawnCards[card]);
+			drawnCards[card]=true;
+			return issues[card];
+		}
+		
+		//region dispute shapes
+			var shapes = [];
+			shapes.push([2,1],[0,3],[0,4],[1,5],[2],[3],[]); // 5 line
+			shapes.push([2,1],[0,3],[0,4],[1,4],[2,3],[],[]); // pentagon
+			shapes.push([2,1],[0,3],[0,3],[1,2,4],[3],[],[]); // Square with Tail
+			shapes.push([2,1],[0,2],[0,1,3],[2,4],[3],[],[]); // Triangle with long Tail
+			shapes.push([2,1],[0,2,3],[0,1,4],[1],[2],[],[]); // Two Tailed Triangle
+			shapes.push([2,1],[0,2],[0,1,3,4],[2],[2],[],[]); // Eared Triangle
+			shapes.push([2,1],[0],[0,3],[2,4,5],[3],[3],[]); // snake
+			shapes.push([2],[2],[0,1,3],[2,4,5],[3],[3],[]); // double fork
+			shapes.push([2],[2],[0,1,3,4],[2,5],[2],[4],[]); // torch
+			shapes.push([1],[0,2,3],[1,4],[2,5],[2],[3],[]); // Tower
+			shapes.push([1,2],[0,2,3],[0,1,3],[1,2],[],[],[]); // crystal
+			shapes.push([2],[2],[0,1,3,4,5],[2],[2],[2],[]); // five star
+			shapes.push([1,2],[0,2],[0,1],[4],[3],[6],[5]); // triple shape
+			shapes.push([1,2],[0,3],[0],[1],[5,6],[4],[4]); // 3 line
+			shapes.push([1],[0,2,3],[1],[1],[5,6],[4],[4]); // 3 star
+			shapes.push([1,2],[0,2],[0,1],[5],[5],[3,4],[]); //  triangle
+			shapes.push([1,2],[0,3],[0,3],[1,2],[5],[4],[]); // Square
+			shapes.push([1,2],[0,3],[0,4],[1],[2],[6],[5]); // 4 line
+			shapes.push([1,2],[0,2],[0,1,3],[2],[5],[4],[]); // triangle tail
+			shapes.push([2],[2],[0,1,3],[2,4],[3],[6],[5]); // short fork
+			shapes.push([2],[2],[0,1,3,4],[2],[2],[6],[5]); // 4 star
+			
+			function getDisputeShape(){
+				return shapes [Math.floor(Math.random()*shapes.length)];
+			}
+			
+			function disputeListFromShape(shape)
+			{
+				var result = [];
+				for(var i=0;i<shape.length;i++)
+					for(var j of shape[i])
+						if(i<j)result.push([i,j]);
+				return result;
+			}
+		//end region
+		
+		
+		function main(){
+		
+			game.disputeShape = getDisputeShape();
+			game.disputes = ko.pureComputed(function () {return disputeListFromShape(game.disputeShape);});
+			
+			game.electors = ko.observableArray([]);
+			for(var i =0;i<numElectors;i++)
+			{
+				game.electors.push(new Elector(drawIssueCard(),i));
+			}
+			
+		
+		}
+	</script>
+</head>
+<body>
+	
+</body>

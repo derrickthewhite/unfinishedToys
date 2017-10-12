@@ -1,0 +1,69 @@
+<html>
+	<head>
+		<title>Tank Battles </title>
+		<script src = "https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.2/knockout-min.js"></script>
+		<script src = "https://cdnjs.cloudflare.com/ajax/libs/konva/1.6.8/konva.min.js"></script>
+		<script src = "konva-knockout.js"></script>
+		<script>
+			function load(){
+				function Entity(data) {
+					var self = this;
+					self.x = ko.observable(data.x);
+					self.y = ko.observable(data.y);
+					self.backgroundColor = ko.observable(data.backgroundColor);
+					
+					self.changeColor = function (){
+						self.backgroundColor("black");
+						self.y(200);
+						self.x(200);
+					}
+				}
+				var vm = new function()
+				{
+					var self = this;
+					self.entities = ko.observableArray([]);
+				}
+
+				ko.applyBindings(vm);
+				 
+
+				setInterval(function()
+						   {
+							   if (vm.entities().length < 10)
+								  vm.entities.push(new Entity({x: randomPx(), y:randomPx(), backgroundColor: getRandomColor()}))
+							   for (var i in vm.entities())
+							   {
+								   vm.entities()[i].x(randomPx());
+								   vm.entities()[i].y(randomPx());
+								   //vm.entities()[i].backgroundColor(getRandomColor());
+							   }
+						   }, 2000)
+
+				function randomPx()
+				{
+					return (Math.random() * 400) ;
+				}
+				function getRandomColor() {
+					var letters = '0123456789ABCDEF'.split('');
+					var color = '#';
+					for (var i = 0; i < 6; i++ ) {
+						color += letters[Math.floor(Math.random() * 16)];
+					}
+					return color;
+				}
+			}
+		</script>
+	</head>
+	<body onload="load()">
+		<div>
+			 <!-- ko Konva.Stage: { width: 400, height: 400 } -->
+			<!--     ko Konva.Layer: { } -->
+			<!--         ko foreach: entities -->
+			<!--             ko Konva.Rect: { x: x()*1, y:y()*1, width: 10,  height: 10, fill: backgroundColor, stroke: "black", strokeWidth: 1, tween: {x:null, y:null, fill : null}, click:changeColor } -->
+			<!--             /ko -->
+			<!--         /ko -->
+			<!--     /ko -->
+<!-- /ko -->
+		</div>
+	</body>
+</html>

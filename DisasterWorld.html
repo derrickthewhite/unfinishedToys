@@ -1,0 +1,121 @@
+<html>
+<head>
+    <title>After The End World</title>
+	<script type="text/javascript" src= "../Tools/knockout-3.4.0.js"></script>
+
+    <script>
+
+		var worlds = {};
+		worlds.worlds = ko.observableArray([]);
+        function select(options)
+        {
+            var total = 0;
+            for(var i in options)
+            {
+                total+= options[i].chance;
+                options[i].draw = total;
+            }
+
+            var roll = Math.random()*total;
+
+            for(var i = 0;i<options.length;i++)
+            {
+                if(roll<options[i].draw)return options[i].option;
+            }
+        }
+
+        var background =[
+            {option:'Bombs Away',chance: 20 },
+            {option:'Cosmic Rays',chance: 5 },
+            {option:'Asteroid',chance: 10 },
+            {option:'Mega-Virus',chance: 10 },
+            {option:'Mother Nature',chance: 10 },
+            {option:'Reign Of Steel',chance: 10 },
+            {option:'Things Fall Apart',chance: 10 },
+            {option:'Walkers and Shufflers',chance: 10 },
+            {option:'X-Factor',chance: 10}
+        ];
+		
+		var secondaries = {
+			"Bombs Away":[
+				{option:'Mega-Virus',chance: 10 },
+				{option:'Mother Nature',chance: 10 },
+				{option:'Things Fall Apart',chance: 10 },
+				{option:'Walkers and Shufflers',chance: 10 }
+			,
+			"Cosmic Rays":[
+				{option:'Mother Nature',chance: 10 },
+				{option:'Reign Of Steel',chance: 10 },
+				{option:'Things Fall Apart',chance: 10 },
+				{option:'Walkers and Shufflers',chance: 10 },
+				{option:'X-Factor',chance: 10}
+			],
+			"Asteroid":[
+				{option:'Cosmic Rays',chance: 5 },
+				{option:'Asteroid',chance: 10 },
+				{option:'Mega-Virus',chance: 10 },
+				{option:'X-Factor',chance: 10}
+			],
+			"Mega-Virus":[
+				{option:'Bombs Away',chance: 20 },
+				{option:'Reign Of Steel',chance: 10 },
+				{option:'Things Fall Apart',chance: 10 },
+				{option:'Walkers and Shufflers',chance: 10 }
+			],
+			"Mother Nature":[
+				{option:'Bombs Away',chance: 20 },
+				{option:'Mega-Virus',chance: 10 },
+				{option:'Things Fall Apart',chance: 10 }
+			],
+			"Reign of Steel":[
+				{option:'Bombs Away',chance: 20 },
+				{option:'Asteroid',chance: 20 },
+				{option:'Mega-Virus',chance: 10 },
+				{option:'Things Fall Apart',chance: 10 }
+			],
+			"Things Fall Apart":[
+				{option:'Bombs Away',chance: 20 },
+				{option:'Reign of Steel',chance: 10 }
+			],
+			"Walkers and Shufflers":[
+				{option:'Reign of Steel',chance: 20 },
+				{option:'Mega-Virus',chance: 10 },
+				{option:'Things Fall Apart',chance: 10 }
+			],
+
+		};
+
+
+        function buildWorld()
+        {
+			var world = {};
+			
+			world.primary = select(background);
+			
+			worlds.worlds.push(world);
+        }
+		
+		function onload()
+		{
+			ko.applyBindings(worlds,document.getElementById('display'));
+		}
+
+
+    </script>
+</head>
+
+<body onload="onload()">
+
+<div id='display'> 
+	<div data-bind="foreach:worlds">
+		<div>PRIMARY CAUSE: <span data-bind="text:primary"></div>
+	</div>
+	<button onclick='buildWorld()' >build World</button>
+</div>
+
+
+
+
+</body>
+
+</html>

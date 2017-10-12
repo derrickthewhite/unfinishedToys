@@ -46,7 +46,7 @@ function buildStartingResourceSet (){
 	//build population
 	startingResourceIndex['neolithic'] = 
 		buildResourceInstance(resourcesList['Populace']['Neolithic'],5);
-	
+
 	// build Food Producers
 	landIDs.sort((a,b)=>{
 		var aSplit = a.split(' ');
@@ -60,8 +60,11 @@ function buildStartingResourceSet (){
 		buildResourceInstance(resourcesList['Food Production']['Hunter'],5,[startingResourceIndex[landIDs[0]],[]]);
 	
 	// build Culture Producers 
+	// currently unnessesary!
+	//*
 	startingResourceIndex['elders'] = 
 		buildResourceInstance(resourcesList['Culture Production']['Elders'],1);
+		//*/
 	resources =[];
 		for(var i in startingResourceIndex) resources.push(startingResourceIndex[i]);
 
@@ -174,7 +177,7 @@ var Resources = [
 			for(var i of instance.upgrades) result = i.alterOutput(instance, land, improvements);
 			return [{POPULATION:1},{FOOD:result}];
 		}
-		//should take multiple land inputs
+		//TODO: should take multiple land inputs -- just fewer population... frr
 	}
 ];
 
@@ -203,12 +206,13 @@ function isValidInputType(input,type,validation)
 	return true;
 }
 
-function buildProjectType(key,inputs,outputs,target)
+function buildProjectType(key,inputs,outputs,target,action)
 {
 	var projectType = {};
 
 	projectType.key = key;
-	projectType.target = target;
+	projectType.action = undefined; //['create','modify']
+	projectType.target = target; // either an object with a number function a reward
 	projectType.inputsIndex = inputs;
 	projectType.outputsIndex = outputs;
 	

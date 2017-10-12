@@ -14,17 +14,18 @@ function buildResourceInstance (template,number,idInputs)
 	//ri.mode = ko.observable(); //maintain, neglect, abandon
 	
 	//TODO: Add ability to increase Instance!
-
-	var actions = ["maintain","neglect","abandon"];
+	ri.buildProject = 
+	//TODO: make a class attribute, not an instance!
+	ri.actions = ["maintain","neglect","abandon"];
 	ri.actionNumbers={};
-	for(var action of actions)
+	for(var action of ri.actions)
 		ri.actionNumbers[action]=ko.observable(0);
-	ri.actionNumbers['maintain'](number);
+	ri.actionNumbers['neglect'](number); // default is neglect, not maintain
 	
 	if(template.build)ri.actionNumbers['build']=ko.observable(0);
 	
 	ri.unassignedNumbers = ko.pureComputed(function (){
-		return ri.number() - actions.reduce (
+		return ri.number() - ri.actions.reduce (
 			function (total,action){return total+Number(ri.actionNumbers[action]())},
 			0
 		);
@@ -51,6 +52,24 @@ function buildResourceInstance (template,number,idInputs)
 				result[d].push({name:i, value:flow[d][i]});
 		return result;
 	});
+	
+	ri.assignAction = function (type,number)
+	{
+		ri.actionNumbers[type](Math.min(number, ri.number()));
+		balanceActionTypes(type);
+	}
+	ri.increaseAction = function (type,number)
+	{
+		ri.actionNumbers[type](Math.min(number+ri.actionNumbers[type](), ri.number()));
+		balanceActionTypes(type);
+	}
+	function balanceActionTypes (activeType)
+	{
+		for(var action of ri.actions)
+			if(activeType != action && ri.unassignedNumbers() <0)
+				ri.actionNumbers[action](ri.actionNumbers[action]()
+					+Math.max(-ri.actionNumbers[action](),ri.unassignedNumbers()))
+	}
 	
 	if(template.idInputs && template.idInputs.length != 0)
 	{
@@ -84,8 +103,8 @@ function buildResourceInstance (template,number,idInputs)
 	if(template.build) projects.push("build");
 	for(var i of projects)
 	{
-		ri[i] = template[i]?template[i]:[{},{}];
-		ri[i] = buildProjectType(i,ri[i][0],ri[i][1]);
+		ri[i] = template[i]?template[i]:[{},{}]; // TODO: come up with a way not to list this
+		ri[i] = buildProjectType(i,ri[i][0],ri[i][1],ri,'modify');
 	}
 	
 	if(template.useInputs)
