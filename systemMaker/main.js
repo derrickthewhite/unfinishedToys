@@ -92,6 +92,7 @@ function companionMass(primaryMass)
 
 function starAge()
 {
+	//TODO: this is wonky! I should not be getting 20;s!
 	var base = Distribution(random.starAge).get(dice(3));
 	return base[0]*(dice()-1)+base[1]*(dice()-1)+base[2]*(dice()-1);
 }
@@ -102,10 +103,37 @@ function generateStarPosition()
 	return [Math.random()*100,Math.random()*100,Math.random()*100];
 }
 
-
+function extrapolateFromTable(table,indexOn,value)
+{
+	table.sort((a,b) => a[indexOn]<b[indexOn]? -1:1);
+	
+	for(var i =0;i<table.length;i++){
+		if(table[i][indexOn] == value) return table[i];
+		if(table[i][indexOn]-value<0 && table[i+1][indexOn]-value>0)
+		{
+			var result = {};
+			for(var key in table[i])
+				if(!isNaN(table[i][key])) result[key]=(table[i][key]+table[i+1][key])/2;
+				else result[key]=table[i][key];
+			return result;
+		}
+	}
+	console.log("TABLE OUT OF RANGE",indexOn,value);
+}
+function findInRangeTable(table,value)
+{
+	for(var entry of table)
+	{
+		if(value>=entry.min && value<entry.max) return entry.value;
+	}
+	console.log("VALUE NOT FOUND IN TABLE",table,value);
+}
 
 var lookup = {};
 var random = {};
+var display = {};
+display.planetStart = 90;
+display.planetRange = 700;
 random.starCount = [
 	{start:3,end:10,value:1},
 	{start:11,end:15,value:2},
@@ -199,9 +227,15 @@ lookup.planetSize = [
 	{min:.024, max:.030},
 	{min:.030, max:.065},
 	{min:.065, max:.091}
-]
-
-random.coreDensity={};
+];
+lookup.moonModifiers =[
+	{min:.000,max:.1,value:{inner:-10,outer:-6,major:-6,terrestrial:-6}},
+	{min:.1,max:.5,value:{inner:-8,outer:-6,major:-5,terrestrial:-6}},
+	{min:.5,max:.75,value:{inner:-6,outer:-5,major:-4,terrestrial:-3}},
+	{min:.75,max:1.5,value:{inner:-3,outer:-4,major:-1,terrestrial:-1}},
+	{min:1.5,max:3,value:{inner:0,outer:-1,major:0,terrestrial:0}},
+	{min:3,max:Number.POSITIVE_INFINITY,value:{inner:0,outer:0,major:0,terrestrial:0}},
+];
 random.coreDensity = [
 	{start:3,end:6,value:.3},
 	{start:7,end:10,value:.4},
@@ -264,6 +298,12 @@ random.gasPlanetSize = [
 	{start:17,end:30,value:3}
 ];
 
+random.moonSize = [
+	{start:3,end:11,value:-3},
+	{start:12,end:14,value:-2},
+	{start:15,end:18,value:-1}
+]
+
 random.marginalAtmosphereType = [
 	{start:3,end:4,value:"Chlorine"},
 	{start:5,end:6,value:"Sulfur Compounds"},
@@ -275,4 +315,14 @@ random.marginalAtmosphereType = [
 	{start:15,end:16,value:"High Oxygen"},
 	{start:17,end:18,value:"Inert Gases"}
 ];
+
+random.resourceValue = [
+	{start:-10,end:2,value:-3},
+	{start:3,end:4,value:-2},
+	{start:5,end:7,value:-1},
+	{start:8,end:13,value:0},
+	{start:14,end:16,value:1},
+	{start:17,end:18,value:2},
+	{start:19,end:30,value:3},
+]
 

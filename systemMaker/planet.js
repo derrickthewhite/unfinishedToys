@@ -1,32 +1,36 @@
-function Planet (type,size,orbit)
+function Planet (type,size,orbit,alternateTypes)
 {
-	//TODO: moons
 	var planet = {};
 	planet.type = ko.observable(type);
 	planet.size = ko.observable(size);
-	planet.orbit = ko.observable(orbit);
-	planet.alternateType =ko.observable(Math.random()>.5); //TODO: move to generator and refine odds
 	
-	planet.viewDistance = ko.pureComputed(function (){
-		//TODO: make 700+100 a changeable and important number
-		var star = planet.orbit().center();
-		var range = Math.log(star.outerLimit())-Math.log(star.innerLimit());
-		var num =  700* (Math.log(planet.orbit().distance()) - Math.log(star.innerLimit()))/range+100;
-		return num;
+	//TODO: change orbits when star changes luminosity
+	planet.orbit = ko.observable(orbit);
+	planet.alternateTypes = {}; 
+	planet.alternateTypes.canBeSulfur = ko.observable(alternateTypes[0]);
+	planet.alternateTypes.canBeGarden = ko.observable(alternateTypes[1]);
+	planet.resourceValue = ko.observable(Distribution(random.gasPlanetSize).get(dice(3)));
+	planet.minorMoons = ko.observable(0);
+	planet.majorMoons = ko.observable(0);
+	
+	planet.star = ko.pureComputed(function (){
+		var current = planet.orbit().center();
+		while(!current.luminosity)current = current.orbit().center();
+		return current;
 	});
 	
 	planet.blackBody = ko.pureComputed(function (){
-		return 278*Math.pow(planet.orbit().center().luminosity(),.25)/Math.pow(planet.orbit().distance(),.5);
+		return 278*Math.pow(planet.star().luminosity(),.25)/Math.pow(planet.orbit().distance(),.5);
 	});
 	
 	planet.terrain = ko.pureComputed(function () {
-		//TODO: determine Ammonia Status
+		//TODO: ammonia should depends on ALL stars in system?
 		if(planet.type() != "terrestrial") return planet.type();
-		if(planet.size() == 1) return planet.blackBody() > 140? 'Rock': planet.alternateType()? 'Sulfer':'Hadean'; 
+		if(planet.size() == 1) return planet.blackBody() > 140? 'Rock': planet.alternateTypes.canBeSulfur()? 'Sulfer':'Hadean'; 
 		if(planet.size() == 2) return planet.blackBody() > 140? 'Rock': planet.blackBody() > 80? 'Ice': 'Hadean';
 		return planet.blackBody() > 500? 'Chthonian': planet.blackBody() > 320? 'Greenhouse':
-			planet.blackBody() > 240? planet.alternateType()? 'Garden':'Ocean': planet.blackBody() > 230? 'Ice':
-			planet.blackBody() > 150? planet.alternateType()? 'Ammonia':'Ice': planet.blackBody() > 80? 'Ice': 
+			planet.blackBody() > 240? planet.alternateTypes.canBeGarden()? 'Garden':'Ocean': planet.blackBody() > 230? 'Ice':
+			planet.blackBody() > 150? planet.star().mass()<=.65? 'Ammonia':'Ice': planet.blackBody() > 80? 'Ice': 
 			planet.size() == 3?'Hadean':'Ice';
 	});
 	
@@ -36,14 +40,30 @@ function Planet (type,size,orbit)
 	})
 	
 	planet.drawnRadius = ko.pureComputed(function (){
-		if(planet.size() < 1) return 2;
-		return planet.size()*5 +(planet.type() == 'giant'?15:0);
+		if(planet.size() < 1) return 2; //TODO: better astroid render
+		var scaleFactor = planet.orbit().center()==planet.star()?5:1;
+		return planet.size()*scaleFactor +(planet.type() == 'giant'?15:0);
 	});
 	
 	//do with surface temp, not blackbody
 	planet.temperature = ko.pureComputed(function() {
 		var blackBodyCorrection = getBlackbodyCorrection(planet.terrain(),planet.size(),planet.hydrographicCoverage(),planet.atmosphere.mass());
 		return 9/5*(planet.blackBody()*blackBodyCorrection-273)+32;
+	});
+	planet.temperatureRange = ko.pureComputed(function (){
+		var temperature = planet.temperature();
+		
+		if(temperature<-20) return "Frozen";
+		if(temperature<0) return "Very Cold";
+		if(temperature<20) return "Cold";
+		if(temperature<40) return "Chilly";
+		if(temperature<60) return "Cool";
+		if(temperature<80) return "Normal";
+		if(temperature<100) return "Warm";
+		if(temperature<120) return "Tropical";
+		if(temperature<140) return "Hot";
+		if(temperature<160) return "Very Hot";
+		 return "Infernal";
 	});
 	
 	planet.drawnColor = ko.pureComputed(function () {
@@ -66,7 +86,8 @@ function Planet (type,size,orbit)
 		return "purple";
 	});
 	
-	planet.atmosphere = generateAtmosphere(planet.terrain(), planet.size());
+	planet.atmosphere = generateAtmosphere(planet);
+	//TODO: hydrographics have memory!
 	planet.hydrographicCoverage = ko.observable(getHydrographicCoverage(planet.terrain(),planet.size()));
 	//TODO make these three interactive!
 	//TODO: remove gas giants from equation!
@@ -74,16 +95,45 @@ function Planet (type,size,orbit)
 	planet.density = ko.pureComputed(function () { return planet.densitySeed()+(planet.size()>=3?.5: planet.terrain=='Rock'?.2:0)});
 	planet.diameterSeed = ko.observable((dice(2)-2)/10);
 	planet.diameter = ko.pureComputed(function (){
-		var constraints = lookup.planetSize[planet.size()]
-		console.log(constraints, planet.diameterSeed(), planet.density());
+		var constraints = lookup.planetSize[planet.size()];
 		return (planet.diameterSeed()*(constraints.max - constraints.min)+constraints.min)* Math.pow(planet.blackBody()/planet.density(),.5);
 	});
+	//TODO: it seems earth is on the heavy side. Why?
 	planet.gravity = ko.pureComputed(function (){
 		return planet.diameter()*planet.density();
 	});
-	planet.atmosphere.pressure = ko.pureComputed(function (){
-		
-	})
+	planet.affinity = ko.pureComputed(function (){
+		if(planet.atmosphere.mass()==0) return 0;
+		var result = 0;
+		if(planet.atmosphere.tags().indexOf("Breathable")==-1)
+		{
+			if(planet.atmosphere.tags().indexOf("Corrosive")!=-1)result=-2
+			else if(planet.atmosphere.tags().indexOf("Highly Toxic")!=-1) result=-1;
+			else if(planet.atmosphere.tags().indexOf("Mildly Toxic")!=-1) result=-1;
+		}
+		else 
+		{
+			//TODO: account for low oxygen high pressure situations
+			if(planet.atmosphere.pressureClass()=="Very Thin")result+=1;
+			else if(planet.atmosphere.pressureClass()=="Thin")result+=2;
+			else if(planet.atmosphere.pressureClass()=="Standard")result+=3;
+			else if(planet.atmosphere.pressureClass()=="Dense")result+=3;
+			else if(planet.atmosphere.pressureClass()=="Very Dense")result+=1;
+			else if(planet.atmosphere.pressureClass()=="SuperDense")result+=1;
+			
+			if(!planet.atmosphere.marginal())result+=1;
+			
+			if(['Cold','Hot'].indexOf(planet.temperatureRange())!=-1) result+=1;
+			if(['Chilly','Cool','Normal','Warm','Tropical'].indexOf(planet.temperatureRange())!=-1) result+=2;
+		}
+		if(planet.terrain()=="Ocean" || planet.terrain()=="Garden") 
+		{
+			if(planet.hydrographicCoverage()<.6) result +=1;
+			else if(planet.hydrographicCoverage()<.9) result +=2;
+			else if(planet.hydrographicCoverage()<1) result +=1;
+		}
+		return result;
+	});
 
 	return planet;
 }
@@ -134,31 +184,87 @@ function getHydrographicCoverage (terrain, size)
 		console.log("BAD INPUT for PLANET TERRAIN!",planet.terrain());
 		return 1;
 }
-function generateAtmosphere(terrain, size)
+//TODO: perhaps we should not be passing in the planet!
+function generateAtmosphere(planet)
 {
 	var atmosphere= {};
-	atmosphere.mass = ko.observable((dice(3)-1+Math.random())/10);
-	atmosphere.tags = ko.observableArray([]); //TODO generate tags
-	atmosphere.toxicty = ko.observable(1); // 0 is safe. 
-	atmosphere.marginal = ko.observable("Safe");
+	atmosphere.naturalMass = ko.observable((dice(3)-1+Math.random())/10);
+	atmosphere.toxicityDice = ko.observable(dice(3)); //TODO: make independent?
+	atmosphere.marginalDice = ko.observable(dice(3)); 
+	atmosphere.marginalValue = ko.observable(Distribution(random.marginalAtmosphereType).get(dice(3)));
+	
+	atmosphere.pressure = ko.pureComputed(function (){
+		var pressureFactor = 0;
+		var size = planet.size();
+		var terrain = planet.terrain();
+		if(size == 2 && terrain=='Ice') pressureFactor=10;
+		if(size == 3) pressureFactor=1;
+		if(size == 4) pressureFactor=5;
+		if(terrain == 'Greenhouse') pressureFactor*=100; 
+		return planet.gravity()*atmosphere.mass()*pressureFactor;
+	});
+	atmosphere.pressureClass = ko.pureComputed(function (){
+		var pressure = atmosphere.pressure();
+		if(pressure < .01) return "Trace";
+		if(pressure < .5) return "Very Thin";
+		if(pressure < .8) return "Thin";
+		if(pressure <=1.2) return "Standard";
+		if(pressure <= 1.5) return "Dense";
+		if(pressure <= 10) return "Very Dense";
+		return "SuperDense";
+	});
+	atmosphere.marginal = ko.pureComputed(function (){
+		if(planet.terrain()!="Garden") return false;
+		if(atmosphere.marginalDice<12) return false;
+		return true;
+	});
+	atmosphere.toxicity = ko.pureComputed(function (){
+		var terrain = planet.terrain();
+		var size = planet.size();
+		//TODO: spell sulfur consistently
+		//Sulfur and Hadean should behave the same
+		if(terrain == "Sulfer" || terrain == "Hadean" || terrain == "Rock" || terrain == "Chthonian") return 0;
+		if (terrain == 'Ice') return atmosphere.toxicityDice()<21-size*3 || size ==4?3:2; 
+		if (terrain == "Ammonia") return 4;
+		if (terrain == "Ocean")return size==4? 3: atmosphere.toxicityDice()-12>=0? 2:1;
+		if (terrain == "Greenhouse") return 4;
+		else if (terrain == "Garden")
+		{
+			if(atmosphere.marginal())
+				return getMarginalAtmosphereToxicity(atmosphere.marginalValue(),atmosphere.mass());
+			else return 0;
+		}
+		console.log("BAD ASSUMPTION! TOXICTY NOT CALCULATABLE!",terrain);
+	});
+	atmosphere.tags = ko.pureComputed(function (){
+		var result = [];
+		var terrain = planet.terrain();
+		var size = planet.size();
+		if(atmosphere.mass()==0) return ['No Atmosphere'];
+		if (terrain == 'Ice') 
+			if(atmosphere.toxicityDice()<21-size*3 || size ==4) 
+				result = result.concat(['Suffocating',"Highly Toxic"]);
+			else result = result.concat(['Suffocating',"Mildly Toxic"]);
+		if (terrain == "Ammonia") result = result.concat(['Suffocating',"Lethally Toxic","Corrosive"]);
+		if (terrain == "Ocean")
+			if(size==4) result = result.concat(['Suffocating',"Highly Toxic"]);
+			else if(atmosphere.toxicityDice()-12>=0) result = result.concat(['Suffocating',"Mildly Toxic"]);
+			else result = result.concat(['Suffocating']);
+		if (terrain == "Greenhouse") result = result.concat(['Suffocating',"Lethally Toxic","Corrosive"]);
+		if (terrain == "Garden")
+		{
+			result.push("Breathable");
+			if(atmosphere.marginal())result.push(atmosphere.marginalValue());
+		}
+		return result;
+	}); 
+	atmosphere.mass = ko.pureComputed(function (){
+		var terrain = planet.terrain();
+		return (terrain == "Sulfur" || terrain == "Hadean" || terrain == "Rock" || terrain == "Cthonian")?
+		0:
+		atmosphere.naturalMass();
+	});
 
-	if(terrain == "Sulfur" || terrain == "Hadean" || terrain == "Rock" || terrain == "Cthonian") {
-		atmosphere.mass(0);
-	} else if (terrain == 'Ice'){
-		atmosphere.toxicty(dice(3)<21-size*3 || size ==4?3:2); 
-	} else if (terrain == "Ammonia"){
-		atmosphere.toxicty(4);
-	} else if (terrain == "Ocean"){
-		atmosphere.toxicty(size==4? 3: dice(3)-12>=0? 2:1);
-	} else if (terrain == "Greenhouse") {
-		atmosphere.toxicty(4)
-	} else if (terrain == "Garden")
-	{
-		//TODO: alterante marginal qualities
-		atmosphere.marginal(Distribution(random.marginalAtmosphereType).get(dice(3)));
-		if(dice(3)<12) atmosphere.marginal("Safe");
-		atmosphere.toxicty(getMarginalAtmosphereToxicity(atmosphere.marginal(),atmosphere.mass()));
-	}
 	return atmosphere;
 }
 function getMarginalAtmosphereToxicity(atmosphere, atmosphereMass)
@@ -177,20 +283,22 @@ function getMarginalAtmosphereToxicity(atmosphere, atmosphereMass)
 	}
 	console.log("BAD ASSUMPTION!",atmosphere);
 }
+function generateAlternatePlanetTypes (){
+	return [Math.random()>.5,Math.random()>.5];
+}
 function generateTerrestialPlanet(orbit,star,sizeModifiers){
 	var size = Distribution(random.terrestialPlanetSize).get(dice(3)+sizeModifiers);
 	var type = size==-1? "none": size ==0? "asteroid" : "terrestrial";
-	
 	//TODO: add eccentricity
-	return Planet(type,size,new Orbit(orbit,0,star));
+	return Planet(type,size,new Orbit(orbit,0,star),generateAlternatePlanetTypes());
 }
 
 function generateGasGiant(orbit,star,sizeModifiers){
 	var size = Distribution(random.gasPlanetSize).get(dice(3)+sizeModifiers);
-	return Planet('giant',size,new Orbit(orbit,0,star));
+	return Planet('giant',size,new Orbit(orbit,0,star),generateAlternatePlanetTypes());
 }
 function generatePlanet(systemType, orbit, star){
-	var planetType = "giant";
+	var planetType = 'giant';
 	if(orbit >= star.snowLine())switch (systemType){
 		case 'none': planetType = 'terrestrial'; break;
 		case 'conventional': planetType =  (dice(3) > 15 ? 'terrestrial': 'giant'); break;
@@ -205,4 +313,38 @@ function generatePlanet(systemType, orbit, star){
 	}
 	//TODO: add size modifiers
 	return planetType == 'giant'? generateGasGiant(orbit,star,0): generateTerrestialPlanet(orbit,star,0);
+}
+
+function generateMoons(planet)
+{
+	var major = 0;
+	var minor = 0;
+	var result = [];
+	var modifiers= findInRangeTable(lookup.moonModifiers,planet.orbit().distance());
+	if(planet.type() == 'giant')
+	{
+		var innerMoons = dice(2)+modifiers.inner;
+		var outerMoons = dice(1)+modifiers.outer;
+		minor+=innerMoons+outerMoons;
+		major = dice(1)+modifiers.major;
+	}
+	else if (planet.type() == "terrestrial")
+	{
+		major = Math.max(0,dice(1)-4+modifiers.terrestrial);
+		minor += major?0:
+			Math.max(0,dice(1)-2+modifiers.terrestrial+planet.size()-3);
+	}
+	planet.minorMoons(minor);
+	planet.majorMoons(major);
+	for(var i =0;i<major;i++)
+	{
+		//TODO: distances on moons
+		var planetSize = planet.type() == "terrestrial"?planet.size():4;
+		var moonAdjustment = Distribution(random.moonSize).get(dice(3));
+		var size = Math.max(1,moonAdjustment+planetSize);
+		console.log("moon!",planet.terrain(),size);
+		result.push(Planet("terrestrial",size,new Orbit(i,0,planet),generateAlternatePlanetTypes()));
+	}
+	return result;
+	
 }

@@ -8,7 +8,7 @@ function Star(mass,age,orbit){
 	star.guid = makeGUID();
 	
 	star.size = ko.pureComputed(function (){
-		var result = lookup.starSize[lookup.starSize.map(s => s.mass).indexOf(star.mass())];
+		var result = extrapolateFromTable(lookup.starSize,'mass',star.mass());
 		if(result == undefined)
 		{
 			console.log(lookup.starSize.map(s => s.mass).indexOf(star.mass()));
@@ -51,7 +51,9 @@ function Star(mass,age,orbit){
 		var stage = star.stage();
 		
 		if(stage == "main")
-			return size.lmin + (size.lmax-size.lmin)*(age/size.mspan);
+		{
+			return size.lmin + (size.lmax-size.lmin)*(star.age()/size.mspan);
+		}
 		if(stage == "white dwarf") return .0005;
 		if(stage == 'subgiant') return size.lmax;
 		if (stage == 'giant') return size.lmax*25;
@@ -59,23 +61,19 @@ function Star(mass,age,orbit){
 	});
 	
 	star.displayPosition = function (distance){
-		//TODO: make 700+100 a changeable and important number
+		//TODO: make 700+100 a changeable and important number in index.html (planetStart and planetRange)
+		//TODO: combine with planet view distance code
 		var range = Math.log(star.outerLimit())-Math.log(star.innerLimit());
-		var num =  700* (Math.log(distance) - Math.log(star.innerLimit()))/range+100;
+		var num =  display.planetRange* (Math.log(distance) - Math.log(star.innerLimit()))/range+display.planetStart;
 		return num;
 	}
 	star.snowLine = ko.pureComputed(function (){
 		return Math.pow(star.size().lmin,.5)*4.85;
 	});
 	star.hotHabitableZone = ko.pureComputed(function (){
-		var range = Math.log(star.outerLimit())-Math.log(star.innerLimit());
-		var num =  700* (Math.log(star.snowLine()) - Math.log(star.innerLimit()))/range+100;
 		return Math.pow(278 * Math.pow(star.luminosity(),.25)/320,2)
 	});
 	star.coldHabitableZone = ko.pureComputed(function (){
-		var range = Math.log(star.outerLimit())-Math.log(star.innerLimit());
-		var num =  700* (Math.log(star.snowLine()) - Math.log(star.innerLimit()))/range+100;
-
 		return Math.pow(278 * Math.pow(star.luminosity(),.25)/240,2)
 	});
 	

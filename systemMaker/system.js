@@ -29,15 +29,17 @@ function System(){
 				{
 					//TODO: calculate what this should be
 				}
-				//TODO: default case
+				//TODO: default case (whose default?)
 				//TODO: companions of companions
 			}
+			console.log("forbidden Zones",forbiddenZones,zones);
 			for(var forbidden of forbiddenZones)
 			{
 				var modifiedZones = [];
 				for(var zone of zones)
 				{
 					//TODO: correct boundaries: >=
+					// (are they not correct now?)
 					if(zone.inner >= forbidden.outer || zone.outer <= forbidden.inner) modifiedZones.push(zone);
 					else if (zone.inner >= forbidden.inner && zone.outer <= forbidden.outer) continue;
 					else if (zone.inner < forbidden.inner && zone.outer > forbidden.outer) {
@@ -51,8 +53,10 @@ function System(){
 			}
 			starZones.push(zones);
 		}
+		console.log(starZones);
 		return starZones;
 	});
+
 	system.isHabitable = ko.pureComputed(function (){
 	
 		for(var planet of system.planets())
@@ -105,6 +109,7 @@ function generateSystem(cosmos)
 		var zones = system.orbitalZones();
 		var initialOrbit = orbits[0];
 		var currentOrbit = initialOrbit;
+		if(!inZone(currentOrbit, zones[i]))orbits.pop();
 		
 		if(zones[i].length != 0)
 		{
@@ -118,13 +123,20 @@ function generateSystem(cosmos)
 				currentOrbit = currentOrbit* Distribution(random.planetSpacing).get(dice(3));
 				if(inZone(currentOrbit,zones[i]))orbits.push(currentOrbit);
 			}while(currentOrbit < zones[i][zones[i].length-1].outer);
-			
-			for(var distance of orbits)
-			{
-				system.planets.push(generatePlanet(gasGiantArrangement,distance,star));
-			}
+		}
+		for(var distance of orbits)
+		{
+			system.planets.push(generatePlanet(gasGiantArrangement,distance,star));
 		}
 	}
+	
+	//generateMoons
+	var moons = [];
+	for(var planet of system.planets())
+	{
+		moons = moons.concat(generateMoons(planet));
+	}
+	for(var moon of moons)system.planets.push(moon);
 	
 	return system;
 }
