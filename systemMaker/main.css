@@ -1,0 +1,9 @@
+#textInterface {
+  display: flex;
+}
+#star {
+  flex: 0 0 50%;
+}
+#planet {
+  flex: 1;
+}

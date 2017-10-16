@@ -19,6 +19,10 @@ function Star(mass,age,orbit){
 		}
 		return result;
 	});
+	star.planetAdjustment = ko.observable(0);
+	star.orbitAdjustment = ko.pureComputed(function (){
+		return Math.pow(1.7,star.planetAdjustment())
+	});
 	
 	star.drawnRadius = ko.pureComputed(function (){
 		//TODO: include stages!

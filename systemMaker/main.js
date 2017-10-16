@@ -100,6 +100,9 @@ function starAge()
 function generateStarPosition()
 {
 	//TODO: control x,y,z
+	var x = [0,100];
+	var y = [0,100];
+	var z = [0,100];
 	return [Math.random()*100,Math.random()*100,Math.random()*100];
 }
 
@@ -112,8 +115,10 @@ function extrapolateFromTable(table,indexOn,value)
 		if(table[i][indexOn]-value<0 && table[i+1][indexOn]-value>0)
 		{
 			var result = {};
+			var weightingRatio = (value-table[i][indexOn])/(table[i+1][indexOn] - table[i][indexOn]);
 			for(var key in table[i])
-				if(!isNaN(table[i][key])) result[key]=(table[i][key]+table[i+1][key])/2;
+				if(!isNaN(table[i][key])) 
+					result[key]=(table[i][key])+(table[i+1][key]-table[i][key])*weightingRatio;
 				else result[key]=table[i][key];
 			return result;
 		}
@@ -134,6 +139,13 @@ var random = {};
 var display = {};
 display.planetStart = 90;
 display.planetRange = 700;
+
+lookup.planetTypes = [
+	"terrestrial",
+	"giant",
+	"asteroid"
+];
+
 random.starCount = [
 	{start:3,end:10,value:1},
 	{start:11,end:15,value:2},
@@ -236,6 +248,35 @@ lookup.moonModifiers =[
 	{min:1.5,max:3,value:{inner:0,outer:-1,major:0,terrestrial:0}},
 	{min:3,max:Number.POSITIVE_INFINITY,value:{inner:0,outer:0,major:0,terrestrial:0}},
 ];
+
+lookup.gasGiantSize =[
+	{mass:10,density:.42},
+	{mass:20,density:.26},
+	{mass:30,density:.22},
+	{mass:40,density:.19},
+	{mass:50,density:.17},
+	{mass:60,density:.17},
+	{mass:70,density:.17},
+	{mass:80,density:.17},
+	{mass:100,density:.18},
+	{mass:150,density:.19},
+	{mass:200,density:.20},
+	{mass:250,density:.22},
+	{mass:300,density:.24},
+	{mass:350,density:.25},
+	{mass:400,density:.26},
+	{mass:450,density:.27},
+	{mass:500,density:.29},
+	{mass:600,density:.31},
+	{mass:800,density:.35},
+	{mass:1000,density:.4},
+	{mass:1500,density:.6},
+	{mass:2000,density:.8},
+	{mass:2500,density:1.0},
+	{mass:3000,density:1.2},
+	{mass:3500,density:1.4},
+	{mass:4000,density:1.6},
+];
 random.coreDensity = [
 	{start:3,end:6,value:.3},
 	{start:7,end:10,value:.4},
@@ -272,6 +313,19 @@ random.gasGiantArrangement = [
 	{start:13,end:14,value:"eccentric"},
 	{start:15,end:26,value:"epistellar"}
 ];
+
+random.GasGiantMass =[
+	{start:3,end:8,value:[10,100,600]},
+	{start:9,end:10,value:[15,150,800]},
+	{start:11,value:[20,200,1000]},
+	{start:12,value:[30,250,1500]},
+	{start:13,value:[40,300,2000]},
+	{start:14,value:[50,350,2500]},
+	{start:15,value:[60,400,3000]},
+	{start:16,value:[70,450,3500]},
+	{start:17,end:18,value:[80,500,4000]},
+
+]
 
 random.planetSpacing = [
 	{start:3,end:4,value:1.4},

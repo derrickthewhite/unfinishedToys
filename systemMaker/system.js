@@ -3,6 +3,7 @@ function System(){
 	
 	system.stars = ko.observableArray([]);
 	system.planets = ko.observableArray([]);
+	system.gasGiantArrangement = ko.observable("conventional");
 	
 	system.orbitalZones = ko.pureComputed(function (){
 		var starZones = [];
@@ -32,7 +33,6 @@ function System(){
 				//TODO: default case (whose default?)
 				//TODO: companions of companions
 			}
-			console.log("forbidden Zones",forbiddenZones,zones);
 			for(var forbidden of forbiddenZones)
 			{
 				var modifiedZones = [];
@@ -53,7 +53,6 @@ function System(){
 			}
 			starZones.push(zones);
 		}
-		console.log(starZones);
 		return starZones;
 	});
 
@@ -62,6 +61,35 @@ function System(){
 		for(var planet of system.planets())
 			if(planet.terrain()=="Garden") return true;
 		return false;
+	});
+	
+	function getBestOrbitByStar(star,planets)
+	{
+		var planets = system.planets()
+			.filter(planet=>planet.orbit().center() == star)
+			.map(planet=>planet.orbit().distance())
+			.sort((a,b)=> a-b);
+		console.log(planets);
+
+		if(planets.length ==0) return star.snowLine();
+		if(planets[0]/star.innerLimit()>1.4)
+			return planets[0]/1.4/star.orbitAdjustment();
+		if(star.outerLimit()/planets[planets.length-1]>1.4)
+			return planets[planets.length-1]*1.4/star.orbitAdjustment();
+		for(var i=1;i<planets.length;i++)
+			if(planets[i]/planets[i-1] > 2.8)
+				return planets[i]*1.4/star.orbitAdjustment();
+		return planets[planets.length-1]*1.4/star.orbitAdjustment();
+	}
+	system.nextBestOrbit = ko.pureComputed(function (){
+		var result = [];
+		var starOrbits = [];
+		var planetLists = [];
+		for(var star of system.stars())
+		{
+			result[star.guid]= getBestOrbitByStar(star,system.planets());
+		}
+		return result;
 	});
 	return system;
 }
@@ -98,9 +126,9 @@ function generateSystem(cosmos)
 	for(var i =0;i< system.stars().length;i++)
 	{
 		var star = system.stars()[i];
-		var gasGiantArrangement = Distribution(random.gasGiantArrangement).get(dice(3));
+		system.gasGiantArrangement(Distribution(random.gasGiantArrangement).get(dice(3)));
 		var orbits = [];
-		switch (gasGiantArrangement){
+		switch (system.gasGiantArrangement()){
 			case "none": 
 			case "conventional": orbits.push(star.snowLine()*(dice(2)-2)*0.05+1);break;
 			case "eccentric": orbits.push(star.snowLine() * dice()*.125); break;
@@ -126,7 +154,7 @@ function generateSystem(cosmos)
 		}
 		for(var distance of orbits)
 		{
-			system.planets.push(generatePlanet(gasGiantArrangement,distance,star));
+			system.planets.push(generatePlanet(system.gasGiantArrangement(),distance,star));
 		}
 	}
 	

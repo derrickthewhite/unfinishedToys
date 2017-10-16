@@ -2,7 +2,7 @@
 <html>
 <head>
 	<title>System Maker</title>
-	<!--<link href="main.css" rel="stylesheet">-->
+	<link href="main.css" rel="stylesheet">
 	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
 	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
 	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
@@ -20,7 +20,13 @@
 			var orbit = {};
 			
 			orbit.eccentricty= ko.observable(eccentricty);
-			orbit.distance = ko.observable(distance);
+			orbit.baseDistance = ko.observable(distance);
+			orbit.distance = ko.pureComputed(function (){
+				var multiplier = orbit.center() && orbit.center().orbitAdjustment 
+					? orbit.center().orbitAdjustment()
+					: 1;
+				return orbit.baseDistance()*multiplier;
+			});
 			orbit.center = ko.observable(center);
 			
 			orbit.minDistance = ko.pureComputed(()=>(1-orbit.eccentricty())*orbit.distance());
@@ -36,6 +42,7 @@
 				systems: ko.observableArray([])
 			};
 			root.events = {};
+			root.lookup = lookup;
 			
 			for(var i =0;i< 100;i++)
 			{
@@ -57,13 +64,40 @@
 				root.currentPlanet(data.planets()[0]);
 			};
 			
+			root.deletePlanet = function (){
+				root.currentSystem().planets.remove(root.currentPlanet());
+				root.currentPlanet(root.currentSystem().planets()[0]);
+			}
+			root.addMoon = function (){
+				var planet = root.currentPlanet();
+				if(planet.orbit().center()!=planet.star()) 
+				{
+					//TODO: perhaps add sister moon?
+					console.log("THIS IS ALREADY A MOON!")
+					return;
+				}
+				var moon = Planet("terrestrial",1,new Orbit(planet.majorMoons(),0,planet),generateAlternatePlanetTypes());
+				planet.majorMoons(planet.majorMoons()+1);
+				root.currentSystem().planets.push(moon);
+			}
+			root.addPlanet = function (){
+				var planet = generatePlanet(
+					root.currentSystem().gasGiantArrangement(),
+					root.currentSystem().nextBestOrbit()
+						[root.currentStar().guid],
+					root.currentStar());
+				root.currentSystem().planets.push(planet);
+				root.currentPlanet(planet);
+			}
+			
 			ko.applyBindings(root,document.getElementById('content'));
 		}
 	</script>
 </head>
 <body onload="load()">
 	<div id = "content">
-		<div data-bind="with: currentStar">
+		<div id="textInterface">
+		<div data-bind="with: currentStar" id="star">
 			STAR <br>
 			mass: <span data-bind="text:mass"></span>
 			<!-- ko if:$root.editStar -->
@@ -83,48 +117,78 @@
 			radius: <span data-bind="text:radius"></span><br>
 			Orbit: <span data-bind="text:orbit().minDistance"></span> to <span data-bind="text:orbit().maxDistance"></span> <br>
 			Limits <span data-bind="text:innerLimit"></span> to <span data-bind="text:outerLimit"></span> <br>
+			<!-- ko if:$root.editStar -->
+				shift planets<input type="number" step=".1" data-bind="value:planetAdjustment"/><br>
+			<!-- /ko  -->
 			<input type="checkbox" value="true" data-bind="checked:$root.editStar"> Edit Star<br>
+			<!-- ko if:$root.editStar -->
+				<button data-bind="click:$root.deletePlanet">Delete Planet</button>
+				<button data-bind="click:$root.addPlanet">Add Planet</button>
+				<button data-bind="click:$root.addMoon">Add Moon</button>
+			<!-- /ko -->
 		</div>
-		<div data-bind="with: currentPlanet">
+		<div data-bind="with: currentPlanet" id="planet">
 			PLANET <br>
 			type: <span data-bind="text:terrain"></span><br>
 			<!-- ko if:$root.editPlanet -->
-			<input type="checkbox" value="true" data-bind="checked:alternateTypes.canBeGarden"> Garden
-			<input type="checkbox" value="true" data-bind="checked:alternateTypes.canBeSulfur"> Sulfur<br>
+				<input type="checkbox" value="true" data-bind="checked:alternateTypes.canBeGarden"> Garden
+				<input type="checkbox" value="true" data-bind="checked:alternateTypes.canBeSulfur"> Sulfur<br>
+				<select data-bind="options:$root.lookup.planetTypes, value:type"></select><br>
 			<!-- /ko -->
 			temperature: <span data-bind="text:temperature"></span><br>
 			<!-- ko if:temperature() > -40 && temperature() < 180 -->
 				climate: <span data-bind="text:temperatureRange"></span><br>
 			<!-- /ko -->
-			pressure: <span data-bind="text:atmosphere.pressureClass"></span>
-			(<span data-bind="text:atmosphere.pressure"></span>)<br>
-			gravity: <span data-bind="text:gravity"></span><br>
-			diameter: <span data-bind="text:diameter"></span><br>
+			<!-- ko if:type()=='terrestrial' -->
+				pressure: <span data-bind="text:atmosphere.pressureClass"></span>
+				(<span data-bind="text:atmosphere.pressure"></span>)<br>
+				gravity: <span data-bind="text:gravity"></span><br>
+				blackbody: <span data-bind="text:blackBody"></span><br>
+				atmosphereic mass: <span data-bind="text:atmosphere.mass"></span>
+				<!-- ko if:$root.editPlanet -->
+				<input type="number" min="0" max="2.0" step=".1" data-bind="value:atmosphere.naturalMass"/>
+				<!-- /ko -->
+				<br>
+				toxicity: <span data-bind="text:atmosphere.toxicity"></span><br>
+				tags: <span data-bind="foreach:atmosphere.tags">
+					<span data-bind="text:$data"></span>
+				</span><br>
+				<!-- ko if:terrain() =="Garden" -->
+					Air Quality: <span data-bind="text:atmosphere.marginal"></span><br>
+				<!-- /ko -->
+				<!-- ko if:hydrographicCoverage -->
+					Ocean Coverage: <span data-bind="text:hydrographicCoverage"></span><br>
+				<!-- /ko -->
+				affinity: <span data-bind="text:affinity"></span><br>
+				resource Value: <span data-bind="text:resourceValue"></span><br>
+			<!-- /ko -->
+			diameter: <span data-bind="text:diameter"></span>
+			<!-- ko if:$root.editPlanet() && type()=='terrestrial' -->
+				<input type="range" min="0" max="1.0" step=".1" data-bind="value:diameterSeed"/>
+			<!-- /ko --><br>
+			<!-- ko if:$root.editPlanet() && type()=='giant' -->
+				<input type="range" min="3" max="18" step="1" data-bind="value:gasGiantMassSeed"/><br>
+			<!-- /ko -->
+			density: <span data-bind="text:density"></span>
+			<!-- ko if:$root.editPlanet() && type()=='terrestrial' -->
+				<input type="range" min=".3" max=".7" step=".1" data-bind="value:densitySeed"/>
+			<!-- /ko --><br>
 			size: <span data-bind="text:size"></span>
 			<!-- ko if:$root.editPlanet -->
-			<input type="number" min="0" max="4" step="1" data-bind="value:size"/>
+			<input type="number" min="1" max="4" step="1" data-bind="value:size"/>
 			<!-- /ko -->
 			<br>
-			blackbody: <span data-bind="text:blackBody"></span><br>
-			ATMOSPHERE <br>
-			mass: <span data-bind="text:atmosphere.mass"></span><br>
-			toxicity: <span data-bind="text:atmosphere.toxicity"></span><br>
-			tags: <span data-bind="foreach:atmosphere.tags">
-				<span data-bind="text:$data"></span>
-			</span><br>
-			<!-- ko if:terrain() =="Garden" -->
-				Air Quality: <span data-bind="text:atmosphere.marginal"></span><br>
+			orbit: <span data-bind="text:orbit().distance"></span>
+			<!-- ko if:$root.editPlanet -->
+				<input type="number" data-bind="value:orbit().baseDistance, attr:{step:orbit().baseDistance()/10}"/>
 			<!-- /ko -->
-			<!-- ko if:hydrographicCoverage -->
-				Ocean Coverage: <span data-bind="text:hydrographicCoverage"></span><br>
-			<!-- /ko -->
-			affinity: <span data-bind="text:affinity"></span><br>
-			resource Value: <span data-bind="text:resourceValue"></span><br>
-			orbit: <span data-bind="text:orbit().distance"></span><br>
+			<br>
 			minor moons: <span data-bind="text:minorMoons"></span><br>
 			major moons: <span data-bind="text:majorMoons"></span><br>
 			 
-			<input type="checkbox" value="true" data-bind="checked:$root.editPlanet"> Edit Planet
+			<input type="checkbox" value="true" data-bind="checked:$root.editPlanet"> Edit Planet<br>
+
+		</div>
 		</div>
 		<!-- ko Konva.Stage: {width: 800, height:800 } -->
 			<!-- ko Konva.Layer: {} -->

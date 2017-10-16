@@ -4,13 +4,13 @@ function Planet (type,size,orbit,alternateTypes)
 	planet.type = ko.observable(type);
 	planet.size = ko.observable(size);
 	
-	//TODO: change orbits when star changes luminosity
 	planet.orbit = ko.observable(orbit);
 	planet.alternateTypes = {}; 
 	planet.alternateTypes.canBeSulfur = ko.observable(alternateTypes[0]);
 	planet.alternateTypes.canBeGarden = ko.observable(alternateTypes[1]);
 	planet.resourceValue = ko.observable(Distribution(random.gasPlanetSize).get(dice(3)));
 	planet.minorMoons = ko.observable(0);
+	//TODO: convert to computed
 	planet.majorMoons = ko.observable(0);
 	
 	planet.star = ko.pureComputed(function (){
@@ -18,9 +18,15 @@ function Planet (type,size,orbit,alternateTypes)
 		while(!current.luminosity)current = current.orbit().center();
 		return current;
 	});
+	planet.isMoon = ko.pureComputed(function (){
+		return planet.star()!=planet.orbit().center();
+	});
 	
 	planet.blackBody = ko.pureComputed(function (){
-		return 278*Math.pow(planet.star().luminosity(),.25)/Math.pow(planet.orbit().distance(),.5);
+		var distance = planet.isMoon()?
+			planet.orbit().center().orbit().distance():
+			planet.orbit().distance();
+		return 278*Math.pow(planet.star().luminosity(),.25)/Math.pow(distance,.5);
 	});
 	
 	planet.terrain = ko.pureComputed(function () {
@@ -33,11 +39,6 @@ function Planet (type,size,orbit,alternateTypes)
 			planet.blackBody() > 150? planet.star().mass()<=.65? 'Ammonia':'Ice': planet.blackBody() > 80? 'Ice': 
 			planet.size() == 3?'Hadean':'Ice';
 	});
-	
-	planet.temperature = ko.pureComputed(function (){
-		var absorbtionFactor = 1;
-		var greenhouseFactor = 0;
-	})
 	
 	planet.drawnRadius = ko.pureComputed(function (){
 		if(planet.size() < 1) return 2; //TODO: better astroid render
@@ -87,14 +88,53 @@ function Planet (type,size,orbit,alternateTypes)
 	});
 	
 	planet.atmosphere = generateAtmosphere(planet);
-	//TODO: hydrographics have memory!
-	planet.hydrographicCoverage = ko.observable(getHydrographicCoverage(planet.terrain(),planet.size()));
-	//TODO make these three interactive!
-	//TODO: remove gas giants from equation!
+	//TODO: hydrographics have diceless memory!
+	planet.hydrographicDice1 = ko.observable(dice());
+	planet.hydrographicDice2 = ko.observable(dice(2));
+	planet.hydrographicCoverage = ko.pureComputed(function (){
+		var terrain = planet.terrain();
+		var size = planet.size();
+		switch (terrain)
+		{
+			case "giant": 
+			case "asteroid": 
+			case "none": 
+			case "Hadean":
+			case "Sulfer": 
+			case "Rock": 
+			case "Chthonian": return 0;
+			case "Ice": return size>2
+				?Math.max(0,planet.hydrographicDice2()/10-1)
+				:(planet.hydrographicDice1()+2)*.1;
+			case "Ammonia": return Math.min(1,planet.hydrographicDice2()/10)
+			case "Ocean": 
+			case "Garden": return Math.min(1,(planet.hydrographicDice1()+(size-1)*2)*.1);
+			case "Greenhouse": return Math.max(0,(planet.hydrographicDice2()-7)*.1);
+		}
+		console.log("BAD INPUT for PLANET TERRAIN!",planet.terrain());
+		return 1;
+
+	});
+	//TODO make gravity something that can be set!
+	planet.gasGiantMassSeed = ko.observable(dice(3));
+	planet.mass = ko.pureComputed(function (){
+		if(planet.type()=='giant')
+		{
+			return Distribution(random.GasGiantMass).get(planet.gasGiantMassSeed())[planet.size()-1];
+		}
+	});
 	planet.densitySeed = ko.observable(Distribution(random.coreDensity).get(dice(3)));
-	planet.density = ko.pureComputed(function () { return planet.densitySeed()+(planet.size()>=3?.5: planet.terrain=='Rock'?.2:0)});
+	planet.density = ko.pureComputed(function () {
+		if(planet.type()=='giant')
+			return extrapolateFromTable(lookup.gasGiantSize,'mass',planet.mass()).density;
+		return Number(planet.densitySeed())+(planet.size()>=3?.5: planet.terrain=='Rock'?.2:0)
+	});
 	planet.diameterSeed = ko.observable((dice(2)-2)/10);
 	planet.diameter = ko.pureComputed(function (){
+		if(planet.type()=='giant')
+		{
+			return Math.pow(planet.mass()/planet.density(),1/3);
+		}
 		var constraints = lookup.planetSize[planet.size()];
 		return (planet.diameterSeed()*(constraints.max - constraints.min)+constraints.min)* Math.pow(planet.blackBody()/planet.density(),.5);
 	});
@@ -164,26 +204,7 @@ function getBlackbodyCorrection (terrain, size, hydrographics,atmosphericMass)
 		}
 		return absorbtionFactor*(1+atmosphericMass*greenhouse);
 }
-function getHydrographicCoverage (terrain, size)
-{
-			switch (terrain)
-		{
-			case "giant": 
-			case "asteroid": 
-			case "none": 
-			case "Hadean":
-			case "Sulfer": 
-			case "Rock": 
-			case "Chthonian": return 0;
-			case "Ice": return size>2?Math.min(0,dice(2)/10-1):(dice()+2)*.1;
-			case "Ammonia": //TODO: DO SEPERATLY. MAYBE
-			case "Ocean": 
-			case "Garden": return Math.min(1,(dice()+(size-1)*2)*.1);
-			case "Greenhouse": return "yellow";
-		}
-		console.log("BAD INPUT for PLANET TERRAIN!",planet.terrain());
-		return 1;
-}
+
 //TODO: perhaps we should not be passing in the planet!
 function generateAtmosphere(planet)
 {
@@ -262,7 +283,7 @@ function generateAtmosphere(planet)
 		var terrain = planet.terrain();
 		return (terrain == "Sulfur" || terrain == "Hadean" || terrain == "Rock" || terrain == "Cthonian")?
 		0:
-		atmosphere.naturalMass();
+		Math.round(atmosphere.naturalMass()*100)/100;
 	});
 
 	return atmosphere;
@@ -330,19 +351,20 @@ function generateMoons(planet)
 	}
 	else if (planet.type() == "terrestrial")
 	{
-		major = Math.max(0,dice(1)-4+modifiers.terrestrial);
-		minor += major?0:
-			Math.max(0,dice(1)-2+modifiers.terrestrial+planet.size()-3);
+		major = dice(1)-4+modifiers.terrestrial;
+		minor += major?0:dice(1)-2+modifiers.terrestrial+planet.size()-3;
 	}
+	major = Math.max(0,major);
+	minor = Math.max(0,minor);
+	
 	planet.minorMoons(minor);
 	planet.majorMoons(major);
 	for(var i =0;i<major;i++)
 	{
-		//TODO: distances on moons
+		//TODO: orbital distances on moons
 		var planetSize = planet.type() == "terrestrial"?planet.size():4;
 		var moonAdjustment = Distribution(random.moonSize).get(dice(3));
 		var size = Math.max(1,moonAdjustment+planetSize);
-		console.log("moon!",planet.terrain(),size);
 		result.push(Planet("terrestrial",size,new Orbit(i,0,planet),generateAlternatePlanetTypes()));
 	}
 	return result;
