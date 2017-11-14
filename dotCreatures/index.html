@@ -1,0 +1,219 @@
+<html>
+<head>
+	<title>Dot Creatures</title>
+	<script>
+		var creatureConfig = [
+			{
+				name:"plant",
+				color:"green",
+				growth: 20,
+				upkeep: 10,
+				move: 0,
+				startingStorage:10,
+				reproductionPoint:50,
+				reproductionCost:25,
+				consumes: []
+			},
+			{
+				name:"grazer",
+				color:"#aaaa00",
+				upkeep: 20,
+				move: 2,
+				startingStorage:100,
+				reproductionPoint:500,
+				reproductionCost:200,
+				consumes: [{name:"plant",effeciency:80}]
+			}
+		];
+		var startingConfig ={
+			creatureCounts:{
+				"plant":300,
+				"grazer":20,
+			},
+			dimensions:{
+				x:20,
+				y:20
+			},
+			scale:10,
+			tickTime: 500 //in milliseconds
+		}
+		var nextCreatureID = 10000;
+		var Creature = function (creatureType,startingPosition){
+			var creature = {};
+			creature.type = creatureType;
+			creature.id = nextCreatureID++;
+			creature.position = startingPosition;
+			creature.energy = creatureType.startingStorage;
+			return creature;
+		}
+		var Position = function (x,y)
+		{
+			var position = {};
+			position.x = x;
+			position.y=y;
+			position.hash = function (){
+				return x+"|"+y;
+			}
+			return position;
+		}
+		var positionFromHash = function (hash)
+		{
+			return {x:Number(hash.split("|")[0]),y:Number(hash.split("|")[1])};
+		}
+		var randomPosition = function (){
+			return Position(Math.floor(Math.random()*startingConfig.dimensions.x),Math.floor(Math.random()*startingConfig.dimensions.x));
+		}
+		var creaturesByPosition = {};
+		var creatures = [];
+		var initializeCreatures = function (){
+			var creatureTypesByName = {};
+			for(var type of creatureConfig)creatureTypesByName[type.name]=type;
+			for(var i in startingConfig.creatureCounts)
+			{
+				//TODO: input validation!
+				for(var creatureCount = 0; creatureCount< startingConfig.creatureCounts[i];creatureCount++ )
+				{
+					if(!creatureTypesByName[i]) {
+						console.log("bad creature type given! "+i+" does not exist in creature config!");
+						continue;
+					}
+					var creature = new Creature(creatureTypesByName[i],randomPosition());
+					creatures.push(creature);
+					if(!creaturesByPosition[creature.position.hash()])creaturesByPosition[creature.position.hash()]=[];
+					creaturesByPosition[creature.position.hash()].push(creature);
+				}
+			}
+		}
+		var positionIsValid = function(position)
+		{
+			return position.x>=0 && position.y>=0 && position.x < startingConfig.dimensions.x && position.y < startingConfig.dimensions.y;
+		}
+		//TODO: better name? its a position from another position
+		var generatePosition = function(startingPosition,distance){
+			//TODO: distance as a random percentage of possible
+			var direction = Math.floor(Math.random()*4);// NESW -> 0123
+			return Position(
+				startingPosition.x+(direction%2*(2-direction))*distance,
+				startingPosition.y+((direction+1)%2)*(1-direction)*distance
+			);
+
+		}
+		var tick = function ()
+		{
+			//shuffle creatures
+			//TODO
+			var removedCreatureIds = [];
+			for(var creature of creatures)
+			{
+				if(removedCreatureIds[creature.id])continue;
+				for(var move =0;move<creature.type.move;move++)
+				{
+					//move phase
+					//generate move direction
+					do{
+						var position = generatePosition(creature.position,1);
+					} while (!positionIsValid(position))
+					// move creature in mapkey
+					if(!creaturesByPosition[creature.position.hash()])creaturesByPosition[creature.position.hash()]=[];
+					creaturesByPosition[creature.position.hash()]=creaturesByPosition[creature.position.hash()].filter(a => a.id != creature.id);
+					if(!creaturesByPosition[position.hash()])creaturesByPosition[position.hash()]=[];
+					creaturesByPosition[position.hash()].push(creature);
+					creature.position=position;
+					//eat phase
+					for(possibleFood of creaturesByPosition[position.hash()])
+					{
+						var eatingEntry = creature.type.consumes.filter(a => possibleFood.type.name == a.name)[0];
+						if(eatingEntry)// TODO: I don't like that method of seaching
+						{
+							console.log("EAT!");
+							creaturesByPosition[possibleFood.position.hash()]=creaturesByPosition[possibleFood.position.hash()].filter(a => a.id != possibleFood.id);
+							removedCreatureIds[possibleFood]=true;
+							creature.energy += possibleFood.energy* eatingEntry.effeciency/100;
+						}
+					}
+					//TODO: reverse check!
+				}
+			}
+			creatures = creatures.filter(a => !removedCreatureIds[a.id]);
+			var removedCreatureIds = [];
+			
+			//TODO: order creatures in positionMap!
+			for(var creature of creatures)
+			{
+				//growth phase
+				//TODO: shade competition!
+				if(creature.type.growth && creaturesByPosition[creature.position.hash()][0] == creature)creature.energy += creature.type.growth;
+				
+				//upkeep phase
+				creature.energy-=creature.type.upkeep;
+				//TODO: minimum enenergys
+				if(creature.energy<0) 
+				{
+					if(creature.type.name == 'grazer')
+					{
+						console.log("grazer has "+creature.energy);
+					}
+					removedCreatureIds[creature.id]=true;
+					creaturesByPosition[creature.position.hash()]=creaturesByPosition[creature.position.hash()].filter(a => a.id != creature.id);
+				}
+				//reproduction phase
+				if(creature.type.reproductionPoint <= creature.energy)
+				{
+					//TODO: reproductive scatter!
+					do{
+						var position = generatePosition(creature.position,1);
+					}while (!positionIsValid(position))
+					var baby = Creature(creature.type,position);
+					creatures.push(baby);
+					if(!creaturesByPosition[position.hash()])creaturesByPosition[position.hash()]=[];
+					creaturesByPosition[position.hash()].push(baby);
+				}
+			}
+			creatures = creatures.filter(a => !removedCreatureIds[a.id]); 
+			draw();
+			console.log("num creatures: ",creatures.length);
+			console.log("Grazers",creatures.filter(a => a.type.name == "grazer").length);
+			console.log("Plants",creatures.filter(a => a.type.name == "plant").length);
+			window.setTimeout(tick,startingConfig.tickTime);
+		}
+		
+		var draw = function(){
+			//TODO: should some of this be in initialize?
+			var canvas = document.getElementById('display');
+			canvas.width = startingConfig.scale*startingConfig.dimensions.x;
+			canvas.height = startingConfig.scale*startingConfig.dimensions.y;
+			var scale = startingConfig.scale;
+			if(canvas.getContext)
+			{
+				var ctx = canvas.getContext('2d');
+				ctx.fillRect(0,0,scale*startingConfig.dimensions.x,scale*startingConfig.dimensions.y,"grey");
+				for(var creature of creatures)
+				{
+					ctx.fillStyle = creature.type.color;
+					ctx.beginPath();
+					ctx.arc(
+						creature.position.x*scale + scale/2,
+						creature.position.y*scale +scale/2, 
+						scale/2,
+						0,
+						Math.PI*2
+					);
+					ctx.fill();
+				}
+			} else {
+			  //TODO: if canvas is not supported scream!
+			}
+		}
+		
+		var main = function (){
+			initializeCreatures();
+			draw();
+			window.setTimeout(tick,startingConfig.tickTime);
+		}
+	</script>
+</head>
+<body onload="main()">
+	<div id="error"> </div>
+	<canvas id = "display" width="200" height="200"></canvas>
+</body>
+</html>
