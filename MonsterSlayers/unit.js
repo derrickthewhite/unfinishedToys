@@ -123,7 +123,7 @@ var copyUnit = function (name,template)
 	return unit(name,template.type,template.hitPoints,template.toughness,template.armor,template.strength,template.size,template.move,template.attacks)
 }
 
-var attack = function (name,accuracy,strength,damageType,attackType,reach,parry,speed, conditions)
+var attack = function (name,accuracy,strength,damageType,attackType,reach,parry,speed,conditions,moveLimitations)
 {
 	var attack = {};
 	attack.name = name;
@@ -135,6 +135,7 @@ var attack = function (name,accuracy,strength,damageType,attackType,reach,parry,
 	attack.reach = reach;
 	//attack.parry = parry;  // TODO: figure out how parries effect defense. Include parry weight
 	attack.speed = speed; // number of rounds for one attack
-	attack.conditions = conditions?conditions:[];
+	attack.conditions = conditions?conditions:[]; //conditions it inflicts?
+	attack.moveLimitations = moveLimitations?moveLimitations:0;
 	return attack;
 }

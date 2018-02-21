@@ -14,7 +14,8 @@ conditions.prone = condition ("prone",[
 		}}
 ]);
 conditions.defending = condition ("defensive",[
-		{}
+	{type:'accuracy bonus',value:-2},
+	{type:'dodge bonus',value:2}
 ])
 //action modifier keywords:
 /*

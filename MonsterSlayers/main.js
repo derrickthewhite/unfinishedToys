@@ -219,19 +219,20 @@ game.validMovePositions = ko.pureComputed (function (){
 
 function setUpFight()
 {
-	var pike = attack("pike",0,6,"stabbing","melee",4,2,1);
-	var cheaterStick = attack("cheater stick",5,10,"stabbing","melee",4,5,1); //Testing only
-	var bow = attack("bow",0,3,"stabbing","ranged",100,0,4);
-	var crossbow = attack("crossbow",0,5,"stabbing","ranged",100,0,20);
-	var spear = attack("spear",1,6,"stabbing","melee",2,2,1);
-	var bearClaws = attack("claws",0,4,"slashing","melee",1,0,1);
-	var monsterClaws = attack("Trample",5,15,"impact","melee",1,0,1,["prone"]);
+	var pike = attack("pike",0,6,"stabbing","melee",4,2,1,[],1);
+	var cheaterStick = attack("cheater stick",5,10,"stabbing","melee",4,5,1,[],4); //Testing only
+	var bow = attack("bow",0,3,"stabbing","ranged",100,0,4,[],0);
+	var crossbow = attack("crossbow",0,5,"stabbing","ranged",100,0,20,[],2);
+	var spear = attack("spear",1,6,"stabbing","melee",2,2,1,[],1);
+	var bearClaws = attack("claws",0,4,"slashing","melee",1,0,1,[],1);
+	var monsterClaws = attack("claws",0,10,"slashing","melee",1,0,1,[],1);
+	var trample = attack("Trample",5,15,"impact","melee",1,0,1,["prone"],[],10);
 	
 	var archer = unit("default","archer",10,10,[4,1,0],10,0,4,[bow,spear]);
 	var pikeman = unit("default","pikeman",10,10,[8,1,0],10,0,4,[pike]);
 	var bear = unit("Bruin","Bear",20,11,[2,1,1,0],20,0,4,[bearClaws]); 
 	//var monster = unit("Beast","Beast",20,11,[2,1,1,0],20,2,4,[monsterClaws]); 
-	var monster = unit("Beast","Beast",20,11,[2,1,1,0],20,2,4,[monsterClaws]); 
+	var monster = unit("Beast","Beast",20,11,[2,1,1,0],20,2,4,[trample]); 
 	
 	var names = ["peter (pike)","james (pike)","john (pike)","andrew (pike)","abraham (bow)","issac (bow)","jacob (bow)","joseph (bow)"];
 	for(var i = 0;i<4;i++)game.team.push(copyUnit(names[i],pikeman));
