@@ -22,25 +22,27 @@ effects.fuel1P = {"name":"1P","action":"consumes","quantity":1,"target":"<Fuel>"
 effects.worthless = {"name":"Worthless","trigger":"score","quantity":-1};
 effects.limit1 = {"name":"Once Per Turn","action":"limits","quantity":1,"trigger":"use"};
 
-effects.automatic = {"name":"Automatic","action":"consumes","quantity":-1,"target":"operator","trigger":"use"};
+effects.automatic = {"name":"Automatic","action":"consumes","quantity":-1,"target":"operators","trigger":"use"};
 effects.manipulator = {"name":"Manipulator","action":"produces","quantity":1,"target":"manipulator","trigger":"use","machine":true};
-effects.miner = {"name":"Miner","action":"produces","quantity":2,"target":"miner","trigger":"use","machine":true};
+effects.miner = {"name":"Miner","action":"produces","quantity":2,"target":"miners","trigger":"use","machine":true};
 effects.destroyer = {"name":"Destroyer","action":"destroys","quantity":1,"target":"[object]","trigger":"use","machine":true};
 
-cards.deck.push(new Card("1 <Fuel> to Use",[effects.fuel1A],-2));
 cards.deck.push(new Card("2 <Fuel> to Use",[effects.fuel2A],-4));
-cards.deck.push(new Card("3 <Fuel> to Use",[effects.fuel3A],-6));
-cards.deck.push(new Card("1 <Fuel> to Create",[effects.fuel1C],-1));
 cards.deck.push(new Card("2 <Fuel> to Create",[effects.fuel2C],-2));
 cards.deck.push(new Card("3 <Fuel> to Create",[effects.fuel3C],-3));
 cards.deck.push(new Card("1 <Fuel> to Maintain",[effects.fuel1P],-3));
-for(var i =0;i<3;i++)
+
+for(var i =0;i<5;i++)cards.deck.push(new Card("1 <Fuel> to Create",[effects.fuel1C],-1));
+for(var i =0;i<3;i++)cards.deck.push(new Card("2 <Fuel> to Create",[effects.fuel2C],-2));
+for(var i =0;i<3;i++)cards.deck.push(new Card("1 <Fuel> to Use",[effects.fuel1A],-2));
+for(var i =0;i<5;i++)cards.deck.push(new Card("Worthless",[effects.worthless],-4));	
+
+for(var i =0;i<6;i++)
 {
 	cards.deck.push(new Card("Automatic",[effects.automatic,effects.limit1],2));
 	cards.deck.push(new Card("Manipulator",[effects.manipulator],2));
 	cards.deck.push(new Card("Miner",[effects.miner],2));
 	cards.deck.push(new Card("Destroyer",[effects.destroyer],2));
-	cards.deck.push(new Card("Worthless",[effects.worthless],-4));
 }
 
 cards.draw = function(num)

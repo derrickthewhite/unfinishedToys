@@ -26,7 +26,7 @@
 					}
 					return result;
 				}
-				self.activateRequirements = countRequirements('use','consumes',self.isMachine?{'operator':1}:{});
+				self.activateRequirements = countRequirements('use','consumes',self.isMachine?{'operators':1}:{});
 				self.buildRequirements = countRequirements('create','consumes',self.isMachine?{'builders':1}:{'miners':1});
 				self.maintainRequirements = countRequirements('maintain','consumes',{});
 				self.useOutput = countRequirements('use','produces',{});
@@ -63,9 +63,11 @@
 						result.push({resource:i,value:self.type.buildRequirements[i]*self.buildCount()});
 					}
 					if(self.activateCount())
-					for(var i in self.type.activateRequirements)
 					{
-						result.push({resource:i,value:self.type.activateRequirements[i]*self.activateCount()});
+						for(var i in self.type.activateRequirements)
+						{
+							result.push({resource:i,value:self.type.activateRequirements[i]*self.activateCount()});
+						}
 					}
 					return result;
 				});
@@ -80,4 +82,7 @@
 					}
 					return result;
 				});
+				self.expectedChange = ko.pureComputed(function (){
+					return self.toBuild() -(self.type.isMachine?0:self.toActivate());
+				})
 			}

@@ -8,6 +8,10 @@
 	background-color:#ffaaaa;
 	color:red;
 }
+.warnings{
+	background-color:#ffffaa;
+	color:brown;
+}
 input[type="number"]{
 	width:40px;
 }

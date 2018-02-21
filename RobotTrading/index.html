@@ -6,239 +6,13 @@
 		<script type="text/javascript" src= "tools.js"></script>
 		<script type="text/javascript" src= "cards.js"></script>
 		<script type="text/javascript" src= "construction.js"></script>
+		<script type="text/javascript" src= "player.js"></script>
+		<script type="text/javascript" src= "game.js"></script>
 		<script>
 			
-			var game = {};
-			game.statics ={};
-			game.statics.manipUses = ['builders','operators','miners'];
-			function player (name)
-			{
-				var self = this;
-				self.name = name;
-				self.constructions = ko.observableArray();
-				var constructionMap = {};
-				self.cards = ko.observableArray();
-				self.id = getID();
-				self.addCards = function (cards){
-					for(var card of cards) self.cards.push(card);
-				};
-				self.addConstruction = function(type,number){
-					var construction = constructionMap[type.name];
-					if(!construction)
-					{
-						construction = new Construction(type,self,0);
-						constructionMap[type.name] = construction;
-						self.constructions.push(construction);
-					}
-					construction.number(construction.number()+number);
-				};
-				
-				self.totalFlow = ko.pureComputed(function (){
-					var result = {}
-					result.inputs = {};
-					result.outputs = {};
-					result.totals = {};
-					for(var construction of self.constructions())
-					{
-						for(var input of construction.cost())
-						{
-							if(!result.inputs[input.resource]) result.inputs[input.resource]=0;
-							result.inputs[input.resource]+=input.value;
-							if(!result.totals[input.resource]) result.totals[input.resource]=0;
-							result.totals[input.resource]-=input.value;
-						}
-						for(var output of construction.output())
-						{
-							if(!result.outputs[output.resource]) result.outputs[output.resource]=0;
-							result.outputs[output.resource]+=output.value;
-							if(!result.totals[output.resource]) result.totals[output.resource]=0;
-							result.totals[output.resource]+=output.value;
-						}
-					}
-					return result;
-				});
-			}
-			
-			
-			game.mode = ko.observable("setup"); // mainView, invention, setup
-			game.players = ko.observableArray();
-			game.currentPlayer = ko.observable(0);
-			
-			//setup
-			game.newPlayerName = ko.observable("");
-			game.addPlayer = function (){
-				game.players.push(new player(game.newPlayerName()));
-			};
-			game.startGame = function ()
-			{
-				var steel = new ConstructionType("Steel",[],"starting");
-				var costsSteel = effects.fuel2C;
-				costsSteel.target = "Steel";
-				var robot = new ConstructionType("Robot",[effects.worthless,effects.manipulator,effects.automatic,costsSteel,effects.limit1],"starting");
-				game.mode("invention");
-				for(var player of game.players())
-				{
-					player.addCards(cards.draw(3));
-					player.addConstruction(robot,2);
-					player.addConstruction(steel,0);
-				}
-			};
-
-			//building
-			//TODO: get these auto creates correct!
-			for(var use of game.statics.manipUses)
-			{
-				game[use] = ko.observable(0);
-			}
-			game.manipulatorsLeft = ko.pureComputed(function (){
-				var player = game.players()[game.currentPlayer()];
-				var flow = player.totalFlow();
-				flow = JSON.parse(JSON.stringify(flow));
-				console.log("---------------")
-				console.log(flow.totals.manipulator);
-				var manipulators = flow.totals.manipulator;
-				for(var use of game.statics.manipUses)
-				{
-					manipulators -= Number(game[use]());
-					console.log(game[use]())
-				}
-				console.log(manipulators);
-				return manipulators;
-			});
-			game.nextTurn = function (){
-				if(game.hasValidInstructions())
-				{
-					var lastPlayer = game.players()[game.currentPlayer()];
-					var nextPlayer = (game.currentPlayer()+1)%game.players().length;
-					
-					var flow = lastPlayer.totalFlow();
-					flow = JSON.parse(JSON.stringify(flow))
-					//TODO -- synthetics might be a problem
-					for(var construction of lastPlayer.constructions())
-					{
-						if(flow.totals[construction.name]!=0) 
-							construction.number(construction.number()+flow.totals[construction.name]);
-					}
-					
-					game.currentPlayer(nextPlayer);
-					lastPlayer.addCards(cards.draw(lastPlayer.cards().length?2:3));
-					game.mode("invention");
-					game.cardsSelected([]);
-				}
-			}
-			game.errors = ko.pureComputed( function() {
-				var result = [];
-				if(game.mode()=="mainView")
-				{
-					player = game.players()[game.currentPlayer()];
-					var flow = player.totalFlow();
-					flow = JSON.parse(JSON.stringify(flow))
-					flow.inputs.manipulator = 0;
-					console.log(flow);
-					var manipUses = ['builders','operators','miners'];
-					for(var i of manipUses)
-					{
-						var value = Number(game[i]());
-						flow.inputs.manipulator += value;
-						flow.outputs[i] = flow.outputs[i]?value+flow.outputs[i]:value;
-						flow.totals[i] = flow.totals[i]?value+flow.totals[i]:value;
-					}
-					flow.totals.manipulator=game.manipulatorsLeft()
-					
-					for(var i in flow.inputs)
-					{
-						if(!flow.outputs[i] && flow.inputs[i])
-						{
-							result.push("Requires "+flow.inputs[i]+" "+i);
-						}
-						else if(flow.outputs[i]<flow.inputs[i])
-							result.push("Requires "+(flow.inputs[i]-flow.outputs[i])+" more "+i);
-					}
-					for(var construction of player.constructions())
-					{
-						if(!construction.type.isMachine && construction.activateCount() > construction.number())
-							result.push ("Burning "
-								+ (construction.activateCount()-construction.number()) 
-								+"more "+construction.name+" than you have!"
-							);
-						if(construction.type.limited 
-							&& construction.activateCount() 
-								> construction.number()*construction.type.limited
-						)
-							result.push("Used "+construction.activateCount()
-								+" " +construction.name+ ", only can use "
-								+construction.number()*construction.type.limited
-							);
-					}
-					//TODO: verify manipulator chain
-				}
-				return result;
-			});
-			
-			game.hasValidInstructions = ko.pureComputed(function (){
-				return game.errors().length==0;
-			});
-			
-			//invention
-			game.cardForInvention = ko.observable();
-			game.cardsSelected = ko.observableArray([]);
-			game.inventionName = ko.observable("null");
-			game.cardActivePlayer = ko.observable(0);
-			game.fuelToUse = ko.observable();
-			game.activePlayer = ko.computed (function (){
-				return (game.cardActivePlayer()+game.currentPlayer())%game.players().length;
-			});
-			game.possibleFuels = ko.pureComputed(function (){
-				var player = game.currentPlayer();
-				var sofar = {};
-				var result = [];
-				
-				for(var player of game.players())
-					for(var invention of player.constructions())
-						if(invention.type.inventor != player.name 
-							&& !sofar[invention.type.name]
-							&& !invention.type.isMachine)
-						{
-								sofar[invention.type.name] = true
-								result.push(invention.type.name);
-						}
-				return result;
-			});
-			game.finalizeInvention = function (){
-				var player = game.players()[game.currentPlayer()];
-				var effects = game.cardsSelected().map((card)=> card.effect);
-				effects = effects.length?effects.reduce((a,b)=> a.concat(b)):[];
-				var type = new ConstructionType(game.inventionName(),effects,player);
-				player.addConstruction(type,0);
-				console.log(type);
-				game.mode('mainView');
-			}
-			game.skipInventing = function (){
-				game.mode('mainView');
-			}
-			game.addCard = function (){
-				
-				var card = game.cardForInvention()
-				game.players()[game.currentPlayer()].cards.remove(card);
-				card = JSON.parse(JSON.stringify(card));
-				for(var effect of card.effect)
-					if(effect.target == '<Fuel>')
-					{
-						console.log("replaceing <Fuel> with "+game.fuelToUse());
-						effect.target = game.fuelToUse();
-						card.name = card.name.replace('<Fuel>',effect.target);
-					}
-					else console.log("effect "+effect.name+" has no Fuel!",effect,card.effect);
-				game.cardsSelected.push(card);
-				
-				game.cardActivePlayer((game.cardActivePlayer()+1)%game.players().length);
-			}
-			game.declineToAdd = function (){
-				game.cardActivePlayer((game.cardActivePlayer()+1)%game.players().length);
-			}
-
+			var game = Game();
 			function load()
-			{
+			{	
 				ko.applyBindings(game,document.getElementById('main'));
 			}
 		</script>
@@ -263,6 +37,7 @@
 			<!-- ko if:game.mode()=='invention' -->
 			
 				<h2>Active Player: <span data-bind="text:players()[activePlayer()].name"></span></h2> <br>
+				<h3>Phase: <span data-bind="text:game.mode()"></span></h3> <br>
 				Invention Name <input type = "text" data-bind="value:inventionName"></input> <br>
 				Next Card: <select data-bind=
 					"value:cardForInvention,
@@ -315,9 +90,21 @@
 					<span data-bind="text:capitalize($data)"></span>:
 					<input type="number" data-bind="value:game[$data]" ></input>
 					<!-- /ko -->
+					
+					<div data-bind="foreach:game.players()[game.currentPlayer()].constructions">
+						<div class = "section">
+							name: <span data-bind="text:name"></span>
+							<div data-bind="foreach:type.effects">
+								<div data-bind="text:name"></div>
+							</div>
+						</div>
+					</div>
 				<!-- /ko -->
 			</div>
 			<div data-bind="foreach:errors" class = "errors">
+				<span data-bind="text:$data"></span><br>
+			</div>
+			<div data-bind="foreach:warnings" class = "warnings">
 				<span data-bind="text:$data"></span><br>
 			</div>
 

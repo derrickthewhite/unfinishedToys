@@ -1,0 +1,30 @@
+<html>
+	<head>
+		<title>Techopoloy</title>
+		<link href="main.css" rel="stylesheet">
+		<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+		<script type="text/javascript" src= "tools.js"></script>
+		<script type="text/javascript" src= "cards.js"></script>
+		<script type="text/javascript" src= "construction.js"></script>
+		<script type="text/javascript" src= "player.js"></script>
+		<script type="text/javascript" src= "game.js"></script>
+		<script>
+			
+			
+			function load()
+			{	
+				var game = Game();
+			}
+			
+			function testCounts(){
+				var game = Game();
+				game.newPlayerName("Derrick");
+				game.addPlayer();
+				game.startGame();
+			}
+		</script>
+	</head>
+	<body onload="load()">
+
+	</body>
+<html>
