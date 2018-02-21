@@ -118,12 +118,29 @@ var Colony = function (name){
 	colony.validProjects = ko.pureComputed(function (){
 		
 		var result = [];
+		
 		for(var resource of colony.standingResources())
 		{
 			if(resource['build'])
 				result.push(resource['build']);
 		}
 		return result;
+	});
+	
+	colony.allProjects = ko.pureComputed(function (){
+		var result = [];
+		
+		for(var resource of colony.standingResources())
+		{
+			if(resource['build'])
+				result.push(resource['build']);
+			// ARE THESE REALLY PROJECTS?
+			for(var i of resource.actions){
+				result.push(resource['build']);
+			}
+		}
+		return result;
+
 	});
 	
 	colony.advanceProjects = function ()
