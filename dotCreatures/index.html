@@ -1,219 +1,441 @@
 <html>
 <head>
 	<title>Dot Creatures</title>
+	<link href="main.css" rel="stylesheet">
+	<!--<script src="http://cdnjs.cloudflare.com/ajax/libs/seedrandom/2.3.10/seedrandom.min.js"></script>-->
+	<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
+	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
+	<!--<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>-->
+	<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jscolor/2.0.4/jscolor.min.js"></script>-->
+	<!--<script type="text/javascript" src= "../../Tools/jscolor.js"></script>-->
+	
+	<script type="text/javascript" src ="creatureConfig.js"></script>
+	<script type="text/javascript" src ="habitat.js"></script>
+	<script type="text/javascript" src ="position.js"></script>
+	<script type="text/javascript" src ="creature.js"></script>
 	<script>
-		var creatureConfig = [
-			{
-				name:"plant",
-				color:"green",
-				growth: 20,
-				upkeep: 10,
-				move: 0,
-				startingStorage:10,
-				reproductionPoint:50,
-				reproductionCost:25,
-				consumes: []
-			},
-			{
-				name:"grazer",
-				color:"#aaaa00",
-				upkeep: 20,
-				move: 2,
-				startingStorage:100,
-				reproductionPoint:500,
-				reproductionCost:200,
-				consumes: [{name:"plant",effeciency:80}]
+	
+		//TODO: variable distances
+		/*
+			fractional steps
+			range number of steps
+			range reproductiveScatter
+			
+			Types: 
+				none
+				flat
+				range
+				multi-fractional // no done yet
+		*/
+		//TODO: less technical config setup
+		//TODO: seperate config and js files
+		//TODO: alter starting energy
+		//TODO: random introduction
+		//TODO: escape chance?
+		//TODO: minimum energy and corpses
+		//TODO: terrain!
+		//TODO: Creature Display and Editor!
+		
+		// from stack overflow
+		//TODO: make less repetitive!
+		ko.bindingHandlers.numericValue = { 
+			init : function(element, valueAccessor, allBindingsAccessor) { 
+				var underlyingObservable = valueAccessor(); 
+				var interceptor = ko.dependentObservable({ 
+					read: underlyingObservable, 
+					write: function(value) { 
+						if (!isNaN(value)) { 
+							underlyingObservable(parseFloat(value)); 
+						} 
+					} 
+				}); 
+				ko.bindingHandlers.value.init(element, function() { return interceptor }, allBindingsAccessor); 
+			}, 
+			update : function(element, valueAccessor, allBindingsAccessor) { 
+				var underlyingObservable = valueAccessor(); 
+				var interceptor = ko.dependentObservable({ 
+					read: underlyingObservable, 
+					write: function(value) { 
+						if (!isNaN(value)) { 
+							underlyingObservable(parseFloat(value)); 
+						} 
+					} 
+				}); 
+				ko.bindingHandlers.value.update(element, function() { return interceptor }, allBindingsAccessor); 
 			}
-		];
+		}; 
+		var root = {};
+		root.distanceTypes = ['flat','none','range'];
+		root.creatureTypes = undefined;
+		root.edit = ko.observable(false);
+		root.taxonomyName = ko.observable("Default Creatures");
+		root.taxonomyList = ko.observableArray([]);
+		root.taxonomyNameToLoad = ko.observable("Default Creatures");
+		root.existingHabitatNames = ko.observableArray([]);
+		root.newHabitatName = ko.observable("");
+		root.loadSaveErrors= ko.observable("");
+		root.saveCreatureTypes = function (){
+			root.loadSaveErrors(saveCreatureTypes(root.taxonomyName(),root.creatureTypes()));
+			root.taxonomyList(JSON.parse(window.localStorage['TaxonomyNameList']));
+		}
+		root.updateCreatureTypes = function (){
+			root.loadSaveErrors(saveCreatureTypes(root.taxonomyNameToLoad(),root.creatureTypes(),true));
+			root.taxonomyList(JSON.parse(window.localStorage['TaxonomyNameList']));
+		}
+		root.deleteCreatureTypes = function (){
+			window.localStorage.removeItem(root.taxonomyNameToLoad());
+			root.taxonomyList.remove(root.taxonomyNameToLoad());
+			window.localStorage['TaxonomyNameList'] = JSON.stringify(root.taxonomyList());
+		}
+		root.loadCreatureTypes = function (){
+			try{var typeConfig = JSON.parse(window.localStorage[root.taxonomyNameToLoad()]);}
+			catch (e) { root.loadSaveErrors("something went wrong with the parsing!"); return;}
+			
+			initializeCreatureTypes(typeConfig);
+			loadConfig(emptyConfig);
+			root.resetHabitat()
+		}
+		root.editCreature = function (creature){
+			root.currentCreatureType(creature);
+			root.edit(true);
+		};
+		root.newCreatureType = function (){
+			var newType = CreatureType({name:"New Creature"});
+			root.creatureTypes.push(newType);
+			root.currentCreatureType(newType);
+			root.configVariables.addCreatureType(newType.name);
+			root.edit(true);
+		};
 		var startingConfig ={
 			creatureCounts:{
-				"plant":300,
-				"grazer":20,
+				"plant": 1200,
+				//"cactus": 400,
+				//"flower": 800,
+				//"grazer":50,
+				"lazy grazer":100,
+				"carnivore":10
 			},
 			dimensions:{
-				x:20,
-				y:20
+				x:30,
+				y:30
 			},
+			seed:"derrick",
 			scale:10,
-			tickTime: 500 //in milliseconds
-		}
-		var nextCreatureID = 10000;
-		var Creature = function (creatureType,startingPosition){
-			var creature = {};
-			creature.type = creatureType;
-			creature.id = nextCreatureID++;
-			creature.position = startingPosition;
-			creature.energy = creatureType.startingStorage;
-			return creature;
-		}
-		var Position = function (x,y)
-		{
-			var position = {};
-			position.x = x;
-			position.y=y;
-			position.hash = function (){
-				return x+"|"+y;
-			}
-			return position;
-		}
-		var positionFromHash = function (hash)
-		{
-			return {x:Number(hash.split("|")[0]),y:Number(hash.split("|")[1])};
-		}
-		var randomPosition = function (){
-			return Position(Math.floor(Math.random()*startingConfig.dimensions.x),Math.floor(Math.random()*startingConfig.dimensions.x));
-		}
-		var creaturesByPosition = {};
-		var creatures = [];
-		var initializeCreatures = function (){
-			var creatureTypesByName = {};
-			for(var type of creatureConfig)creatureTypesByName[type.name]=type;
-			for(var i in startingConfig.creatureCounts)
-			{
-				//TODO: input validation!
-				for(var creatureCount = 0; creatureCount< startingConfig.creatureCounts[i];creatureCount++ )
-				{
-					if(!creatureTypesByName[i]) {
-						console.log("bad creature type given! "+i+" does not exist in creature config!");
-						continue;
-					}
-					var creature = new Creature(creatureTypesByName[i],randomPosition());
-					creatures.push(creature);
-					if(!creaturesByPosition[creature.position.hash()])creaturesByPosition[creature.position.hash()]=[];
-					creaturesByPosition[creature.position.hash()].push(creature);
-				}
-			}
-		}
-		var positionIsValid = function(position)
-		{
-			return position.x>=0 && position.y>=0 && position.x < startingConfig.dimensions.x && position.y < startingConfig.dimensions.y;
-		}
-		//TODO: better name? its a position from another position
-		var generatePosition = function(startingPosition,distance){
-			//TODO: distance as a random percentage of possible
-			var direction = Math.floor(Math.random()*4);// NESW -> 0123
-			return Position(
-				startingPosition.x+(direction%2*(2-direction))*distance,
-				startingPosition.y+((direction+1)%2)*(1-direction)*distance
-			);
-
-		}
-		var tick = function ()
-		{
-			//shuffle creatures
-			//TODO
-			var removedCreatureIds = [];
-			for(var creature of creatures)
-			{
-				if(removedCreatureIds[creature.id])continue;
-				for(var move =0;move<creature.type.move;move++)
-				{
-					//move phase
-					//generate move direction
-					do{
-						var position = generatePosition(creature.position,1);
-					} while (!positionIsValid(position))
-					// move creature in mapkey
-					if(!creaturesByPosition[creature.position.hash()])creaturesByPosition[creature.position.hash()]=[];
-					creaturesByPosition[creature.position.hash()]=creaturesByPosition[creature.position.hash()].filter(a => a.id != creature.id);
-					if(!creaturesByPosition[position.hash()])creaturesByPosition[position.hash()]=[];
-					creaturesByPosition[position.hash()].push(creature);
-					creature.position=position;
-					//eat phase
-					for(possibleFood of creaturesByPosition[position.hash()])
-					{
-						var eatingEntry = creature.type.consumes.filter(a => possibleFood.type.name == a.name)[0];
-						if(eatingEntry)// TODO: I don't like that method of seaching
-						{
-							console.log("EAT!");
-							creaturesByPosition[possibleFood.position.hash()]=creaturesByPosition[possibleFood.position.hash()].filter(a => a.id != possibleFood.id);
-							removedCreatureIds[possibleFood]=true;
-							creature.energy += possibleFood.energy* eatingEntry.effeciency/100;
-						}
-					}
-					//TODO: reverse check!
-				}
-			}
-			creatures = creatures.filter(a => !removedCreatureIds[a.id]);
-			var removedCreatureIds = [];
-			
-			//TODO: order creatures in positionMap!
-			for(var creature of creatures)
-			{
-				//growth phase
-				//TODO: shade competition!
-				if(creature.type.growth && creaturesByPosition[creature.position.hash()][0] == creature)creature.energy += creature.type.growth;
-				
-				//upkeep phase
-				creature.energy-=creature.type.upkeep;
-				//TODO: minimum enenergys
-				if(creature.energy<0) 
-				{
-					if(creature.type.name == 'grazer')
-					{
-						console.log("grazer has "+creature.energy);
-					}
-					removedCreatureIds[creature.id]=true;
-					creaturesByPosition[creature.position.hash()]=creaturesByPosition[creature.position.hash()].filter(a => a.id != creature.id);
-				}
-				//reproduction phase
-				if(creature.type.reproductionPoint <= creature.energy)
-				{
-					//TODO: reproductive scatter!
-					do{
-						var position = generatePosition(creature.position,1);
-					}while (!positionIsValid(position))
-					var baby = Creature(creature.type,position);
-					creatures.push(baby);
-					if(!creaturesByPosition[position.hash()])creaturesByPosition[position.hash()]=[];
-					creaturesByPosition[position.hash()].push(baby);
-				}
-			}
-			creatures = creatures.filter(a => !removedCreatureIds[a.id]); 
-			draw();
-			console.log("num creatures: ",creatures.length);
-			console.log("Grazers",creatures.filter(a => a.type.name == "grazer").length);
-			console.log("Plants",creatures.filter(a => a.type.name == "plant").length);
-			window.setTimeout(tick,startingConfig.tickTime);
+			tickTime: 5, //in milliseconds
+			displayTime:50 //in milliseconds
 		}
 		
+		var emptyConfig = {
+			creatureCounts:{},
+			dimensions:{
+				x:100,
+				y:40
+			},
+			seed:"derrick",
+			scale:10,
+			tickTime: 5, //in milliseconds
+			displayTime:50 //in milliseconds
+		};
+		
+		root.configVariables = {
+			dimensions:{
+				x:ko.observable(10),
+				y:ko.observable(10)
+			},
+			seed:ko.observable("random"),
+			scale: ko.observable(10),
+			tickTime: ko.observable(5),
+			displayTime: ko.observable(50),
+			creatures: ko.observableArray([]),
+			addCreatureType: function (nameFunction){
+				root.configVariables.creatures.push({
+					name:ko.computed(nameFunction),
+					count:ko.observable(0)
+				})
+			}
+		};
+		
+		root.resetHabitat= function (){
+			var config = buildConfig();
+			habitat = habitat = initializeHabitat(config,types);
+			root.reports.numTicks = ko.pureComputed(function (){
+				if(!habitat || !habitat.numTicks || !habitat.numTicks()) return 0;
+				return habitat.numTicks();
+			});
+			draw();
+		}
+		root.addNewCreature = function (){
+			var type = root.currentCreatureType();
+			var creature = Creature(type,habitat.randomPosition(),type.reproductionPoint()- type.reproductionCost(),habitat.numTicks());
+			habitat.addCreature(creature);
+			if(!habitat.run) draw();
+		}
+		var loadConfig =function (config)
+		{
+			root.configVariables.dimensions.x(config.dimensions.x);
+			root.configVariables.dimensions.y(config.dimensions.y);
+			['seed','scale','tickTime','displayTime','creatures'].
+				forEach(attribute => root.configVariables[attribute](config[attribute]));
+			root.configVariables.creatures([]);
+			/*
+			types.creatureTypes().forEach(creature=> root.configVariables.creatures.push({
+				name:ko.observable(creature.name),
+				count:ko.observable(0)
+			}));
+			//*/
+			//TODO: the wrapping on this is getting stupid!
+			types.creatureTypes().forEach(creature => root.configVariables.addCreatureType(creature.name));
+			for(var creature in config.creatureCounts)
+			{
+				root.configVariables.creatures().filter(a => ko.unwrap(a.name) == creature)[0].count(config.creatureCounts[creature]);
+			}
+		}
+		var buildConfig = function (){
+			var result = {};
+			result.dimensions={};
+			result.dimensions.x = root.configVariables.dimensions.x();
+			result.dimensions.y = root.configVariables.dimensions.y();
+			['seed','scale','tickTime','displayTime','creatures'].
+				forEach(attribute => result[attribute] = root.configVariables[attribute]());
+			result.creatureCounts = {};
+			for(var creature of root.configVariables.creatures())
+				result.creatureCounts[creature.name()] = creature.count();
+			return result;
+		}
+
+		var storeConfig = function () {
+			var config = {};
+			config.dimensions = habitat.canvas.dimensions;
+			config.scale = habitat.canvas.scale;
+			config.tickTime = root.configVariables.tickTime();
+			config.displayTime = root.configVariables.displayTime();
+			config.creatureCounts = [];
+			for(var creature of reportTotals)
+			{
+				if(creature.name != 'total'){
+					config.creatureCounts[creature.name]=creature.count;
+				}
+			}
+			//TODO: FINISH!
+		}
+		
+		var start = function (){
+			habitat.run = true;
+			window.setTimeout(habitat.tick,startingConfig.tickTime);
+			window.setTimeout(display,startingConfig.displayTime);
+		}
+		var display = function (){
+			root.reports.creatureCounts(reportTotals());
+			draw();
+			window.setTimeout(display,startingConfig.displayTime);
+		}
 		var draw = function(){
-			//TODO: should some of this be in initialize?
 			var canvas = document.getElementById('display');
-			canvas.width = startingConfig.scale*startingConfig.dimensions.x;
-			canvas.height = startingConfig.scale*startingConfig.dimensions.y;
-			var scale = startingConfig.scale;
+			var frame = document.getElementById('canvasFrame');
+			var config = habitat.canvas;
+			canvas.width = config.scale*config.dimensions.x;
+			canvas.height = config.scale*config.dimensions.y;
+			frame.width = config.scale*config.dimensions.x;
+			frame.height = config.scale*config.dimensions.y;
+			var scale = config.scale;
 			if(canvas.getContext)
 			{
 				var ctx = canvas.getContext('2d');
-				ctx.fillRect(0,0,scale*startingConfig.dimensions.x,scale*startingConfig.dimensions.y,"grey");
-				for(var creature of creatures)
+				ctx.fillStyle="grey";
+				ctx.fillRect(0,0,scale*config.dimensions.x,scale*config.dimensions.y);
+				for(var creature of habitat.creatures)
 				{
-					ctx.fillStyle = creature.type.color;
-					ctx.beginPath();
-					ctx.arc(
-						creature.position.x*scale + scale/2,
-						creature.position.y*scale +scale/2, 
-						scale/2,
-						0,
-						Math.PI*2
-					);
-					ctx.fill();
+					var positionArray = habitat.creaturesByPosition[creature.position.hash()];
+					positionArray.sort((a,b)=> a.type.displayOrder() == b.type.displayOrder()? a.id<b.id? -1:1: a.type.displayOrder() < b.type.displayOrder()? -1:1);
+					if(positionArray[positionArray.length-1]==creature)
+					{
+						ctx.fillStyle = creature.type.color();
+						ctx.beginPath();
+						ctx.arc(
+							creature.position.x*scale + scale/2,
+							creature.position.y*scale +scale/2, 
+							scale/2,
+							0,
+							Math.PI*2
+						);
+						ctx.fill();
+					}
 				}
 			} else {
-			  //TODO: if canvas is not supported scream!
+			  document.getElementById("error").innerHTML = "you are using a very old browser that can't run this program!"
 			}
 		}
-		
+		var reportTotals = function ()
+		{
+			var total = habitat.creatures.length;
+			result = [];
+			var counts = {};
+			for(var creature of habitat.creatures)
+			{
+				if(!counts[creature.type.name()])counts[creature.type.name()]=0;
+				counts[creature.type.name()]++;
+			}
+			for(type in counts)
+			{
+				result.push({name:type,count:counts[type]});
+			}
+			result.sort((a,b)=>a.name.localeCompare(b.name));
+			result.unshift({name:'total',count:total});
+			return result;
+		}
+		root.reports = {};
+		root.reports.creatureCounts = ko.observableArray([]);
+		root.reports.numTicks = ko.pureComputed(function (){
+			if(!habitat || !habitat.numTicks || !habitat.numTicks()) return 0;
+			return habitat.numTicks();
+		});
+		root.currentCreatureType = ko.observable(ko.unwrap(types.creatureTypes)[0]);
+		var habitat = undefined;
 		var main = function (){
-			initializeCreatures();
+			initializeCreatureTypes(creatureConfig);
+			loadConfig(startingConfig);
+			
+			root.taxonomyList(JSON.parse(window.localStorage['TaxonomyNameList']));
+			root.creatureTypes = types.creatureTypes;
+			habitat = initializeHabitat(startingConfig,types);
+			ko.applyBindings(root,document.getElementById('TextDisplay'));
 			draw();
-			window.setTimeout(tick,startingConfig.tickTime);
 		}
 	</script>
 </head>
 <body onload="main()">
-	<div id="error"> </div>
-	<canvas id = "display" width="200" height="200"></canvas>
+	<div id = "canvasFrame">
+		<!-- canvas only shrinks properly if placed inside a div and THAT is manipulated-->
+		<canvas id = "display" width="200" height="200"></canvas>
+	</div>
+	<div id = "textDisplay"> 
+		<div id="error"> </div>
+		<div id = "totalsReport" data-bind="foreach:reports.creatureCounts">
+			<div><span data-bind="text:name"></span>:<span data-bind="text:count"></span></div>
+		</div>
+		<div>Time: <span data-bind="text:reports.numTicks"></span></div>
+		<button onclick="habitat.run = false">Halt</button>
+		<button onclick="start()">Start</button>
+		<br>
+		<div data-bind="with:configVariables" class = "HabitatEdit">
+			Width <input type="number" data-bind="numericValue:dimensions.x"/><br/>
+			Height <input type="number" data-bind="numericValue:dimensions.y"/><br/>
+			Scale <input type="number" data-bind="numericValue:scale"/><br/>
+			Time for cycle <input type="number" data-bind="numericValue:tickTime"/><br/>
+			Time to display <input type="number" data-bind="numericValue:displayTime"/><br/>
+			<table data-bind="foreach:creatures">
+				<!--Name: <select type="text" data-bind="options:$root.creatureTypes().map(a => a.name), value:name"></select> -->
+				<tr><td>Name: <span data-bind="text:name()" class="configNamePresentation"></span></td>
+				<td>Number: <input type="number" data-bind="numericValue:count"></input></td></tr>
+			</table>
+			
+			<button data-bind="click:$root.resetHabitat"> Use new Habitat </button><br>
+			
+			New Habitat Name<input data-bind="value:$root.newHabitatName"> </input>
+			<button data-bind="click:$root.saveHabitat">Save Habitat Numbers</button><br>
+			Exiting Habitats<select data-bind="options:$root.existingHabitatNames"> </select>
+			<button data-bind="click:$root.saveHabitat">Overwrite Habitat Numbers</button>
+			<button data-bind="click:$root.saveHabitat">Load Habitat Numbers</button>
+		</div>
+		Creatures <select data-bind="options:creatureTypes, value:currentCreatureType, optionsText: 'name'"></select>
+		<button data-bind="click:$root.addNewCreature"> Drop in Creature </button>
+		<div data-bind="with:currentCreatureType" class = "SpeciesEdit">
+			<!-- ko if: $root.edit -->
+			name: <input type="text" data-bind="value:name"></span><br>
+			color: <input type ="color" data-bind="value:color"><br>
+			growth: <input type="number" min =0 step =1 data-bind="numericValue:growth"></input><br>
+			upkeep: <input type="number" min =0 step =1 data-bind="numericValue:upkeep"></input><br>
+			move: <span data-bind="with:move">
+				<select data-bind="options:$root.distanceTypes, value:type"></select>
+				<!-- ko if:type() == "flat" -->
+				<input type ="number" min=0 step=1 data-bind="numericValue:flatMove"></input>
+				<!-- /ko -->
+				<!-- ko if:type() == "range" -->
+				<input type ="number" min=0 step=1 data-bind="numericValue:minValue"></input>
+				<input type ="number" min=0 step=1 data-bind="numericValue:maxValue"></input>
+				<!-- /ko -->
+			</span><br>
+			Consumes: <span data-bind="foreach:consumes">
+				<div>
+					<select data-bind="options:$root.creatureTypes().map(a => a.name).filter(a=>$parent.name!=a), value:name"> 
+					effeciency: <input type = "number" min=0 max = 100 data-bind="numericValue:effeciency"></input>
+					<button data-bind="click:$parent.removeConsumes">Remove</button>
+				</div>
+			</span><br>
+			<button data-bind="click:addConsumes">Add To Menu</button><br>
+			Energy At Birth: <input type="number" min =0 step =1 data-bind="numericValue:startingStorage"></input><br>
+			Energy At Reproduction: <input type="number" min =0 step =1 data-bind="numericValue:reproductionPoint"></input><br>
+			Reproduction Cost: <input type="number" min =0 step =1 data-bind="numericValue:reproductionCost"></input><br>
+			<!-- TODO: standardize distance interface! -->
+			Seed Scatter: <span data-bind="with:reproductiveScatter">
+				<select data-bind="options:$root.distanceTypes, value:type"></select>
+				<!-- ko if:type() == "flat" -->
+				<input type ="number" min=0 step=1 data-bind="numericValue:flatMove"></input>
+				<!-- /ko -->
+				<!-- ko if:type() == "range" -->
+				<input type ="number" min=0 step=1 data-bind="numericValue:minValue"></input>
+				<input type ="number" min=0 step=1 data-bind="numericValue:maxValue"></input>
+				<!-- /ko -->
+			</span><br>
+			Display Priority: <input type="text" min =0 step =1 data-bind="value:displayOrder"></input><br>
+			<button data-bind= "click:function () {$root.edit(false)}">Lock</button>
+			<!-- /ko -->
+
+			
+			<button data-bind= "click:$root.newCreatureType">New Species</button>
+		</div>
+		<div data-bind="foreach: $root.creatureTypes">
+			<div class="float">
+				name: <span data-bind="text:name"></span> <br>
+				color: <div data-bind="style: {'background-color': color, width: '20px', height: '17px', display:'inline-block'}"></div> <br>
+				growth: <span data-bind="text:growth"></span><br>
+				upkeep: <span data-bind="text:upkeep"></span><br>
+				move: <span data-bind="with:move">
+					<span data-bind="text:type"></span>
+					<!-- ko if:type() == "flat" -->
+					<span data-bind="text:flatMove"></span>
+					<!-- /ko -->
+					<!-- ko if:type() == "range" -->
+					<span data-bind="text:minValue"></span>
+					<span data-bind="text:maxValue"></span>
+					<!-- /ko -->
+				</span><br>
+				<div>
+					Consumes: <span data-bind="foreach:consumes">
+						<div>
+							<span data-bind="text:name"></span>
+							<span data-bind="text:effeciency"></span>
+						</div>
+					</span>
+				</div>
+				Energy At Birth: <span data-bind="text:startingStorage"></span><br>
+				Energy At Reproduction: <span data-bind="text:reproductionPoint"></span><br>
+				Reproduction Cost: <span data-bind="text:reproductionCost"></span><br>
+				<!-- TODO: standardize distance interface! -->
+				Seed Scatter: <span data-bind="with:reproductiveScatter">
+					<span data-bind="text:type"></span>
+					<!-- ko if:type() == "flat" -->
+					<span data-bind="text:flatMove"></span>
+					<!-- /ko -->
+					<!-- ko if:type() == "range" -->
+					<span data-bind="text:minValue"></span>
+					<span data-bind="text:maxValue"></span>
+					<!-- /ko -->
+				</span><br>
+				Display Priority: <span data-bind="text:displayOrder"></span><br>
+			<button data-bind= "click:$root.editCreature">Edit</button>
+			</div>
+		</div>
+		<div>
+			Name: <select type = "text" data-bind = "options:taxonomyList,value:taxonomyNameToLoad"></select>
+			<button data-bind= "click:loadCreatureTypes">Load Creature Types</button>
+			<button data-bind= "click:updateCreatureTypes">Update Creature Types</button>
+			<button data-bind= "click:deleteCreatureTypes">Delete Creature Types</button><br>
+			Name: <input type = "text" data-bind = "value:taxonomyName"></input>
+			<button data-bind= "click:saveCreatureTypes">Save Creature Types</button>
+			<span data-bind="text:loadSaveErrors"></span>
+		</div>
+	</div>
 </body>
 </html>

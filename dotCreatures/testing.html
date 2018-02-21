@@ -1,0 +1,245 @@
+<html>
+<head>
+	<title>Dot Creature Tests</title>
+	<!--<script src="http://cdnjs.cloudflare.com/ajax/libs/seedrandom/2.3.10/seedrandom.min.js"></script>-->
+	<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
+	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
+	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
+	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+	<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jscolor/2.0.4/jscolor.min.js"></script>-->
+	<!--<script type="text/javascript" src= "../../Tools/jscolor.js"></script>-->
+	
+	<script type="text/javascript" src ="creatureConfig.js"></script>
+	<script type="text/javascript" src ="habitat.js"></script>
+	<script type="text/javascript" src ="position.js"></script>
+	<script type="text/javascript" src ="creature.js"></script>
+	<script>
+
+	var simpleConfig = {
+		creatureCounts:{
+			"flower": 4,
+			"lazy grazer":1
+		},
+		dimensions:{
+			x:3,
+			y:3
+		},
+		seed:"test",
+		scale:10,
+		tickTime: 50, //in milliseconds
+		displayTime:50 //in milliseconds
+	};
+	var nullHabitat = {
+		creatureCounts:{},
+		dimensions:{
+			x:3,
+			y:3
+		},
+		seed:"test",
+		scale:10,
+		tickTime: 50, //in milliseconds
+		displayTime:50 //in milliseconds
+	};
+function runTests(){
+	initializeCreatureTypes();
+	testCreatureInitialization();
+	testPosition();
+	testReproduction();
+	testDistance();
+	testGrowth();
+	testRemoval();
+	testEating();
+}
+
+function testMovement(){
+	
+}
+
+function testEating (){
+	var habitat = initializeHabitat(nullHabitat);
+	var plant = new Creature(types.byName()["plant"],Position(0,0),0);
+	var plantA = new Creature(types.byName()["plant"],Position(1,0),40);
+	var plantB = new Creature(types.byName()["plant"],Position(1,0),40);
+	var plantX = new Creature(types.byName()["plant"],Position(0,1),20);
+	var plantT = new Creature(types.byName()["plant"],Position(2,0),20);
+	var weed = new Creature(types.byName()["cactus"],Position(2,0),20);
+	var animal = new Creature(types.byName()["grazer"],Position(1,1),8);
+	
+	for(var c of [plant,plantA,plantB,plantX,plantT,weed,animal]) habitat.addCreature(c);
+	//grazer should eat plants at 70% to pass
+	//grazer should not eat carnivores or cactus to pass
+	//carnvivore should eat grazer at 50% to pass
+	habitat.eatingAction(animal);
+	test(animal.energy,8,"eating an empty plate","eating");
+	habitat.moveCreature(animal,Position(0,1));
+	habitat.eatingAction(animal);
+	habitat.flushRemovedCreatures();
+	test(animal.energy,22,"eating a plant","eating");
+	test(habitat.creaturesByPosition["0|1"].length,1,"plant X removed","eating");
+	habitat.eatingAction(animal);
+	test(animal.energy,22,"test eating the same creature twice","eating");
+	habitat.moveCreature(animal,Position(1,0));
+	habitat.eatingAction(animal);
+	test(animal.energy,50,"test eating one at a time","eating");
+	test(habitat.creaturesByPosition["1|0"].length,2,"test eating one at a time","eating");
+	habitat.eatingAction(animal);
+	test(animal.energy,78,"test eating on the same square twice","eating");
+	test(habitat.creaturesByPosition["1|0"].length,1,"test eating one at a time","eating");
+	habitat.eatingAction(animal);
+	test(animal.energy,78,"test eating on the same square thrice with two targets","eating");
+	test(habitat.creaturesByPosition["1|0"].length,1,"test eating one at a time","eating");
+	habitat.moveCreature(animal,Position(0,0));
+	habitat.eatingAction(animal);
+	test(animal.energy,78,"test eating an empty creature (energy)","eating");
+	test(habitat.creaturesByPosition["0|0"].length,1,"test eating an empty creature (removal)","eating");
+	habitat.moveCreature(animal,Position(2,0));
+	habitat.eatingAction(animal);
+	test(animal.energy,92,"test selecting the right creature to eat","eating");
+	test(habitat.creaturesByPosition["2|0"].length,2,"test selection (removal)","eating");
+	habitat.eatingAction(animal);
+	test(animal.energy,92,"test not eating things not on your list","eating");
+	test(habitat.creaturesByPosition["2|0"].length,2,"test not eating (removal)","eating");
+
+	reportErrors("eating");
+}
+
+function testGrowth(){
+	var habitat = initializeHabitat(nullHabitat);
+	var plantA = new Creature(types.byName()["plant"],Position(0,0),20);
+	var plantB = new Creature(types.byName()["plant"],Position(0,0),20);
+	
+	habitat.addCreature(plantA);
+	habitat.addCreature(plantB);
+	habitat.growCreature(plantA);
+	habitat.growCreature(plantB);
+	test(plantA.energy,40,"grow on top","growth");
+	test(plantB.energy,20,"wilt on bottom","growth");
+	reportErrors("growth");
+}
+
+function testRemoval(){
+	var habitat = initializeHabitat(nullHabitat);
+	var plantA = new Creature(types.byName()["plant"],Position(0,0),20);
+	var plantB = new Creature(types.byName()["plant"],Position(0,0),20);
+	var animal = new Creature(types.byName()["lazy grazer"],Position(1,1),8);
+	var animal2 = new Creature(types.byName()["lazy grazer"],Position(1,1),8);
+	
+	
+	
+	habitat.addCreature(plantA);
+	habitat.addCreature(plantB);
+	habitat.addCreature(animal);
+	habitat.addCreature(animal2);
+	habitat.removeCreatureFromLists(animal2);
+	habitat.flushRemovedCreatures();
+	test(habitat.creaturesByPosition["1|1"].length,1,"animal 2 removed","removal");
+	test(habitat.creatures.length,3,"removed animal 2 from creature list","removal");
+	habitat.upkeepAndStarvation(plantB);
+	test(habitat.creaturesByPosition["0|0"].length,2,"bottom flower not removed yet","removal");
+	habitat.upkeepAndStarvation(plantB);
+	habitat.upkeepAndStarvation(plantB);
+	habitat.flushRemovedCreatures();
+	test(habitat.creaturesByPosition["0|0"].length,1,"removed bottom flower","removal");
+	test(habitat.creatures.length,2,"removed bottom flower from creature list","removal");
+	
+	habitat.upkeepAndStarvation(animal);
+	test(habitat.creaturesByPosition["1|1"].length,1,"animal not removed yet","removal");
+	habitat.upkeepAndStarvation(animal);
+	habitat.flushRemovedCreatures();
+	test(habitat.creaturesByPosition["1|1"].length,0,"removed animal","removal");
+	test(habitat.creatures.length,1,"removed animal from creature list","removal");
+	
+	reportErrors("removal");
+}
+
+function testPosition(){
+	Math.seedrandom("test");
+	test(0,0,"sample Test","position");
+	test(generatePositionChange(Position(0,0),1).x,1,"west move.","position");//W
+	test(generatePositionChange(Position(0,0),1).x,-1,"east move.","position");//E
+	test(generatePositionChange(Position(0,0),2).x,2,"double move.","position");//W
+	test(generatePositionChange(Position(0,0),10).x,-10,"double move.","position");//E
+	test(generatePositionChange(Position(0,0),0).x,0,"null move.","position");//E
+	Math.random(); //E
+	Math.random(); //E
+	test(generatePositionChange(Position(0,0),1).y,1,"north move.","position");//N (line 8)
+	reportErrors("position");
+}
+
+function testDistance (){
+	Math.seedrandom("test");
+	test(Distance(1).type(),"flat","plain number to type (type)","distance");
+	test(Distance(1).generateDistance(),1,"plain number to type (value)","distance");
+	test(Distance(4).generateDistance(),4,"flat default long range","distance");
+	test(Distance({flatMove:5}).generateDistance(),5,"no type flat test","distance");
+	test(Distance({type:"flat",flatMove:8}).generateDistance(),8,"flat test","distance");
+	test(Distance({type:"none"}).generateDistance(),0,"none test","distance");
+	var range = Distance({type:"range",minValue:1,maxValue:10});
+	test(range.generateDistance(),range.distance(),"memory test","distance")
+	var results = [];
+	for(var i = 0;i<1000;i++){
+		if(!results[range.generateDistance()]) results[range.distance()]=1; 
+		else results[range.distance()]++;
+	}
+	test(results[0],undefined,"minmum range boundaries","distance");
+	test(results[11],undefined,"maximum range boundaries","distance");
+	testRange(results[1]/results[4],.8,1.2,"selection ratio (1 vs 2)","distance");
+	testRange(results[1]/results[3],.8,1.2,"selection ratio (1 vs 3)","distance");
+	testRange(results[2]/results[3],.8,1.2,"selection ratio (2 vs 3)","distance");
+
+	reportErrors("distance");
+}
+
+function testReproduction (){
+	nextCreatureID=1000;
+	var habitat = initializeHabitat(simpleConfig,types);
+	var creature = habitat.creatures[4]
+	creature.energy = 499;
+	habitat.reproduceCreatureIfViable(creature);
+	if(habitat.creatures.length != 5) errors.push("reproduced at under level");
+	creature.energy = 500;
+	habitat.reproduceCreatureIfViable(creature);
+	if(habitat.creatures.length != 6) errors.push("failed to reproduce!");
+	else {
+		var baby = habitat.creatures[5];
+		if(creature.energy != 470) errors.push("failed to pay reproduction cost!");
+		test(baby.type.name(),"lazy grazer","baby type test","reproduction");
+		test(baby.id,1005,"baby id test","reproduction");
+		test(baby.position.hash(),"1|1","baby location test","reproduction");
+		test(baby.energy,8,"baby energy test","reproduction");
+	}
+	Math.seedrandom("test");
+	var creature = habitat.creatures[0];
+	creature.energy = 80;
+	habitat.reproduceCreatureIfViable(creature);
+
+	reportErrors("reproduction");
+}
+
+function testCreatureInitialization (){
+	var habitat = initializeHabitat(simpleConfig,types);
+	console.log(habitat);
+	var positions = ["2|1","2|0","1|0","1|0","2|1"];
+	for(var i =0;i<positions.length;i++)
+		if(positions[i]!=habitat.creatures[i].position.hash())
+			errors.push("InitializeHabitat Error! position "+i+" should be "+ positions[i]+" but is "+habitat.creatures[i].position.hash());
+	reportErrors("initialization");
+}
+function test(actual,target,comment,module){
+	if(actual != target) errors.push(module+" error! " +comment+" Should have been "+target+" was "+actual);
+}
+function testRange(actual,targetMin,targetMax,comment,module){
+	if(actual < targetMin || actual > targetMax) errors.push(module+" error! " +comment+" Should have been between "+targetMin+" and "+targetMax+" was "+actual);
+}
+var errors = [];
+function reportErrors (module)
+{
+	if(errors.length) errors.forEach(e => console.log(e));
+	else console.log("no errors in "+module);
+	errors = [];
+}
+</script>
+</head>
+<body onload="runTests()">
+</body>
+</html>
