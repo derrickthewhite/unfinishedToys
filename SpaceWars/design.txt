@@ -1,0 +1,49 @@
+Planet
+	Population Alligance
+	Production
+	Occupation Force Needed? TODO....
+
+Infantry
+	Power
+	Space
+	Cost
+
+Ships
+	Speed
+	Attack
+		Power
+		Cost
+	Transport
+		Cost
+
+Terran Federation
+	Infantry
+		Power:	10
+		Space:	1
+		Cost:	10
+	Speed:		10
+	Transport
+		Cost:	5
+	Attack:
+		Power:	10
+		Cost:	10
+
+Star Wars
+	Infantry
+		Power:	5
+		Space:	1
+		Cost:	3
+	Speed:		15
+	Transport
+		Cost:	6
+	Attack
+		Power: 10
+		Cost: 12
+
+Planet: 
+	Location
+	Production Rate
+	Production Type
+	Owner
+	Status		// Pacified, Occupied, Sidelined
+	Stationed Units
