@@ -39,6 +39,19 @@
 		function distance(a,b){
 			return Math.sqrt((a.x -b.x)*(a.x -b.x) +(a.y -b.y)*(a.y -b.y));
 		}
+		//TODO: should random tools be in their own tools file?
+		//fisher-yates shuffle algorithm
+		function shuffleArray(a)
+		{
+			 var j, x, i;
+			for (i = a.length - 1; i > 0; i--) {
+				j = Math.floor(Math.random() * (i + 1));
+				x = a[i];
+				a[i] = a[j];
+				a[j] = x;
+			}
+			return a;
+		}
 		function randomGausian(average,dev)
 		{
 			var u = 0, v = 0;
@@ -60,9 +73,9 @@
 			game.createGame(factions,config.map,20);
 			
 			
-			var view = View(factions[0]);
+			var view = View(game,factions[0]);
 			view.currentPlanet(game.galaxy()[0]);
-			var ai = AI(config.factionByName["Chinese"]);
+			var ai = AI(game,config.factionByName["Chinese"]);
 			console.log("AI analysis",ai.strongPositions(game.galaxy(),game.movingFleets()));
 			
 			root.game = game;

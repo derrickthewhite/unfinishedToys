@@ -17,9 +17,11 @@ function buildSetting(numStars, dimensions, cultures){
 	locations = locations.map(function (a){ return {location:a,production:Math.floor(Math.pow(6,randomGausian(1,.5)))}});
 	var totalProduction = locations.reduce((sofar,a)=> a.production+sofar,0);
 	var productionSum = 0;
+	var worldNamesByCultures = cultures.map(culture => shuffleArray(JSON.parse(JSON.stringify(culture.planetNames))));
 	locations.forEach(a => {
 		productionSum += a.production;
 		var culture = productionSum<totalProduction/2?cultures[0]:cultures[1];
+		var worldNames = productionSum<totalProduction/2?worldNamesByCultures[0]:worldNamesByCultures[1];
 		var startingUnits = [];
 		for(var unitType of culture.units)
 		{

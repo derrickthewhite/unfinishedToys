@@ -1,4 +1,4 @@
-function View(activePlayer){
+function View(game,activePlayer){
 	var view = {};
 
 	view.drawMode = false;

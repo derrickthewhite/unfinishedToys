@@ -1,4 +1,4 @@
-function AI(ownerID){
+function AI(game,ownerID){
 	var ai = {};
 	ai.owner = ownerID;
 	
