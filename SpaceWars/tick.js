@@ -1,6 +1,6 @@
 function tick(){
 	drawMode=false;
-	for(var order of root.orders())
+	for(var order of game.orders())
 	{
 		var planet = order.origin;
 		var activeFleet = planet.fleets().filter(a=>a.owner()==order.owner)[0];
@@ -28,9 +28,9 @@ function tick(){
 		}
 		planet.orders.remove(order);
 		var fleet = order.fleet;
-		root.movingFleets.push(MovingFleet(fleet,order.origin.location,order.destination));
+		game.movingFleets.push(MovingFleet(fleet,order.origin.location,order.destination));
 	}
-	for(var movingFleet of root.movingFleets()){
+	for(var movingFleet of game.movingFleets()){
 		movingFleet.move();
 		if(movingFleet.position == movingFleet.destination)
 		{
@@ -48,11 +48,11 @@ function tick(){
 			else 
 				planet.fleets.push(movingFleet.fleet);
 			
-			root.movingFleets.remove(movingFleet);
+			game.movingFleets.remove(movingFleet);
 		}
 	}
-	console.log(root.galaxy());
-	for(var planet of root.galaxy())
+	console.log(game.galaxy());
+	for(var planet of game.galaxy())
 	{
 		//Do production before combat so we can fairly defeat all troops and take over planet
 		//TODO: produce less depending on planet's status.
@@ -78,7 +78,7 @@ function tick(){
 			var defendFleets = [];
 			var attackFleets=[];
 			for(var fleet of planet.fleets())
-				if(root.diplomacy.factionRelations[fleet.owner().name][planet.fleets()[0].owner().name]=="warring")
+				if(game.diplomacy.factionRelations[fleet.owner().name][planet.fleets()[0].owner().name]=="warring")
 					attackFleets.push(fleet);
 				else defendFleets.push(fleet);
 			//Space Mode
@@ -113,7 +113,7 @@ function tick(){
 			defendFleets.forEach( fleet => fleet.takeCausulties('infantry',remainingTroops[1]/troopPower[1]));
 		}
 		planet.fleets().filter(planet => planet.empty()).forEach(fleet => planet.fleets.remove(fleet));
-		if(root.diplomacy.status(planet.fleets().map(fleet=> fleet.owner().name)) == "unified" && planet.fleets()[0].owner().name != planet.owner().name)
+		if(game.diplomacy.status(planet.fleets().map(fleet=> fleet.owner().name)) == "unified" && planet.fleets()[0].owner().name != planet.owner().name)
 			planet.owner(planet.fleets()[0].owner());
 	}
 	drawMode=true;

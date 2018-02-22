@@ -31,7 +31,7 @@ function Planet (name,production, location, culture, owner, fleets){
 	
 	planet.status = ko.pureComputed(function (){
 		var forceLoyalties = planet.fleets().map(a=>a.owner().name);
-		var warStatus = root.diplomacy.status(forceLoyalties);
+		var warStatus = game.diplomacy.status(forceLoyalties);
 		if(warStatus == "warring") return "Battleground";
 		if(forceLoyalties.indexOf(planet.culture.name)==-1) return "Occupied"; 
 		return "Peaceful";

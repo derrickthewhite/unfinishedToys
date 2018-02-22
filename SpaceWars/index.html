@@ -3,12 +3,19 @@
 <head>
 	<title>Space Wars</title>
 	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
+	<script type="text/javascript" src="../../Tools/laconic.js"></script>
 	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
 	<!--<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>-->
+	<!--
 	<script type="text/javascript" src= "https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.5/require.min.js"></script>
+	<script type="text/javascript" src= "https://cdnjs.cloudflare.com/ajax/libs/require-text/2.0.12/text.js"></script>
+	<!--<script type="text/javascript" src= "https://cdnjs.cloudflare.com/ajax/libs/require-text/2.0.12/text.min.js"></script>-->
 	<!--<script type="text/javascript" src= "../../Tools/require.js"></script>-->
+	<!-- Am I actually using Konva? I don't think so -->
+	<!--
 	<script src="https://cdn.rawgit.com/konvajs/konva/1.6.5/konva.js"></script>
 	<script type="text/javascript" src= "../../Tools/knockout-konva.js"></script>
+	-->
 	<script type="text/javascript" src= "planetNames.js"></script>
 	<script type="text/javascript" src= "planet.js"></script>
 	<script type="text/javascript" src= "units.js"></script>
@@ -46,9 +53,11 @@
 		view.currentPlanet= ko.observable();
 		view.currentFleet= ko.observable();
 		view.workingFleet= Fleet("",[],"Ground");
+		view.activePlayer= ko.observable();
 		view.viewMode = ko.observable("planet");
 		view.clickMode = ko.observable("display");
 		
+		//TODO: not entirely sure if that's view data or game
 		view.planetProductionOptions = ko.pureComputed(function (){
 			if(!view.currentPlanet())return [];
 			return view.currentPlanet().culture.units.concat({name:"peace"});
@@ -58,8 +67,7 @@
 			view.clickMode("destination");
 		}
 		view.sendAll = function (){
-			//TODO: current player to active player
-			var activeFleet = view.currentPlanet().fleets().filter(a=>a.owner()==game.currentPlayer())[0];
+			var activeFleet = view.currentPlanet().fleets().filter(a=>a.owner()==view.activePlayer())[0];
 			if(!activeFleet)return;
 			for(var i = 0;i<activeFleet.units().length;i++){
 				view.workingFleet.units()[i].count(activeFleet.units()[i].count());
@@ -67,8 +75,7 @@
 			view.clickMode("destination");
 		}
 		view.events.systemClick= function (planet){ 
-			//TODO: current player to active player
-			var activeFleet = planet.fleets().filter(a=>a.owner()==game.currentPlayer())[0]; 
+			var activeFleet = planet.fleets().filter(a=>a.owner()==view.activePlayer())[0]; 
 			if(!activeFleet)view.workingFleet.units([]);
 			else view.workingFleet.units(activeFleet.units().map(a=>Unit(a.type,a.owner,0)));
 			view.viewMode("planet");
@@ -82,6 +89,12 @@
 			view.currentFleet(order.fleet);
 			view.viewMode("fleet");
 		}
+		view.setForAllMyUnits = function (){
+			for(var planet of game.galaxy()){
+				if(planet.owner() == view.currentPlanet().owner())
+					planet.currentProduction(view.currentPlanet().currentProduction());
+			}
+		}
 		view.click = function (event){
 			var position = {x:event.offsetX,y:event.offsetY};
 			var scale = config.map.scale;
@@ -90,10 +103,7 @@
 			location.objects = getObjectsAtLocation(location);
 			if(view.clickMode()=="destination")
 			{
-				//TODO: current player to active player
-				view.currentPlanet().orders.push(Order(root.currentPlayer(),Fleet(root.currentPlayer(),view.workingFleet.units()),view.currentPlanet(),location));
-				
-				//TODO: current player to active player
+				view.currentPlanet().orders.push(Order(view.activePlayer(),Fleet(view.activePlayer(),view.workingFleet.units()),view.currentPlanet(),location));
 				view.events.systemClick(view.currentPlanet()); //TODO: odd, but does the job!
 				view.clickMode('select');
 			}
@@ -103,7 +113,6 @@
 		}
 		
 		var game = {};
-		game.currentPlayer= ko.observable(); //distinguish between current (game state) and active (interface user) player. 
 		game.players = ko.observableArray([]);
 		game.movingFleets= ko.observableArray([]);
 		
@@ -115,7 +124,6 @@
 			}
 			return orders;
 		});
-		
 
 		function getPlanetAtLocation(location){
 			return game.galaxy().filter(planet => planet.location.x == location.x && planet.location.y == location.y)[0];
@@ -135,12 +143,6 @@
 			)};
 		}
 
-		setForAllMyUnits = function (){
-			for(var planet of game.galaxy()){
-				if(planet.owner() == root.currentPlanet().owner())
-					planet.currentProduction(root.currentPlanet().currentProduction());
-			}
-		}
 		function draw(){
 			var canvas = document.getElementById('display');
 			var frame = document.getElementById('canvasFrame');
@@ -149,8 +151,6 @@
 			canvas.height = scale*config.map.y;
 			frame.width = scale*config.map.x;
 			frame.height = scale*config.map.y;
-			
-			canvas.addEventListener("click",root.click);
 
 			if(canvas.getContext)
 			{
@@ -178,7 +178,7 @@
 					ctx.fillText(planet.infoString(),planet.location.x*scale + scale,planet.location.y*scale +scale);
 					ctx.fillText(planet.name(),planet.location.x*scale + scale,planet.location.y*scale +scale+10);
 				}
-				for(var order of root.orders()){
+				for(var order of game.orders()){
 					ctx.fillStyle = order.owner.color;
 					ctx.strokeStyle = order.owner.color;
 					ctx.strokeStyle = '10px';
@@ -192,7 +192,7 @@
 					ctx.fillStyle = "white";
 					ctx.fillText(order.fleet.infoString(),order.midpoint.x*scale+scale/4,order.midpoint.y*scale+scale/2);
 				}
-				for(var movingFleet of root.movingFleets()){
+				for(var movingFleet of game.movingFleets()){
 					ctx.fillStyle = movingFleet.fleet.owner().color;
 					ctx.strokeStyle = movingFleet.fleet.owner().color;
 					ctx.beginPath();
@@ -222,33 +222,54 @@
 			}
 		}
 		function load(){
+			//TODO: separate into game load and screen load
 			initConfig();
 			var factions =[config.factionByName["English"],config.factionByName["Chinese"]];
 			game.galaxy = ko.observableArray(buildSetting(20,config.map,factions));
-			root.diplomacy = Diplomacy(factions); //TODO -- include in buildSetting?
-			root.currentPlanet(game.galaxy()[0]);
+			game.diplomacy = Diplomacy(factions); //TODO -- include in buildSetting?
+			view.currentPlanet(game.galaxy()[0]);
 			
 			var ai = AI(config.factionByName["Chinese"]);
-			console.log(ai.strongPositions(game.galaxy(),root.movingFleets()));
+			console.log(ai.strongPositions(game.galaxy(),game.movingFleets()));
 			
+			root.game = game;
+			root.view = view;
 			ko.applyBindings(root,document.getElementById('content'));
+			var canvas = document.getElementById('display');
+			canvas.addEventListener("click",view.click);
 			draw();
 			drawMode = true;
 		}
 		
 		ko.components.register('FleetDisplay',{
-			template:{require: 'fleet.html'}
+			viewModel: function fleetForDisplay(params){
+				this.fleet = params;
+			},
+			template: dom.div(
+				dom.div({'data-bind':'text:fleet.infoString'}),
+					dom.div(
+						{'data-bind':'foreach:fleet.units'},
+						dom.div(
+						dom.span({'data-bind':'text:count'}),
+						dom.span({'data-bind':'text:type.name'}),
+						dom.span({'data-bind':'if:power()'},
+							"with power",
+							dom.span({'data-bind':'text:power'})
+						)
+					)
+				)
+			).outerHTML
 		});
 
 	</script>
 </head>
 <body onload="load()">
 	<div id = "content">
-		<div>Current Player: <span data-bind="text:currentPlayer().name"></span></div>
-		<div data-bind="with: (viewMode() == 'fleet') && currentFleet()">
-			<div data-bind="component: {name: 'FleetDisplay', params:fleet}"></div>
+		<div>Current Player: <span data-bind="text:view.activePlayer().name"></span></div>
+		<div data-bind="with: (view.viewMode() == 'fleet') && view.currentFleet()">
+			<div data-bind="component: {name: 'FleetDisplay', params:view.currentFleet()}"></div>
 		</div>
-		<div data-bind="with: (viewMode() == 'planet') && currentPlanet()">
+		<div data-bind="with: (view.viewMode() == 'planet') && view.currentPlanet()">
 			<div data-bind = "text:name"></div>
 			<div data-bind = "text:id"></div>
 			<div > Production: <span data-bind = "text:production"></span></div>
@@ -270,7 +291,7 @@
 				</div>
 			</div>
 			ORDER:
-			<div data-bind="foreach:$root.workingFleet.units">
+			<div data-bind="foreach:$root.view.workingFleet.units">
 				<div>
 					<input type = "number" data-bind = "value:count"></input>
 					<span data-bind = "text:type.name"></span> 
@@ -280,8 +301,8 @@
 					</span>
 				</div>
 			</div>
-			<button data-bind = "click:$root.sendAll">Send All</button>
-			<button data-bind = "click:$root.setDestination">Set Destination</button>
+			<button data-bind = "click:$root.view.sendAll">Send All</button>
+			<button data-bind = "click:$root.view.setDestination">Set Destination</button>
 			<div data-bind="foreach:orders">
 				Destination:
 				<span data-bind="text:destination.planet.infoString"></span> at
@@ -298,8 +319,8 @@
 					</div>
 				</div>
 			</div>
-			<select data-bind = "options:$root.planetProductionOptions, optionsText:'name', value:currentProduction"></select>
-			<button data-bind = "click:setForAllMyUnits">Set For All</button><br>
+			<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:currentProduction"></select>
+			<button data-bind = "click:view.setForAllMyUnits">Set For All</button><br>
 		</div>
 		<button data-bind = "click:tick">Tick</button>
 	</div>

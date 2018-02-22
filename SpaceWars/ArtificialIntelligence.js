@@ -19,9 +19,11 @@ function AI(ownerID){
 		
 		for(var time = 0; time <= maxTime; time++)
 		{
+			//TODO: global access! shame! no! (of game)
+			// Or is that ok and everyone should see game?
 			planets.forEach(
 				planet =>
-				result[planet.id][time]={planet:planet,power:root.diplomacy.possibleStatus.reduce(
+				result[planet.id][time]={planet:planet,power:game.diplomacy.possibleStatus.reduce(
 					(out,status) => {out[status]=0; return out},[]
 				)}
 			);
@@ -29,7 +31,7 @@ function AI(ownerID){
 				fleet => 
 				fleet.destinations.forEach(
 					destination => 
-					result[destination.destination.id][time].power[root.diplomacy.factionRelations[ai.owner.name][fleet.fleet.owner().name]] += destination.distance<=time?fleet.fleet.power():0
+					result[destination.destination.id][time].power[game.diplomacy.factionRelations[ai.owner.name][fleet.fleet.owner().name]] += destination.distance<=time?fleet.fleet.power():0
 				)
 			);
 		}
