@@ -6,9 +6,6 @@ function buildSetting(numStars, dimensions, cultures){
 	//TODO: how to generate production size
 	//TODO: how to place empires
 	//TODO: round to perfect numbers?
-	console.log(cultures);
-	game.players(cultures);
-	view.activePlayer(cultures[0]); //ARG! this should not be set here! this function should only build the galaxy!
 	for(var i =0;i<numStars;i++)
 	{
 		locations.push({

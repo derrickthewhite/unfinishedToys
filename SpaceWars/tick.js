@@ -1,5 +1,5 @@
 function tick(){
-	drawMode=false;
+	view.drawMode=false; //TODO: move to view code
 	for(var order of game.orders())
 	{
 		var planet = order.origin;
@@ -34,7 +34,7 @@ function tick(){
 		movingFleet.move();
 		if(movingFleet.position == movingFleet.destination)
 		{
-			var planet = getPlanetAtLocation({x:movingFleet.destination.x(),y:movingFleet.destination.y()});
+			var planet = game.getPlanetAtLocation({x:movingFleet.destination.x(),y:movingFleet.destination.y()});
 			var activeFleet = planet?planet.fleets().filter(a=>a.owner()==movingFleet.fleet.owner())[0]:undefined;
 			if(activeFleet)
 				for(var unit of movingFleet.fleet.units())
@@ -116,6 +116,6 @@ function tick(){
 		if(game.diplomacy.status(planet.fleets().map(fleet=> fleet.owner().name)) == "unified" && planet.fleets()[0].owner().name != planet.owner().name)
 			planet.owner(planet.fleets()[0].owner());
 	}
-	drawMode=true;
-	draw();
+	drawMode=true; //TODO: move to view code
+	root.view.draw(); //TODO: Move to outer function, don't trigger automatically with tick
 }

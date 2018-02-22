@@ -23,12 +23,13 @@
 	<script type="text/javascript" src= "diplomacy.js"></script>
 	<script type="text/javascript" src= "galaxy.js"></script>
 	<script type="text/javascript" src= "tick.js"></script>
+	<script type="text/javascript" src= "game.js"></script>
+	<script type="text/javascript" src= "view.js"></script>
 	<!--  // TODO : build CSS! -->
 	<script type="text/javascript" src= "config.js"></script>
 	<script >
 
 		var root = {};
-		var drawMode = false;
 		var battleRate = .1;
 		//TODO: alter battle rate based on unit types and aggression
 		function battleRound(a,b){
@@ -48,187 +49,17 @@
 		//TODO: split root into game and view
 		//TODO: create interface between game and view
 		
-		var view = {};
+		var game = Game();
 
-		view.currentPlanet= ko.observable();
-		view.currentFleet= ko.observable();
-		view.workingFleet= Fleet("",[],"Ground");
-		view.activePlayer= ko.observable();
-		view.viewMode = ko.observable("planet");
-		view.clickMode = ko.observable("display");
-		
-		//TODO: not entirely sure if that's view data or game
-		view.planetProductionOptions = ko.pureComputed(function (){
-			if(!view.currentPlanet())return [];
-			return view.currentPlanet().culture.units.concat({name:"peace"});
-		})
-		view.events = {};
-		view.setDestination = function (){
-			view.clickMode("destination");
-		}
-		view.sendAll = function (){
-			var activeFleet = view.currentPlanet().fleets().filter(a=>a.owner()==view.activePlayer())[0];
-			if(!activeFleet)return;
-			for(var i = 0;i<activeFleet.units().length;i++){
-				view.workingFleet.units()[i].count(activeFleet.units()[i].count());
-			}
-			view.clickMode("destination");
-		}
-		view.events.systemClick= function (planet){ 
-			var activeFleet = planet.fleets().filter(a=>a.owner()==view.activePlayer())[0]; 
-			if(!activeFleet)view.workingFleet.units([]);
-			else view.workingFleet.units(activeFleet.units().map(a=>Unit(a.type,a.owner,0)));
-			view.viewMode("planet");
-			view.currentPlanet(planet);
-		}
-		view.events.fleetClick = function (fleet){
-			view.currentFleet(fleet);
-			view.viewMode("fleet");
-		}
-		view.events.orderClick = function (order){
-			view.currentFleet(order.fleet);
-			view.viewMode("fleet");
-		}
-		view.setForAllMyUnits = function (){
-			for(var planet of game.galaxy()){
-				if(planet.owner() == view.currentPlanet().owner())
-					planet.currentProduction(view.currentPlanet().currentProduction());
-			}
-		}
-		view.click = function (event){
-			var position = {x:event.offsetX,y:event.offsetY};
-			var scale = config.map.scale;
-			var location = {x:Math.floor(position.x/scale),y:Math.floor(position.y/scale)};
-			location.planet = getPlanetAtLocation(location);
-			location.objects = getObjectsAtLocation(location);
-			if(view.clickMode()=="destination")
-			{
-				view.currentPlanet().orders.push(Order(view.activePlayer(),Fleet(view.activePlayer(),view.workingFleet.units()),view.currentPlanet(),location));
-				view.events.systemClick(view.currentPlanet()); //TODO: odd, but does the job!
-				view.clickMode('select');
-			}
-			else if(location.objects.planets.length) view.events.systemClick(location.objects.planets[0]);
-			else if(location.objects.orders.length) view.events.orderClick(location.objects.orders[0]);
-			else if(location.objects.fleets.length) view.events.fleetClick(location.objects.fleets[0]);
-		}
-		
-		var game = {};
-		game.players = ko.observableArray([]);
-		game.movingFleets= ko.observableArray([]);
-		
-		game.orders = ko.pureComputed(function (){
-			var orders=[];
-			for(var planet of game.galaxy())
-			{
-				orders = orders.concat(planet.orders());
-			}
-			return orders;
-		});
-
-		function getPlanetAtLocation(location){
-			return game.galaxy().filter(planet => planet.location.x == location.x && planet.location.y == location.y)[0];
-		}
-		function getObjectsAtLocation(location){
-			return {planets : game.galaxy().filter(planet => 
-				planet.location.x == location.x 
-				&& planet.location.y == location.y
-			),
-			orders : game.orders().filter(order =>
-				Math.abs(order.midpoint.x - location.x)<1 
-				&& Math.abs(order.midpoint.y - location.y)<1
-			),
-			fleets : game.movingFleets().filter(fleet =>
-				Math.abs(fleet.position.x() - location.x)<1 
-				&& Math.abs(fleet.position.y() - location.y)<1
-			)};
-		}
-
-		function draw(){
-			var canvas = document.getElementById('display');
-			var frame = document.getElementById('canvasFrame');
-			var scale = config.map.scale;
-			canvas.width = scale*config.map.x;
-			canvas.height = scale*config.map.y;
-			frame.width = scale*config.map.x;
-			frame.height = scale*config.map.y;
-
-			if(canvas.getContext)
-			{
-				var ctx = canvas.getContext('2d');
-				ctx.fillStyle="black";
-				ctx.fillRect(0,0,scale*config.map.x,scale*config.map.y);
-				var scale = config.map.scale;
-				for(var planet of game.galaxy())
-				{
-					ctx.fillStyle = planet.owner().color;
-					ctx.strokeStyle = planet.culture.color;
-					ctx.lineWidth  = 2;
-					ctx.beginPath();
-					ctx.arc(
-						planet.location.x*scale + scale/2,
-						planet.location.y*scale +scale/2, 
-						scale/2,
-						0,
-						Math.PI*2
-					);
-					ctx.fill();
-					ctx.stroke();
-					ctx.fillStyle = "white";
-					ctx.fillText(planet.production,planet.location.x*scale + scale/4,planet.location.y*scale+scale*3/4);
-					ctx.fillText(planet.infoString(),planet.location.x*scale + scale,planet.location.y*scale +scale);
-					ctx.fillText(planet.name(),planet.location.x*scale + scale,planet.location.y*scale +scale+10);
-				}
-				for(var order of game.orders()){
-					ctx.fillStyle = order.owner.color;
-					ctx.strokeStyle = order.owner.color;
-					ctx.strokeStyle = '10px';
-					ctx.beginPath();
-					ctx.moveTo(order.origin.location.x*scale+scale/2,order.origin.location.y*scale+scale/2);
-					ctx.lineTo(order.destination.x*scale+scale/2,order.destination.y*scale+scale/2);
-					ctx.stroke();
-					
-					ctx.rect(order.midpoint.x*scale+scale/4,order.midpoint.y*scale+scale/4,scale/2,scale/2);
-					ctx.fill();
-					ctx.fillStyle = "white";
-					ctx.fillText(order.fleet.infoString(),order.midpoint.x*scale+scale/4,order.midpoint.y*scale+scale/2);
-				}
-				for(var movingFleet of game.movingFleets()){
-					ctx.fillStyle = movingFleet.fleet.owner().color;
-					ctx.strokeStyle = movingFleet.fleet.owner().color;
-					ctx.beginPath();
-					ctx.moveTo(movingFleet.position.x()*scale+scale/2,movingFleet.position.y()*scale+scale/2);
-					ctx.lineTo(movingFleet.destination.x()*scale+scale/2,movingFleet.destination.y()*scale+scale/2);
-					ctx.stroke();
-					
-
-					ctx.rect(movingFleet.position.x()*scale+scale/4,movingFleet.position.y()*scale+scale/4,scale/2,scale/2);
-					ctx.fill();
-					ctx.fillStyle = "white";
-					ctx.fillText(movingFleet.fleet.infoString(),movingFleet.position.x()*scale+scale/4,movingFleet.position.y()*scale+scale/2);
-
-				}
-			} else {
-			  document.getElementById("error").innerHTML = "you are using a very old browser that can't run this program!"
-			}
-
-
-		}
-		function initConfig(){
-			config.factionByName = [];
-			for(var faction of config.factions){
-				config.factionByName[faction.name]=faction;
-				for(var unit of faction.units)
-					if(!unit.name)unit.name = faction.name+" "+unit.type;
-			}
-		}
 		function load(){
-			//TODO: separate into game load and screen load
+			//TODO: separate into game load and view load
 			initConfig();
 			var factions =[config.factionByName["English"],config.factionByName["Chinese"]];
-			game.galaxy = ko.observableArray(buildSetting(20,config.map,factions));
-			game.diplomacy = Diplomacy(factions); //TODO -- include in buildSetting?
-			view.currentPlanet(game.galaxy()[0]);
+			game.createGame(factions,config.map,20);
 			
+			
+			var view = View(factions[0]);
+			view.currentPlanet(game.galaxy()[0]);
 			var ai = AI(config.factionByName["Chinese"]);
 			console.log(ai.strongPositions(game.galaxy(),game.movingFleets()));
 			
@@ -237,8 +68,8 @@
 			ko.applyBindings(root,document.getElementById('content'));
 			var canvas = document.getElementById('display');
 			canvas.addEventListener("click",view.click);
-			draw();
-			drawMode = true;
+			view.draw();
+			view.drawMode = true; // TODO: why is draw mode after draw()? show draw set draw mode to true?
 		}
 		
 		ko.components.register('FleetDisplay',{
@@ -265,11 +96,11 @@
 </head>
 <body onload="load()">
 	<div id = "content">
-		<div>Current Player: <span data-bind="text:view.activePlayer().name"></span></div>
-		<div data-bind="with: (view.viewMode() == 'fleet') && view.currentFleet()">
-			<div data-bind="component: {name: 'FleetDisplay', params:view.currentFleet()}"></div>
+		<div>Current Player: <span data-bind="text:$root.view.activePlayer().name"></span></div>
+		<div data-bind="with: ($root.view.viewMode() == 'fleet') && $root.view.currentFleet()">
+			<div data-bind="component: {name: 'FleetDisplay', params:$root.view.currentFleet()}"></div>
 		</div>
-		<div data-bind="with: (view.viewMode() == 'planet') && view.currentPlanet()">
+		<div data-bind="with: ($root.view.viewMode() == 'planet') && $root.view.currentPlanet()">
 			<div data-bind = "text:name"></div>
 			<div data-bind = "text:id"></div>
 			<div > Production: <span data-bind = "text:production"></span></div>
@@ -320,7 +151,7 @@
 				</div>
 			</div>
 			<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:currentProduction"></select>
-			<button data-bind = "click:view.setForAllMyUnits">Set For All</button><br>
+			<button data-bind = "click:$root.view.setForAllMyUnits">Set For All</button><br>
 		</div>
 		<button data-bind = "click:tick">Tick</button>
 	</div>

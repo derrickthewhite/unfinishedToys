@@ -38,7 +38,7 @@ function Fleet(owner,units,status)
 			if(unit.type.type == 'ship')ships+=unit.power();
 			if(unit.type.type == 'transport')transports+=unit.count();
 		}
-		if(drawMode)draw(); //TODO: Find best way to trigger a draw
+		if(drawMode)root.view.draw(); //TODO: Find best way to trigger a draw, make it not fail if there is no view!
 		return infantry+" "+ships+" "+transports;
 	});
 	
@@ -52,7 +52,7 @@ function Fleet(owner,units,status)
 function unitType(type,culture,power,speed,cost)
 {
 	var type = {};
-	type.type = type; //Differentiate between troop role and combat type
+	type.type = type; //TODO: Differentiate between troop role and combat type
 	type.speed = speed;
 	type.culture= culture;
 	type.power = power;

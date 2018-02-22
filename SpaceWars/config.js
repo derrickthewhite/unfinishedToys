@@ -45,3 +45,12 @@ var config = {
 		}
 	]
 };
+
+function initConfig(){
+	config.factionByName = [];
+	for(var faction of config.factions){
+		config.factionByName[faction.name]=faction;
+		for(var unit of faction.units)
+			if(!unit.name)unit.name = faction.name+" "+unit.type;
+	}
+}
