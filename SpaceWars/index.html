@@ -4,6 +4,7 @@
 	<title>Space Wars</title>
 	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
 	<script type="text/javascript" src="../../Tools/laconic.js"></script>
+	<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
 	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
 	<!--<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>-->
 	<!--
@@ -53,6 +54,7 @@
 
 		function load(){
 			//TODO: separate into game load and view load
+			Math.seedrandom("test");
 			initConfig();
 			var factions =[config.factionByName["English"],config.factionByName["Chinese"]];
 			game.createGame(factions,config.map,20);
@@ -90,20 +92,41 @@
 				)
 			).outerHTML
 		});
+		
+		ko.components.register("OrderDisplay",{
+			viewModel: function (params){
+				Object.keys(params).forEach(key => this[key]=params[key]);
+			},
+			template: dom.div(
+				"Destination:",
+				dom.span({"data-bind":"text:destination.planet.infoString"}), 
+				" at ",
+				dom.span({"data-bind":"text:destination.x"}),
+				", ",
+				dom.span({"data-bind":"text:destination.y"}),
+				dom.div({"data-bind":"component: {name: 'FleetDisplay', params:fleet}"})
+			).outerHTML
+		});
 
 	</script>
 </head>
 <body onload="load()">
 	<div id = "content">
 		<div>Current Player: <span data-bind="text:$root.view.activePlayer().name"></span></div>
-		<div data-bind="with: ($root.view.viewMode() == 'fleet') && $root.view.currentFleet()">
-			<div data-bind="text:infoString"></div>
-			<div data-bind="component: {name: 'FleetDisplay', params:$root.view.currentFleet()}"></div>
+		<div data-bind="with: ($root.view.viewMode() == 'fleet') && $root.view.currentMovingFleet()">
+			<div data-bind="text:fleet.infoString"></div>
+			<div data-bind="component: {name: 'FleetDisplay', params:fleet}"></div>
+		</div>
+		<div data-bind="with: ($root.view.viewMode() == 'order') && $root.view.currentOrder()">
+			<div data-bind="text:fleet.infoString"></div>
+			<div data-bind="component: {name: 'OrderDisplay', params:$data}"></div>
 		</div>
 		<div data-bind="with: ($root.view.viewMode() == 'planet') && $root.view.currentPlanet()">
 			<div data-bind = "text:name"></div>
 			<div data-bind = "text:id"></div>
-			<div > Production: <span data-bind = "text:production"></span></div>
+			<div > Industry: <span data-bind = "text:production"></span></div>
+			<div > Produced: <span data-bind = "text:currentProduction().name"></span></div>
+			<div > Producing: <span data-bind = "text:$root.view.planetProductionChange().name"></span></div>
 			<div> Culture: <span data-bind = "text:culture.name"></span></div>
 			<div> Status: <span data-bind = "text:status"></span></div>
 			<div data-bind = "text:infoString"></div>
@@ -126,14 +149,11 @@
 			<button data-bind = "click:$root.view.sendAll">Send All</button>
 			<button data-bind = "click:$root.view.setDestination">Set Destination</button>
 			<div data-bind="foreach:orders">
-				Destination:
-				<span data-bind="text:destination.planet.infoString"></span> at
-				<span data-bind="text:destination.x"></span>,
-				<span data-bind="text:destination.y"></span> 
-				<div data-bind="component: {name: 'FleetDisplay', params:fleet}"></div>
+				<div data-bind="component: {name: 'OrderDisplay', params:$data}"></div>
 			</div>
-			<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:currentProduction"></select>
-			<button data-bind = "click:$root.view.setForAllMyUnits">Set For All</button><br>
+			<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:$root.view.workingProduction"></select>
+			<button data-bind = "click:$root.view.setProductionForCurrentPlanet">Set Current Planet</button>
+			<button data-bind = "click:$root.view.setProductionForAllMyPlanets">Set For All Planets</button><br>
 		</div>
 		<button data-bind = "click:tick">Tick</button>
 	</div>

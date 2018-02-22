@@ -8,14 +8,14 @@ function Planet (name,production, location, culture, owner, fleets){
 	planet.culture = culture;
 	planet.name = ko.observable(name);
 	
-	planet.currentProduction = ko.observable(undefined);
+	planet.currentProduction = ko.observable({name:"peace"});
 	planet.fleets = ko.observableArray(fleets?fleets:[]);
 	planet.owner = ko.observable(owner);
 	
 	planet.orders = ko.observableArray([]);
 	
 	planet.productionType = ko.pureComputed(function (){
-		if(planet.currentProduction()==undefined) return 'P';
+		if(planet.currentProduction().type==undefined) return 'P';
 		switch (planet.currentProduction().type)
 		{
 			case 'infantry': return 'I';
@@ -25,7 +25,6 @@ function Planet (name,production, location, culture, owner, fleets){
 	});
 	
 	planet.infoString = ko.computed(function() {
-		if(root.view && root.view.drawMode && !planet.fleets().length)draw(); //TODO: Find best way to trigger a draw
 		return planet.productionType()+(planet.fleets().length? planet.fleets()[0].infoString():"0 0 0");
 	});
 	
@@ -38,4 +37,13 @@ function Planet (name,production, location, culture, owner, fleets){
 	});
 	
 	return planet;
+}
+
+function productionChange(planet,production)
+{
+	//TODO: check if valid?
+	var change = {};
+	change.planet = planet;
+	change.production = production;
+	return change;
 }

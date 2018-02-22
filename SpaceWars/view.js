@@ -3,8 +3,10 @@ function View(activePlayer){
 
 	view.drawMode = false;
 	view.currentPlanet= ko.observable();
-	view.currentFleet= ko.observable();
-	view.workingFleet= Fleet("",[],"Ground");
+	view.currentMovingFleet = ko.observable();
+	view.currentOrder= ko.observable();
+	view.workingFleet= Fleet("",[],"Ground"); //working Fleet is used to create orders
+	view.workingProduction = ko.observable();
 	view.activePlayer= ko.observable();
 	view.viewMode = ko.observable("planet");
 	view.clickMode = ko.observable("display");
@@ -12,8 +14,13 @@ function View(activePlayer){
 
 	view.planetProductionOptions = ko.pureComputed(function (){
 		if(!view.currentPlanet())return [];
-		return view.currentPlanet().culture.units.concat({name:"peace"});
-	})
+		return view.currentPlanet().culture.units.concat({name:"peace"}); //TODO: better empty unit placeholder
+	});
+	view.planetProductionChange = ko.pureComputed(function (){
+		if(!view.currentPlanet()) return {name:"peace"};
+		return game.productionChanges().filter( change => change.planet == view.currentPlanet()).map(change => change.production)[0]
+			|| {name:"peace"};
+	});
 	view.events = {};
 	view.setDestination = function (){
 		view.clickMode("destination");
@@ -34,17 +41,26 @@ function View(activePlayer){
 		view.currentPlanet(planet);
 	}
 	view.events.fleetClick = function (fleet){
-		view.currentFleet(fleet);
+		view.currentMovingFleet(fleet);
 		view.viewMode("fleet");
 	}
 	view.events.orderClick = function (order){
-		view.currentFleet(order.fleet);
-		view.viewMode("fleet");
+		view.currentOrder(order);
+		view.viewMode("order");
 	}
-	view.setForAllMyUnits = function (){
+	view.setProductionForAllMyPlanets = function (){
+		var productionChanges = [];
 		for(var planet of game.galaxy()){
-			if(planet.owner() == view.currentPlanet().owner())
-				planet.currentProduction(view.currentPlanet().currentProduction());
+			if(planet.owner() == view.activePlayer() && planet.culture.units.indexOf(view.workingProduction())!=-1)
+				productionChanges.push(productionChange(planet,view.workingProduction()));
+		}
+		game.addProductionChanges(productionChanges);
+		view.draw();
+	}
+	view.setProductionForCurrentPlanet = function (){
+		if(view.currentPlanet().owner() == view.activePlayer())
+		{
+			game.addProductionChanges(new productionChange(view.currentPlanet(),view.workingProduction()));
 		}
 	}
 	view.click = function (event){

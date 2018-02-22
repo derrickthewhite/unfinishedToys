@@ -52,7 +52,9 @@ function tick(){
 			game.movingFleets.remove(movingFleet);
 		}
 	}
-	console.log(game.galaxy());
+	for(var productionChange of game.productionChanges()){
+		productionChange.planet.currentProduction(productionChange.production);
+	}
 	for(var planet of game.galaxy())
 	{
 		//Do production before combat so we can fairly defeat all troops and take over planet
@@ -76,6 +78,7 @@ function tick(){
 		{
 			//TODO: 3+ factions!
 			//TODO: uneven casulties
+			//TODO: test cases!
 			var defendFleets = [];
 			var attackFleets=[];
 			for(var fleet of planet.fleets())
@@ -89,18 +92,22 @@ function tick(){
 			var power = [attackFleets.reduce((total,fleet)=>total+fleet.power(),0),
 				defendFleets.reduce((total,fleet)=>total+fleet.power(),0)
 			];
-			if(power[0]==power[1]) power[1]+=randomGausian(0,power[1]*battleRate);
-			var initalPower = power;
-			while(power[0] >0 && power[1] > 0)
-				power = battleRound(...power);
-			
-			var losingFleet = power[0]>0 ? defendFleets: attackFleets;
-			var winningFleet = power[1]>0 ? defendFleets: attackFleets;
-			var survivalRatio = power[0]>0? power[0]/initalPower[0]: power[1]/initalPower[1];
-			
-			losingFleet.forEach( fleet => fleet.takeCausulties('ship',0));
-			losingFleet.forEach( fleet => fleet.takeCausulties('transport',0));
-			winningFleet.forEach (fleet => fleet.takeCausulties('ship',survivalRatio));
+			if(power[1]!=0 && power[0]!=0) //don't run no contest battles
+			{
+				if(power[0]==power[1]) power[1]+=randomGausian(0,power[1]*battleRate);
+				var initalPower = power;
+				while(power[0] >0 && power[1] > 0)
+					power = battleRound(...power);
+				
+				var losingFleet = power[0]>0 ? defendFleets: attackFleets;
+				var winningFleet = power[1]>0 ? defendFleets: attackFleets;
+				var survivalRatio = power[0]>0? power[0]/initalPower[0]: power[1]/initalPower[1];
+				
+				losingFleet.forEach( fleet => fleet.takeCausulties('ship',0));
+				losingFleet.forEach( fleet => fleet.takeCausulties('transport',0));
+				winningFleet.forEach (fleet => fleet.takeCausulties('ship',survivalRatio));
+			}
+
 			
 			//Ground Mode
 			//TODO: Allow variations of the casulty rate!

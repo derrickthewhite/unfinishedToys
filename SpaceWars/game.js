@@ -3,6 +3,8 @@ function Game (){
 	game.players = ko.observableArray([]);
 	game.movingFleets= ko.observableArray([]);
 	
+	//Orders and production changes: attached to the game or to planets?
+	game.productionChanges = ko.observableArray([]);
 	game.orders = ko.pureComputed(function (){
 		var orders=[];
 		for(var planet of game.galaxy())
@@ -16,6 +18,12 @@ function Game (){
 		game.players(factions);
 		game.galaxy = ko.observableArray(buildSetting(numSystems,map,factions));
 		game.diplomacy = Diplomacy(factions); //TODO -- interactions with buildSetting?
+	}
+	
+	game.addProductionChanges = function (changes){
+		if(!Array.isArray(changes)) changes = [changes];
+		var preseveredChanges = game.productionChanges().filter(old => changes.map(c => c.planet).indexOf(old.planet)==-1);
+		game.productionChanges(preseveredChanges.concat(changes));
 	}
 
 	game.getPlanetAtLocation = function(location){
@@ -37,6 +45,3 @@ function Game (){
 	}
 	return game;
 }
-
-
-

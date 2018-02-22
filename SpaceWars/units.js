@@ -99,7 +99,7 @@ function MovingFleet(fleet,position,destination)
 	return mf;
 }
 
-
+//TODO: require carriers for troops
 function Order(owner,fleet,origin,destination)
 {
 	var order = {};
