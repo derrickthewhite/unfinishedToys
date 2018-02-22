@@ -1,5 +1,6 @@
+//TODO: faction into sub functions
 function tick(){
-	view.drawMode=false; //TODO: move to view code
+	root.view.drawMode=false; //TODO: move to view code
 	for(var order of game.orders())
 	{
 		var planet = order.origin;
@@ -108,7 +109,6 @@ function tick(){
 				defendFleets.reduce((total,fleet)=>total+fleet.troopPower(),0)
 			];
 			var remainingTroops = battleRound(...troopPower);
-			console.log("Ground Battle",remainingTroops[0]/troopPower[0],remainingTroops[1]/troopPower[1])
 			attackFleets.forEach( fleet => fleet.takeCausulties('infantry',remainingTroops[0]/troopPower[0]));
 			defendFleets.forEach( fleet => fleet.takeCausulties('infantry',remainingTroops[1]/troopPower[1]));
 		}

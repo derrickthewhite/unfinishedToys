@@ -25,7 +25,7 @@ function Planet (name,production, location, culture, owner, fleets){
 	});
 	
 	planet.infoString = ko.computed(function() {
-		if(drawMode && !planet.fleets().length)draw(); //TODO: Find best way to trigger a draw
+		if(root.view && root.view.drawMode && !planet.fleets().length)draw(); //TODO: Find best way to trigger a draw
 		return planet.productionType()+(planet.fleets().length? planet.fleets()[0].infoString():"0 0 0");
 	});
 	

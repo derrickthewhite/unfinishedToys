@@ -56,6 +56,7 @@ function View(activePlayer){
 		if(view.clickMode()=="destination")
 		{
 			view.currentPlanet().orders.push(Order(view.activePlayer(),Fleet(view.activePlayer(),view.workingFleet.units()),view.currentPlanet(),location));
+			view.draw();
 			view.events.systemClick(view.currentPlanet()); //TODO: odd, but does the job!
 			view.clickMode('select');
 		}
@@ -76,6 +77,7 @@ function View(activePlayer){
 
 		if(canvas.getContext)
 		{
+			console.log("drawing!");
 			var ctx = canvas.getContext('2d');
 			ctx.fillStyle="black";
 			ctx.fillRect(0,0,scale*config.map.x,scale*config.map.y);

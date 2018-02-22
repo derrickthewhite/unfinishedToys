@@ -61,7 +61,7 @@
 			var view = View(factions[0]);
 			view.currentPlanet(game.galaxy()[0]);
 			var ai = AI(config.factionByName["Chinese"]);
-			console.log(ai.strongPositions(game.galaxy(),game.movingFleets()));
+			console.log("AI analysis",ai.strongPositions(game.galaxy(),game.movingFleets()));
 			
 			root.game = game;
 			root.view = view;
@@ -72,21 +72,20 @@
 			view.drawMode = true; // TODO: why is draw mode after draw()? show draw set draw mode to true?
 		}
 		
+		//TODO: give component an input option as well
 		ko.components.register('FleetDisplay',{
 			viewModel: function fleetForDisplay(params){
-				this.fleet = params;
+				this.units = params.units;
 			},
 			template: dom.div(
-				dom.div({'data-bind':'text:fleet.infoString'}),
-					dom.div(
-						{'data-bind':'foreach:fleet.units'},
-						dom.div(
-						dom.span({'data-bind':'text:count'}),
-						dom.span({'data-bind':'text:type.name'}),
-						dom.span({'data-bind':'if:power()'},
-							"with power",
-							dom.span({'data-bind':'text:power'})
-						)
+				{'data-bind':'foreach:units'},
+				dom.div(
+					dom.span({'data-bind':'text:count'}),
+					" ",
+					dom.span({'data-bind':'text:type.name'}),
+					dom.span({'data-bind':'if:power()'},
+						" with power ",
+						dom.span({'data-bind':'text:power'})
 					)
 				)
 			).outerHTML
@@ -98,6 +97,7 @@
 	<div id = "content">
 		<div>Current Player: <span data-bind="text:$root.view.activePlayer().name"></span></div>
 		<div data-bind="with: ($root.view.viewMode() == 'fleet') && $root.view.currentFleet()">
+			<div data-bind="text:infoString"></div>
 			<div data-bind="component: {name: 'FleetDisplay', params:$root.view.currentFleet()}"></div>
 		</div>
 		<div data-bind="with: ($root.view.viewMode() == 'planet') && $root.view.currentPlanet()">
@@ -110,16 +110,7 @@
 			<div data-bind="foreach:fleets">
 				<div> Owner: <span data-bind="text:owner().name"><span></div>
 				<div data-bind = "text:infoString"></div>
-				<div data-bind="foreach:units">
-					<div>
-						<span data-bind = "text:count"></span>
-						<span data-bind = "text:type.name"></span>
-						<span data-bind = "if:power()">
-							with power
-							<span data-bind = "text:power"></span>
-						</span>
-					</div>
-				</div>
+				<div data-bind="component: {name: 'FleetDisplay', params:$data}"></div>
 			</div>
 			ORDER:
 			<div data-bind="foreach:$root.view.workingFleet.units">
@@ -139,16 +130,7 @@
 				<span data-bind="text:destination.planet.infoString"></span> at
 				<span data-bind="text:destination.x"></span>,
 				<span data-bind="text:destination.y"></span> 
-				<div data-bind="foreach:fleet.units">
-					<div>
-						<span data-bind = "text:count"></span>
-						<span data-bind = "text:type.name"></span>
-						<span data-bind = "if:power()">
-							with power
-							<span data-bind = "text:power"></span>
-						</span>
-					</div>
-				</div>
+				<div data-bind="component: {name: 'FleetDisplay', params:fleet}"></div>
 			</div>
 			<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:currentProduction"></select>
 			<button data-bind = "click:$root.view.setForAllMyUnits">Set For All</button><br>
