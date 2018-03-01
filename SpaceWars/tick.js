@@ -29,13 +29,13 @@ function tick(){
 		}
 		planet.orders.remove(order);
 		var fleet = order.fleet;
-		game.movingFleets.push(MovingFleet(fleet,order.origin.location,order.destination));
+		game.movingFleets.push(MovingFleet(fleet,order.origin.position,order.destination));
 	}
 	for(var movingFleet of game.movingFleets()){
 		movingFleet.move();
 		if(movingFleet.position == movingFleet.destination)
 		{
-			var planet = game.getPlanetAtLocation({x:movingFleet.destination.x(),y:movingFleet.destination.y()});
+			var planet = game.getPlanetAtPosition({x:movingFleet.destination.x(),y:movingFleet.destination.y()});
 			var activeFleet = planet?planet.fleets().filter(a=>a.owner()==movingFleet.fleet.owner())[0]:undefined;
 			if(activeFleet)
 				for(var unit of movingFleet.fleet.units())
@@ -60,7 +60,7 @@ function tick(){
 		//Do production before combat so we can fairly defeat all troops and take over planet
 		//TODO: produce less depending on planet's status.
 		var type = planet.currentProduction();
-		if(type){//TODO: accomodate Different production choices better
+		if(type && type.name != "peace"){//TODO: accomodate Different production choices better
 			var fleet = planet.fleets().filter(a=>a.owner() == planet.owner())[0];
 			if(!fleet){
 				fleet = new Fleet(planet.owner(),[]);

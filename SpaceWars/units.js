@@ -108,8 +108,8 @@ function Order(owner,fleet,origin,destination)
 	order.origin = origin;
 	order.destination = destination;
 	order.midpoint = {
-		x:order.origin.location.x/2+order.destination.x/2,
-		y:order.origin.location.y/2+order.destination.y/2
+		x:order.origin.position.x/2+order.destination.x/2,
+		y:order.origin.position.y/2+order.destination.y/2
 	};
 	return order;
 }

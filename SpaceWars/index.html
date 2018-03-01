@@ -60,14 +60,23 @@
 			var r = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
 			return average+r*dev;
 		}
-		//TODO: split root into game and view
 		//TODO: create interface between game and view
 		
 		var game = Game();
-
+		var ai = {};
 		function load(){
 			//TODO: separate into game load and view load
-			Math.seedrandom("test");
+			/*
+				Interesting Seeds:
+					9015: Big Green capital (Bacchus) with some supporters
+					9413: Gap between the two sides
+					2609: Green has most its power in the back
+			*/
+			var seed = Math.floor(Math.random()*10000);
+			seed = "test";
+			Math.seedrandom(seed);
+			console.log("seed",seed);
+			//Math.seedrandom("test");
 			initConfig();
 			var factions =[config.factionByName["English"],config.factionByName["Chinese"]];
 			game.createGame(factions,config.map,20);
@@ -75,8 +84,11 @@
 			
 			var view = View(game,factions[0]);
 			view.currentPlanet(game.galaxy()[0]);
-			var ai = AI(game,config.factionByName["Chinese"]);
+			ai = AI(game,factions[0]); //intentionally defined globally for testing
+			console.log("fleet movement", ai.fleetMovementMap(game.galaxy(),game.movingFleets()));
 			console.log("AI analysis",ai.strongPositions(game.galaxy(),game.movingFleets()));
+			console.log("attackAndAbandon",ai.attackAndAbandon());
+			console.log("Troop Movements",ai.troopMovements());
 			
 			root.game = game;
 			root.view = view;

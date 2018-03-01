@@ -1,10 +1,10 @@
 var nextPlanetID = 1000;
-function Planet (name,production, location, culture, owner, fleets){
+function Planet (name,production, position, culture, owner, fleets){
 	var planet = {};
 	
 	planet.id = nextPlanetID++;
 	planet.production = production;
-	planet.location = location;
+	planet.position = position;
 	planet.culture = culture;
 	planet.name = ko.observable(name);
 	

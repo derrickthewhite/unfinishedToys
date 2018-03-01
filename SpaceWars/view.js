@@ -67,8 +67,8 @@ function View(game,activePlayer){
 		var position = {x:event.offsetX,y:event.offsetY};
 		var scale = config.map.scale;
 		var location = {x:Math.floor(position.x/scale),y:Math.floor(position.y/scale)};
-		location.planet = game.getPlanetAtLocation(location);
-		location.objects = game.getObjectsAtLocation(location);
+		location.planet = game.getPlanetAtPosition(location);
+		location.objects = game.getObjectsAtPosition(location);
 		if(view.clickMode()=="destination")
 		{
 			view.currentPlanet().orders.push(Order(view.activePlayer(),Fleet(view.activePlayer(),view.workingFleet.units()),view.currentPlanet(),location));
@@ -93,7 +93,6 @@ function View(game,activePlayer){
 
 		if(canvas.getContext)
 		{
-			console.log("drawing!");
 			var ctx = canvas.getContext('2d');
 			ctx.fillStyle="black";
 			ctx.fillRect(0,0,scale*config.map.x,scale*config.map.y);
@@ -105,8 +104,8 @@ function View(game,activePlayer){
 				ctx.lineWidth  = 2;
 				ctx.beginPath();
 				ctx.arc(
-					planet.location.x*scale + scale/2,
-					planet.location.y*scale +scale/2, 
+					planet.position.x*scale + scale/2,
+					planet.position.y*scale +scale/2, 
 					scale/2,
 					0,
 					Math.PI*2
@@ -114,16 +113,16 @@ function View(game,activePlayer){
 				ctx.fill();
 				ctx.stroke();
 				ctx.fillStyle = "white";
-				ctx.fillText(planet.production,planet.location.x*scale + scale/4,planet.location.y*scale+scale*3/4);
-				ctx.fillText(planet.infoString(),planet.location.x*scale + scale,planet.location.y*scale +scale);
-				ctx.fillText(planet.name(),planet.location.x*scale + scale,planet.location.y*scale +scale+10);
+				ctx.fillText(planet.production,planet.position.x*scale + scale/4,planet.position.y*scale+scale*3/4);
+				ctx.fillText(planet.infoString(),planet.position.x*scale + scale,planet.position.y*scale +scale);
+				ctx.fillText(planet.name(),planet.position.x*scale + scale,planet.position.y*scale +scale+10);
 			}
 			for(var order of game.orders()){
 				ctx.fillStyle = order.owner.color;
 				ctx.strokeStyle = order.owner.color;
 				ctx.strokeStyle = '10px';
 				ctx.beginPath();
-				ctx.moveTo(order.origin.location.x*scale+scale/2,order.origin.location.y*scale+scale/2);
+				ctx.moveTo(order.origin.position.x*scale+scale/2,order.origin.position.y*scale+scale/2);
 				ctx.lineTo(order.destination.x*scale+scale/2,order.destination.y*scale+scale/2);
 				ctx.stroke();
 				
