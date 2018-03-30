@@ -4,7 +4,8 @@ var config = {
 	map:{
 		x:20,
 		y:10,
-		scale:40
+		scale:40,
+		border:20
 	},
 	factions:[
 		{

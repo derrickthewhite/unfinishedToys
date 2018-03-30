@@ -84,11 +84,14 @@
 			
 			var view = View(game,factions[0]);
 			view.currentPlanet(game.galaxy()[0]);
-			ai = AI(game,factions[0]); //intentionally defined globally for testing
+			ai = AI(game,factions[1]); //intentionally defined globally for testing
 			console.log("fleet movement", ai.fleetMovementMap(game.galaxy(),game.movingFleets()));
 			console.log("AI analysis",ai.strongPositions(game.galaxy(),game.movingFleets()));
 			console.log("attackAndAbandon",ai.attackAndAbandon());
-			console.log("Troop Movements",ai.troopMovements());
+			console.log("Troop Movements",ai.troopMovements().map(move =>
+				move.units +" from " + move.toMove.name()+" to " + move.destination.name()
+			));
+			console.log("PlanetPurchases",ai.purchaseChoices().map(purchase => purchase.planet.name()+" builds "+purchase.build));
 			
 			root.game = game;
 			root.view = view;

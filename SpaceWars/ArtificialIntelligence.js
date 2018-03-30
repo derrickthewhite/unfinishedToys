@@ -110,18 +110,17 @@ function AI(game,ownerID){
 		var horizon = ai.horizon(analysis);
 		
 		
-		//TODO: factor these functions 
-		var spareUnits = analysis.filter(planetHistory => planetHistory[0].planet.owner() == ai.owner).map(
-			planetHistory => { return{action:ai.planetsSpareUnits(planetHistory,horizon),planet:planetHistory[0].planet}}
-		);
-		
-		var planetStatus = analysis.filter(planetHistory => planetHistory[0].planet.owner() == ai.owner).map(
-			planetHistory => { return{action:ai.classifyFriendlyPlanetFuture(planetHistory,horizon),planet:planetHistory[0].planet}}
-		);
-
-		var targetStatus = analysis.filter(planetHistory => planetHistory[0].planet.owner() != ai.owner).map(
-			planetHistory => { return{action:ai.classifyEnemyPlanetBattleOdds(planetHistory,horizon),planet:planetHistory[0].planet}}
-		);
+		//TODO: factor these functions
+		function analyzePlanetsWithHorizon(tool,isOwner){
+			return analysis.filter(planetHistory => (planetHistory[0].planet.owner() == ai.owner)==isOwner).map(
+				planetHistory => { return{action:tool(planetHistory,horizon),planet:planetHistory[0].planet}}
+			);
+		}
+		var spareUnits = analyzePlanetsWithHorizon(ai.planetsSpareUnits,true);
+		var planetStatus = analyzePlanetsWithHorizon(ai.classifyFriendlyPlanetFuture,true);
+		planetStatus.forEach((planet,index)=>planet.units = spareUnits[index].action);
+		//TODO: target status distinguish between ally, neutral, and enemy
+		var targetStatus = analyzePlanetsWithHorizon(ai.classifyEnemyPlanetBattleOdds,false);
 		
 		return {enemyStatus:targetStatus,freindlyStatus:planetStatus,spareUnits:spareUnits,horizon:horizon};
 	}
@@ -138,14 +137,45 @@ function AI(game,ownerID){
 		
 	}
 	ai.troopMovements = function (){
+		//TODO: consider troops and ships separately
 		var toMove = ai.attackAndAbandon();
 		var retreats = toMove.freindlyStatus.filter(planet => planet.action == "abandon")
-			.map(planet => {return {toMove:planet.planet,destination: ai.rallyPoint(planet.planet,toMove.freindlyStatus).destination}});
-		
-		console.log("retreats",retreats);
+			.map(planet => {return {
+				toMove:planet.planet,
+				destination: ai.rallyPoint(planet.planet,toMove.freindlyStatus).destination,
+				units: -planet.units
+			}});
 		
 		var attacks = toMove.enemyStatus.filter(planet => planet.action > 0);
+		//TODO: don't attack if you will be overwhelmed
+		//TODO: time attacks to arrive all at the same time
+		//TODO: nearest isn't always best
+		
+		var hotSpots = attacks.map(a=>a.planet).concat(retreats.map(a=>a.destination));
+		
+		var moves = toMove.freindlyStatus.filter(planet => planet.action == "attack")
+			.map(planet => {
+				return {
+					toMove: planet.planet,
+					destination: hotSpots.reduce((a,b)=> distance(a.position,planet.planet.position) < distance(b.position,planet.planet.position)?a:b),
+					units:planet.units 
+				}
+			});
+		return moves.concat(retreats);
 	}
-	
+	ai.purchaseChoices = function (){
+		//TODO: consider transports and troop types
+		function choice (action){
+			switch(action){
+				case "abandon":
+				case "delay": return "troops";
+				case "reinforce":
+				case "attack": return "ships";
+			}
+		}
+		return ai.attackAndAbandon().freindlyStatus.map(planet => {
+			return {planet:planet.planet,build:choice(planet.action)};
+		});
+	}
 	return ai;
 }

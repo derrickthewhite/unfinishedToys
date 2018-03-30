@@ -42,7 +42,7 @@
 				{option:'Mother Nature',chance: 10 },
 				{option:'Things Fall Apart',chance: 10 },
 				{option:'Walkers and Shufflers',chance: 10 }
-			,
+			],
 			"Cosmic Rays":[
 				{option:'Mother Nature',chance: 10 },
 				{option:'Reign Of Steel',chance: 10 },
@@ -105,12 +105,12 @@
 </head>
 
 <body onload="onload()">
-
+Not entirely finished!
 <div id='display'> 
+	<button onclick='buildWorld()' >build World</button>
 	<div data-bind="foreach:worlds">
 		<div>PRIMARY CAUSE: <span data-bind="text:primary"></div>
 	</div>
-	<button onclick='buildWorld()' >build World</button>
 </div>
 
 
