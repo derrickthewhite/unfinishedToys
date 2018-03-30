@@ -133,6 +133,7 @@ function View(game,activePlayer){
 				ctx.fillText(planet.name(),xCorr + scale,yCorr +scale+10);
 			}
 			for(var order of game.orders()){
+				if(order.owner!=view.activePlayer())continue;
 				ctx.fillStyle = order.owner.color;
 				ctx.strokeStyle = order.owner.color;
 				ctx.strokeStyle = '10px';
