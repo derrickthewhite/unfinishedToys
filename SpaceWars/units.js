@@ -38,7 +38,8 @@ function Fleet(owner,units,status)
 			if(unit.type.type == 'ship')ships+=unit.power();
 			if(unit.type.type == 'transport')transports+=unit.count();
 		}
-		if(root.view && root.view.drawMode)root.view.draw(); //TODO: Find best way to trigger a draw, make it not fail if there is no view!
+		if(root.view && root.view.drawMode)
+			root.view.draw(); //TODO: Find best way to trigger a draw, make it not fail if there is no view!
 		return infantry+" "+ships+" "+transports;
 	});
 	

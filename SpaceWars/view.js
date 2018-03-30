@@ -83,17 +83,21 @@ function View(game,activePlayer){
 	}
 	
 	view.readyToTick = function(){
+		view.drawMode=false;
+		view.moveMode=false;
 		game.readyToTick(activePlayer);
-		drawMode=false;
-		moveMode=false;
 	}
 	view.takeTurn = function (){
+		view.drawMode=false;
+		view.drawMode=false;
 		view.draw();
-		drawMode=true;
-		moveMode=true;
+		view.drawMode=true;
+		view.moveMode=true;
 	}
 	//TODO: make this function need to be less public and called everywhere!
 	view.draw = function(){
+		view.drawMode=false;
+		console.trace();
 		var canvas = document.getElementById('display');
 		var frame = document.getElementById('canvasFrame');
 		var scale = config.map.scale;
@@ -154,15 +158,12 @@ function View(game,activePlayer){
 					order.midpoint.y*scale+config.map.border+scale/2);
 			}
 			for(var movingFleet of game.movingFleets()){
-				console.log("drawing moving fleet");
 				ctx.fillStyle = movingFleet.fleet.owner().color;
 				ctx.strokeStyle = movingFleet.fleet.owner().color;
 				ctx.beginPath();
 				ctx.moveTo(movingFleet.position.x()*scale+config.map.border+scale/2,movingFleet.position.y()*scale+config.map.border+scale/2);
 				ctx.lineTo(movingFleet.destination.x()*scale+config.map.border+scale/2,movingFleet.destination.y()*scale+config.map.border+scale/2);
 				ctx.stroke();
-				
-				console.log(movingFleet.position.x(),movingFleet.position.y(),"to",movingFleet.destination.x(),movingFleet.destination.y())
 				
 
 				ctx.rect(movingFleet.position.x()*scale+config.map.border+scale/4,movingFleet.position.y()*scale+config.map.border+scale/4,scale/2,scale/2);
@@ -174,6 +175,7 @@ function View(game,activePlayer){
 		} else {
 		  document.getElementById("error").innerHTML = "you are using a very old browser that can't run this program!"
 		}
+		view.drawMode=true;
 	}
 	
 	view.currentPlanet(game.galaxy()[0]);

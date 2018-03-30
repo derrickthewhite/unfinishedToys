@@ -45,7 +45,8 @@ function Game (){
 	//TODO: authenticate user giving command... far in future
 	game.addOrder = function(order){
 		//TODO: make game store orders, not planets!
-		//TODO: make orders resist being changed
+		//TODO: remove orders!
+		//TODO: make this the enforced canonical way
 		//TODO: reject invalid orders 
 		//	not enough transports
 		//	not enough units

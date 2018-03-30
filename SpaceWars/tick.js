@@ -1,6 +1,5 @@
-//TODO: faction into sub functions
+//TODO: factor into sub functions
 function tick(){
-	root.view.drawMode=false; //TODO: move to view code
 	for(var order of game.orders())
 	{
 		var planet = order.origin;
@@ -123,6 +122,4 @@ function tick(){
 		if(game.diplomacy.status(planet.fleets().map(fleet=> fleet.owner().name)) == "unified" && planet.fleets()[0].owner().name != planet.owner().name)
 			planet.owner(planet.fleets()[0].owner());
 	}
-	drawMode=true; //TODO: move to view code
-	root.view.draw(); //TODO: Move to outer function, don't trigger automatically with tick
 }
