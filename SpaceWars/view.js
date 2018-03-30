@@ -64,7 +64,7 @@ function View(game,activePlayer){
 		}
 	}
 	view.click = function (event){
-		var position = {x:event.offsetX,y:event.offsetY};
+		var position = {x:event.offsetX-config.map.border,y:event.offsetY-config.map.border};
 		var scale = config.map.scale;
 		var location = {x:Math.floor(position.x/scale),y:Math.floor(position.y/scale)};
 		location.planet = game.getPlanetAtPosition(location);
@@ -86,26 +86,28 @@ function View(game,activePlayer){
 		var canvas = document.getElementById('display');
 		var frame = document.getElementById('canvasFrame');
 		var scale = config.map.scale;
-		canvas.width = scale*config.map.x;
-		canvas.height = scale*config.map.y;
-		frame.width = scale*config.map.x;
-		frame.height = scale*config.map.y;
+		canvas.width = scale*config.map.x+config.map.border*2;
+		canvas.height = scale*config.map.y+config.map.border*2;
+		frame.width = scale*config.map.x+config.map.border*2;
+		frame.height = scale*config.map.y+config.map.border*2;
 
 		if(canvas.getContext)
 		{
 			var ctx = canvas.getContext('2d');
 			ctx.fillStyle="black";
-			ctx.fillRect(0,0,scale*config.map.x,scale*config.map.y);
+			ctx.fillRect(config.map.border,config.map.border,scale*config.map.x,scale*config.map.y);
 			var scale = config.map.scale;
 			for(var planet of game.galaxy())
 			{
+				var xCorr=planet.position.x*scale+config.map.border;
+				var yCorr=planet.position.y*scale+config.map.border
 				ctx.fillStyle = planet.owner().color;
 				ctx.strokeStyle = planet.culture.color;
 				ctx.lineWidth  = 2;
 				ctx.beginPath();
 				ctx.arc(
-					planet.position.x*scale + scale/2,
-					planet.position.y*scale +scale/2, 
+					xCorr + scale/2,
+					yCorr +scale/2, 
 					scale/2,
 					0,
 					Math.PI*2
@@ -113,30 +115,36 @@ function View(game,activePlayer){
 				ctx.fill();
 				ctx.stroke();
 				ctx.fillStyle = "white";
-				ctx.fillText(planet.production,planet.position.x*scale + scale/4,planet.position.y*scale+scale*3/4);
-				ctx.fillText(planet.infoString(),planet.position.x*scale + scale,planet.position.y*scale +scale);
-				ctx.fillText(planet.name(),planet.position.x*scale + scale,planet.position.y*scale +scale+10);
+				ctx.fillText(planet.production,xCorr + scale/4,yCorr+scale*3/4);
+				ctx.fillText(planet.infoString(),xCorr + scale,yCorr +scale);
+				ctx.fillText(planet.name(),xCorr + scale,yCorr +scale+10);
 			}
 			for(var order of game.orders()){
 				ctx.fillStyle = order.owner.color;
 				ctx.strokeStyle = order.owner.color;
 				ctx.strokeStyle = '10px';
 				ctx.beginPath();
-				ctx.moveTo(order.origin.position.x*scale+scale/2,order.origin.position.y*scale+scale/2);
-				ctx.lineTo(order.destination.x*scale+scale/2,order.destination.y*scale+scale/2);
+				ctx.moveTo(order.origin.position.x*scale+config.map.border+scale/2,
+					order.origin.position.y*scale+config.map.border+scale/2);
+				ctx.lineTo(order.destination.x*scale+config.map.border+scale/2,
+					order.destination.y*scale+config.map.border+scale/2);
 				ctx.stroke();
 				
-				ctx.rect(order.midpoint.x*scale+scale/4,order.midpoint.y*scale+scale/4,scale/2,scale/2);
+				ctx.rect(order.midpoint.x*scale+config.map.border+scale/4,
+					order.midpoint.y*scale+config.map.border+scale/4,scale/2,scale/2);
 				ctx.fill();
 				ctx.fillStyle = "white";
-				ctx.fillText(order.fleet.infoString(),order.midpoint.x*scale+scale/4,order.midpoint.y*scale+scale/2);
+				ctx.fillText(
+					order.fleet.infoString(),
+					order.midpoint.x*scale+config.map.border+scale/4,
+					order.midpoint.y*scale+config.map.border+scale/2);
 			}
 			for(var movingFleet of game.movingFleets()){
 				ctx.fillStyle = movingFleet.fleet.owner().color;
 				ctx.strokeStyle = movingFleet.fleet.owner().color;
 				ctx.beginPath();
-				ctx.moveTo(movingFleet.position.x()*scale+scale/2,movingFleet.position.y()*scale+scale/2);
-				ctx.lineTo(movingFleet.destination.x()*scale+scale/2,movingFleet.destination.y()*scale+scale/2);
+				ctx.moveTo(movingFleet.position.x()*scale+config.map.border+scale/2,movingFleet.position.y()*scale+config.map.border+scale/2);
+				ctx.lineTo(movingFleet.destination.x()*scale+config.map.border+scale/2,movingFleet.destination.y()*scale+config.map.border+scale/2);
 				ctx.stroke();
 				
 
