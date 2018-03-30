@@ -8,9 +8,13 @@ function buildSetting(numStars, dimensions, cultures){
 	//TODO: round to perfect numbers?
 	for(var i =0;i<numStars;i++)
 	{
+		//use floor for the moment -- doesn't stick things in margins
+		//var changeFunct = Math.round;
+		var changeFunct = Math.floor;
+		//var changeFunct = (a)=>a;
 		locations.push({
-			x:Math.round(Math.random()*dimensions.x),
-			y:Math.round(Math.random()*dimensions.y)}); 
+			x:changeFunct(Math.random()*dimensions.x),
+			y:changeFunct(Math.random()*dimensions.y)}); 
 	}
 	locations.sort((a,b)=>a.x==b.x?a.y<b.y?-1:1:a.x<b.x?-1:1);
 	locations = locations.filter((value,index,self) => index ==0 || self[index-1].x != value.x ||self[index-1].y != value.y);

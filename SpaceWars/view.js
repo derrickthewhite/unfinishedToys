@@ -94,6 +94,8 @@ function View(game,activePlayer){
 		if(canvas.getContext)
 		{
 			var ctx = canvas.getContext('2d');
+			ctx.fillStyle="#222222";
+			ctx.fillRect(0,0,scale*config.map.x+config.map.border*2,scale*config.map.y+config.map.border*2);
 			ctx.fillStyle="black";
 			ctx.fillRect(config.map.border,config.map.border,scale*config.map.x,scale*config.map.y);
 			var scale = config.map.scale;
