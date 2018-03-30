@@ -79,27 +79,19 @@
 			//Math.seedrandom("test");
 			initConfig();
 			var factions =[config.factionByName["English"],config.factionByName["Chinese"]];
-			game.createGame(factions,config.map,20);
-			
-			
-			var view = View(game,factions[0]);
-			view.currentPlanet(game.galaxy()[0]);
-			ai = AI(game,factions[1]); //intentionally defined globally for testing
-			console.log("fleet movement", ai.fleetMovementMap(game.galaxy(),game.movingFleets()));
-			console.log("AI analysis",ai.strongPositions(game.galaxy(),game.movingFleets()));
-			console.log("attackAndAbandon",ai.attackAndAbandon());
-			console.log("Troop Movements",ai.troopMovements().map(move =>
-				move.units +" from " + move.toMove.name()+" to " + move.destination.name()
-			));
-			console.log("PlanetPurchases",ai.purchaseChoices().map(purchase => purchase.planet.name()+" builds "+purchase.build));
-			
+			var playerTypes = [View,AI_Player];
+			game.createGame(factions,playerTypes,config.map,20);
+
 			root.game = game;
-			root.view = view;
+			root.view = game.players()[0];
+			
+			//TODO: more strongly associate this with view and separate from root
 			ko.applyBindings(root,document.getElementById('content'));
 			var canvas = document.getElementById('display');
-			canvas.addEventListener("click",view.click);
-			view.draw();
-			view.drawMode = true; // TODO: why is draw mode after draw()? show draw set draw mode to true?
+			canvas.addEventListener("click",root.view.click);
+			root.view.draw();
+			root.view.drawMode = true; // TODO: why is draw mode after draw()? show draw set draw mode to true?
+			game.runRound();
 		}
 		
 		//TODO: give component an input option as well
@@ -183,7 +175,7 @@
 			<button data-bind = "click:$root.view.setProductionForCurrentPlanet">Set Current Planet</button>
 			<button data-bind = "click:$root.view.setProductionForAllMyPlanets">Set For All Planets</button><br>
 		</div>
-		<button data-bind = "click:tick">Tick</button>
+		<button data-bind = "click:$root.view.readyToTick">Tick</button>
 	</div>
 	<div id = "canvasFrame">
 		<!-- canvas only shrinks properly if placed inside a div and THAT is manipulated-->

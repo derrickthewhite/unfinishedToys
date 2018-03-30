@@ -2,6 +2,7 @@ function View(game,activePlayer){
 	var view = {};
 
 	view.drawMode = false;
+	view.moveMode = false; //TODO: don't allow changes when move mode is false!
 	view.currentPlanet= ko.observable();
 	view.currentMovingFleet = ko.observable();
 	view.currentOrder= ko.observable();
@@ -60,7 +61,7 @@ function View(game,activePlayer){
 	view.setProductionForCurrentPlanet = function (){
 		if(view.currentPlanet().owner() == view.activePlayer())
 		{
-			game.addProductionChanges(new productionChange(view.currentPlanet(),view.workingProduction()));
+			game.addProductionChanges(productionChange(view.currentPlanet(),view.workingProduction()));
 		}
 	}
 	view.click = function (event){
@@ -81,6 +82,16 @@ function View(game,activePlayer){
 		else if(location.objects.fleets.length) view.events.fleetClick(location.objects.fleets[0]);
 	}
 	
+	view.readyToTick = function(){
+		game.readyToTick(activePlayer);
+		drawMode=false;
+		moveMode=false;
+	}
+	view.takeTurn = function (){
+		view.draw();
+		drawMode=true;
+		moveMode=true;
+	}
 	//TODO: make this function need to be less public and called everywhere!
 	view.draw = function(){
 		var canvas = document.getElementById('display');
@@ -142,6 +153,7 @@ function View(game,activePlayer){
 					order.midpoint.y*scale+config.map.border+scale/2);
 			}
 			for(var movingFleet of game.movingFleets()){
+				console.log("drawing moving fleet");
 				ctx.fillStyle = movingFleet.fleet.owner().color;
 				ctx.strokeStyle = movingFleet.fleet.owner().color;
 				ctx.beginPath();
@@ -149,11 +161,13 @@ function View(game,activePlayer){
 				ctx.lineTo(movingFleet.destination.x()*scale+config.map.border+scale/2,movingFleet.destination.y()*scale+config.map.border+scale/2);
 				ctx.stroke();
 				
+				console.log(movingFleet.position.x(),movingFleet.position.y(),"to",movingFleet.destination.x(),movingFleet.destination.y())
+				
 
-				ctx.rect(movingFleet.position.x()*scale+scale/4,movingFleet.position.y()*scale+scale/4,scale/2,scale/2);
+				ctx.rect(movingFleet.position.x()*scale+config.map.border+scale/4,movingFleet.position.y()*scale+config.map.border+scale/4,scale/2,scale/2);
 				ctx.fill();
 				ctx.fillStyle = "white";
-				ctx.fillText(movingFleet.fleet.infoString(),movingFleet.position.x()*scale+scale/4,movingFleet.position.y()*scale+scale/2);
+				ctx.fillText(movingFleet.fleet.infoString(),movingFleet.position.x()*scale+config.map.border+scale/4,movingFleet.position.y()*scale+config.map.border+scale/2);
 
 			}
 		} else {
@@ -161,5 +175,6 @@ function View(game,activePlayer){
 		}
 	}
 	
+	view.currentPlanet(game.galaxy()[0]);
 	return view;
 }

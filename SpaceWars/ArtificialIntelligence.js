@@ -168,9 +168,9 @@ function AI(game,ownerID){
 		function choice (action){
 			switch(action){
 				case "abandon":
-				case "delay": return "troops";
+				case "delay": return "infantry";
 				case "reinforce":
-				case "attack": return "ships";
+				case "attack": return "ship";
 			}
 		}
 		return ai.attackAndAbandon().freindlyStatus.map(planet => {
@@ -178,4 +178,41 @@ function AI(game,ownerID){
 		});
 	}
 	return ai;
+}
+
+function AI_Player(game,owner){
+	var player = {};
+	var ai = AI(game,owner); //The AI itself is an analysis tool, not a player
+	var grabRequestedFleet = function (location,owner,numbers){
+		//TODO: optimize unit types grabbed
+		var units = location.fleets().filter(fleet => fleet.owner()==owner)
+			.map(fleet=>fleet.units())
+			.reduce((a,b)=>a.concat(b));
+		return numbers.map(unitRequest => {
+			var runningTotal=0;
+			var available = units.filter(unit=>unit.type.type == unitRequest.type);
+			var sumSoFar = available.map(unit => {runningTotal+=unit.power()});
+			var indexToGrab = sumSoFar.findIndex(a=> a> unitRequest.count);
+			var unitsToUse = available.slice(0,indexToGrab==-1?undefined:indexToGrab+1).map(unit=>unit.copy());
+			var powerToLeave = indexToGrab==-1?0:sumSoFar[indexToGrab]-unitRequest;
+			var unitToSplit = unitsToUse[unitsToUse.length-1];
+			unitToSplit.count(unitToSplit.count() - powerToLeave/unitToSplit.type.power);
+			return unitsToUse;
+		}).reduce((a,b)=>a.concat(b));
+	};
+	player.takeTurn = function (){
+		console.log(ai.purchaseChoices());
+		ai.purchaseChoices().forEach(choice => game.addProductionChanges(productionChange(
+			choice.planet,
+			choice.planet.culture.units.filter(unit => choice.build==unit.type)[0]
+		)));
+		ai.troopMovements().forEach(choice => game.addOrder(Order(
+			owner,
+			Fleet(owner,grabRequestedFleet(choice.toMove,owner,[{type:"ship",count:choice.units}]),"space"),
+			choice.toMove,
+			choice.destination.position
+		)));
+		game.readyToTick(owner);
+	}
+	return player;
 }

@@ -2,6 +2,7 @@ function Game (){
 	var game = {};
 	game.players = ko.observableArray([]);
 	game.movingFleets= ko.observableArray([]);
+	game.turnsCompleted = ko.observableArray([]);
 	
 	//Orders and production changes: attached to the game or to planets?
 	game.productionChanges = ko.observableArray([]);
@@ -14,16 +15,12 @@ function Game (){
 		return orders;
 	});
 	
-	game.createGame = function(factions,map,numSystems){
-		game.players(factions);
+	game.createGame = function(factions,playerTypes,map,numSystems){
 		game.galaxy = ko.observableArray(buildSetting(numSystems,map,factions));
 		game.diplomacy = Diplomacy(factions); //TODO -- interactions with buildSetting?
-	}
-	
-	game.addProductionChanges = function (changes){
-		if(!Array.isArray(changes)) changes = [changes];
-		var preseveredChanges = game.productionChanges().filter(old => changes.map(c => c.planet).indexOf(old.planet)==-1);
-		game.productionChanges(preseveredChanges.concat(changes));
+		
+		players = playerTypes.map((type,index)=>type(game,factions[index]));
+		game.players(players);
 	}
 
 	game.getPlanetAtPosition = function(position){
@@ -43,5 +40,41 @@ function Game (){
 			&& Math.abs(fleet.position.y() - position.y)<1
 		)};
 	}
+	
+	//REGION commands
+	//TODO: authenticate user giving command... far in future
+	game.addOrder = function(order){
+		//TODO: make game store orders, not planets!
+		//TODO: make orders resist being changed
+		//TODO: reject invalid orders 
+		//	not enough transports
+		//	not enough units
+		order.origin.orders.push(order);
+	}
+	game.addProductionChanges = function (changes){
+		//TODO: reject invalid production changes
+		if(!Array.isArray(changes)) changes = [changes];
+		var preseveredChanges = game.productionChanges().filter(old => changes.map(c => c.planet).indexOf(old.planet)==-1);
+		game.productionChanges(preseveredChanges.concat(changes));
+	}
+	game.readyToTick = function (readyPlayer){
+		if(game.turnsCompleted().indexOf(readyPlayer)==-1){
+			game.turnsCompleted.push(readyPlayer);
+			if(game.players().length == game.turnsCompleted().length){
+				//console.log("VIRTUAL TICK");
+				game.runRound();
+			}
+		}
+		return game.players().length - game.turnsCompleted().length;
+	}
+	//ENDREGION
+	
+	//REGION push notifications
+	game.runRound = function (){
+		tick();
+		game.turnsCompleted([]);
+		game.players().forEach(player=>player.takeTurn());
+	}
+	//ENDREGION
 	return game;
 }

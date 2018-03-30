@@ -68,6 +68,9 @@ function Unit(type, owner, count)
 	unit.power = ko.pureComputed(function (){
 		return unit.count()*unit.type.power;
 	});
+	unit.copy = function (){
+		return Unit(unit.type,unit.owner,unit.count());
+	}
 	return unit;
 }
 
