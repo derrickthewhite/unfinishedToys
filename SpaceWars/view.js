@@ -97,7 +97,8 @@ function View(game,activePlayer){
 	//TODO: make this function need to be less public and called everywhere!
 	view.draw = function(){
 		view.drawMode=false;
-		console.trace();
+		//console.trace();
+		//TODO: reduce number of draw calls
 		var canvas = document.getElementById('display');
 		var frame = document.getElementById('canvasFrame');
 		var scale = config.map.scale;

@@ -41,7 +41,9 @@ function Planet (name,production, position, culture, owner, fleets){
 
 function productionChange(planet,production)
 {
-	//TODO: check if valid?
+	//TODO: report if not valid
+	if(planet.culture.units.indexOf(production)==-1) 
+		return {planet:planet,production:undefined};
 	var change = {};
 	change.planet = planet;
 	change.production = production;

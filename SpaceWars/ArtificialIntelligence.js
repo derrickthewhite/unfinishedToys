@@ -2,40 +2,17 @@ function AI(game,ownerID){
 	var ai = {};
 	ai.owner = ownerID;
 	
-	console.log("owner is",ai.owner.name);
-	
-	ai.strongPositions = function (planets,fleets){
-		
-		var result = [];
-		planets.forEach(planet => result[planet.id]=[]);
-		var fleetMovementMap = ai.fleetMovementMap(planets,fleets);
-		var maxTime = fleetMovementMap.reduce((out,fleet) => Math.max(out,fleet.destinations.reduce((out,destination)=>Math.max(out,destination.distance),0)),0);
-		
-		for(var time = 0; time <= maxTime; time++)
-		{
-			planets.forEach(
-				planet =>
-				result[planet.id][time]={planet:planet,power:game.diplomacy.possibleStatus.reduce(
-					(out,status) => {out[status]=0; return out},[]
-				)}
-			);
-			fleetMovementMap.forEach(
-				fleet => 
-				fleet.destinations.forEach(
-					destination => 
-					result[destination.destination.id][time].power[game.diplomacy.factionRelations[ai.owner.name][fleet.fleet.owner().name]] += destination.distance<=time?fleet.fleet.power():0
-				)
-			);
-		}
-		return result;
-	}
-	
-	
 	ai.fleetMovementMap = function (planets,fleets){
 		return planets.reduce((out,planet) => 
 			out.concat(planet.fleets().map(fleet => 
-				{return {planet:planet,fleet:fleet,destinations:planets.map(destination => 
-					{return {destination:destination,distance: Math.ceil(distance(planet.position,destination.position)/fleet.speed())
+				{
+					var buildUnit = planet.culture.units.filter(unit=>unit.type=="ship")[0];//TODO: choose ship to produce more intelligently
+				return {
+					planet:planet,
+					fleet:fleet,
+					productionRate:planet.production*buildUnit.power/buildUnit.cost,
+					destinations:planets.map(destination => {
+						return {destination:destination,distance: Math.ceil(distance(planet.position,destination.position)/fleet.speed())
 					}}
 				)}}
 			)),
@@ -43,15 +20,56 @@ function AI(game,ownerID){
 		);
 	}
 	
+	ai.strongPositions = function (planets,fleets){
+		
+		var result = [];
+		planets.forEach(planet => result[planet.id]=[]);
+		var fleetMovementMap = ai.fleetMovementMap(planets,fleets);
+		var maxTime = fleetMovementMap.reduce((out,fleet) => Math.max(out,fleet.destinations.reduce((out,destination)=>Math.max(out,destination.distance),0)),0);
+
+		//TODO: include planet production into calcs
+		for(var time = 0; time <= maxTime; time++)
+		{
+			planets.forEach(
+				planet =>
+				result[planet.id][time]={
+					planet:planet,
+					power:game.diplomacy.possibleStatus.reduce(
+						(out,status) => {out[status]=0; return out},[]
+					)
+				}
+			);
+			fleetMovementMap.forEach(
+				fleet => 
+				fleet.destinations.forEach(
+					destination => 
+					result[destination.destination.id][time].power[
+						game.diplomacy.factionRelations[ai.owner.name][fleet.fleet.owner().name]] 
+						+=(destination.distance<=time?fleet.fleet.power():0)
+				)
+			);
+			fleetMovementMap.forEach(
+				fleet => {
+				result[fleet.planet.id][time].power[
+					game.diplomacy.factionRelations[ai.owner.name][fleet.planet.owner().name]] 
+					+= time*fleet.productionRate;
+				}
+			);
+		}
+		return result;
+	}
+	
 	ai.classifyFriendlyPlanetFuture = function (predictedHistory,horizon){
+		
+		var highestEnemyRatio = predictedHistory.slice(0,horizon)
+			.reduce((out,history)=> 
+				Math.max(out,history.power.warring/history.power.unified)
+			,0);
+		
 		//TODO: refine these numbers
 		var abandonDelay= 1.7;
 		var delayReinforce = .9;
 		var reinforceAttack = .6;
-		
-		var highestEnemyRatio = predictedHistory.slice(0,horizon).reduce((out,history)=> Math.max(out,history.power.warring/history.power.unified),0);
-		
-		//TODO: include planet production into calcs
 		
 		if(highestEnemyRatio > abandonDelay) return "abandon";
 		if(highestEnemyRatio > delayReinforce) return "delay";
@@ -220,5 +238,6 @@ function AI_Player(game,owner){
 		)));
 		game.readyToTick(owner);
 	}
+	player.ai= ai;
 	return player;
 }

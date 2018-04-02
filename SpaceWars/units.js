@@ -12,6 +12,22 @@ function Fleet(owner,units,status)
 		return fleet.units().reduce((sofar,a) => Math.min(sofar,a.type.speed?a.type.speed:Number.POSITIVE_INFINITY),Number.POSITIVE_INFINITY);
 	});
 	//TODO: factor these!
+	fleet.sum = function (attribute,filter){
+		var result = {
+			attribute:attribute,
+			filter:filter,
+			func: function (){
+				return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type == filter?a[attribute]():0),0));
+			}
+		};
+		return result.func;
+	}
+
+	fleet.power = ko.pureComputed(fleet.sum("power","ship"));
+	fleet.capacity = ko.pureComputed(fleet.sum("count","transport"));
+	fleet.troops = ko.pureComputed(fleet.sum("count","infantry"));
+	fleet.troopPower = ko.pureComputed(fleet.sum("power","infantry"));
+	/*
 	fleet.power = ko.pureComputed(function (){
 		return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type=="ship"?a.power():0),0));
 	});
@@ -24,6 +40,7 @@ function Fleet(owner,units,status)
 	fleet.troopPower = ko.pureComputed(function (){
 		return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type=="infantry"?a.power():0),0));
 	});
+	//*/
 	fleet.empty = ko.pureComputed(function (){
 		return fleet.units().reduce((sofar,unit) => unit.count()+sofar,0)==0;
 	});
