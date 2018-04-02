@@ -4,16 +4,9 @@ function Game (){
 	game.movingFleets= ko.observableArray([]);
 	game.turnsCompleted = ko.observableArray([]);
 	
-	//Orders and production changes: attached to the game or to planets?
+	//production changes: attached to the game or to planets?
 	game.productionChanges = ko.observableArray([]);
-	game.orders = ko.pureComputed(function (){
-		var orders=[];
-		for(var planet of game.galaxy())
-		{
-			orders = orders.concat(planet.orders());
-		}
-		return orders;
-	});
+	game.orders = ko.observableArray([]);
 	
 	game.createGame = function(factions,playerTypes,map,numSystems){
 		game.galaxy = ko.observableArray(buildSetting(numSystems,map,factions));
@@ -22,10 +15,11 @@ function Game (){
 		players = playerTypes.map((type,index)=>type(game,factions[index]));
 		game.players(players);
 	}
-
+	//TODO: move functionality to Galaxy?
 	game.getPlanetAtPosition = function(position){
 		return game.galaxy().filter(planet => planet.position.x == position.x && planet.position.y == position.y)[0];
 	}
+	//TODO: move functionality to Galaxy?
 	game.getObjectsAtPosition = function(position){
 		return {planets : game.galaxy().filter(planet => 
 			planet.position.x == position.x 
@@ -44,13 +38,12 @@ function Game (){
 	//REGION commands
 	//TODO: authenticate user giving command... far in future
 	game.addOrder = function(order){
-		//TODO: make game store orders, not planets!
 		//TODO: remove orders!
 		//TODO: make this the enforced canonical way
 		//TODO: reject invalid orders 
 		//	not enough transports
 		//	not enough units
-		order.origin.orders.push(order);
+		game.orders.push(order);
 	}
 	game.addProductionChanges = function (changes){
 		//TODO: reject invalid production changes

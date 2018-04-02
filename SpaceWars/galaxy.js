@@ -35,6 +35,6 @@ function buildSetting(numStars, dimensions, cultures){
 		}
 		galaxy.push(Planet(worldNames[Math.floor(Math.random()*worldNames.length)],a.production,a.location,culture,culture,[Fleet(culture,startingUnits,"Ground")]));
 	})
-	console.log(galaxy.reduce((sofar,a)=>a.owner().name == "English"? a.production+sofar: sofar,0), totalProduction);
+	console.log("Production Ratio",galaxy.reduce((sofar,a)=>a.owner().name == "English"? a.production+sofar: sofar,0), totalProduction);
 	return galaxy;
 }

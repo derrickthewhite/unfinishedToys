@@ -99,7 +99,7 @@
 			viewModel: function fleetForDisplay(params){
 				this.units = params.units;
 			},
-			template: dom.div(
+			template:dom.div(
 				{'data-bind':'foreach:units'},
 				dom.div(
 					dom.span({'data-bind':'text:count'}),
@@ -119,7 +119,7 @@
 			},
 			template: dom.div(
 				"Destination:",
-				dom.span({"data-bind":"text:destination.planet.infoString"}), 
+				dom.span({"data-bind":"text:destination.name"}), 
 				" at ",
 				dom.span({"data-bind":"text:destination.x"}),
 				", ",
@@ -142,6 +142,7 @@
 			<div data-bind="component: {name: 'OrderDisplay', params:$data}"></div>
 		</div>
 		<div data-bind="with: ($root.view.viewMode() == 'planet') && $root.view.currentPlanet()">
+			PLANET:
 			<div data-bind = "text:name"></div>
 			<div data-bind = "text:id"></div>
 			<div > Industry: <span data-bind = "text:production"></span></div>
@@ -155,6 +156,14 @@
 				<div data-bind = "text:infoString"></div>
 				<div data-bind="component: {name: 'FleetDisplay', params:$data}"></div>
 			</div>
+			<div data-bind="foreach:orders">
+				<div data-bind="component: {name: 'OrderDisplay', params:$data}"></div>
+			</div>
+			<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:$root.view.workingProduction"></select>
+			<button data-bind = "click:$root.view.setProductionForCurrentPlanet">Set Current Planet</button>
+			<button data-bind = "click:$root.view.setProductionForAllMyPlanets">Set For All Planets</button><br>
+		</div>
+		<div>
 			ORDER:
 			<div data-bind="foreach:$root.view.workingFleet.units">
 				<div>
@@ -168,12 +177,6 @@
 			</div>
 			<button data-bind = "click:$root.view.sendAll">Send All</button>
 			<button data-bind = "click:$root.view.setDestination">Set Destination</button>
-			<div data-bind="foreach:orders">
-				<div data-bind="component: {name: 'OrderDisplay', params:$data}"></div>
-			</div>
-			<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:$root.view.workingProduction"></select>
-			<button data-bind = "click:$root.view.setProductionForCurrentPlanet">Set Current Planet</button>
-			<button data-bind = "click:$root.view.setProductionForAllMyPlanets">Set For All Planets</button><br>
 		</div>
 		<button data-bind = "click:$root.view.readyToTick">Tick</button>
 	</div>

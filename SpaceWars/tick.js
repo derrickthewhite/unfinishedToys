@@ -1,35 +1,13 @@
 //TODO: factor into sub functions
+
 function tick(){
 	for(var order of game.orders())
 	{
-		var planet = order.origin;
-		var activeFleet = planet.fleets().filter(a=>a.owner()==order.owner)[0];
-		for(var unit of order.fleet.units())
-		{
-			var sources = activeFleet.units().filter(troops => troops.type.name == unit.type.name);
-			var total = sources.reduce((sofar,a)=> sofar+a.count(),0);
-			if(total < unit.count())
-			{
-				console.log("TODO: tell the user why we didn't do this! (Not enough troops to do so)");
-				continue;
-			}
-			else 
-			{
-				//TODO: rounding
-				var removed = 0;
-				var counter = 0;
-				while(unit.count()>removed && counter++<100){
-					var current = sources.pop();
-					var toRemove = Math.min(current.count(),unit.count());
-					removed += toRemove;
-					current.count(current.count()-toRemove);
-				}
-			}
-		}
-		planet.orders.remove(order);
+		order.removeFromOrigin();
 		var fleet = order.fleet;
 		game.movingFleets.push(MovingFleet(fleet,order.origin.position,order.destination));
 	}
+	game.orders([]);
 	for(var movingFleet of game.movingFleets()){
 		movingFleet.move();
 		if(movingFleet.position == movingFleet.destination)

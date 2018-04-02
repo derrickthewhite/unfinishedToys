@@ -4,12 +4,13 @@ function View(game,activePlayer){
 	view.drawMode = false;
 	view.moveMode = false; //TODO: don't allow changes when move mode is false!
 	view.currentPlanet= ko.observable();
-	view.currentMovingFleet = ko.observable();
-	view.currentOrder= ko.observable();
+	view.currentMovingFleet = ko.observable(); //a fleet in deep space -- not a fleet object!
+	view.currentOrder= ko.observable(); 
+	view.activeFleet = ko.observable(); //the fleet that orders are given too. 
 	view.workingFleet= Fleet("",[],"Ground"); //working Fleet is used to create orders
 	view.workingProduction = ko.observable();
 	view.activePlayer= ko.observable();
-	view.viewMode = ko.observable("planet");
+	view.viewMode = ko.observable("planet"); //planet, fleet, order
 	view.clickMode = ko.observable("display");
 	view.activePlayer(activePlayer);
 
@@ -27,25 +28,31 @@ function View(game,activePlayer){
 		view.clickMode("destination");
 	}
 	view.sendAll = function (){
-		var activeFleet = view.currentPlanet().fleets().filter(a=>a.owner()==view.activePlayer())[0];
-		if(!activeFleet)return;
-		for(var i = 0;i<activeFleet.units().length;i++){
-			view.workingFleet.units()[i].count(activeFleet.units()[i].count());
+		if(!view.activeFleet())return; //TODO: tell player there is no active fleet?
+		for(var i = 0;i<view.activeFleet().units().length;i++){
+			view.workingFleet.units()[i].count(view.activeFleet().units()[i].count());
 		}
-		view.clickMode("destination");
+		view.clickMode("destination"); //TODO: indicate click mode on screen
+	}
+	var setActiveFleet = function (fleet){
+		if(fleet.owner()!=view.activePlayer())fleet = undefined;
+		view.activeFleet(fleet);
+		if(!fleet || fleet.owner()!=view.activePlayer())view.workingFleet.units([]);
+		else view.workingFleet.units(fleet.units().map(a=>Unit(a.type,a.owner,0)));
 	}
 	view.events.systemClick= function (planet){ 
-		var activeFleet = planet.fleets().filter(a=>a.owner()==view.activePlayer())[0]; 
-		if(!activeFleet)view.workingFleet.units([]);
-		else view.workingFleet.units(activeFleet.units().map(a=>Unit(a.type,a.owner,0)));
+		//TODO: more than just that first fleet: either select individually or set all fleets
+		setActiveFleet(planet.fleets().filter(a=>a.owner()==view.activePlayer())[0]); 
 		view.viewMode("planet");
 		view.currentPlanet(planet);
 	}
 	view.events.fleetClick = function (fleet){
+		setActiveFleet(fleet.fleet); 
 		view.currentMovingFleet(fleet);
 		view.viewMode("fleet");
 	}
 	view.events.orderClick = function (order){
+		setActiveFleet(order.fleet);
 		view.currentOrder(order);
 		view.viewMode("order");
 	}
@@ -68,18 +75,31 @@ function View(game,activePlayer){
 		var position = {x:event.offsetX-config.map.border,y:event.offsetY-config.map.border};
 		var scale = config.map.scale;
 		var location = {x:Math.floor(position.x/scale),y:Math.floor(position.y/scale)};
-		location.planet = game.getPlanetAtPosition(location);
-		location.objects = game.getObjectsAtPosition(location);
-		if(view.clickMode()=="destination")
+		var objects = game.getObjectsAtPosition(location);
+		if(view.clickMode()=="destination" && objects.planets.length)
 		{
-			view.currentPlanet().orders.push(Order(view.activePlayer(),Fleet(view.activePlayer(),view.workingFleet.units()),view.currentPlanet(),location));
+			location.name = game.getPlanetAtPosition(location).name();
+			//TODO: should orders be stored away from game until ready for tick?
+			//TODO: orders are removed from other orders and have planets as their origins
+			//TODO: verify a planet hasn't maxed out its orders!
+			var origin = view.viewMode()=="planet"?view.currentPlanet()
+				:view.viewMode()=="fleet"?view.currentFleet()
+				:view.viewMode()=="order"?view.currentOrder().origin:console.log("UNLISTED VIEW MODE",view.viewMode());
+			var order = Order(
+				Fleet(view.activePlayer(),view.workingFleet.units()),
+				origin,
+				location
+			);
+			if(view.viewMode()=="order")order.removeFromOrigin(view.currentOrder());
+			game.addOrder(order);
 			view.draw();
-			view.events.systemClick(view.currentPlanet()); //TODO: odd, but does the job!
+			view.events.systemClick(view.currentPlanet()); //TODO: odd, but does the job! TODO: not always a planet!
 			view.clickMode('select');
 		}
-		else if(location.objects.planets.length) view.events.systemClick(location.objects.planets[0]);
-		else if(location.objects.orders.length) view.events.orderClick(location.objects.orders[0]);
-		else if(location.objects.fleets.length) view.events.fleetClick(location.objects.fleets[0]);
+		//TODO: intelligently order objects? how to select something behind one
+		else if(objects.planets.length) view.events.systemClick(objects.planets[0]);
+		else if(objects.orders.length) view.events.orderClick(objects.orders[0]);
+		else if(objects.fleets.length) view.events.fleetClick(objects.fleets[0]);
 	}
 	
 	view.readyToTick = function(){
@@ -138,9 +158,9 @@ function View(game,activePlayer){
 				ctx.fillText(planet.name(),xCorr + scale,yCorr +scale+10);
 			}
 			for(var order of game.orders()){
-				if(order.owner!=view.activePlayer())continue;
-				ctx.fillStyle = order.owner.color;
-				ctx.strokeStyle = order.owner.color;
+				if(order.fleet.owner()!=view.activePlayer())continue;
+				ctx.fillStyle = order.fleet.owner().color;
+				ctx.strokeStyle = order.fleet.owner().color;
 				ctx.strokeStyle = '10px';
 				ctx.beginPath();
 				ctx.moveTo(order.origin.position.x*scale+config.map.border+scale/2,

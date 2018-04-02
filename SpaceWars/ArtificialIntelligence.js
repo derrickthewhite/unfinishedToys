@@ -169,6 +169,7 @@ function AI(game,ownerID){
 		//TODO: time attacks to arrive all at the same time
 		//TODO: nearest isn't always best
 		
+		//TODO: possible to have not hot spots!
 		var hotSpots = attacks.map(a=>a.planet).concat(retreats.map(a=>a.destination));
 		
 		var moves = toMove.freindlyStatus.filter(planet => planet.action == "attack")
@@ -219,21 +220,20 @@ function AI_Player(game,owner){
 		}).reduce((a,b)=>a.concat(b));
 	};
 	player.takeTurn = function (){
-		console.log(ai.purchaseChoices());
 		ai.purchaseChoices().forEach(choice => game.addProductionChanges(productionChange(
 			choice.planet,
 			choice.planet.culture.units.filter(unit => choice.build==unit.type)[0]
 		)));
 		//TODO: sort out what is and isn't required to be stored in an order
 		ai.troopMovements().forEach(choice => game.addOrder(Order(
-			owner,
 			Fleet(owner,grabRequestedFleet(choice.toMove,owner,[{type:"ship",count:choice.units}]),"space"),
 			choice.toMove,
 			{
 				x:choice.destination.position.x,
 				y:choice.destination.position.y,
-				objects:game.getObjectsAtPosition(choice.destination.position),
-				planet:game.getPlanetAtPosition(choice.destination.position)
+				name:game.getPlanetAtPosition(choice.destination.position).name()
+				//objects:game.getObjectsAtPosition(choice.destination.position),
+				//planet:game.getPlanetAtPosition(choice.destination.position)
 			}
 		)));
 		game.readyToTick(owner);

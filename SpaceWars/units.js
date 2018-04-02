@@ -102,6 +102,7 @@ function MovingFleet(fleet,position,destination)
 	mf.destination={};
 	mf.destination.x = ko.observable(destination.x);
 	mf.destination.y = ko.observable(destination.y);
+	mf.fleets = ko.pureComputed(()=>[fleet]);
 	
 	mf.move = function (){
 		distanceLeft = Math.sqrt(
@@ -121,16 +122,43 @@ function MovingFleet(fleet,position,destination)
 }
 
 //TODO: require carriers for troops
-function Order(owner,fleet,origin,destination)
+function Order(fleet,origin,destination)
 {
 	var order = {};
-	order.owner = owner;
 	order.fleet = fleet;
 	order.origin = origin;
 	order.destination = destination;
+	order.fleets = ko.pureComputed(()=>[fleet]);
 	order.midpoint = {
 		x:order.origin.position.x/2+order.destination.x/2,
 		y:order.origin.position.y/2+order.destination.y/2
 	};
+	
+	order.removeFromOrigin= function(origin){
+		origin=origin?origin:order.origin;
+		var commandedFleets = origin.fleets().filter(a=>a.owner()==order.fleet.owner()).reduce((a,b)=>a.units().concat(b.units()));
+		for(var unit of order.fleet.units())
+		{
+			var sources = commandedFleets.units().filter(troops => troops.type.name == unit.type.name);
+			var total = sources.reduce((sofar,a)=> sofar+a.count(),0);
+			if(total < unit.count())
+			{
+				console.log("TODO: tell the user why we didn't do this! (Not enough troops to do so)");
+				continue;
+			}
+			else 
+			{
+				//TODO: rounding
+				var removed = 0;
+				var counter = 0;
+				while(unit.count()>removed && counter++<100){
+					var current = sources.pop();
+					var toRemove = Math.min(current.count(),unit.count());
+					removed += toRemove;
+					current.count(current.count()-toRemove);
+				}
+			}
+		}
+	}
 	return order;
 }
