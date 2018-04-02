@@ -2,7 +2,7 @@ var nextPlanetID = 1000;
 function Planet (name,production, position, culture, owner, fleets){
 	var planet = {};
 	
-	planet.id = nextPlanetID++;
+	planet.id = "Planet_"+(nextPlanetID++);
 	planet.production = production;
 	planet.position = position;
 	planet.culture = culture;

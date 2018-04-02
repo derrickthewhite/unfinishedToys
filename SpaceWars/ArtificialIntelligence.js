@@ -2,18 +2,27 @@ function AI(game,ownerID){
 	var ai = {};
 	ai.owner = ownerID;
 	
+	//TODO: consider numbers other than fleet power
 	ai.fleetMovementMap = function (planets,fleets){
-		return planets.reduce((out,planet) => 
-			out.concat(planet.fleets().map(fleet => 
+		return planets.concat(fleets).reverse().
+		reduce((out,origin) => 
+			out.concat(origin.fleets().map(fleet => 
 				{
-					var buildUnit = planet.culture.units.filter(unit=>unit.type=="ship")[0];//TODO: choose ship to produce more intelligently
+					var productionRate = 0;
+					if(origin.production){ //duck typing for is a planet
+						var buildUnit = origin.culture.units.filter(unit=>unit.type=="ship")[0];//TODO: choose ship to produce more intelligently
+						productionRate:origin.production*buildUnit.power/buildUnit.cost
+					}
 				return {
-					planet:planet,
+					origin:origin,
 					fleet:fleet,
-					productionRate:planet.production*buildUnit.power/buildUnit.cost,
+					productionRate:productionRate,
 					destinations:planets.map(destination => {
-						return {destination:destination,distance: Math.ceil(distance(planet.position,destination.position)/fleet.speed())
-					}}
+						return {
+							destination:destination,
+							distance: Math.ceil(distance(origin.position,destination.position)/fleet.speed())
+						}
+					}
 				)}}
 			)),
 			[]
@@ -23,17 +32,18 @@ function AI(game,ownerID){
 	ai.strongPositions = function (planets,fleets){
 		
 		var result = [];
-		planets.forEach(planet => result[planet.id]=[]);
+		var locales = planets.concat(fleets);
+		locales.forEach(locale => result[locale.id]=[]);
 		var fleetMovementMap = ai.fleetMovementMap(planets,fleets);
 		var maxTime = fleetMovementMap.reduce((out,fleet) => Math.max(out,fleet.destinations.reduce((out,destination)=>Math.max(out,destination.distance),0)),0);
 
 		//TODO: include planet production into calcs
 		for(var time = 0; time <= maxTime; time++)
 		{
-			planets.forEach(
-				planet =>
-				result[planet.id][time]={
-					planet:planet,
+			locales.forEach(
+				locale =>
+				result[locale.id][time]={
+					origin:locale,
 					power:game.diplomacy.possibleStatus.reduce(
 						(out,status) => {out[status]=0; return out},[]
 					)
@@ -48,13 +58,15 @@ function AI(game,ownerID){
 						+=(destination.distance<=time?fleet.fleet.power():0)
 				)
 			);
+			//*
 			fleetMovementMap.forEach(
 				fleet => {
-				result[fleet.planet.id][time].power[
-					game.diplomacy.factionRelations[ai.owner.name][fleet.planet.owner().name]] 
+				result[fleet.origin.id][time].power[
+					game.diplomacy.factionRelations[ai.owner.name][fleet.fleet.owner().name]] 
 					+= time*fleet.productionRate;
 				}
 			);
+			//*/
 		}
 		return result;
 	}
@@ -107,12 +119,14 @@ function AI(game,ownerID){
 	}
 	
 	ai.horizon = function (analysis){
-		// Horizon is the amount of time needed for the enemy to move all ships to one position
 		//TODO: should horizon be the time to defend any of their worlds? 
-		var endTotals = analysis[Object.keys(analysis)[0]][analysis[Object.keys(analysis)[0]].length -1].power; // analysis is enough time for every ship to go everywhere
+		var endTotals = analysis[Object.keys(analysis)[0]][analysis[Object.keys(analysis)[0]].length -1].power; // analysis has enough time for every ship to go everywhere
 		var horizon = Math.min(...(Object.keys(analysis).map(
 			key => Math.min(...analysis[key].map(
-				(data,time) => data.power.warring == endTotals.warring?time:Infinity
+				// Horizon is the amount of time needed for the enemy to move all ships to one position
+				//(data,time) => data.power.warring == endTotals.warring?time:Infinity 
+				//Horizon is amount of time needed for enemy to move 90% of ships to one position
+				(data,time) => data.power.warring >= endTotals.warring*.9?time:Infinity 
 				))
 		)));
 		return horizon;
@@ -127,16 +141,15 @@ function AI(game,ownerID){
 		
 		var horizon = ai.horizon(analysis);
 		
-		
 		//TODO: factor these functions
 		function analyzePlanetsWithHorizon(tool,isOwner){
-			return analysis.filter(planetHistory => (planetHistory[0].planet.owner() == ai.owner)==isOwner).map(
-				planetHistory => { return{action:tool(planetHistory,horizon),planet:planetHistory[0].planet}}
+			return Object.keys(analysis).map((key)=>analysis[key]).filter(planetHistory => (planetHistory[0].origin.owner() == ai.owner)==isOwner).map(
+				planetHistory => { return{action:tool(planetHistory,horizon),origin:planetHistory[0].origin}}
 			);
 		}
 		var spareUnits = analyzePlanetsWithHorizon(ai.planetsSpareUnits,true);
 		var planetStatus = analyzePlanetsWithHorizon(ai.classifyFriendlyPlanetFuture,true);
-		planetStatus.forEach((planet,index)=>planet.units = spareUnits[index].action);
+		planetStatus.forEach((origin,index)=>origin.units = spareUnits[index].action);
 		//TODO: target status distinguish between ally, neutral, and enemy
 		var targetStatus = analyzePlanetsWithHorizon(ai.classifyEnemyPlanetBattleOdds,false);
 		
@@ -146,9 +159,9 @@ function AI(game,ownerID){
 		//TODO: nearest is not necessarily best
 		//TODO: consider fleets as well as planets
 		//TODO: consider empty space?
-		return freindlyStatus.filter(planet => ["attack", "reinforce"].indexOf(planet.action)!=-1)
-			.map(planet => planet.planet)
-			.map(planet => {return {distance:distance(toRetreat.position,planet.position),destination:planet}})
+		return freindlyStatus.filter(locale => ["attack", "reinforce"].indexOf(locale.action)!=-1 && locale.origin.production)
+			.map(locale => locale.origin)
+			.map(origin => {return {distance:distance(toRetreat.position,origin.position),destination:origin}})
 			.sort((a,b)=>a.distance<b.distance?-1:1)[0];
 	}
 	ai.troopsNeeded = function (targetPlanet, analysis){
@@ -157,27 +170,27 @@ function AI(game,ownerID){
 	ai.troopMovements = function (){
 		//TODO: consider troops and ships separately
 		var toMove = ai.attackAndAbandon();
-		var retreats = toMove.freindlyStatus.filter(planet => planet.action == "abandon")
-			.map(planet => {return {
-				toMove:planet.planet,
-				destination: ai.rallyPoint(planet.planet,toMove.freindlyStatus).destination,
-				units: -planet.units
+		var retreats = toMove.freindlyStatus.filter(origin => origin.action == "abandon")
+			.map(origin => {return {
+				toMove:origin.origin,
+				destination: ai.rallyPoint(origin.origin,toMove.freindlyStatus).destination,
+				units: -origin.units
 			}});
 		
-		var attacks = toMove.enemyStatus.filter(planet => planet.action > 0);
+		var attacks = toMove.enemyStatus.filter(origin => origin.action > 0);
 		//TODO: don't attack if you will be overwhelmed
 		//TODO: time attacks to arrive all at the same time
 		//TODO: nearest isn't always best
 		
 		//TODO: possible to have not hot spots!
-		var hotSpots = attacks.map(a=>a.planet).concat(retreats.map(a=>a.destination));
+		var hotSpots = attacks.map(a=>a.origin).concat(retreats.map(a=>a.destination));
 		
-		var moves = toMove.freindlyStatus.filter(planet => planet.action == "attack")
-			.map(planet => {
+		var moves = toMove.freindlyStatus.filter(origin => origin.action == "attack")
+			.map(origin => {
 				return {
-					toMove: planet.planet,
-					destination: hotSpots.reduce((a,b)=> distance(a.position,planet.planet.position) < distance(b.position,planet.planet.position)?a:b),
-					units:planet.units 
+					toMove: origin.origin,
+					destination: hotSpots.reduce((a,b)=> distance(a.position,origin.origin.position) < distance(b.position,origin.origin.position)?a:b),
+					units:origin.units 
 				}
 			});
 		return moves.concat(retreats);
@@ -192,9 +205,11 @@ function AI(game,ownerID){
 				case "attack": return "ship";
 			}
 		}
-		return ai.attackAndAbandon().freindlyStatus.map(planet => {
-			return {planet:planet.planet,build:choice(planet.action)};
-		});
+		return ai.attackAndAbandon().freindlyStatus
+			.filter(locale=>locale.origin.production)
+			.map(planet => {
+				return {planet:planet.origin,build:choice(planet.action)};
+			});
 	}
 	return ai;
 }
@@ -229,8 +244,8 @@ function AI_Player(game,owner){
 			Fleet(owner,grabRequestedFleet(choice.toMove,owner,[{type:"ship",count:choice.units}]),"space"),
 			choice.toMove,
 			{
-				x:choice.destination.position.x,
-				y:choice.destination.position.y,
+				x:ko.unwrap(choice.destination.position.x),
+				y:ko.unwrap(choice.destination.position.y),
 				name:game.getPlanetAtPosition(choice.destination.position).name()
 				//objects:game.getObjectsAtPosition(choice.destination.position),
 				//planet:game.getPlanetAtPosition(choice.destination.position)

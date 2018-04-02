@@ -36,8 +36,9 @@
 		function battleRound(a,b){
 			return [a-b*battleRate,b-a*battleRate];
 		}
+		//TODO: alter distance based on ship flight type
 		function distance(a,b){
-			return Math.sqrt((a.x -b.x)*(a.x -b.x) +(a.y -b.y)*(a.y -b.y));
+			return Math.sqrt(Math.pow(ko.unwrap(a.x) -ko.unwrap(b.x),2) +Math.pow(ko.unwrap(a.y) -ko.unwrap(b.y),2));
 		}
 		//TODO: should random tools be in their own tools file?
 		//fisher-yates shuffle algorithm
@@ -124,6 +125,9 @@
 				dom.span({"data-bind":"text:destination.x"}),
 				", ",
 				dom.span({"data-bind":"text:destination.y"}),
+				" in ",
+				dom.span({"data-bind":"text:time"}),
+				" turns ",
 				dom.div({"data-bind":"component: {name: 'FleetDisplay', params:fleet}"})
 			).outerHTML
 		});
@@ -135,6 +139,14 @@
 		<div>Current Player: <span data-bind="text:$root.view.activePlayer().name"></span></div>
 		<div data-bind="with: ($root.view.viewMode() == 'fleet') && $root.view.currentMovingFleet()">
 			<div data-bind="text:fleet.infoString"></div>
+			<div>
+				Moving to 
+				<span data-bind="text:destination.x"></span>,
+				<span data-bind="text:destination.y"></span>
+				in
+				<span data-bind="text:time"></span>
+				Turns
+			</div>
 			<div data-bind="component: {name: 'FleetDisplay', params:fleet}"></div>
 		</div>
 		<div data-bind="with: ($root.view.viewMode() == 'order') && $root.view.currentOrder()">

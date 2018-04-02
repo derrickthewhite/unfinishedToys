@@ -1,8 +1,9 @@
 var nextFleetID=1000;
+var nextMovingFleetID=1000;
 function Fleet(owner,units,status)
 {
 	var fleet = {};
-	fleet.id = nextFleetID++;
+	fleet.id = "Fleet_"+(nextFleetID++);
 	fleet.units = ko.observableArray(units?units:[]);
 	fleet.owner = ko.observable(owner);
 	fleet.status = ko.observable(status); // Space,Land -- not fully implemented
@@ -27,20 +28,7 @@ function Fleet(owner,units,status)
 	fleet.capacity = ko.pureComputed(fleet.sum("count","transport"));
 	fleet.troops = ko.pureComputed(fleet.sum("count","infantry"));
 	fleet.troopPower = ko.pureComputed(fleet.sum("power","infantry"));
-	/*
-	fleet.power = ko.pureComputed(function (){
-		return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type=="ship"?a.power():0),0));
-	});
-	fleet.capacity = ko.pureComputed(function (){
-		return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type=="transport"?a.count():0),0));
-	});
-	fleet.troops = ko.pureComputed(function (){
-		return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type=="infantry"?a.count():0),0));
-	});
-	fleet.troopPower = ko.pureComputed(function (){
-		return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type=="infantry"?a.power():0),0));
-	});
-	//*/
+
 	fleet.empty = ko.pureComputed(function (){
 		return fleet.units().reduce((sofar,unit) => unit.count()+sofar,0)==0;
 	});
@@ -95,14 +83,20 @@ function Unit(type, owner, count)
 function MovingFleet(fleet,position,destination)
 {
 	var mf = {};
+	mf.id = "Moving_Fleet_"+(nextMovingFleetID++);
 	mf.position = {};
-	mf.position.x = ko.observable(position.x);
-	mf.position.y = ko.observable(position.y);
+	mf.position.x = ko.observable(ko.unwrap(position.x));
+	mf.position.y = ko.observable(ko.unwrap(position.y));
 	mf.fleet = fleet;
 	mf.destination={};
-	mf.destination.x = ko.observable(destination.x);
-	mf.destination.y = ko.observable(destination.y);
+	mf.destination.x = ko.observable(ko.unwrap(destination.x));
+	mf.destination.y = ko.observable(ko.unwrap(destination.y));
 	mf.fleets = ko.pureComputed(()=>[fleet]);
+	mf.owner = ko.pureComputed(()=>fleet.owner());
+	
+	mf.time = ko.pureComputed(()=>
+		distance(mf.position,mf.destination)/mf.fleet.speed()
+	);
 	
 	mf.move = function (){
 		distanceLeft = Math.sqrt(
@@ -133,6 +127,9 @@ function Order(fleet,origin,destination)
 		x:order.origin.position.x/2+order.destination.x/2,
 		y:order.origin.position.y/2+order.destination.y/2
 	};
+	order.time = ko.pureComputed(()=>
+		distance(order.origin.position,destination)/order.fleet.speed()
+	);
 	
 	order.removeFromOrigin= function(origin){
 		origin=origin?origin:order.origin;

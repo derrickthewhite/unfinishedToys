@@ -17,7 +17,7 @@ function Game (){
 	}
 	//TODO: move functionality to Galaxy?
 	game.getPlanetAtPosition = function(position){
-		return game.galaxy().filter(planet => planet.position.x == position.x && planet.position.y == position.y)[0];
+		return game.galaxy().filter(planet => planet.position.x == ko.unwrap(position.x) && planet.position.y == ko.unwrap(position.y))[0];
 	}
 	//TODO: move functionality to Galaxy?
 	game.getObjectsAtPosition = function(position){

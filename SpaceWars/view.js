@@ -35,7 +35,7 @@ function View(game,activePlayer){
 		view.clickMode("destination"); //TODO: indicate click mode on screen
 	}
 	var setActiveFleet = function (fleet){
-		if(fleet.owner()!=view.activePlayer())fleet = undefined;
+		if(!fleet || fleet.owner()!=view.activePlayer())fleet = undefined;
 		view.activeFleet(fleet);
 		if(!fleet || fleet.owner()!=view.activePlayer())view.workingFleet.units([]);
 		else view.workingFleet.units(fleet.units().map(a=>Unit(a.type,a.owner,0)));
@@ -83,7 +83,7 @@ function View(game,activePlayer){
 			//TODO: orders are removed from other orders and have planets as their origins
 			//TODO: verify a planet hasn't maxed out its orders!
 			var origin = view.viewMode()=="planet"?view.currentPlanet()
-				:view.viewMode()=="fleet"?view.currentFleet()
+				:view.viewMode()=="fleet"?view.currentMovingFleet()
 				:view.viewMode()=="order"?view.currentOrder().origin:console.log("UNLISTED VIEW MODE",view.viewMode());
 			var order = Order(
 				Fleet(view.activePlayer(),view.workingFleet.units()),

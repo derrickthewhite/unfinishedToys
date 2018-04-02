@@ -1,7 +1,7 @@
 //TODO: factor into sub functions
 
 function tick(){
-	for(var order of game.orders())
+	for(var order of game.orders().reverse())
 	{
 		order.removeFromOrigin();
 		var fleet = order.fleet;
@@ -29,6 +29,7 @@ function tick(){
 			game.movingFleets.remove(movingFleet);
 		}
 	}
+	game.movingFleets(game.movingFleets().filter(mf=>!mf.fleet.empty()));
 	for(var productionChange of game.productionChanges()){
 		productionChange.planet.currentProduction(productionChange.production);
 	}
