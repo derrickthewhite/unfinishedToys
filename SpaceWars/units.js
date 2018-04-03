@@ -43,8 +43,6 @@ function Fleet(owner,units,status)
 			if(unit.type.type == 'ship')ships+=unit.power();
 			if(unit.type.type == 'transport')transports+=unit.count();
 		}
-		if(root.view && root.view.drawMode)
-			root.view.draw(); //TODO: Find best way to trigger a draw, make it not fail if there is no view!
 		return infantry+" "+ships+" "+transports;
 	});
 	
@@ -52,18 +50,19 @@ function Fleet(owner,units,status)
 		survivalRatio=Math.max(0,survivalRatio);
 		fleet.units().forEach(unit => {if(unit.type.type == type) unit.count(Math.round(unit.count()*survivalRatio*roundingTolerance)/roundingTolerance)});
 	}
+	
+	fleet.combine = function(combined){
+		for(var unit of combined.units())
+		{
+			var mergeUnit = fleet.units().filter(a=> a.type.name == unit.type.name)[0];
+			if(mergeUnit)
+				mergeUnit.count(mergeUnit.count()+unit.count());
+			else
+				fleet.push(unit);
+		}
+	}
 
 	return fleet;
-}
-function unitType(type,culture,power,speed,cost)
-{
-	var type = {};
-	type.type = type; //TODO: Differentiate between troop role and combat type
-	type.speed = speed;
-	type.culture= culture;
-	type.power = power;
-	type.cost = cost;
-	return type;
 }
 function Unit(type, owner, count)
 {

@@ -8,15 +8,10 @@ function AI(game,ownerID){
 		reduce((out,origin) => 
 			out.concat(origin.fleets().map(fleet => 
 				{
-					var productionRate = 0;
-					if(origin.production){ //duck typing for is a planet
-						var buildUnit = origin.culture.units.filter(unit=>unit.type=="ship")[0];//TODO: choose ship to produce more intelligently
-						productionRate:origin.production*buildUnit.power/buildUnit.cost
-					}
 				return {
 					origin:origin,
 					fleet:fleet,
-					productionRate:productionRate,
+					productionRate:origin.production?origin.production:0,
 					destinations:planets.map(destination => {
 						return {
 							destination:destination,
@@ -29,7 +24,10 @@ function AI(game,ownerID){
 		);
 	}
 	
-	ai.strongPositions = function (planets,fleets){
+	ai.strongPositions = function (planets,fleets,troops){
+		
+		var unitTypeToBuild = troops?"infantry":"ship";
+		var powerFunction = troops?"troopPower":"power";
 		
 		var result = [];
 		var locales = planets.concat(fleets);
@@ -55,15 +53,21 @@ function AI(game,ownerID){
 					destination => 
 					result[destination.destination.id][time].power[
 						game.diplomacy.factionRelations[ai.owner.name][fleet.fleet.owner().name]] 
-						+=(destination.distance<=time?fleet.fleet.power():0)
+						+=(destination.distance<=time?fleet.fleet[powerFunction]():0)
 				)
 			);
 			//*
 			fleetMovementMap.forEach(
 				fleet => {
+					var productionRate = 0;
+				if(fleet.origin.production){ //duck typing for is a planet
+					var buildUnit = fleet.origin.culture.units.filter(unitType=>unitType.type==unitTypeToBuild)[0];//TODO: optimize unit chosen
+					productionRate = fleet.productionRate*buildUnit.power/buildUnit.cost; 
+				}
+				
 				result[fleet.origin.id][time].power[
 					game.diplomacy.factionRelations[ai.owner.name][fleet.fleet.owner().name]] 
-					+= time*fleet.productionRate;
+					+= time*productionRate;
 				}
 			);
 			//*/

@@ -35,6 +35,16 @@ function Game (){
 		)};
 	}
 	
+	game.save = function (){
+		var result = {};
+
+		result.planets = game.galaxy.map(p=>savePlanet(p));
+		//TODO: save moving fleets
+		result.cultures = game.galaxy.map(p=>p.culture).filter((culture,index,cultures)=>cultures.indexOf(culture)==index);
+		//TODO: save players
+		//result.owners = game.players().map(p=>p.player)
+		return result;
+	}
 	//REGION commands
 	//TODO: authenticate user giving command... far in future
 	game.addOrder = function(order){

@@ -11,10 +11,12 @@ var config = {
 		{
 			"name": "English",
 			"color": "#008800",
+			"shading":"#88ff88",
 			"units":[
 				{type:"infantry", name:"Conscripts",power:10,cost:10},
+				{type:"infantry", role:"special forces",name:"Marines",power:20,cost:30},
 				{type:"ship", name:"Carrier",power:10,speed:2,cost:10},
-				{type:"transport",name:"transport",speed:2,cost:5}
+				{type:"transport",name:"transport",speed:2,cost:20},
 			],
 			"planetNames":[
 				"Ares",
@@ -47,6 +49,7 @@ var config = {
 		{
 			"name": "Chinese",
 			"color": "#880000",
+			"shading":"#ff8888",
 			"units":[
 				{type:"infantry",power:10,cost:10},
 				{type:"ship",power:10,speed:2,cost:10},
@@ -80,6 +83,7 @@ var config = {
 		{
 			"name": "Galactic Empire",
 			"color": "#008800",
+			"shading":"#88ff88",
 			"units":[
 				{type:"infantry",power:5,cost:3},
 				{type:"ship",power:10,speed:15,cost:12},
@@ -202,6 +206,7 @@ var config = {
 		{
 			"name": "Machine Collective",
 			"color": "#008800",
+			"shading":"#88ff88",
 			"units":[
 				{type:"infantry",power:20,cost:30},
 				{type:"ship",power:12,speed:12,cost:12},
@@ -318,6 +323,7 @@ function initConfig(){
 	for(var faction of config.factions){
 		config.factionByName[faction.name]=faction;
 		for(var unit of faction.units)
-			if(!unit.name)unit.name = faction.name+" "+unit.type;
+			if(!unit.name)unit.name = faction.name+" "+unit.type; //TODO: handle multiple unnamed of one type. include roles
+			unit.id = faction.name+"_"+unit.name;
 	}
 }

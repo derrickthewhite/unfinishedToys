@@ -11,7 +11,7 @@ function View(game,activePlayer){
 	view.workingProduction = ko.observable();
 	view.activePlayer= ko.observable();
 	view.viewMode = ko.observable("planet"); //planet, fleet, order
-	view.clickMode = ko.observable("display");
+	view.clickMode = ko.observable("display"); //display, destination
 	view.activePlayer(activePlayer);
 
 	view.planetProductionOptions = ko.pureComputed(function (){
@@ -70,6 +70,7 @@ function View(game,activePlayer){
 		{
 			game.addProductionChanges(productionChange(view.currentPlanet(),view.workingProduction()));
 		}
+		view.draw();
 	}
 	view.click = function (event){
 		var position = {x:event.offsetX-config.map.border,y:event.offsetY-config.map.border};
@@ -94,7 +95,7 @@ function View(game,activePlayer){
 			game.addOrder(order);
 			view.draw();
 			view.events.systemClick(view.currentPlanet()); //TODO: odd, but does the job! TODO: not always a planet!
-			view.clickMode('select');
+			view.clickMode('display');
 		}
 		//TODO: intelligently order objects? how to select something behind one
 		else if(objects.planets.length) view.events.systemClick(objects.planets[0]);

@@ -15,6 +15,8 @@ function tick(){
 			var planet = game.getPlanetAtPosition({x:movingFleet.destination.x(),y:movingFleet.destination.y()});
 			var activeFleet = planet?planet.fleets().filter(a=>a.owner()==movingFleet.fleet.owner())[0]:undefined;
 			if(activeFleet)
+				activeFleet.combine(movingFleet.fleet);
+				/*
 				for(var unit of movingFleet.fleet.units())
 				{
 					var mergeUnit = activeFleet.units().filter(a=> a.type.name == unit.type.name)[0];
@@ -23,10 +25,33 @@ function tick(){
 					else
 						activeFleet.push(unit);
 				}
+				*/
 			else 
 				planet.fleets.push(movingFleet.fleet);
 			
 			game.movingFleets.remove(movingFleet);
+		}
+	}
+	var mergeTolerance = .25; //turn fractions spent merging
+	//TODO: set merge number in config, not here
+	//TODO: match all and then combine (handle a string)
+	game.movingFleets().sort((a,b)=> {
+		a.fleet.speed() != b.fleet.speed()?a.fleet.speed() - b.fleet.speed()
+		:a.destination.x()!=b.destination.x()?b.destination.x()-a.destination.x()
+		:a.destination.y()!=b.destination.y()?b.destination.y()-a.destination.y()
+		:a.position.x()!=b.position.x()?b.position.x()-a.position.x()
+		:a.position.y()!=b.position.y()?b.position.y()-a.position.y()
+		:0
+	})
+	for(var i=1;i<game.movingFleets().length;i++){
+		var a =game.movingFleets()[i-1];
+		var b =game.movingFleets()[i];
+		if(distance(a.position,b.position)<mergeTolerance){
+			a.position.x(a.position.x()/2+b.position.x()/2);
+			a.position.y(a.position.y()/2+b.position.y()/2);
+			game.movingFleets.remove(b);
+			a.fleet.combine(b.fleet);
+			i--;
 		}
 	}
 	game.movingFleets(game.movingFleets().filter(mf=>!mf.fleet.empty()));

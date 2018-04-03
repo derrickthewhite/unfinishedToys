@@ -2,6 +2,7 @@
 <html>
 <head>
 	<title>Space Wars</title>
+	<link href="main.css" rel="stylesheet"></link>
 	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
 	<script type="text/javascript" src="../../Tools/laconic.js"></script>
 	<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
@@ -164,18 +165,19 @@
 			<div> Status: <span data-bind = "text:status"></span></div>
 			<div data-bind = "text:infoString"></div>
 			<div data-bind="foreach:fleets">
-				<div> Owner: <span data-bind="text:owner().name"><span></div>
+				<div class = "fleet" data-bind="style: { 'background-color': owner().shading}">
+				<div><span data-bind="text:owner().name"></span> Forces</div>
 				<div data-bind = "text:infoString"></div>
-				<div data-bind="component: {name: 'FleetDisplay', params:$data}"></div>
+				<div data-bind = "component: {name: 'FleetDisplay', params:$data}"></div>
+				</div>
 			</div>
-			<div data-bind="foreach:orders">
-				<div data-bind="component: {name: 'OrderDisplay', params:$data}"></div>
+			<div data-bind ="if:owner() == $root.view.activePlayer()">
+				<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:$root.view.workingProduction"></select>
+				<button data-bind = "click:$root.view.setProductionForCurrentPlanet">Set Current Planet</button>
+				<button data-bind = "click:$root.view.setProductionForAllMyPlanets">Set For All Planets</button>
 			</div>
-			<select data-bind = "options:$root.view.planetProductionOptions, optionsText:'name', value:$root.view.workingProduction"></select>
-			<button data-bind = "click:$root.view.setProductionForCurrentPlanet">Set Current Planet</button>
-			<button data-bind = "click:$root.view.setProductionForAllMyPlanets">Set For All Planets</button><br>
 		</div>
-		<div>
+		<div data-bind="if:$root.view.workingFleet.units().length">
 			ORDER:
 			<div data-bind="foreach:$root.view.workingFleet.units">
 				<div>
@@ -187,8 +189,11 @@
 					</span>
 				</div>
 			</div>
-			<button data-bind = "click:$root.view.sendAll">Send All</button>
-			<button data-bind = "click:$root.view.setDestination">Set Destination</button>
+			
+			<div data-bind ="if: $root.view.clickMode() == 'display'">
+				<button data-bind = "click:$root.view.sendAll">Send All</button>
+				<button data-bind = "click:$root.view.setDestination">Set Destination</button>
+			</div>
 		</div>
 		<button data-bind = "click:$root.view.readyToTick">Tick</button>
 	</div>

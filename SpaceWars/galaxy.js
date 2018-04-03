@@ -38,3 +38,36 @@ function buildSetting(numStars, dimensions, cultures){
 	console.log("Production Ratio",galaxy.reduce((sofar,a)=>a.owner().name == "English"? a.production+sofar: sofar,0), totalProduction);
 	return galaxy;
 }
+//TODO: move save data
+
+function copy(a){return JSON.parse(JSON.stringify(a));};
+function savePlanet(planet){
+	result = {};
+	result.production = copy(planet.production);
+	result.position = copy(planet.position);
+	result.name = copy(planet.name);
+	result.currentProduction = copy(planet.currentProduction);
+	
+	result.fleets = planet.fleets().map(fleet => saveFleet(fleet));
+	
+	result.culture = planet.culture.name;
+	result.owner = planet.owner.name;
+	
+	return result;
+}
+
+function saveFleet(fleet){
+	var result = {};
+	result.owner = fleet.owner.name;
+	result.status = fleet.status();
+	result.units = fleet.units().map(unit => saveUnit(unit));
+	return result;
+}
+
+function saveUnit(unit){
+	var result = {};
+	result.type = unit.type.id; //TODO: make sure unit type names are unique, or use some better identifier
+	result.owner = unit.owner.name;
+	result.count = unit.count();
+	return result;
+}
