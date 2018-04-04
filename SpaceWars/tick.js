@@ -12,7 +12,7 @@ function tick(){
 		movingFleet.move();
 		if(movingFleet.position == movingFleet.destination)
 		{
-			var planet = game.getPlanetAtPosition({x:movingFleet.destination.x(),y:movingFleet.destination.y()});
+			var planet = game.getPlanetAtPosition(movingFleet.destination);
 			var activeFleet = planet?planet.fleets().filter(a=>a.owner()==movingFleet.fleet.owner())[0]:undefined;
 			if(activeFleet)
 				activeFleet.combine(movingFleet.fleet);

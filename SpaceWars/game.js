@@ -66,21 +66,21 @@ function Game (){
 	}
 	//TODO: move functionality to Galaxy?
 	game.getPlanetAtPosition = function(position){
-		return game.galaxy().filter(planet => planet.position.x == ko.unwrap(position.x) && planet.position.y == ko.unwrap(position.y))[0];
+		return game.galaxy().filter(planet => planet.position.x() == position.x() && planet.position.y() == position.y())[0];
 	}
 	//TODO: move functionality to Galaxy?
 	game.getObjectsAtPosition = function(position){
 		return {planets : game.galaxy().filter(planet => 
-			planet.position.x == position.x 
-			&& planet.position.y == position.y
+			planet.position.x() == position.x() 
+			&& planet.position.y() == position.y()
 		),
 		orders : game.orders().filter(order =>
-			Math.abs(order.midpoint.x - position.x)<1 
-			&& Math.abs(order.midpoint.y - position.y)<1
+			Math.abs(order.midpoint.x() - position.x())<1 
+			&& Math.abs(order.midpoint.y() - position.y())<1
 		),
 		fleets : game.movingFleets().filter(fleet =>
-			Math.abs(fleet.position.x() - position.x)<1 
-			&& Math.abs(fleet.position.y() - position.y)<1
+			Math.abs(fleet.position.x() - position.x())<1 
+			&& Math.abs(fleet.position.y() - position.y())<1
 		)};
 	}
 	

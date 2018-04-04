@@ -4,7 +4,10 @@ function Planet (name,production, position, culture, owner, fleets,id){
 	
 	planet.id = id?id:"Planet_"+(nextPlanetID++);
 	planet.production = production;
-	planet.position = position;
+	planet.position = {
+		x:ko.observable(position.x),
+		y:ko.observable(position.y)
+	};
 	planet.culture = culture;
 	planet.name = ko.observable(name);
 	

@@ -145,8 +145,8 @@ function Order(fleet,origin,destination)
 	order.destination = destination;
 	order.fleets = ko.pureComputed(()=>[fleet]);
 	order.midpoint = {
-		x:order.origin.position.x/2+order.destination.x/2,
-		y:order.origin.position.y/2+order.destination.y/2
+		x:ko.unwrap(order.origin.position.x)/2+ko.unwrap(order.destination.x)/2,
+		y:ko.unwrap(order.origin.position.y)/2+ko.unwrap(order.destination.y)/2
 	};
 	order.time = ko.pureComputed(()=>
 		distance(order.origin.position,destination)/order.fleet.speed()

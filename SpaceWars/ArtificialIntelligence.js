@@ -33,7 +33,13 @@ function AI(game,ownerID){
 		var locales = planets.concat(fleets);
 		locales.forEach(locale => result[locale.id]=[]);
 		var fleetMovementMap = ai.fleetMovementMap(planets,fleets);
-		var maxTime = fleetMovementMap.reduce((out,fleet) => Math.max(out,fleet.destinations.reduce((out,destination)=>Math.max(out,destination.distance),0)),0);
+		var maxTime = fleetMovementMap.reduce(
+			(out,fleet) => 
+				Math.max(out,fleet.destinations.reduce(
+					(out,destination)=>Math.max(out,destination.distance),0)
+				),
+			0
+		);
 
 		//TODO: include planet production into calcs
 		for(var time = 0; time <= maxTime; time++)
@@ -250,8 +256,8 @@ function AI_Player(game,owner){
 			Fleet(owner,grabRequestedFleet(choice.toMove,owner,[{type:"ship",count:choice.units}]),"space"),
 			choice.toMove,
 			{
-				x:ko.unwrap(choice.destination.position.x),
-				y:ko.unwrap(choice.destination.position.y),
+				x:choice.destination.position.x(),
+				y:choice.destination.position.y(),
 				name:game.getPlanetAtPosition(choice.destination.position).name()
 				//objects:game.getObjectsAtPosition(choice.destination.position),
 				//planet:game.getPlanetAtPosition(choice.destination.position)

@@ -78,7 +78,10 @@ function View(game,activePlayer){
 	view.click = function (event){
 		var position = {x:event.offsetX-config.map.border,y:event.offsetY-config.map.border};
 		var scale = config.map.scale;
-		var location = {x:Math.floor(position.x/scale),y:Math.floor(position.y/scale)};
+		var location = {
+			x:ko.observable(Math.floor(position.x/scale)),
+			y:ko.observable(Math.floor(position.y/scale))
+		};
 		var objects = game.getObjectsAtPosition(location);
 		if(view.clickMode()=="destination" && objects.planets.length)
 		{
@@ -141,8 +144,8 @@ function View(game,activePlayer){
 			var scale = config.map.scale;
 			for(var planet of game.galaxy())
 			{
-				var xCorr=planet.position.x*scale+config.map.border;
-				var yCorr=planet.position.y*scale+config.map.border
+				var xCorr=planet.position.x()*scale+config.map.border;
+				var yCorr=planet.position.y()*scale+config.map.border
 				ctx.fillStyle = planet.owner().color;
 				ctx.strokeStyle = planet.culture.color;
 				ctx.lineWidth  = 2;
@@ -167,20 +170,20 @@ function View(game,activePlayer){
 				ctx.strokeStyle = order.fleet.owner().color;
 				ctx.strokeStyle = '10px';
 				ctx.beginPath();
-				ctx.moveTo(order.origin.position.x*scale+config.map.border+scale/2,
-					order.origin.position.y*scale+config.map.border+scale/2);
-				ctx.lineTo(order.destination.x*scale+config.map.border+scale/2,
-					order.destination.y*scale+config.map.border+scale/2);
+				ctx.moveTo(order.origin.position.x()*scale+config.map.border+scale/2,
+					order.origin.position.y()*scale+config.map.border+scale/2);
+				ctx.lineTo(order.destination.x()*scale+config.map.border+scale/2,
+					order.destination.y()*scale+config.map.border+scale/2);
 				ctx.stroke();
 				
-				ctx.rect(order.midpoint.x*scale+config.map.border+scale/4,
-					order.midpoint.y*scale+config.map.border+scale/4,scale/2,scale/2);
+				ctx.rect(order.midpoint.x()*scale+config.map.border+scale/4,
+					order.midpoint.y()*scale+config.map.border+scale/4,scale/2,scale/2);
 				ctx.fill();
 				ctx.fillStyle = "white";
 				ctx.fillText(
 					order.fleet.infoString(),
-					order.midpoint.x*scale+config.map.border+scale/4,
-					order.midpoint.y*scale+config.map.border+scale/2);
+					order.midpoint.x()*scale+config.map.border+scale/4,
+					order.midpoint.y()*scale+config.map.border+scale/2);
 			}
 			for(var movingFleet of game.movingFleets()){
 				ctx.fillStyle = movingFleet.fleet.owner().color;
