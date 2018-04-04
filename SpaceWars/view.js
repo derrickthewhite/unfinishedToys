@@ -1,6 +1,9 @@
 function View(game,activePlayer){
 	var view = {};
 
+	view.owner = function (){return view.activePlayer()};
+	view.playerType = "VIEW";
+	
 	view.drawMode = false;
 	view.moveMode = false; //TODO: don't allow changes when move mode is false!
 	view.currentPlanet= ko.observable();
@@ -60,7 +63,7 @@ function View(game,activePlayer){
 		var productionChanges = [];
 		for(var planet of game.galaxy()){
 			if(planet.owner() == view.activePlayer() && planet.culture.units.indexOf(view.workingProduction())!=-1)
-				productionChanges.push(productionChange(planet,view.workingProduction()));
+				game.addProductionChanges(ProductionChange(planet,view.workingProduction()));
 		}
 		game.addProductionChanges(productionChanges);
 		view.draw();
@@ -68,7 +71,7 @@ function View(game,activePlayer){
 	view.setProductionForCurrentPlanet = function (){
 		if(view.currentPlanet().owner() == view.activePlayer())
 		{
-			game.addProductionChanges(productionChange(view.currentPlanet(),view.workingProduction()));
+			game.addProductionChanges(ProductionChange(view.currentPlanet(),view.workingProduction()));
 		}
 		view.draw();
 	}

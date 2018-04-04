@@ -1,14 +1,14 @@
 var nextPlanetID = 1000;
-function Planet (name,production, position, culture, owner, fleets){
+function Planet (name,production, position, culture, owner, fleets,id){
 	var planet = {};
 	
-	planet.id = "Planet_"+(nextPlanetID++);
+	planet.id = id?id:"Planet_"+(nextPlanetID++);
 	planet.production = production;
 	planet.position = position;
 	planet.culture = culture;
 	planet.name = ko.observable(name);
 	
-	planet.currentProduction = ko.observable({name:"peace"});
+	planet.currentProduction = ko.observable({name:"peace"}); //TODO: allow different values on creation
 	planet.fleets = ko.observableArray(fleets?fleets:[]);
 	planet.owner = ko.observable(owner);
 	
@@ -36,10 +36,26 @@ function Planet (name,production, position, culture, owner, fleets){
 		return "Peaceful";
 	});
 	
+	planet.save = function(){
+		result = {};
+		result.production = copy(planet.production);
+		result.position = copy(planet.position);
+		result.name = copy(planet.name);
+		result.currentProduction = copy(planet.currentProduction); 
+		
+		result.fleets = planet.fleets().map(fleet => fleet.save());
+		
+		result.culture = planet.culture.name;
+		result.owner = planet.owner().name;
+		result.id = planet.id;
+		
+		return result;
+	}
+	
 	return planet;
 }
 
-function productionChange(planet,production)
+function ProductionChange(planet,production)
 {
 	//TODO: report if not valid
 	if(planet.culture.units.indexOf(production)==-1) 
@@ -47,5 +63,12 @@ function productionChange(planet,production)
 	var change = {};
 	change.planet = planet;
 	change.production = production;
+	
+	change.save = function (){
+		var result = {};
+		result.production = production.id;
+		result.planet = planet.id;
+		return result;
+	}
 	return change;
 }

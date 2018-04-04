@@ -62,6 +62,7 @@
 			var r = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
 			return average+r*dev;
 		}
+		function copy(a){return JSON.parse(ko.toJSON(a));};
 		//TODO: create interface between game and view
 		
 		var game = Game();

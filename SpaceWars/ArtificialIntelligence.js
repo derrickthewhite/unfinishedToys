@@ -221,6 +221,8 @@ function AI(game,ownerID){
 function AI_Player(game,owner){
 	var player = {};
 	var ai = AI(game,owner); //The AI itself is an analysis tool, not a player
+	player.owner = function (){return owner};
+	player.playerType = "AI_PLAYER";
 	var grabRequestedFleet = function (location,owner,numbers){
 		//TODO: optimize unit types grabbed
 		var units = location.fleets().filter(fleet => fleet.owner()==owner)
@@ -239,7 +241,7 @@ function AI_Player(game,owner){
 		}).reduce((a,b)=>a.concat(b));
 	};
 	player.takeTurn = function (){
-		ai.purchaseChoices().forEach(choice => game.addProductionChanges(productionChange(
+		ai.purchaseChoices().forEach(choice => game.addProductionChanges(ProductionChange(
 			choice.planet,
 			choice.planet.culture.units.filter(unit => choice.build==unit.type)[0]
 		)));

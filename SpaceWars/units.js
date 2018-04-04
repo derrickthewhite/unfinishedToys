@@ -61,6 +61,14 @@ function Fleet(owner,units,status)
 				fleet.push(unit);
 		}
 	}
+	
+	fleet.save = function (){
+		var result = {};
+		result.owner = fleet.owner().name;
+		result.status = fleet.status();
+		result.units = fleet.units().map(unit => unit.save());
+		return result;
+	}
 
 	return fleet;
 }
@@ -68,7 +76,7 @@ function Unit(type, owner, count)
 {
 	var unit = {};
 	unit.type = type;
-	unit.owner = owner;
+	unit.owner = owner; //TODO: do we need owner? can you temporarily loan a unit to a fleet without changing the owner? Can two fleets defend together or do they need to be one?
 	unit.count = ko.observable(count);
 	unit.power = ko.pureComputed(function (){
 		return unit.count()*unit.type.power;
@@ -76,13 +84,20 @@ function Unit(type, owner, count)
 	unit.copy = function (){
 		return Unit(unit.type,unit.owner,unit.count());
 	}
+	unit.save= function(){
+		var result = {};
+		result.type = unit.type.id;
+		result.owner = unit.owner.name;
+		result.count = unit.count();
+		return result;
+	};
 	return unit;
 }
 
-function MovingFleet(fleet,position,destination)
+function MovingFleet(fleet,position,destination,id)
 {
 	var mf = {};
-	mf.id = "Moving_Fleet_"+(nextMovingFleetID++);
+	mf.id = id?id:"Moving_Fleet_"+(nextMovingFleetID++);
 	mf.position = {};
 	mf.position.x = ko.observable(ko.unwrap(position.x));
 	mf.position.y = ko.observable(ko.unwrap(position.y));
@@ -111,6 +126,13 @@ function MovingFleet(fleet,position,destination)
 		}
 	}
 
+	mf.save = function(){
+		var result = {};
+		result.fleet = mf.fleet.save();
+		result.position = copy(mf.position);
+		result.destination = copy(mf.destination);
+		result.id = mf.id;
+	}
 	return mf;
 }
 
@@ -155,6 +177,14 @@ function Order(fleet,origin,destination)
 				}
 			}
 		}
+	}
+	
+	order.save = function (){
+		var result = {}
+		result.fleet = fleet.save();
+		result.origin = origin.id;
+		result.destination = copy(destination);
+		return result;
 	}
 	return order;
 }

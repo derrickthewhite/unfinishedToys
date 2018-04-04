@@ -322,8 +322,9 @@ function initConfig(){
 	config.factionByName = [];
 	for(var faction of config.factions){
 		config.factionByName[faction.name]=faction;
-		for(var unit of faction.units)
+		for(var unit of faction.units){
 			if(!unit.name)unit.name = faction.name+" "+unit.type; //TODO: handle multiple unnamed of one type. include roles
-			unit.id = faction.name+"_"+unit.name;
+			unit.id = faction.name+"|_|_|"+unit.name;
+		}
 	}
 }

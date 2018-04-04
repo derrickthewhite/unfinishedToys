@@ -15,6 +15,55 @@ function Game (){
 		players = playerTypes.map((type,index)=>type(game,factions[index]));
 		game.players(players);
 	}
+	
+	game.load = function (savedState){
+		var cultures = savedState.cultures;
+		var playerTypes = {"VIEW":View,"AI_PLAYER":AI_Player};
+		game.players(savedState.owners.map(savedOwner => playerTypes[savedOwner.type](
+			game,
+			cultures.filter(culture=> culture.name == savedOwner.owner)[0]
+		)));
+		var ownerMap = game.players().reduce((out,a)=>{ out[a.owner().name] = a.owner();return out;},{});
+		var unitMap = cultures.map(culture=>culture.units).reduce((a,b)=>a.concat(b)).reduce((out,type)=>{out[type.id]=type;return out;},{})
+
+		function buildFleet(savedFleet){ 
+			return Fleet(
+				ownerMap[savedFleet.owner],
+				savedFleet.units.map(unit => 
+					Unit(
+						unitMap[unit.type],
+						ownerMap[unit.owner],
+						unit.count
+					)
+				),
+				savedFleet.status
+			);
+		}
+		game.galaxy (savedState.planets.map(planet=>Planet(
+			planet.name,
+			planet.production,
+			planet.position,
+			cultures.filter(culture=> culture.name ==planet.culture)[0],
+			ownerMap[planet.owner],
+			planet.fleets.map(fleet=>buildFleet(fleet)),
+			planet.id
+		)));
+		game.movingFleets(savedState.movingFleets.map(mf=>MovingFleet(
+			buildFleet(mf.fleet),
+			mf.position,
+			mf.destination,
+			mf.id
+		)));
+		game.orders(savedState.orders.map(order => Order(
+			buildFleet(order.fleet),
+			game.movingFleets().concat(game.galaxy()).filter(origin=>origin.id == order.origin)[0],
+			order.destination
+		)));
+		game.productionChanges(savedState.productionChanges.map(change=>ProductionChange(
+			game.galaxy().filter(planet=>planet.id == change.planet)[0],
+			unitMap[change.production]
+		)));
+	}
 	//TODO: move functionality to Galaxy?
 	game.getPlanetAtPosition = function(position){
 		return game.galaxy().filter(planet => planet.position.x == ko.unwrap(position.x) && planet.position.y == ko.unwrap(position.y))[0];
@@ -38,11 +87,17 @@ function Game (){
 	game.save = function (){
 		var result = {};
 
-		result.planets = game.galaxy.map(p=>savePlanet(p));
-		//TODO: save moving fleets
-		result.cultures = game.galaxy.map(p=>p.culture).filter((culture,index,cultures)=>cultures.indexOf(culture)==index);
-		//TODO: save players
-		//result.owners = game.players().map(p=>p.player)
+		result.productionChanges = game.productionChanges().map(change=>change.save());
+		result.planets = game.galaxy().map(p=>p.save());
+		result.movingFleets = game.movingFleets().map(mf=>mf.save());
+		result.orders = game.orders().map(order=>order.save());
+		result.cultures = game.galaxy().map(p=>p.culture).filter((culture,index,cultures)=>cultures.indexOf(culture)==index);
+		result.owners = game.players().map(p=>{
+			return {
+				owner:p.owner().name,
+				type:p.playerType
+			}
+		})
 		return result;
 	}
 	//REGION commands
