@@ -1,42 +1,32 @@
 function Game(){
 	var game = {};
 	game.statics ={};
-	game.statics.manipUses = ['builders','operators','miners'];
-	
-	
-	game.mode = ko.observable("setup"); // mainView, invention, setup
-	game.players = ko.observableArray();
-	game.currentPlayer = ko.observable(0);
-	
-	//setup
-	game.newPlayerName = ko.observable("");
-	game.addPlayer = function (){
-		game.players.push(new player(game.newPlayerName()));
-	};
-	game.startGame = function ()
-	{
-		var steel = new ConstructionType("Steel",[],"starting");
-		var costsSteel = effects.fuel2C;
-		costsSteel.target = "Steel";
-		var robot = new ConstructionType("Robot",[effects.worthless,effects.manipulator,effects.automatic,costsSteel,effects.limit1],"starting");
-		game.mode("invention");
-		for(var player of game.players())
-		{
-			player.addCards(cards.draw(3));
-			player.addConstruction(robot,2);
-			player.addConstruction(steel,0);
-		}
-	};
-
-	//building
+	game.statics.manipUses = ['builders','operators','miners']; //TODO: move to model? maybe?
 	//TODO: get these auto creates correct!
 	for(var use of game.statics.manipUses)
 	{
 		game[use] = ko.observable(0);
 	}
+	
+	game.model = Model();
+	
+	game.currentPlayer = ko.pureComputed(function (){
+		return game.model.players()[game.model.currentPlayer()];
+	})
+	
+	//setup
+	game.newPlayerName = ko.observable("");
+	game.addPlayer = function (){
+		game.model.addPlayer(game.newPlayerName(),game);
+	};
+	game.startGame = function ()
+	{
+		game.model.startGame();
+	};
+
+	//building
 	game.manipulatorsLeft = ko.pureComputed(function (){
-		var player = game.players()[game.currentPlayer()];
-		var flow = player.totalFlow();
+		var flow = game.currentPlayer().totalFlow();
 		flow = JSON.parse(JSON.stringify(flow));
 		var manipulators = flow.totals.manipulator;
 		for(var use of game.statics.manipUses)
@@ -48,29 +38,24 @@ function Game(){
 	game.nextTurn = function (){
 		if(game.hasValidInstructions())
 		{
-			var lastPlayer = game.players()[game.currentPlayer()];
-			var nextPlayer = (game.currentPlayer()+1)%game.players().length;
-			
-			var flow = lastPlayer.totalFlow();
-			flow = JSON.parse(JSON.stringify(flow))
-			//TODO -- synthetics might be a problem
-			//TODO: implement burning properly
+			/*
 			for(var construction of lastPlayer.constructions())
 			{
 				construction.number(construction.number()+construction.expectedChange());
 				if(construction.expectedChange())console.log(construction.name,"changed by",construction.expectedChange());
 			}
-			
-			game.currentPlayer(nextPlayer);
-			lastPlayer.addCards(cards.draw(lastPlayer.cards().length?2:3));
-			game.mode("invention");
+			*/
+			game.model.runBuildPhase(game.currentPlayer().constructions().reduce((out,a)=>{
+					out[a.name]={};
+					out[a.name].totalChange=a.expectedChange();
+					return out;
+			},{}));
 			game.cardsSelected([]);
 		}
 	}
 	game.currentFlow = ko.pureComputed(function () {
-		player = game.players()[game.currentPlayer()];
-		if(!player) return {};
-		var flow = player.totalFlow();
+		if(!game.currentPlayer()) return {};
+		var flow = game.currentPlayer().totalFlow();
 		flow = JSON.parse(JSON.stringify(flow))
 		flow.inputs.manipulator = 0;
 		for(var i of game.statics.manipUses)
@@ -85,7 +70,7 @@ function Game(){
 	});
 	game.errors = ko.pureComputed( function() {
 		var result = [];
-		if(game.mode()=="mainView")
+		if(game.model.mode()=="mainView")
 		{
 			flow = game.currentFlow();
 			for(var i in flow.inputs)
@@ -97,7 +82,7 @@ function Game(){
 				else if(flow.outputs[i]<flow.inputs[i])
 					result.push("Requires "+(flow.inputs[i]-flow.outputs[i])+" more "+i);
 			}
-			for(var construction of player.constructions())
+			for(var construction of game.currentPlayer().constructions())
 			{
 				if(!construction.type.isMachine && construction.activateCount() > construction.number()+construction.buildCount()) //yes, you can build and burn same round
 					result.push ("Burning "
@@ -119,7 +104,7 @@ function Game(){
 	});
 	game.warnings = ko.pureComputed(function (){
 		var result = [];
-		if(game.mode()=="mainView")
+		if(game.model.mode()=="mainView")
 		{
 			flow = game.currentFlow();
 			for(var i in flow.totals)
@@ -129,7 +114,7 @@ function Game(){
 					result.push("You have "+flow.totals[i]+" unused "+i)
 				}
 			}
-			for(var construction of player.constructions())
+			for(var construction of game.currentPlayer().constructions())
 			{
 				if(construction.type.isMachine && Object.keys(construction.type.activateRequirements).length==0 && construction.number()!=construction.toActivate())
 					result.push("You have only activated "+construction.toActivate() +" of "+ construction.number() +" " + construction.type.name)
@@ -152,7 +137,7 @@ function Game(){
 	game.cardActivePlayer = ko.observable(0);
 	game.fuelToUse = ko.observable();
 	game.activePlayer = ko.computed (function (){
-		return (game.cardActivePlayer()+game.currentPlayer())%game.players().length;
+		return (game.cardActivePlayer()+game.model.currentPlayer())%game.model.players().length;
 	});
 	game.possibleFuels = ko.pureComputed(function (){
 		var player = game.currentPlayer();
@@ -162,7 +147,7 @@ function Game(){
 		//TODO: refine possible Fuel rules
 		//TODO: Add trading
 		//TODO: exclude machines?
-		for(var player of game.players())
+		for(var player of game.model.players())
 			for(var invention of player.constructions())
 				if(invention.type.inventor != player.name 
 					&& !sofar[invention.type.name]
@@ -174,36 +159,16 @@ function Game(){
 		return result;
 	});
 	game.finalizeInvention = function (){
-		var player = game.players()[game.currentPlayer()];
-		var effects = game.cardsSelected().map((card)=> card.effect);
-		effects = effects.length?effects.reduce((a,b)=> a.concat(b)):[];
-		var type = new ConstructionType(game.inventionName(),effects,player);
-		player.addConstruction(type,0);
-		console.log(type);
-		game.mode('mainView');
+		game.model.finalizeInvention(game.inventionName());
 	}
 	game.skipInventing = function (){
-		game.mode('mainView');
+		game.model.doneInventing();
 	}
 	game.addCard = function (){
-		
-		var card = game.cardForInvention()
-		game.players()[game.currentPlayer()].cards.remove(card);
-		card = JSON.parse(JSON.stringify(card));
-		for(var effect of card.effect)
-			if(effect.target == '<Fuel>')
-			{
-				console.log("replaceing <Fuel> with "+game.fuelToUse());
-				effect.target = game.fuelToUse();
-				card.name = card.name.replace('<Fuel>',effect.target);
-			}
-			else console.log("effect "+effect.name+" has no Fuel!",effect,card.effect);
-		game.cardsSelected.push(card);
-		
-		game.cardActivePlayer((game.cardActivePlayer()+1)%game.players().length);
+		game.model.addCard(game.cardForInvention(),game.fuelToUse());
 	}
 	game.declineToAdd = function (){
-		game.cardActivePlayer((game.cardActivePlayer()+1)%game.players().length);
+		game.model.addCard();
 	}
 	return game;
 }

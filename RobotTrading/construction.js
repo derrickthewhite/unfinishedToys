@@ -2,7 +2,8 @@
 			{
 				var self = this;
 				self.name = name;
-				self.effects = effects;
+				//TODO: will we eventually want to pass in functions?
+				self.effects = JSON.parse(JSON.stringify(effects)); 
 				self.id = getID();
 				self.inventor = inventor;
 				

@@ -7,6 +7,7 @@
 		<script type="text/javascript" src= "cards.js"></script>
 		<script type="text/javascript" src= "construction.js"></script>
 		<script type="text/javascript" src= "player.js"></script>
+		<script type="text/javascript" src= "model.js"></script>
 		<script type="text/javascript" src= "game.js"></script>
 		<script>
 			
@@ -19,29 +20,29 @@
 	</head>
 	<body onload="load()">
 		<div id="main">
-			<!-- ko if:game.mode()=='setup' -->
+			<!-- ko if:game.model.mode()=='setup' -->
 				New Player Name <input type = "text" data-bind="value:newPlayerName"></input> <br>
 				<button data-bind="click:addPlayer"> Add Player</button> <br>
 				<button data-bind="click:startGame"> Start Game </button> <br>
 				
-				<div data-bind="foreach:players">
+				<div data-bind="foreach:model.players">
 					<div data-bind="text:name"></div>
 				</div>
 			<!-- /ko -->
-			<!-- ko if:game.mode()!='setup' -->
-				<h1>Current Player: <span data-bind="text:players()[currentPlayer()].name"></span></h1> <br>
+			<!-- ko if:game.model.mode()!='setup' -->
+				<h1>Current Player: <span data-bind="text:currentPlayer().name"></span></h1> <br>
 			<!-- /ko -->
-			<!-- ko if:game.mode()=='mainView' -->
+			<!-- ko if:game.model.mode()=='mainView' -->
 				<button data-bind="click:nextTurn"> End Turn</button> <br>
 			<!-- /ko -->
-			<!-- ko if:game.mode()=='invention' -->
+			<!-- ko if:game.model.mode()=='invention' -->
 			
-				<h2>Active Player: <span data-bind="text:players()[activePlayer()].name"></span></h2> <br>
-				<h3>Phase: <span data-bind="text:game.mode()"></span></h3> <br>
+				<h2>Active Player: <span data-bind="text:model.players()[activePlayer()].name"></span></h2> <br>
+				<h3>Phase: <span data-bind="text:game.model.mode()"></span></h3> <br>
 				Invention Name <input type = "text" data-bind="value:inventionName"></input> <br>
 				Next Card: <select data-bind=
 					"value:cardForInvention,
-					options:players()[activePlayer()].cards,
+					options:model.players()[activePlayer()].cards,
 					optionsText:'name'"
 					></select>
 				Fuel: <select data-bind="value:fuelToUse,options:possibleFuels"></select>
@@ -54,11 +55,11 @@
 				<!-- /ko -->
 				<div data-bind="if:cardForInvention"><span data-bind="text:cardForInvention().name"></span></div>
 				Cards On Table <br>
-				<div data-bind="foreach:cardsSelected" class="section">
+				<div data-bind="foreach:model.cardsSelected" class="section">
 					<span data-bind="text:name"></span><br>
 				</div>
 			<!-- /ko -->
-			<div data-bind="foreach:players">
+			<div data-bind="foreach:model.players">
 				<h5><div data-bind="text:name"></div></h5>
 				<span data-bind="text:score"></span><br>
 				Deck <br>
@@ -68,7 +69,7 @@
 				<div data-bind="foreach:constructions">
 					<span data-bind="text:type.name"></span>:
 					<span data-bind="text:number"></span>
-					<!-- ko if:game.mode()=='mainView' -->
+					<!-- ko if:game.model.mode()=='mainView' -->
 						toBuild: <input type="number" data-bind="value:toBuild">
 						
 						<span data-bind="text:type.useName"></span> :
@@ -85,14 +86,14 @@
 					<!-- /ko -->
 					<br>
 				</div>
-				<!-- ko if: id == game.players()[game.currentPlayer()].id -->
+				<!-- ko if: id == game.currentPlayer().id -->
 					Manipulators Anassigned: <span data-bind="text:game.manipulatorsLeft"></span>
 					<!-- ko foreach:game.statics.manipUses -->
 					<span data-bind="text:capitalize($data)"></span>:
 					<input type="number" data-bind="value:game[$data]" ></input>
 					<!-- /ko -->
 					
-					<div data-bind="foreach:game.players()[game.currentPlayer()].constructions">
+					<div data-bind="foreach:game.currentPlayer().constructions">
 						<div class = "section">
 							name: <span data-bind="text:name"></span>
 							<div data-bind="foreach:type.effects">
