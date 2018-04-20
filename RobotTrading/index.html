@@ -37,19 +37,19 @@
 			<!-- /ko -->
 			<!-- ko if:game.model.mode()=='invention' -->
 			
-				<h2>Active Player: <span data-bind="text:model.players()[activePlayer()].name"></span></h2> <br>
+				<h2>Active Player: <span data-bind="text:model.cardActivePlayer().name"></span></h2> <br>
 				<h3>Phase: <span data-bind="text:game.model.mode()"></span></h3> <br>
 				Invention Name <input type = "text" data-bind="value:inventionName"></input> <br>
 				Next Card: <select data-bind=
 					"value:cardForInvention,
-					options:model.players()[activePlayer()].cards,
+					options:model.cardActivePlayer().cards,
 					optionsText:'name'"
 					></select>
 				Fuel: <select data-bind="value:fuelToUse,options:possibleFuels"></select>
 
 				<button data-bind="click:addCard"> Add Card</button><br>
 				<button data-bind="click:declineToAdd"> No Action</button><br>
-				<!-- ko if: !(game.cardActivePlayer()) -->
+				<!-- ko if: (model.cardActivePlayer()==game.currentPlayer()) -->
 					<button data-bind="click:finalizeInvention"> Finalize Invention</button> <br>
 					<button data-bind="click:skipInventing"> Skip Inventing</button> <br>
 				<!-- /ko -->

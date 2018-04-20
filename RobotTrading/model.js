@@ -49,7 +49,7 @@ function Model(){
 		
 		model.currentPlayer(nextPlayer);
 		currentPlayer.addCards(cards.draw(currentPlayer.cards().length?2:3));
-		model.mode("invention");
+		model.startInventing();
 	}
 	
 	model.addCard = function (card,fuel){
@@ -69,8 +69,14 @@ function Model(){
 		}
 		model.cardActivePlayerIndex((model.cardActivePlayerIndex()+1)%model.players().length);
 	}
-	
-	model.doneInventing = function(){model.mode('mainView');}
+	model.startInventing = function (){
+		model.cardActivePlayerIndex(model.currentPlayer());
+		model.cardsSelected([]);
+		model.mode("invention");
+	}
+	model.doneInventing = function(){
+		model.mode('mainView');
+	}
 	model.finalizeInvention = function(name){
 		var player = model.players()[model.currentPlayer()];
 		var effects = model.cardsSelected().map((card)=> card.effect);

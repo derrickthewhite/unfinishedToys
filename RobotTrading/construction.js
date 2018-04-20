@@ -41,6 +41,7 @@
 						else self.limited*=effect.quantity;
 					}
 				}
+				self.free = Object.keys(self.activateRequirements).length==0;
 			}
 			
 			function Construction (type,player,number)

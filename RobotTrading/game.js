@@ -12,7 +12,18 @@ function Game(){
 	
 	game.currentPlayer = ko.pureComputed(function (){
 		return game.model.players()[game.model.currentPlayer()];
-	})
+	});
+
+	//TODO: remove view elements from model elements, particuarly for constructions
+	game.activeConstructions = ko.pureComputed(function (){
+		return game.currentPlayer().constructions().map(construction =>{
+			return {
+				base:construction,
+				toBuild: ko.observable(0),
+				toActivate:ko.observable(construction.type.free?construction.number():0)
+			};
+		});
+	});
 	
 	//setup
 	game.newPlayerName = ko.observable("");
@@ -38,19 +49,15 @@ function Game(){
 	game.nextTurn = function (){
 		if(game.hasValidInstructions())
 		{
-			/*
-			for(var construction of lastPlayer.constructions())
-			{
-				construction.number(construction.number()+construction.expectedChange());
-				if(construction.expectedChange())console.log(construction.name,"changed by",construction.expectedChange());
-			}
-			*/
 			game.model.runBuildPhase(game.currentPlayer().constructions().reduce((out,a)=>{
 					out[a.name]={};
 					out[a.name].totalChange=a.expectedChange();
 					return out;
 			},{}));
-			game.cardsSelected([]);
+			for(var use of game.statics.manipUses)
+			{
+				game[use](0);
+			}
 		}
 	}
 	game.currentFlow = ko.pureComputed(function () {
@@ -134,22 +141,17 @@ function Game(){
 	game.cardForInvention = ko.observable();
 	game.cardsSelected = ko.observableArray([]);
 	game.inventionName = ko.observable("null");
-	game.cardActivePlayer = ko.observable(0);
 	game.fuelToUse = ko.observable();
-	game.activePlayer = ko.computed (function (){
-		return (game.cardActivePlayer()+game.model.currentPlayer())%game.model.players().length;
-	});
 	game.possibleFuels = ko.pureComputed(function (){
-		var player = game.currentPlayer();
 		var sofar = {};
 		var result = [];
 		
 		//TODO: refine possible Fuel rules
 		//TODO: Add trading
 		//TODO: exclude machines?
-		for(var player of game.model.players())
-			for(var invention of player.constructions())
-				if(invention.type.inventor != player.name 
+		for(var neighbor of game.model.players())
+			for(var invention of neighbor.constructions())
+				if(invention.type.inventor != game.currentPlayer().name 
 					&& !sofar[invention.type.name]
 					&& !invention.type.isMachine)
 				{
