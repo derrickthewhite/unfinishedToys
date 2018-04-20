@@ -24,10 +24,12 @@ function AI(game,ownerID){
 		);
 	}
 	
+	//TODO: troop version broken!
 	ai.strongPositions = function (planets,fleets,troops){
 		
 		var unitTypeToBuild = troops?"infantry":"ship";
-		var powerFunction = troops?"troopPower":"power";
+		var powerFunction = troops?"invasionPower":"power";
+		var selfPowerFunction = troops?"troopPower":"power";
 		
 		var result = [];
 		var locales = planets.concat(fleets);
@@ -59,7 +61,7 @@ function AI(game,ownerID){
 					destination => 
 					result[destination.destination.id][time].power[
 						game.diplomacy.factionRelations[ai.owner.name][fleet.fleet.owner().name]] 
-						+=(destination.distance<=time?fleet.fleet[powerFunction]():0)
+						+=(destination.distance<=time?fleet.fleet[destination.destination.id==fleet.origin.id?selfPowerFunction:powerFunction]():0)
 				)
 			);
 			//*
@@ -81,6 +83,20 @@ function AI(game,ownerID){
 		return result;
 	}
 	
+	//{ REGION CLASSIFY ODDS
+	//TODO: refine these numbers!
+	//TODO: consider differently for each troop type!
+	//TODO: make these numbers passed in!
+	ai.attackOdds=[
+		{name:2,value:3},
+		{name:1,value:1.5},
+		{name:0,value:1.1},
+		{name:-1,value:0}
+	]
+	ai.classifyOdds = function (odds,classification){
+		return classification.sort((a,b)=>b.value-a.value)
+			.filter(a=>a.value<=odds)[0].name;
+	}
 	ai.classifyFriendlyPlanetFuture = function (predictedHistory,horizon){
 		
 		var highestEnemyRatio = predictedHistory.slice(0,horizon)
@@ -100,25 +116,18 @@ function AI(game,ownerID){
 	}
 	
 	ai.classifyEnemyPlanetBattleOdds = function (predictedHistory,horizon){
-		
-		//TODO: refine these numbers!
-		var goodOdds = 1.5;
-		var exceptionalOdds = 3;
-		var fairOdds = 1.1;
-		
-		var ratioHistory = predictedHistory.slice(0,horizon).map(history => history.power.unified/history.power.warring);
-		var maxPower = ratioHistory.reduce((out,history,index)=>out.power<history? {power:history,index:index}: out,{power:0,index:-1});
-		
+		var maxPower = predictedHistory.slice(0,horizon)
+			.map(history => history.power.unified/history.power.warring)
+			.reduce((out,history,index)=>out.power<history? {power:history,time:index}: out,{power:0,index:-1});
+		return (ai.classifyOdds(maxPower.power,ai.attackOdds));
 		//recommendation
-		if(maxPower.power > exceptionalOdds)
-			return 2;
-		if(maxPower.power > goodOdds)
-			return 1;
-		if(maxPower.power > fairOdds)
-			return 0;
-		return -1;
 	}
-	
+	ai.attackTiming = function (predictedHistory,horizon){
+		var prefferredRatio = ai.attackOdds.filter(odds=>odds.name==1)[0].value;
+		return predictedHistory.slice(0,horizon)
+			.map((history,index) => history.power.unified/history.power.warring>=prefferredRatio?index:-1)
+			.filter(timing => timing>0)[0]
+	}
 	ai.planetsSpareUnits = function (predictedHistory,horizon){
 		var spareUnits = Infinity;
 		for(var time = 0; time <= horizon; time++){
@@ -128,6 +137,11 @@ function AI(game,ownerID){
 		return spareUnits;
 	}
 	
+	ai.maximumEnemy = function (predictedHistory,horizon){
+		return predictedHistory.slice(0,horizon).reduce((out,a)=>Math.max(a.power.warring,out),0);
+	}
+	
+	//}
 	ai.horizon = function (analysis){
 		//TODO: should horizon be the time to defend any of their worlds? 
 		var endTotals = analysis[Object.keys(analysis)[0]][analysis[Object.keys(analysis)[0]].length -1].power; // analysis has enough time for every ship to go everywhere
@@ -143,27 +157,30 @@ function AI(game,ownerID){
 	}
 	
 	ai.attackAndAbandon = function (){
-		// abandon weak points, attack the enemies' weak points, reinforce neccisary points
-		// jump ship immediately or just in time?
+		// abandon weak points, attack the enemies' weak points, reinforce necessary points
+		// TODO: jump ship immediately or just in time?
 
 		var analysis = ai.strongPositions(game.galaxy(),game.movingFleets());
-		var extraUnits = [];
-		
+		var troopAnalysis = ai.strongPositions(game.galaxy(),game.movingFleets(),true);
 		var horizon = ai.horizon(analysis);
 		
-		//TODO: factor these functions
-		function analyzePlanetsWithHorizon(tool,isOwner){
+		function analyzePlanetsWithHorizon(analysis,tool,isOwner){
 			return Object.keys(analysis).map((key)=>analysis[key]).filter(planetHistory => (planetHistory[0].origin.owner() == ai.owner)==isOwner).map(
 				planetHistory => { return{action:tool(planetHistory,horizon),origin:planetHistory[0].origin}}
 			);
 		}
-		var spareUnits = analyzePlanetsWithHorizon(ai.planetsSpareUnits,true);
-		var planetStatus = analyzePlanetsWithHorizon(ai.classifyFriendlyPlanetFuture,true);
-		planetStatus.forEach((origin,index)=>origin.units = spareUnits[index].action);
 		//TODO: target status distinguish between ally, neutral, and enemy
-		var targetStatus = analyzePlanetsWithHorizon(ai.classifyEnemyPlanetBattleOdds,false);
-		
-		return {enemyStatus:targetStatus,freindlyStatus:planetStatus,spareUnits:spareUnits,horizon:horizon};
+		return {
+				enemyStatus:analyzePlanetsWithHorizon(analysis,ai.classifyEnemyPlanetBattleOdds,false),
+				possibleInvasions:analyzePlanetsWithHorizon(troopAnalysis,ai.classifyEnemyPlanetBattleOdds,false),
+				maxEnemy:analyzePlanetsWithHorizon(troopAnalysis,ai.maximumEnemy,false),
+				attackTiming:analyzePlanetsWithHorizon(troopAnalysis,ai.attackTiming,false),
+				spareUnits:analyzePlanetsWithHorizon(analysis,ai.planetsSpareUnits,true),
+				freindlyStatus: analyzePlanetsWithHorizon(analysis,ai.classifyFriendlyPlanetFuture,true),
+				horizon:horizon,
+				analysis:analysis,
+				troopAnalysis:troopAnalysis
+			};
 	}
 	ai.rallyPoint = function (toRetreat,freindlyStatus){
 		//TODO: nearest is not necessarily best
@@ -177,14 +194,18 @@ function AI(game,ownerID){
 	ai.troopsNeeded = function (targetPlanet, analysis){
 		
 	}
-	ai.troopMovements = function (){
+	ai.troopMovements = function (toMove){
 		//TODO: consider troops and ships separately
-		var toMove = ai.attackAndAbandon();
+		//TODO: move transports!
+		console.log(toMove);
 		var retreats = toMove.freindlyStatus.filter(origin => origin.action == "abandon")
 			.map(origin => {return {
 				toMove:origin.origin,
 				destination: ai.rallyPoint(origin.origin,toMove.freindlyStatus).destination,
-				units: -origin.units
+				units: origin.origin.fleets().map(f=>f.units())
+					.reduce((a,b)=>a.concat(b))
+					.filter(unit=>unit.type.type=="ship")
+					.reduce((out,a)=>a.count()+out,0) //TODO: more than just ships!
 			}});
 		
 		var attacks = toMove.enemyStatus.filter(origin => origin.action > 0);
@@ -196,16 +217,16 @@ function AI(game,ownerID){
 		var hotSpots = attacks.map(a=>a.origin).concat(retreats.map(a=>a.destination));
 		
 		var moves = toMove.freindlyStatus.filter(origin => origin.action == "attack")
-			.map(origin => {
+			.map((origin,index) => {
 				return {
 					toMove: origin.origin,
 					destination: hotSpots.reduce((a,b)=> distance(a.position,origin.origin.position) < distance(b.position,origin.origin.position)?a:b),
-					units:origin.units 
+					units:toMove.spareUnits[index].action 
 				}
 			});
 		return moves.concat(retreats);
 	}
-	ai.purchaseChoices = function (){
+	ai.purchaseChoices = function (toMove){
 		//TODO: consider transports and troop types
 		function choice (action){
 			switch(action){
@@ -215,7 +236,7 @@ function AI(game,ownerID){
 				case "attack": return "ship";
 			}
 		}
-		return ai.attackAndAbandon().freindlyStatus
+		return toMove.freindlyStatus
 			.filter(locale=>locale.origin.production)
 			.map(planet => {
 				return {planet:planet.origin,build:choice(planet.action)};
@@ -247,17 +268,18 @@ function AI_Player(game,owner){
 		}).reduce((a,b)=>a.concat(b));
 	};
 	player.takeTurn = function (){
-		ai.purchaseChoices().forEach(choice => game.addProductionChanges(ProductionChange(
+		toMove = ai.attackAndAbandon();
+		ai.purchaseChoices(toMove).forEach(choice => game.addProductionChanges(ProductionChange(
 			choice.planet,
 			choice.planet.culture.units.filter(unit => choice.build==unit.type)[0]
 		)));
 		//TODO: sort out what is and isn't required to be stored in an order
-		ai.troopMovements().forEach(choice => game.addOrder(Order(
+		ai.troopMovements(toMove).forEach(choice => game.addOrder(Order(
 			Fleet(owner,grabRequestedFleet(choice.toMove,owner,[{type:"ship",count:choice.units}]),"space"),
 			choice.toMove,
 			{
-				x:choice.destination.position.x(),
-				y:choice.destination.position.y(),
+				x:choice.destination.position.x,
+				y:choice.destination.position.y,
 				name:game.getPlanetAtPosition(choice.destination.position).name()
 				//objects:game.getObjectsAtPosition(choice.destination.position),
 				//planet:game.getPlanetAtPosition(choice.destination.position)

@@ -106,9 +106,12 @@ function Game (){
 		//TODO: remove orders!
 		//TODO: make this the enforced canonical way
 		//TODO: reject invalid orders 
-		//	not enough transports
 		//	not enough units
+		if(order.fleet.capacity() < order.fleet.troops()){return "INVALID ORDER! TOO MANY TROOPS, NOT ENOUGH TRANSPORTS!"};
 		game.orders.push(order);
+		
+		//TODO: check for value on other side. Also, returning false for success is annoying
+		return false;
 	}
 	game.addProductionChanges = function (changes){
 		//TODO: reject invalid production changes

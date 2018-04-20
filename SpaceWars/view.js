@@ -32,9 +32,18 @@ function View(game,activePlayer){
 	}
 	view.sendAll = function (){
 		if(!view.activeFleet())return; //TODO: tell player there is no active fleet?
+		/*
 		for(var i = 0;i<view.activeFleet().units().length;i++){
-			view.workingFleet.units()[i].count(view.activeFleet().units()[i].count());
+			if(view.activeFleet().units()[i].type.type != "infantry")
+				view.workingFleet.units()[i].count(view.activeFleet().units()[i].count());
 		}
+		*/
+		view.workingFleet.units(
+			view.activeFleet().units()
+			.map(u=>u.copy())
+			.filter(u=>u.type.type!="infantry")
+			.concat(view.activeFleet().maxInfantry())
+		);
 		view.clickMode("destination"); //TODO: indicate click mode on screen
 	}
 	var setActiveFleet = function (fleet){

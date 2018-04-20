@@ -18,7 +18,7 @@ function Fleet(owner,units,status)
 			attribute:attribute,
 			filter:filter,
 			func: function (){
-				return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type == filter?a[attribute]():0),0));
+				return Math.round(fleet.units().reduce((sofar,a)=> sofar+(a.type.type == filter?a[attribute]():0),0)*1000)/1000;
 			}
 		};
 		return result.func;
@@ -28,22 +28,15 @@ function Fleet(owner,units,status)
 	fleet.capacity = ko.pureComputed(fleet.sum("count","transport"));
 	fleet.troops = ko.pureComputed(fleet.sum("count","infantry"));
 	fleet.troopPower = ko.pureComputed(fleet.sum("power","infantry"));
+	fleet.invasionPower = ko.pureComputed(function (){return fleet.maxInfantry().reduce((out,a)=>out+a.power(),0)});
 
 	fleet.empty = ko.pureComputed(function (){
 		return fleet.units().reduce((sofar,unit) => unit.count()+sofar,0)==0;
 	});
 	
 	fleet.infoString = ko.computed(function() {
-		var infantry=0;
-		var ships=0;
-		var transports=0;
-		for(var unit of fleet.units()){
-			//TODO: maybe not do all this checking here.
-			if(unit.type.type == 'infantry')infantry+=unit.power();
-			if(unit.type.type == 'ship')ships+=unit.power();
-			if(unit.type.type == 'transport')transports+=unit.count();
-		}
-		return infantry+" "+ships+" "+transports;
+
+		return fleet.troopPower()+" "+fleet.power()+" "+fleet.capacity();
 	});
 	
 	fleet.takeCausulties = function(type, survivalRatio){
@@ -62,6 +55,26 @@ function Fleet(owner,units,status)
 		}
 	}
 	
+	fleet.maxInfantry = ko.pureComputed(function (sort){
+		if(!sort)sort = (a,b)=>b.type.power - a.type.power;
+		var unitList = fleet.units().filter(u=>u.type.type=="infantry").sort(sort);
+		var maxCargo = fleet.capacity();
+		var result = [];
+		var soFar = 0;
+		for(var unit of unitList){
+			if(soFar < maxCargo){
+				result.push(unit.copy());
+				soFar+=unit.count();
+			}
+		}
+		if(soFar!=maxCargo){
+			var end = result[result.length-1];
+			end.count(end.count()-(soFar-maxCargo));
+		}
+		//TODO: turn it into an entire fleet? don't copy units at all?
+		return result;
+	});
+	
 	fleet.save = function (){
 		var result = {};
 		result.owner = fleet.owner().name;
@@ -77,9 +90,9 @@ function Unit(type, owner, count)
 	var unit = {};
 	unit.type = type;
 	unit.owner = owner; //TODO: do we need owner? can you temporarily loan a unit to a fleet without changing the owner? Can two fleets defend together or do they need to be one?
-	unit.count = ko.observable(count);
+	unit.count = ko.observable(count).extend({numeric:3}); //TODO: make rounding universally defined 
 	unit.power = ko.pureComputed(function (){
-		return unit.count()*unit.type.power;
+		return Math.round(unit.count()*unit.type.power*1000)/1000;
 	});
 	unit.copy = function (){
 		return Unit(unit.type,unit.owner,unit.count());
@@ -145,8 +158,8 @@ function Order(fleet,origin,destination)
 	order.destination = destination;
 	order.fleets = ko.pureComputed(()=>[fleet]);
 	order.midpoint = {
-		x:ko.unwrap(order.origin.position.x)/2+ko.unwrap(order.destination.x)/2,
-		y:ko.unwrap(order.origin.position.y)/2+ko.unwrap(order.destination.y)/2
+		x:ko.observable(order.origin.position.x()/2+order.destination.x()/2),
+		y:ko.observable(order.origin.position.y()/2+order.destination.y()/2),
 	};
 	order.time = ko.pureComputed(()=>
 		distance(order.origin.position,destination)/order.fleet.speed()
