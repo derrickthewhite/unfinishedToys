@@ -57,8 +57,8 @@ function Game(){
 			//TODO: implement burning properly
 			for(var construction of lastPlayer.constructions())
 			{
-				if(flow.totals[construction.name]!=0) 
-					construction.number(construction.number()+construction.expectedChange());
+				construction.number(construction.number()+construction.expectedChange());
+				if(construction.expectedChange())console.log(construction.name,"changed by",construction.expectedChange());
 			}
 			
 			game.currentPlayer(nextPlayer);
@@ -99,7 +99,7 @@ function Game(){
 			}
 			for(var construction of player.constructions())
 			{
-				if(!construction.type.isMachine && construction.activateCount() > construction.number())
+				if(!construction.type.isMachine && construction.activateCount() > construction.number()+construction.buildCount()) //yes, you can build and burn same round
 					result.push ("Burning "
 						+ (construction.activateCount()-construction.number()) 
 						+" more "+construction.name+" than you have!"

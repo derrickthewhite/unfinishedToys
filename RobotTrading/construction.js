@@ -30,6 +30,7 @@
 				self.buildRequirements = countRequirements('create','consumes',self.isMachine?{'builders':1}:{'miners':1});
 				self.maintainRequirements = countRequirements('maintain','consumes',{});
 				self.useOutput = countRequirements('use','produces',{});
+				self.score = 1+self.effects.filter(a=>a.trigger=="score").map(a=>a.quantity).reduce((a,b)=>a+b,0);
 				self.limited = 0;
 				for(var effect of effects)
 				{
@@ -54,6 +55,16 @@
 				
 				self.activateCount = ko.pureComputed(()=>Number(self.toActivate()));
 				self.buildCount = ko.pureComputed(()=>Number(self.toBuild()));
+				self.buildChange = ko.pureComputed(()=>{
+					return [{
+						resource:self.name,
+						value:self.buildCount()
+					}];
+				});
+				
+				self.score = ko.pureComputed(function (){
+					return self.number()*self.type.score;
+				})
 				
 				self.cost = ko.pureComputed(function (){
 					var result = [];
@@ -71,11 +82,12 @@
 					}
 					return result;
 				});
+				//TODO: distinguish between activates and builds, and possibly between activates and burns
 				self.output = ko.pureComputed(function (){
 					var result = [];
-					result.push({resource:self.name,value:self.buildCount()});
+					//result.push({resource:self.name,value:self.buildCount()});
 					if(!self.type.isMachine) 
-						result[0].value += self.activateCount();
+						result.push({resource:self.name,value:self.activateCount()});
 					else for(var i in self.type.useOutput)
 					{
 						result.push({resource:i,value:self.type.useOutput[i]*self.activateCount()})
@@ -83,6 +95,6 @@
 					return result;
 				});
 				self.expectedChange = ko.pureComputed(function (){
-					return self.toBuild() -(self.type.isMachine?0:self.toActivate());
-				})
+					return self.buildCount() -(self.type.isMachine?0:self.toActivate());
+				});
 			}

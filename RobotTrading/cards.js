@@ -20,6 +20,7 @@ effects.fuel3C = {"name":"3C","action":"consumes","quantity":3,"target":"<Fuel>"
 effects.fuel1P = {"name":"1P","action":"consumes","quantity":1,"target":"<Fuel>","trigger":"maintain"};
 
 effects.worthless = {"name":"Worthless","trigger":"score","quantity":-1};
+effects.valuable = {"name":"Valuable","trigger":"score","quantity":1};
 effects.limit1 = {"name":"Once Per Turn","action":"limits","quantity":1,"trigger":"use"};
 
 effects.automatic = {"name":"Automatic","action":"consumes","quantity":-1,"target":"operators","trigger":"use"};
@@ -36,6 +37,7 @@ for(var i =0;i<5;i++)cards.deck.push(new Card("1 <Fuel> to Create",[effects.fuel
 for(var i =0;i<3;i++)cards.deck.push(new Card("2 <Fuel> to Create",[effects.fuel2C],-2));
 for(var i =0;i<3;i++)cards.deck.push(new Card("1 <Fuel> to Use",[effects.fuel1A],-2));
 for(var i =0;i<5;i++)cards.deck.push(new Card("Worthless",[effects.worthless],-4));	
+for(var i =0;i<5;i++)cards.deck.push(new Card("Valuable",[effects.valuable],4));
 
 for(var i =0;i<6;i++)
 {
@@ -44,6 +46,12 @@ for(var i =0;i<6;i++)
 	cards.deck.push(new Card("Miner",[effects.miner],2));
 	cards.deck.push(new Card("Destroyer",[effects.destroyer],2));
 }
+
+console.log(cards.deck);
+console.log("absolute card value",cards.deck.reduce((out,a)=>out+Math.abs(a.value),0));
+console.log("addative card value",cards.deck.reduce((out,a)=>out+a.value,0));
+console.log("positive Cards",cards.deck.filter(a=>a.value>0).length);
+console.log("negative Cards",cards.deck.filter(a=>a.value<0).length);
 
 cards.draw = function(num)
 {

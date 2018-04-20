@@ -2,7 +2,7 @@ function player (name)
 {
 	var self = this;
 	self.name = name;
-	self.constructions = ko.observableArray();
+	self.constructions = ko.observableArray([]);
 	var constructionMap = {};
 	self.cards = ko.observableArray();
 	self.id = getID();
@@ -25,25 +25,27 @@ function player (name)
 		result.inputs = {};
 		result.outputs = {};
 		result.totals = {};
-		for(var construction of self.constructions())
-		{
-			for(var input of construction.cost())
-			{
-				if(!result.inputs[input.resource]) result.inputs[input.resource]=0;
-				if(!result.totals[input.resource]) result.totals[input.resource]=0;
-				
-				result.inputs[input.resource]+=input.value;
-				result.totals[input.resource]-=input.value;
-			}
-			for(var output of construction.output())
-			{
-				if(!result.outputs[output.resource]) result.outputs[output.resource]=0;
-				if(!result.totals[output.resource]) result.totals[output.resource]=0;
-				
-				result.outputs[output.resource]+=output.value;
-				result.totals[output.resource]+=output.value;
+		result.builds = {};
+		result.changes = {};
+		function addResources(list,aspect,name,sign){
+			sign = sign?sign:1;
+			for(var item of list)
+			for(var resource of item[aspect]()){
+				if(!result[name][resource.resource])result[name][resource.resource]=0;
+				result[name][resource.resource]+=resource.value*sign;
 			}
 		}
+		addResources(self.constructions(),'cost','inputs');
+		addResources(self.constructions(),'cost','totals',-1);
+		addResources(self.constructions(),'output','outputs');
+		addResources(self.constructions(),'output','totals');
+		addResources(self.constructions(),'buildChange','builds');
+		
+		console.log(result);
 		return result;
+	});
+
+	self.score = ko.pureComputed(function (){
+		return self.constructions().reduce((out,a)=>out+a.score(),0);
 	});
 }
