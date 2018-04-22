@@ -1,4 +1,5 @@
 <html>
+	<!--- based on the rules given at https://kevan.org/games/technopoly.php --->
 	<head>
 		<title>Techopoloy</title>
 		<link href="main.css" rel="stylesheet">
@@ -69,20 +70,19 @@
 				<div data-bind="foreach:constructions">
 					<span data-bind="text:type.name"></span>:
 					<span data-bind="text:number"></span>
-					<!-- ko if:game.model.mode()=='mainView' -->
-						toBuild: <input type="number" data-bind="value:toBuild">
+					<!-- ko if:game.model.mode()=='mainView' && game.currentPlayer().id==$parent.id -->
+						toBuild: <input type="number" data-bind="value:game.activeConstructionsMap()[$data.type.id].toBuild">
 						
 						<span data-bind="text:type.useName"></span> :
-						<input type="number" data-bind="value:toActivate"></input>
-						<span data-bind="foreach:cost" class="costs">
+						<input type="number" data-bind="value:game.activeConstructionsMap()[$data.type.id].toActivate"></input>
+						<span data-bind="foreach:game.activeConstructionsMap()[$data.type.id].cost" class="costs">
 							<span data-bind="text:resource"></span>:
 							<span data-bind="text:value"></span>
 						</span>
-						<span data-bind="foreach:output" class="outputs">
+						<span data-bind="foreach:game.activeConstructionsMap()[$data.type.id].output" class="outputs">
 							<span data-bind="text:resource"></span>:
 							<span data-bind="text:value"></span>
 						</span>
-
 					<!-- /ko -->
 					<br>
 				</div>

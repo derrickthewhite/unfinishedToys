@@ -21,7 +21,7 @@ function Model(){
 	model.startGame = function ()
 	{
 		var steel = new ConstructionType("Steel",[],"starting");
-		var costsSteel = effects.fuel2C;
+		var costsSteel = effects.fuel1C;
 		costsSteel.target = "Steel";
 		var robot = new ConstructionType("Robot",[effects.worthless,effects.manipulator,effects.automatic,costsSteel,effects.limit1],"starting");
 		model.mode("invention");
@@ -44,7 +44,7 @@ function Model(){
 		for(var construction of currentPlayer.constructions())
 		{
 			construction.number(construction.number()+orders[construction.name].totalChange);
-			if(construction.expectedChange())console.log(construction.name,"changed by",construction.expectedChange());
+			if(orders[construction.name].totalChange)console.log(construction.name,"changed by",orders[construction.name].totalChange);
 		}
 		
 		model.currentPlayer(nextPlayer);

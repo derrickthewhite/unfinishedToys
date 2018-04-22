@@ -19,7 +19,7 @@ function player (name)
 		}
 		construction.number(construction.number()+number);
 	};
-	
+	/*
 	self.totalFlow = ko.pureComputed(function (){
 		var result = {}
 		result.inputs = {};
@@ -44,7 +44,7 @@ function player (name)
 		console.log(result);
 		return result;
 	});
-
+	*/
 	self.score = ko.pureComputed(function (){
 		return self.constructions().reduce((out,a)=>out+a.score(),0);
 	});

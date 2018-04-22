@@ -15,14 +15,17 @@ function Game(){
 	});
 
 	//TODO: remove view elements from model elements, particuarly for constructions
+	//TODO: make sure active constructions doesn't reset in mid turn
 	game.activeConstructions = ko.pureComputed(function (){
 		return game.currentPlayer().constructions().map(construction =>{
-			return {
-				base:construction,
-				toBuild: ko.observable(0),
-				toActivate:ko.observable(construction.type.free?construction.number():0)
-			};
+			return ConstructionWrapperView(construction);
 		});
+	});
+	game.activeConstructionsMap = ko.pureComputed(function (){
+		var a =  game.activeConstructions().reduce((out,a)=>{
+			out[a.type.id]=a;return out;
+		},{});
+		return a;
 	});
 	
 	//setup
@@ -37,7 +40,7 @@ function Game(){
 
 	//building
 	game.manipulatorsLeft = ko.pureComputed(function (){
-		var flow = game.currentPlayer().totalFlow();
+		var flow = game.playerFlow();
 		flow = JSON.parse(JSON.stringify(flow));
 		var manipulators = flow.totals.manipulator;
 		for(var use of game.statics.manipUses)
@@ -49,9 +52,9 @@ function Game(){
 	game.nextTurn = function (){
 		if(game.hasValidInstructions())
 		{
-			game.model.runBuildPhase(game.currentPlayer().constructions().reduce((out,a)=>{
-					out[a.name]={};
-					out[a.name].totalChange=a.expectedChange();
+			game.model.runBuildPhase(game.activeConstructions().reduce((out,a)=>{
+					out[a.type.name]={};
+					out[a.type.name].totalChange=a.expectedChange();
 					return out;
 			},{}));
 			for(var use of game.statics.manipUses)
@@ -60,9 +63,32 @@ function Game(){
 			}
 		}
 	}
+	game.playerFlow = ko.pureComputed(function (){
+		var result = {}
+		result.inputs = {};
+		result.outputs = {};
+		result.totals = {};
+		result.builds = {};
+		result.changes = {};
+		function addResources(list,aspect,name,sign){
+			sign = sign?sign:1;
+			for(var item of list)
+			for(var resource of item[aspect]()){
+				if(!result[name][resource.resource])result[name][resource.resource]=0;
+				result[name][resource.resource]+=resource.value*sign;
+			}
+		}
+		addResources(game.activeConstructions(),'cost','inputs');
+		addResources(game.activeConstructions(),'cost','totals',-1);
+		addResources(game.activeConstructions(),'output','outputs');
+		addResources(game.activeConstructions(),'output','totals');
+		addResources(game.activeConstructions(),'buildChange','builds');
+		
+		return result;
+	});
 	game.currentFlow = ko.pureComputed(function () {
 		if(!game.currentPlayer()) return {};
-		var flow = game.currentPlayer().totalFlow();
+		var flow = game.playerFlow();
 		flow = JSON.parse(JSON.stringify(flow))
 		flow.inputs.manipulator = 0;
 		for(var i of game.statics.manipUses)
@@ -89,7 +115,7 @@ function Game(){
 				else if(flow.outputs[i]<flow.inputs[i])
 					result.push("Requires "+(flow.inputs[i]-flow.outputs[i])+" more "+i);
 			}
-			for(var construction of game.currentPlayer().constructions())
+			for(var construction of game.activeConstructions())
 			{
 				if(!construction.type.isMachine && construction.activateCount() > construction.number()+construction.buildCount()) //yes, you can build and burn same round
 					result.push ("Burning "
@@ -121,7 +147,7 @@ function Game(){
 					result.push("You have "+flow.totals[i]+" unused "+i)
 				}
 			}
-			for(var construction of game.currentPlayer().constructions())
+			for(var construction of game.activeConstructions())
 			{
 				if(construction.type.isMachine && Object.keys(construction.type.activateRequirements).length==0 && construction.number()!=construction.toActivate())
 					result.push("You have only activated "+construction.toActivate() +" of "+ construction.number() +" " + construction.type.name)
