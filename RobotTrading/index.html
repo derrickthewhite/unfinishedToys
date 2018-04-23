@@ -4,9 +4,12 @@
 		<title>Techopoloy</title>
 		<link href="main.css" rel="stylesheet">
 		<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+		<script type="text/javascript" src="../../Tools/laconic.js"></script>
 		<script type="text/javascript" src= "tools.js"></script>
+		<script type="text/javascript" src= "config.js"></script>
 		<script type="text/javascript" src= "cards.js"></script>
 		<script type="text/javascript" src= "construction.js"></script>
+		<script type="text/javascript" src= "attack.js"></script>
 		<script type="text/javascript" src= "player.js"></script>
 		<script type="text/javascript" src= "model.js"></script>
 		<script type="text/javascript" src= "game.js"></script>
@@ -17,6 +20,44 @@
 			{	
 				ko.applyBindings(game,document.getElementById('main'));
 			}
+			ko.components.register("playerView",{
+			viewModel:function (params){
+				Object.keys(params.player).forEach(key => this[key]=params.player[key]);
+				this.mayEdit = params.edit;
+			},
+			template:dom.div(
+				dom.h5({"data-bind":"text:name"}),
+				"Score: ",
+				dom.span({"data-bind":"text:score"}),
+				dom.br(),
+				"Deck",
+				dom.br(),
+				dom.div(
+					{"data-bind":"foreach:cards","class":"section"},
+					dom.div({"data-bind":"text:name"})
+				),
+				dom.div(
+					{"data-bind":"foreach:constructions"},
+					dom.span({"data-bind":"text:type.name"}),
+					":",
+					dom.span({"data-bind":"text:number"}),
+					dom.span({"data-bind":"if:game.model.mode()=='mainView' && $parent.mayEdit"},
+						" To Build:",
+						dom.input({type:"number","data-bind":"value:game.activeConstructionsMap()[$data.type.id].toBuild"}),
+						" To ",
+						dom.span({"data-bind":"text:type.useName"}),
+						dom.input({type:"number","data-bind":"value:game.activeConstructionsMap()[$data.type.id].toActivate"}),
+						dom.span(
+							{"data-bind":"foreach:game.activeConstructionsMap()[$data.type.id].output","class":"outputs"},
+							dom.span({"data-bind":"text:resource"}),
+							": ",
+							dom.span({"data-bind":"text:value"})
+						),
+					),
+					dom.br()
+				)
+			).outerHTML
+			})
 		</script>
 	</head>
 	<body onload="load()">
@@ -32,10 +73,19 @@
 			<!-- /ko -->
 			<!-- ko if:game.model.mode()!='setup' -->
 				<h1>Current Player: <span data-bind="text:currentPlayer().name"></span></h1> <br>
+				<h2>Turn: <span data-bind="text:game.model.turn()+''"></span></h2>
 			<!-- /ko -->
-			<!-- ko if:game.model.mode()=='mainView' -->
-				<button data-bind="click:nextTurn"> End Turn</button> <br>
-			<!-- /ko -->
+			<div data-bind="foreach:errors" class = "errors">
+				<span data-bind="text:message"></span>
+				<button data-bind="click:game.solve">Solve</button>
+				<br>
+			</div>
+			<div data-bind="foreach:warnings" class = "warnings">
+				<span data-bind="text:message"></span>
+				<button data-bind="click:game.solve">Solve</button>
+				<br>
+			</div>
+
 			<!-- ko if:game.model.mode()=='invention' -->
 			
 				<h2>Active Player: <span data-bind="text:model.cardActivePlayer().name"></span></h2> <br>
@@ -47,6 +97,8 @@
 					optionsText:'name'"
 					></select>
 				Fuel: <select data-bind="value:fuelToUse,options:possibleFuels"></select>
+				Product: <select data-bind="value:fuelToUse,options:possibleFuels"></select>
+				<input></input>
 
 				<button data-bind="click:addCard"> Add Card</button><br>
 				<button data-bind="click:declineToAdd"> No Action</button><br>
@@ -55,61 +107,143 @@
 					<button data-bind="click:skipInventing"> Skip Inventing</button> <br>
 				<!-- /ko -->
 				<div data-bind="if:cardForInvention"><span data-bind="text:cardForInvention().name"></span></div>
+				Cards Available <br>
+				<div data-bind="foreach:model.cardActivePlayer().cards()" class="section">
+					<span data-bind="text:name"></span><br>
+				</div>
 				Cards On Table <br>
 				<div data-bind="foreach:model.cardsSelected" class="section">
 					<span data-bind="text:name"></span><br>
 				</div>
 			<!-- /ko -->
-			<div data-bind="foreach:model.players">
-				<h5><div data-bind="text:name"></div></h5>
-				<span data-bind="text:score"></span><br>
-				Deck <br>
-				<div data-bind="foreach:cards" class="section">
-					<div data-bind="text:name"></div>
-				</div>
-				<div data-bind="foreach:constructions">
-					<span data-bind="text:type.name"></span>:
-					<span data-bind="text:number"></span>
-					<!-- ko if:game.model.mode()=='mainView' && game.currentPlayer().id==$parent.id -->
-						toBuild: <input type="number" data-bind="value:game.activeConstructionsMap()[$data.type.id].toBuild">
-						
-						<span data-bind="text:type.useName"></span> :
-						<input type="number" data-bind="value:game.activeConstructionsMap()[$data.type.id].toActivate"></input>
-						<span data-bind="foreach:game.activeConstructionsMap()[$data.type.id].cost" class="costs">
-							<span data-bind="text:resource"></span>:
-							<span data-bind="text:value"></span>
-						</span>
-						<span data-bind="foreach:game.activeConstructionsMap()[$data.type.id].output" class="outputs">
-							<span data-bind="text:resource"></span>:
-							<span data-bind="text:value"></span>
-						</span>
-					<!-- /ko -->
-					<br>
-				</div>
-				<!-- ko if: id == game.currentPlayer().id -->
-					Manipulators Anassigned: <span data-bind="text:game.manipulatorsLeft"></span>
+			
+			<!-- ko if:game.model.mode()=='mainView' -->
+				<button data-bind="click:nextTurn"> End Turn</button> <br>
+				<button data-bind="click:inventionMode"> Invent Something</button> <br>
+				<button data-bind="click:tradeMode"> Offer Trade</button> <br>
+				<button data-bind="click:resetInputs"> Clear</button> <br>
+				<div data-bind="with:game.currentPlayer()">
+					<div data-bind="component: {name: 'playerView', params:{player:$data,edit:true}}"></div>
+					Manipulators Anassigned: <span data-bind="text:game.manipulatorsLeft"></span><br>
 					<!-- ko foreach:game.statics.manipUses -->
 					<span data-bind="text:capitalize($data)"></span>:
 					<input type="number" data-bind="value:game[$data]" ></input>
 					<!-- /ko -->
-					
 					<div data-bind="foreach:game.currentPlayer().constructions">
-						<div class = "section">
-							name: <span data-bind="text:name"></span>
+						<div class = "section invention">
+							<h3 data-bind="text:name"></h3>
+							<div data-bind="text:type.type"></div>
 							<div data-bind="foreach:type.effects">
 								<div data-bind="text:name"></div>
 							</div>
 						</div>
 					</div>
+				</div>
+				
+				<!-- ko if:model.players().length>1 -->
+				Attacks
+				<div data-bind="foreach:attacks">
+					<div>
+						<span data-bind="text:attacker().name"></span>
+						attacking
+						<span data-bind="text:defender().name"></span>
+						with
+						<span data-bind="text:forces"></span>
+						forces targeting
+						<span data-bind="foreach:targets">
+							<div>
+								<!-- TODO: factor target list, remember remove button-->
+								<span data-bind ="text:count"></span>
+								 
+								<span data-bind ="text:attackType"></span>
+								on
+								<span data-bind ="text:targetType().name"></span>
+							</div>
+						</span>
+						<button data-bind="click:game.removeAttack">delete</button>
+					</div>
+				</div>
+				<div data-bind="with:workingTarget" class = "inline section">
+					Target:
+					<select data-bind=
+						"value:targetType,
+						options:game.possibleAttackTargets,
+						optionsText:'name'"
+					></select><br>
+					Forces Sent: 
+					<input type="number" data-bind="value:count"></input><br>
+					Count by: 
+					<select data-bind=
+						"value:attackType,
+						options:game.attackTypes"
+					></select><br>
+					<button data-bind="click:game.addTarget">Add Target</button>
+				</div>
+				<div data-bind="with:workingAttack" class="section inline">
+					Attacker: 
+					<span data-bind="text:attacker().name"></span><br>
+					Defender:
+					<select data-bind=
+						"value:defender,
+						options:game.possibleAttackPlayer,
+						optionsText:'name'"
+					></select><br>
+					Forces Sent: 
+					<input type="number" data-bind="value:forces"></input><br>
+					Targets: 
+					<div data-bind="foreach:targets">
+						<div>
+							<span data-bind ="text:count"></span>
+							 
+							<span data-bind ="text:attackType"></span>
+							on
+							<span data-bind ="text:targetType().name"></span>
+							<button data-bind="click:game.removeTarget">delete</button>
+						</div>
+					</div>
+					<button data-bind="click:game.addAttack">Add Attack</button>
+				</div>
 				<!-- /ko -->
+				<br>
+				Research To Buy:
+				Positive Research: <span data-bind ="text:positiveResearch"></span><br>
+				Negative Research: <span data-bind ="text:negativeResearch"></span><br>
+				Total Research: <span data-bind ="text:researchCost"></span><br>
+				<div data-bind="foreach:game.cardsToPurchase">
+					<div class ="card">
+						<span data-bind="text:name"></span>
+						<strong><span data-bind="text:value"></span></strong>
+						<span data-bind="foreach:effect">
+							<div data-bind="text:name"></div>
+						</span>
+						<br>
+						<button data-bind="click:game.removeCardToBuy">Don't Purchase</button>
+					</div>
+				</div>
+			<!-- /ko -->
+			
+			<div data-bind="foreach:model.players">
+				<div data-bind="component: {name: 'playerView', params:{player:$data,edit:false}}" class="playerStats"></div>
 			</div>
-			<div data-bind="foreach:errors" class = "errors">
-				<span data-bind="text:$data"></span><br>
+			<div data-bind="foreach:game.model.goodCards">
+				<div class ="card">
+					<span data-bind="text:name"></span>
+					<strong><span data-bind="text:value"></span></strong>
+					<span data-bind="foreach:effect">
+						<div data-bind="text:name"></div>
+					</span>
+					<br>
+					<button data-bind="click:game.purchaseResearch">Purchase Research</button>
+				</div>
 			</div>
-			<div data-bind="foreach:warnings" class = "warnings">
-				<span data-bind="text:$data"></span><br>
+			<div data-bind="foreach:game.model.badCards">
+				<div class="card">
+					<span data-bind="text:name"></span>
+					<strong><span data-bind="text:value"></span></strong>
+					<br>
+					<button data-bind="click:game.purchaseResearch">Purchase Research</button>
+				</div>
 			</div>
-
 		</div>
 	</body>
 <html>

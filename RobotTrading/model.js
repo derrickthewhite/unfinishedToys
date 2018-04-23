@@ -1,7 +1,7 @@
 function Model(){
 	var model = {};
 	
-	model.mode = ko.observable("setup"); // mainView, invention, setup
+	model.mode = ko.observable("setup"); // mainView, invention, trading, setup
 	
 	model.players = ko.observableArray([]);
 	model.turn = ko.observable(-1);
@@ -12,28 +12,38 @@ function Model(){
 	model.cardActivePlayerIndex = ko.observable(0); 
 	model.cardActivePlayer = ko.pureComputed(()=>model.players()[model.cardActivePlayerIndex()]);
 	
+	//TODO: move observables away from model
+	model.goodCards =ko.observableArray([]);
+	model.badCards =ko.observableArray([]);
+	
 	model.addPlayer = function (name,view){
 		//TODO: make players track views and enfource orders coming from views
 		//TODO: enforce unique names
-		model.players.push(new player(name));
+		if(name == "")name = config.names[model.players().length];
+		if(model.players().map(player => player.name).indexOf(name)!=-1)
+			return "Bad player Name!";
+		else model.players.push(new player(name));
 	};
 	
 	model.startGame = function ()
 	{
 		var steel = new ConstructionType("Steel",[],"starting");
-		var costsSteel = effects.fuel1C;
+		var costsSteel = effects.fuel2C;
 		costsSteel.target = "Steel";
-		var robot = new ConstructionType("Robot",[effects.worthless,effects.manipulator,effects.automatic,costsSteel,effects.limit1],"starting");
-		model.mode("invention");
+		var robot = new ConstructionType("Robots",[effects.worthless,effects.manipulator,effects.automatic,costsSteel,effects.limit1],"starting");
+		model.mode("mainView");
 		for(var player of model.players())
 		{
-			player.addCards(cards.draw(3));
-			player.addConstruction(robot,2);
+			player.addConstruction(robot,3);
 			player.addConstruction(steel,0);
 		}
+		model.goodCards (cards.positivePool);
+		model.badCards (cards.negativePool);
+		model.turn(0);
 	};
 	
-	model.runBuildPhase = function(orders){
+	
+	model.runBuildPhase = function(orders,attacks,research){
 		var currentPlayer = model.players()[model.currentPlayer()];
 		var nextPlayer = (model.currentPlayer()+1)%model.players().length;
 		
@@ -47,9 +57,35 @@ function Model(){
 			if(orders[construction.name].totalChange)console.log(construction.name,"changed by",orders[construction.name].totalChange);
 		}
 		
+		for(var attack of attacks){
+			var targetPlayer = model.players().filter(p=>p.id == attack.defender().id)[0];
+			var expendedAttacks = 0;
+			var currentTargetAttackCount = 0;
+			var currentTargetIndex = 0;
+			var currentTarget = attack.targets()[currentTargetIndex];
+			while(
+				attack.targets().length>currentTargetIndex 
+				&& expendedAttacks<attack.forces()
+			){
+				//TODO: make the roll under number configurable
+				var targetObject = targetPlayer.constructions().filter(c=>c.type.id == currentTarget.targetType().type.id)[0];
+				var hit = Math.random()*config.rollUnder < targetObject.number();
+				if(hit || currentTarget.attackType == "attacks")currentTargetAttackCount++;
+				if(hit)targetObject.number(targetObject.number()-1);
+				expendedAttacks++;
+				//TODO: report succesful attacks?
+				if(currentTargetAttackCount == currentTarget.count() || targetObject.number()==0){
+					currentTargetIndex++;
+					currentTarget = attack.targets()[currentTargetIndex];
+				}
+			}
+		}
+		
+		research.forEach(c=>currentPlayer.cards.push(c));
+		if(nextPlayer <= model.currentPlayer())model.turn(model.turn()+1);
 		model.currentPlayer(nextPlayer);
-		currentPlayer.addCards(cards.draw(currentPlayer.cards().length?2:3));
-		model.startInventing();
+		//currentPlayer.addCards(cards.draw(currentPlayer.cards().length?2:3));
+		//model.startInventing();
 	}
 	
 	model.addCard = function (card,fuel){

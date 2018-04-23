@@ -12,6 +12,8 @@ function ConstructionType(name,effects,inventor)
 		if (i.machine) self.isMachine=true;
 	self.useName = self.isMachine?"Activate":"Burn";
 	
+	self.type = self.isMachine?"machine":"fuel"; //fuel, machine, good, waste
+	
 	function countRequirements(trigger,action,existing)
 	{
 		var result = {};

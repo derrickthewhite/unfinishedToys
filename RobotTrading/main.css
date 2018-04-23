@@ -18,3 +18,18 @@ input[type="number"]{
 .section{
 	border: 5px solid black;
 }
+.playerStats{
+	display:inline-block;
+}
+.invention{
+	display:inline-block;
+}
+.inline{
+	display:inline-block;
+}
+.card{
+	display:inline-block;
+	border: 3px solid green;
+	margin: 5px;
+	padding: 5px;
+}
