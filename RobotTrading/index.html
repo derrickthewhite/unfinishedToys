@@ -13,6 +13,7 @@
 		<script type="text/javascript" src= "player.js"></script>
 		<script type="text/javascript" src= "model.js"></script>
 		<script type="text/javascript" src= "game.js"></script>
+		<script type="text/javascript" src= "ArtificialIntelligence.js"></script>
 		<script>
 			
 			var game = Game();
@@ -125,7 +126,7 @@
 				<div data-bind="with:game.currentPlayer()">
 					<div data-bind="component: {name: 'playerView', params:{player:$data,edit:true}}"></div>
 					Manipulators Anassigned: <span data-bind="text:game.manipulatorsLeft"></span><br>
-					<!-- ko foreach:game.statics.manipUses -->
+					<!-- ko foreach:config.manipUses -->
 					<span data-bind="text:capitalize($data)"></span>:
 					<input type="number" data-bind="value:game[$data]" ></input>
 					<!-- /ko -->

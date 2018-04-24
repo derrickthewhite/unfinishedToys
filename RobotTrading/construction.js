@@ -84,14 +84,7 @@ function ConstructionWrapperView (construction){ //TODO: better name
 	});
 	//TODO: distinguish between activates and builds, and possibly between activates and burns
 	wrapper.output = ko.pureComputed(function (){
-		var result = [];
-		if(!type.isMachine) 
-			result.push({resource:type.name,value:wrapper.activateCount()});
-		else for(var i in type.useOutput)
-		{
-			result.push({resource:i,value:type.useOutput[i]*wrapper.activateCount()})
-		}
-		return result;
+		return construction.outputForNumber(wrapper.toActivate());
 	});
 	wrapper.expectedChange = ko.pureComputed(function (){
 		return wrapper.buildCount() -(type.isMachine?0:wrapper.toActivate());
@@ -109,5 +102,16 @@ function Construction (type,player,number)
 	
 	self.score = ko.pureComputed(function (){
 		return self.number()*self.type.score;
-	})
+	});
+	
+	self.outputForNumber = function (number){
+		var result = [];
+		if(!type.isMachine) 
+			result.push({resource:type.name,value:number});
+		else for(var i in type.useOutput)
+		{
+			result.push({resource:i,value:type.useOutput[i]*number})
+		}
+		return result;
+	}
 }

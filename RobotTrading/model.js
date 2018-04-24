@@ -31,11 +31,13 @@ function Model(){
 		var costsSteel = effects.fuel2C;
 		costsSteel.target = "Steel";
 		var robot = new ConstructionType("Robots",[effects.worthless,effects.manipulator,effects.automatic,costsSteel,effects.limit1],"starting");
+		var digger = new ConstructionType("Digger",[effects.miner],"starting");
 		model.mode("mainView");
 		for(var player of model.players())
 		{
-			player.addConstruction(robot,3);
-			player.addConstruction(steel,0);
+			player.addConstruction(robot,5);
+			player.addConstruction(digger,1);
+			player.addConstruction(steel,3);
 		}
 		model.goodCards (cards.positivePool);
 		model.badCards (cards.negativePool);

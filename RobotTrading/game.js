@@ -1,9 +1,8 @@
 function Game(){
 	var game = {};
 	game.statics ={};
-	game.statics.manipUses = ['builders','operators','miners',"attackers","researchers"]; //TODO: move to model? maybe?
 	//TODO: get these auto creates correct!
-	for(var use of game.statics.manipUses)
+	for(var use of config.manipUses)
 	{
 		game[use] = ko.observable(0);
 	}
@@ -21,8 +20,8 @@ function Game(){
 	};
 	game.startGame = function ()
 	{
-		game.model.startGame();
 		game.resetInputs();
+		game.model.startGame();
 	};
 	
 	game.inventionMode = function (){
@@ -52,7 +51,7 @@ function Game(){
 		var flow = game.playerFlow();
 		flow = JSON.parse(JSON.stringify(flow));
 		var manipulators = flow.totals.manipulator;
-		for(var use of game.statics.manipUses)
+		for(var use of config.manipUses)
 		{
 			manipulators -= Number(game[use]());
 		}
@@ -96,7 +95,7 @@ function Game(){
 			construction.toBuild(0);
 			construction.toActivate(0);
 		}
-		for(var use of game.statics.manipUses)
+		for(var use of config.manipUses)
 		{
 			game[use](0);
 		}
@@ -129,7 +128,7 @@ function Game(){
 		var flow = game.playerFlow();
 		flow = JSON.parse(JSON.stringify(flow))
 		flow.inputs.manipulator = 0;
-		for(var i of game.statics.manipUses)
+		for(var i of config.manipUses)
 		{
 			var value = Number(game[i]());
 			flow.inputs.manipulator += value;
@@ -202,7 +201,7 @@ function Game(){
 			flow = game.currentFlow();
 			for(var i in flow.totals)
 			{
-				if(flow.totals[i] && game.statics.manipUses.concat('manipulator').indexOf(i)!=-1)
+				if(flow.totals[i] && config.manipUses.concat('manipulator').indexOf(i)!=-1)
 				{
 					result.push({
 						message:"You have "+flow.totals[i]+" unused "+i,
@@ -251,7 +250,7 @@ function Game(){
 	game.solve = function (problem){
 		if(problem.solution.action == "adjust Activation" || problem.solution.action == "adjust Construction"){
 			var toAdjust;
-			if(game.statics.manipUses.indexOf(problem.solution.resource)!=-1)
+			if(config.manipUses.indexOf(problem.solution.resource)!=-1)
 				toAdjust = game[problem.solution.resource];
 			if(game.activeConstructions().filter(c=>c.type.name==problem.solution.resource).length)
 				toAdjust = game.activeConstructions().filter(c=>c.type.name==problem.solution.resource)[0]

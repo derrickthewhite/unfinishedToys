@@ -1,5 +1,7 @@
 var config = {};
 
+config.manipUses =['builders','operators','miners',"attackers","researchers"];
+
 config.names = [
 "Adam",
 "Bethany",
