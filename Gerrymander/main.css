@@ -1,0 +1,56 @@
+.constitBlock{
+	border: solid black 2px;
+	/*text-align:center;*/
+	vertical-align:center;
+	display:inline-block;
+}
+.constitName{
+	font-size:16pt;
+	font-weight:bold;
+	vertical-align:center;
+	width:150px;
+}
+.constitKey{
+	height:4em;
+	min-width:4em;
+	/*text-align:center;*/
+}
+.constitKey div{
+	display:inline-block;
+	height:4em;
+	min-width:4em;
+	vertical-align:top;
+}
+.row{
+	display:table-row;
+}
+.city{
+	display:inline-table;
+	vertical-align:top;
+}
+.block{
+	display:table-cell;
+	height:4em;
+	min-width:4em;
+	border: solid black 2px;
+	text-align:center;
+	vertical-align:center;
+}
+.currentBlock{
+	border: solid red 4px;
+	font-weight:bold;
+}
+#key{
+	display:inline-block;
+}
+.parties{
+	display:table;
+}
+.party{
+	display:table-row;
+}
+.party span{
+	display:table-cell;
+	padding:3px;
+}
+
