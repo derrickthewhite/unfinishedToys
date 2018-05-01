@@ -7,6 +7,8 @@
 	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
 	<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
 	<script type="text/javascript" src= "config.js"></script>
+	<script type="text/javascript" src= "game.js"></script>
+	<script type="text/javascript" src= "view.js"></script>
 
 	<script>
 		function shuffleArray(a)
@@ -80,285 +82,12 @@
 		
 		var root = {};
 		function setup(){
-			root.constits = ko.observableArray(constits.map(c=>constituency(c.name,c.color,c.blocks)));
-			root.squares = ko.observableArray([]);
-			root.parties = ko.observableArray([]);
 			
-			root.currentBlock = ko.observable();
-			root.currentParty = ko.observable();
-			root.governmentParty = ko.observable();
-
-			root.currentPartyChange = ko.observable();
-			root.currentConstitChange = ko.observable();
-			root.currentZoning = ko.observable();
-			
-			root.colorMode = ko.observable("constituencies");//constituencies, parties
-			root.undoAction = ko.observable();
-			
-			root.possibleBuildings = ko.pureComputed(function (){
-			if(!root.currentBlock() || !root.currentBlock().contents().filter(c=>c.name=="zone").length)
-				return[];
-			var base = ["church","park","housing","newspaper","resturants"];
-
-				return base;
-			})
-
-			root.blockConstits = ko.pureComputed(function (){
-				var result = [];
-				for(var i =0;i<10;i++)result.push([]);
-				
-				root.constits().forEach(c=>c.blocks().forEach(b=>result[b[0]][b[1]] = c));
-				return result;
-			});
-			root.possibleConstitChanges = ko.pureComputed(function (){
-				if(!root.currentBlock())return [];
-				var b = root.currentBlock();
-				if(root.constitSize() [root.blockConstits()[b.x][b.y].name]<=8) return [];
-				if(!root.blockConstits()[b.x][b.y].canLoose([b.x,b.y])) return [];
-				return adjacents.map(adj=>
-					(b.x+adj[0]>9 || b.x+adj[0]<0 || b.y+adj[1]>9 || b.y+adj[1]<0)? undefined:root.blockConstits()[b.x+adj[0]][b.y+adj[1]] 
-				)
-				.filter(c=>c)
-				.filter((constit,index,array)=>array.indexOf(constit)==index)
-				.filter(c=>root.blockConstits()[b.x][b.y].name!=c.name)
-				.filter(c=> root.constitSize()[c.name] <12);
-				
-			});
-			root.possiblePartyChanges = ko.pureComputed(function (){
-				if(!root.currentBlock())return [];
-				var b = root.currentBlock();
-				return adjacents.map(adj=>
-					(b.x+adj[0]>9 || b.x+adj[0]<0 || b.y+adj[1]>9 || b.y+adj[1]<0)? undefined:root.squares()[b.x+adj[0]]()[b.y+adj[1]] 
-				)
-				.filter(c=>c)
-				.map(block=>block.party())
-				.filter((block,index,array)=>array.indexOf(block)!=index) //only keep duplicates
-				.filter((block,index,array)=>array.indexOf(block)==index) //remove additional duplicates
-				.filter(party=>party!=b.party());
-
-			});
-		
-			root.blockDisplay = ko.pureComputed (function (){
-				var result = [];
-				for(var i = 0;i<10;i++){
-					result.push([]);
-				}
-				for(var i = 0;i<10;i++)
-				for(var j = 0; j<10;j++)
-					result[j][i] = root.squares()[i]()[j]
-				
-				return result;
-			})
-			root.election = ko.pureComputed(function (){
-				var results = [];
-				
-				for(var constit of root.constits()){
-					results[constit.name]={}
-					for(var p of root.parties())results[constit.name][p.name]=0;
-					for(var blockLoc of constit.blocks()){
-						var block = root.squares()[blockLoc[0]]()[blockLoc[1]];
-						results[constit.name][block.party().name]++;
-						results[constit.name][block.party().name]+=block.contents().filter(c=>c.name == "housing").length
-						results[constit.name][block.party().name]-=block.contents().filter(c=>c.name == "park").length
-					}
-				}
-				return results;
-			});
-			root.constitSize = ko.pureComputed(function (){
-				var result = {};
-				root.constits().map(constit=> {
-					return {
-						name:constit.name,
-						size:Object.keys(root.election()[constit.name])
-					.reduce((out,a)=>root.election()[constit.name][a]+out,0)}
-				}).forEach(constit=>result[constit.name]=constit.size);
-				return result;
-			})
-			root.constitControl = ko.pureComputed(function (){
-				var result = [];
-				
-				for(var constit in root.election()){
-					var maxParty = Object.keys(root.election()[constit])
-						.reduce((a,b)=>root.election()[constit][a]<root.election()[constit][b]?b:a);
-					var blockVotes = Object.keys(root.election()[constit])
-						.reduce((out,a)=>root.election()[constit][a]+out,0);
-					result[constit] = root.election()[constit][maxParty]>blockVotes/2
-						?maxParty
-						:"none";
-				}
-				
-				return result;
-			});
-			root.partyPower = ko.pureComputed(function (){
-				var partyPower = {};
-				for(var p of root.parties())partyPower[p.name]=[];
-				var election = root.election();
-				for(var constit of root.constits()){
-					var blockVotes = Object.keys(root.election()[constit.name])
-						.reduce((out,a)=>root.election()[constit.name][a]+out,0);
-					for(var party in election[constit.name]){
-						if(election[constit.name][party] > blockVotes/2){
-							partyPower[party].push(constit);
-						}
-					}
-				}
-				return partyPower;
-			});
-			root.totalVotes = function (){
-				var election = root.election();
-				var result = [];
-				for(var constit of root.constits()){
-					for(var party in election[constit.name]){
-						if(!result[party])result[party]=0;
-						result[party]+=election[constit.name][party];
-					}
-				}
-				return result;
-			}
-			root.gerryMander = function (){
-				if(!root.currentBlock() || !root.currentConstitChange() || !root.currentParty() || !root.currentParty().readyStaff()) return;
-				var toMove = root.currentBlock();
-				var looser = root.blockConstits()[toMove.x][toMove.y]
-				root.undoAction({
-					act:"gerrymander",
-					block:root.currentBlock(),
-					constit:looser,
-					staff:root.currentParty().readyStaff()
-				});
-				root.currentConstitChange().blocks.push([toMove.x,toMove.y]);
-				looser.blocks.remove(looser.blocks().filter(b => b[0] == toMove.x && b[1] == toMove.y)[0]);
-				root.currentParty().readyStaff(root.currentParty().readyStaff()-1);
-			}
-			root.campaign = function (){
-				if(!root.currentBlock() || !root.currentPartyChange() 
-					|| !root.currentParty() || root.currentParty().readyStaff()<2) return;
-				//TODO: vary cost of campaigning!
-				root.undoAction({
-					act:"campaign",
-					block:root.currentBlock(),
-					party:root.currentBlock().party(),
-					staff:root.currentParty().readyStaff()
-				});
-				root.currentBlock().party(root.currentPartyChange());
-				root.currentParty().readyStaff(root.currentParty().readyStaff()-2);
-			}
-			root.build = function (){
-				if(!root.currentBlock() || !root.currentZoning()
-					|| !root.currentParty() || root.currentParty().readyStaff()<1) return;
-				var block = root.currentBlock();
-				// yes, building projects can exceed gerrymander limits
-				//if(root.currentZoning()=="housing" && root.constitSize()[root.blockConstits()[block.x][block.y].name]>=12) return;
-				//if(root.currentZoning()=="park" && root.constitSize()[root.blockConstits()[block.x][block.y].name]<=8) return;
-				root.undoAction({
-					act:"build",
-					block:root.currentBlock(),
-					contents:root.currentBlock().contents(),
-					staff:root.currentParty().readyStaff()
-				});
-				root.currentBlock().contents([{name:root.currentZoning()}]);
-				root.currentParty().readyStaff(root.currentParty().readyStaff()-1);
-			}
-			root.zone = function (){
-			if(!root.currentParty() || root.currentParty().readyStaff()<1) return;
-				var block = root.assignRandomZoningissue();
-				root.undoAction({
-					act:"zone",
-					block:block,
-					contents:[],
-					staff:root.currentParty().readyStaff()
-				});
-				root.currentParty().readyStaff(root.currentParty().readyStaff()-1);
-			}
-			root.undo = function (){
-				if(!root.undoAction())return;
-				var action = root.undoAction();
-				root.currentBlock(action.block);
-				root.currentParty().readyStaff(action.staff);
-				if(action.act == "gerrymander"){
-					root.currentConstitChange(action.constit);
-					root.gerryMander();
-				}
-				if(action.act == "campaign"){
-					root.currentBlock().party(action.party);
-				}
-				root.currentParty().readyStaff(action.staff);
-			}
-			root.setCurrentBlock = function (block){
-				root.currentBlock(block);
-			}
-			root.randomParty = function(){
-				return root.parties()[Math.floor(Math.random()*root.parties().length)];
-			}
-			root.assignRandomZoningissue= function (){
-				var x = Math.floor(Math.random()*root.squares().length);
-				var y = Math.floor(Math.random()*root.squares()[x]().length);
-				
-				root.squares()[x]()[y].contents.push({name:"zone"});
-				return root.squares()[x]()[y];
-			}
-			root.endTurn = function (param){
-				root.undoAction(undefined);
-				if (root.currentParty() && !param.keepStaff)
-					root.currentParty().readyStaff(0);
-				var readyParties = root.parties().filter(p=>p.readyStaff())
-					.sort((a,b)=>
-						a.score()!=b.score()?b.score()-a.score()
-						:root.partyPower()[a.name]!=root.partyPower()[b.name]
-							?root.partyPower()[b.name]-root.partyPower()[a.name]
-						:root.totalVotes()[b.name]-root.totalVotes()[a.name]
-					);
-				if(readyParties.length){
-					root.currentParty(readyParties[0]);
-					root.parties(root.parties().sort((a,b)=>a==root.currentParty()?-1:1));
-					root.constits(root.constits().sort((a,b)=>
-						root.election()[b.name][root.currentParty().name]
-						-root.election()[a.name][root.currentParty().name]
-					));
-					// assign a zone to be live
-					root.assignRandomZoningissue();
-				}
-				else {
-					//hold election
-					//put party in power
-					//change momentum
-					//score points
-					//*
-					if(!param.noScore){
-						var partiesByPower = Object.keys(root.partyPower()).map(key=>{
-							return {party:key,power:root.partyPower()[key].length}
-						}).sort((a,b)=>b.power-a.power);
-						if( partiesByPower[0].power > root.constits().length/2)
-						root.governmentParty(partiesByPower[0])
-						if(root.governmentParty())
-							root.parties().filter(p!=root.governmentParty())
-								.forEach(p=>p.momentum(p.momentum()+Math.ceil(root.constits().length/root.parties().length)))
-						partiesByPower.forEach(partyPower=>{
-							var party = root.parties().filter(p=>partyPower.party==p.name)[0];
-							party.score(party.score()+partyPower.power);
-						});
-					}
-					//*/
-					
-					//ready Staff and pick next player
-					root.parties().forEach(p=>p.readyStaff(p.staff()));
-					root.endTurn({keepStaff:true});
-				}
-			}
-			
-			
-			for(var i =0;i<config.numParties;i++)
-				root.parties.push(new Party(config.partyNames[i]));
-			var partyDeck = [];
-			while(partyDeck.length < 100){
-				root.parties().forEach(p=>partyDeck.push(p));
-			}
-			shuffleArray(partyDeck);
-			for(var i = 0;i<10;i++){
-				root.squares.push(ko.observableArray([]));
-				for(var j =0;j<10;j++)root.squares()[i]()[j]=square(i,j,partyDeck[i*10+j]);
-			}
-
-			root.endTurn({keepStaff:true,noScore:true});
+			root.game = Game();
+			var game = root.game;
+			game.init();
+			var view = View(game);
+			root.view = view;
 			return root;
 		}
 		
@@ -368,56 +97,56 @@
 			Math.seedrandom(seed);
 			console.log("seed",seed);
 			setup();
-			ko.applyBindings(root,document.getElementById('content'));
+			ko.applyBindings(root.view,document.getElementById('content'));
 		}
 	</script>
 </head>
 <body onload="main()">
 	<div id = "content">
 		<div id="actions">
-			<h3 data-bind="text:currentParty() && currentParty().name"></h3>
-			<span data-bind="text:governmentParty || 'no one'"></span> is the government<br>
+			<h3 data-bind="text:game.currentParty() && game.currentParty().name"></h3>
+			<span data-bind="text:game.governmentParty || 'no one'"></span> is the government<br>
 			<button data-bind="click:gerryMander">Gerrymander!</button>
 			<button data-bind="click:campaign">Campaign!</button>
 			<button data-bind="click:zone">Zone!</button>
 			<button data-bind="click:build">Build!</button>
 			<button data-bind="click:undo">Undo!</button>
 			<button data-bind="click:endTurn">End Turn!</button>
-			<select data-bind="options:root.possiblePartyChanges,optionsText:'name', value:currentPartyChange"></select>
-			<select data-bind="options:root.possibleConstitChanges, optionsText:'name', value: currentConstitChange, color: currentConstitChange"></select>
-			<select data-bind="options:root.possibleBuildings, value: currentZoning"></select>
+			<select data-bind="options:possiblePartyChanges,optionsText:'name', value:currentPartyChange"></select>
+			<select data-bind="options:possibleConstitChanges, optionsText:'name', value: currentConstitChange, color: currentConstitChange"></select>
+			<select data-bind="options:possibleBuildings, value: currentZoning"></select>
 		</div>
 		<div id="key">
-			<div data-bind="foreach:root.parties" class="parties">
+			<div data-bind="foreach:game.parties" class="parties">
 				<div class="party">
 					<span data-bind="text:name"></span>:
-					<span data-bind="text:root.totalVotes()[$data.name]"></span> ->
-					<span data-bind="text:root.partyPower()[$data.name].length"></span>
+					<span data-bind="text:$root.game.totalVotes()[$data.name]"></span> ->
+					<span data-bind="text:$root.game.partyPower()[$data.name].length"></span>
 					(<span data-bind="text:momentum"></span>)
 					<span data-bind="text:readyStaff"></span>/
 					<span data-bind="text:staff"></span>:
 					<span data-bind="text:score"></span>
 				</div>
 			</div>
-			<div data-bind="foreach:root.constits">
+			<div data-bind="foreach:game.constits">
 				<div class="constitKey">
 					<div data-bind="style:{'background-color':color}" class="constitBlock">
-						<span data-bind="text:root.constitControl()[$data.name]"></span><br>
-						<span data-bind="text:root.constitSize()[$data.name]"></span>
+						<span data-bind="text:$root.game.constitControl()[$data.name]"></span><br>
+						<span data-bind="text:$root.game.constitSize()[$data.name]"></span>
 					</div>
 					<div data-bind="text:name" class = "constitName"></div>
-					<div data-bind="foreach:root.parties" class ="voteTally">
+					<div data-bind="foreach:$root.game.parties" class ="voteTally">
 						<span data-bind="text:name"></span>:
-						<span data-bind="text:root.election()[$parent.name][$data.name]"></span><br>
+						<span data-bind="text:$root.game.election()[$parent.name][$data.name]"></span><br>
 					</div>
 				</div>
 			</div>
 		</div>
 		<div data-bind="foreach:blockDisplay" class="city">
 			<div data-bind="foreach:$data" class="row">
-				<div data-bind="click:root.setCurrentBlock,
-					css: {currentBlock: root.currentBlock()==$data},
-					style:{'background-color':root.blockConstits()[$data.x][$data.y].color}" class="block">
+				<div data-bind="click:$root.setCurrentBlock,
+					css: {currentBlock: $root.currentBlock()==$data},
+					style:{'background-color':$root.game.blockConstits()[$data.x][$data.y].color}" class="block">
 					<span data-bind="text:party().name"></span>
 					<div data-bind="foreach:contents">
 						<span data-bind="text:name"></span>
