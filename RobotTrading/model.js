@@ -33,12 +33,17 @@ function Model(){
 		var robot = new ConstructionType("Robots",[effects.worthless,effects.manipulator,effects.automatic,costsSteel,effects.limit1],"starting");
 		var digger = new ConstructionType("Digger",[effects.miner],"starting");
 		model.mode("mainView");
-		for(var player of model.players())
-		{
+		model.players().forEach((player,index)=>{
+			var color = config.colors[index];
+			var factoryEffect = JSON.parse(JSON.stringify(effects.factory));
+			factoryEffect.target = color;
+			var factory = new ConstructionType(color+" Factory",[factoryEffect],player.name);
 			player.addConstruction(robot,5);
 			player.addConstruction(digger,1);
 			player.addConstruction(steel,3);
-		}
+			player.addConstruction(factory,1);
+			player.addConstruction(new ConstructionType(color,[]),0)
+		});
 		model.goodCards (cards.positivePool);
 		model.badCards (cards.negativePool);
 		model.turn(0);

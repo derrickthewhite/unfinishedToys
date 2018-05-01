@@ -1,6 +1,22 @@
 function ArtificialIntelligence(){
 	var ai = {};
 	
+	ai.identifyTools = function (constructions){
+		return machines.filter(m=>!m.type.free)
+			.map(m=>{
+				var output = manipulatorCost({name:m.type.name,attribute:"useOutput"},constructions);
+				var activation = manipulatorCost({name:m.type.name,attribute:"activateRequirements"},constructions);
+				//TODO: why is manipulator always 0?
+				var primaryOutput = Object.keys(output).sort((a,b)=>output[b]-output[a])[1];
+				return {
+					product: primaryOutput,
+					ratio:output[primaryOutput]/activation.manipulator,
+					name:m.name,
+					tool:m
+				}
+			});
+	}
+	
 	ai.buildInfrastructure = function (constructions,target){
 		//Increase capabilities in target the most!
 		
@@ -31,19 +47,7 @@ function ArtificialIntelligence(){
 		}});
 		
 		var manipUseShortCuts = {};
-		var tools = machines.filter(m=>!m.type.free)
-			.map(m=>{
-				var output = manipulatorCost({name:m.type.name,attribute:"useOutput"},constructions);
-				var activation = manipulatorCost({name:m.type.name,attribute:"activateRequirements"},constructions);
-				//TODO: why is manipulator always 0?
-				var primaryOutput = Object.keys(output).sort((a,b)=>output[b]-output[a])[1];
-				return {
-					product: primaryOutput,
-					ratio:output[primaryOutput]/activation.manipulator,
-					name:m.name,
-					tool:m
-				}
-			});
+		var tools = ai.identifyTools(machines);
 		
 		usefulMachineCosts.forEach(m=>{
 			m.cost.effectiveManip = 0;
@@ -60,7 +64,9 @@ function ArtificialIntelligence(){
 		})
 		usefulMachineCosts.sort((a,b)=>b.cost.effectiveManip - a.cost.effectiveManip);
 		var haveResources = true;
+		var orders = {};
 		while(haveResources){
+			var excessGoodsCount = burnableGoods.length;
 			var toBuild = cheapestMachine(usefulMachines,burnableGoods,constructions);
 			console.log(toBuild,burnableGoods);
 			for(consuming in toBuild.burn){
@@ -69,11 +75,63 @@ function ArtificialIntelligence(){
 					existing.value-= toBuild.burn[consuming];
 				});
 			}
-			console.log(toBuild,burnableGoods);
 			haveResources = false;
 		}
 		
 		return usefulMachines;
+	}
+	
+	var possibleConstructionCosts = function (machine){
+		var costs = {
+			cost:manipulatorCost({name:machine.type.name,attribute:"buildRequirements"},constructions),
+			machine:machine
+		}
+		costs.effectiveManip = 0;
+		Object.keys(costs.cost)
+			.filter(resource=>config.manipUses.indexOf(resource)!=-1)
+			.forEach(resource=>{
+				var shortCut = tools.filter(t=>t.product == resource)
+					.sort((a,b)=>a.ratio-b.ratio)[0];
+				if(shortCut){
+					m.cost[resource]/=shortCut.ratio;
+				}
+				m.cost.effectiveManip+=m.cost[resource];
+			});
+		return cost;
+	}
+	
+	ai.usefulMachines = function (constructions,target){
+		var machines = constructions.filter(c=>c.type.isMachine);
+		var usefulMachines = machines
+			.filter(c=>c.type.useOutput[target] || c.type.useOutput['manipulator']); 
+		
+		var usefulMachineCosts = usefulMachines.map(m=>{return {
+			cost:manipulatorCost({name:m.type.name,attribute:"buildRequirements"},constructions),
+			output:m.type.useOutput[target]?m.type.useOutput[target]:0+
+				m.type.useOutput['manipulator']?m.type.useOutput['manipulator']:0,
+			name:m.type.name,
+			machine:m
+		}});
+		
+		usefulMachineCosts.forEach(m=>{
+			m.cost.effectiveManip = 0;
+			Object.keys(m.cost)
+				.filter(resource=>config.manipUses.indexOf(resource)!=-1)
+				.forEach(resource=>{
+					var shortCut = tools.filter(t=>t.product == resource)
+						.sort((a,b)=>a.ratio-b.ratio)[0];
+					if(shortCut){
+						m.cost[resource]/=shortCut.ratio;
+					}
+					m.cost.effectiveManip+=m.cost[resource];
+				});
+		})
+		usefulMachineCosts.sort((a,b)=>b.cost.effectiveManip - a.cost.effectiveManip);
+		return usefulMachineCosts;
+	}
+	
+	var selfBuildingSystem = function (constructions,target){
+		var usefulMachines = ai.usefulMachines(constructions,target);
 	}
 	
 	var cheapestMachine = function (usefulMachines,existingResources,constructions,target){

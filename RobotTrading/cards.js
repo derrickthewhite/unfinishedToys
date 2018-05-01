@@ -39,6 +39,9 @@ effects.builder4 = {"name":"Builder (4)","action":"produces","quantity":4,"targe
 effects.operator = {"name":"Operator","action":"produces","quantity":3,"target":"operators","trigger":"use","machine":true};
 effects.attacks = {"name":"Destroyer","action":"produces","quantity":3,"target":"attackers","trigger":"use","machine":true};
 
+effects.factory = {"name":"Factory","action":"produces","quantity":1,"target":"<Good>","trigger":"use","machine":true};
+effects.good = {"name":"Good","trigger":"initialize","good":true};
+
 function buildCreator(name,product,quantity){
 	return {
 		"name":name,
@@ -105,3 +108,7 @@ cards.positivePool = [
 for(var i =2;i<=5;i++)
 	for(var product of ['builders','operators','miners',"attackers","researchers"])
 		cards.positivePool.push(buildCreatorCard(product+" ("+i+")",product,i,1+(i-2)*2));
+
+cards.goods = [
+	new Card("Red",[],5)
+]

@@ -8,11 +8,14 @@ function ConstructionType(name,effects,inventor)
 	self.inventor = inventor;
 	
 	self.isMachine = false;
+	self.isGood = false;
 	for(var i of effects)
 		if (i.machine) self.isMachine=true;
-	self.useName = self.isMachine?"Activate":"Burn";
+		else if (i.good) self.isGood = true;
+	//TODO: validate that goods and machines and manditory fuels don't mix!
+	self.useName = self.isMachine?"Activate":self.isGood?"Burn":undefined;
 	
-	self.type = self.isMachine?"machine":"fuel"; //fuel, machine, good, waste
+	self.type = self.isMachine?"machine":self.isGood?"good":"fuel"; //fuel, machine, good, waste
 	
 	function countRequirements(trigger,action,existing)
 	{
@@ -87,7 +90,8 @@ function ConstructionWrapperView (construction){ //TODO: better name
 		return construction.outputForNumber(wrapper.toActivate());
 	});
 	wrapper.expectedChange = ko.pureComputed(function (){
-		return wrapper.buildCount() -(type.isMachine?0:wrapper.toActivate());
+		//TODO: account for factories, pollutants, research
+		return (type.isGood?0:wrapper.buildCount()) -(type.isMachine?0:wrapper.toActivate());
 	});
 	return wrapper;
 }
