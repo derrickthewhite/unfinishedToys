@@ -41,17 +41,40 @@ var View = function (game){
 	});
 	view.possiblePartyChanges = ko.pureComputed(function (){
 		if(!view.currentBlock())return [];
+		return game.parties()
+			.filter(p=>view.currentBlock().party()!=p)
+			.sort((a,b)=>view.cheapCampaigns().indexOf(b)-view.cheapCampaigns().indexOf(a));
+		/*
 		var b = view.currentBlock();
 		return adjacents.map(adj=>
 			(b.x+adj[0]>9 || b.x+adj[0]<0 || b.y+adj[1]>9 || b.y+adj[1]<0)? undefined:game.squares()[b.x+adj[0]]()[b.y+adj[1]] 
 		)
 		.filter(c=>c)
+		.filter(block=>block.contents().filter(c=>c.name=="park").length==0)
+		.map(block=>block.party())
+		.filter((block,index,array)=>array.indexOf(block)!=index) //only keep duplicates
+		.filter((block,index,array)=>array.indexOf(block)==index) //remove additional duplicates
+		.filter(party=>party!=b.party());
+		*/
+
+	});
+	view.cheapCampaigns = ko.pureComputed(function (){
+		var b = view.currentBlock();
+		if(!b)return [];
+		return adjacents.map(adj=>
+			(b.x+adj[0]>9 || b.x+adj[0]<0 || b.y+adj[1]>9 || b.y+adj[1]<0)? undefined:game.squares()[b.x+adj[0]]()[b.y+adj[1]] 
+		)
+		.filter(c=>c)
+		.filter(block=>block.contents().filter(c=>c.name=="park").length==0)
 		.map(block=>block.party())
 		.filter((block,index,array)=>array.indexOf(block)!=index) //only keep duplicates
 		.filter((block,index,array)=>array.indexOf(block)==index) //remove additional duplicates
 		.filter(party=>party!=b.party());
 
-	});
+	})
+	view.campaignCost = ko.pureComputed(function (){
+		return 2 * (view.cheapCampaigns().indexOf(view.currentPartyChange())!=-1?1:2);
+	})
 	view.gerryMander = function (){
 		if(!view.currentBlock() || !view.currentConstitChange() 
 			|| !game.currentParty() || !game.currentParty().readyStaff()) return;
@@ -63,6 +86,18 @@ var View = function (game){
 	}
 	view.zone = function (){
 		game.zone();
+	}
+	view.redistrict = function (){
+		if(!view.currentBlock())return;
+		var b = view.currentBlock()
+		var districtA = game.blockConstits()[b.x][b.y];
+		var districtB = ([[-1,0],[1,0],[0,-1],[0,1]])
+			.map(dir=>game.blockConstits()[b.x+dir[0]][b.y+dir[1]])
+			.filter(c=>c)
+			.filter(c=>c!=districtA)
+			.sort((a,b)=>b.blocks().length - a.blocks().length)[0];
+		if(!districtB || districtB.blocks().length+ districtA.blocks().length <24) return;
+		game.redistrict(districtA,districtB);
 	}
 	view.endTurn = function (){
 		game.endTurn();

@@ -11,6 +11,14 @@
 	<script type="text/javascript" src= "view.js"></script>
 
 	<script>
+		function getRandomColor() {
+			var letters = '0123456789ABCDEF';
+			var color = '#';
+			for (var i = 0; i < 6; i++) {
+				color += letters[Math.floor(Math.random() * 16)];
+			}
+			return color;
+		}
 		function shuffleArray(a)
 		{
 			 var j, x, i;
@@ -70,9 +78,10 @@
 			
 			return square;
 		}
-		function Party(name){
+		function Party(name,icon){
 			var party = {};
 			party.name = name;
+			party.icon = icon;
 			party.momentum = ko.observable(0);
 			party.staff = ko.observable(4);
 			party.readyStaff = ko.observable(0);
@@ -105,11 +114,14 @@
 	<div id = "content">
 		<div id="actions">
 			<h3 data-bind="text:game.currentParty() && game.currentParty().name"></h3>
-			<span data-bind="text:game.governmentParty || 'no one'"></span> is the government<br>
+			<span data-bind="text: game.governmentParty()?game.governmentParty().party: 'no one'"></span> is the government<br>
+			turn: <span data-bind="text:game.turns"></span> <br>
 			<button data-bind="click:gerryMander">Gerrymander!</button>
 			<button data-bind="click:campaign">Campaign!</button>
+			(<span data-bind="text:campaignCost"></span>)
 			<button data-bind="click:zone">Zone!</button>
 			<button data-bind="click:build">Build!</button>
+			<button data-bind="click:redistrict">Redistrict!</button>
 			<button data-bind="click:undo">Undo!</button>
 			<button data-bind="click:endTurn">End Turn!</button>
 			<select data-bind="options:possiblePartyChanges,optionsText:'name', value:currentPartyChange"></select>
@@ -131,13 +143,14 @@
 			<div data-bind="foreach:game.constits">
 				<div class="constitKey">
 					<div data-bind="style:{'background-color':color}" class="constitBlock">
-						<span data-bind="text:$root.game.constitControl()[$data.name]"></span><br>
-						<span data-bind="text:$root.game.constitSize()[$data.name]"></span>
+						<div data-bind="text:$root.game.constitSize()[$data.name]"></div>
+						<div data-bind="text:$root.game.constitControl()[$data.name] && $root.game.constitControl()[$data.name].name"></div>
+						<img data-bind="attr:{'src':$root.game.constitControl()[$data.name] && $root.game.constitControl()[$data.name].icon}" class="blockIcon"></img>
 					</div>
 					<div data-bind="text:name" class = "constitName"></div>
 					<div data-bind="foreach:$root.game.parties" class ="voteTally">
 						<span data-bind="text:name"></span>:
-						<span data-bind="text:$root.game.election()[$parent.name][$data.name]"></span><br>
+						<span data-bind="text:$root.game.election()[$parent.name] && $root.game.election()[$parent.name][$data.name]"></span><br>
 					</div>
 				</div>
 			</div>
@@ -147,7 +160,10 @@
 				<div data-bind="click:$root.setCurrentBlock,
 					css: {currentBlock: $root.currentBlock()==$data},
 					style:{'background-color':$root.game.blockConstits()[$data.x][$data.y].color}" class="block">
-					<span data-bind="text:party().name"></span>
+					<div data-bind="text:party().name"></div>
+					<!-- ko if:contents().filter(c=>c.name =="park").length == 0 -->
+					<img data-bind="attr:{'src':party().icon}" class="blockIcon"></img>
+					<!-- /ko -->
 					<div data-bind="foreach:contents">
 						<span data-bind="text:name"></span>
 					</div>

@@ -11,15 +11,20 @@
 	width:150px;
 }
 .constitKey{
-	height:4em;
+	height:5em;
 	min-width:4em;
 	/*text-align:center;*/
 }
 .constitKey div{
 	display:inline-block;
-	height:4em;
+	height:5em;
 	min-width:4em;
 	vertical-align:top;
+}
+.constitBlock div{
+	display:block;
+	height:auto;
+	min-width:auto;
 }
 .row{
 	display:table-row;
@@ -35,6 +40,9 @@
 	border: solid black 2px;
 	text-align:center;
 	vertical-align:center;
+}
+.blockIcon{
+	max-width:40px;
 }
 .currentBlock{
 	border: solid red 4px;

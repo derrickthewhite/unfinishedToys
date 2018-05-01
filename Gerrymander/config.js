@@ -1,6 +1,9 @@
 var config = {};
-config.numParties = 3;
+config.numParties = 4;
 config.partyNames = ["up","down","strange","charmed","top","bottom"];
+config.partyIcons = ["diamond.svg","circle.svg","star.svg","spiral.svg"];
+var nextName = 0;
+config.constitNames = ["Inner","Outer","Upper","Lower","Hither","Yonder"];
 var adjacents = [
 	[-1,0],
 	[1,0],
