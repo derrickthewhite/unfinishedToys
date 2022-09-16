@@ -274,6 +274,8 @@ function AI_Player(game,owner){
 			choice.planet.culture.units.filter(unit => choice.build==unit.type)[0]
 		)));
 		//TODO: sort out what is and isn't required to be stored in an order
+		//TODO: restore AI actions
+		//*
 		ai.troopMovements(toMove).forEach(choice => game.addOrder(Order(
 			Fleet(owner,grabRequestedFleet(choice.toMove,owner,[{type:"ship",count:choice.units}]),"space"),
 			choice.toMove,
@@ -285,6 +287,7 @@ function AI_Player(game,owner){
 				//planet:game.getPlanetAtPosition(choice.destination.position)
 			}
 		)));
+		//*/
 		game.readyToTick(owner);
 	}
 	player.ai= ai;
