@@ -9,6 +9,7 @@
 	<script type="text/javascript" src= "config.js"></script>
 	<script type="text/javascript" src= "game.js"></script>
 	<script type="text/javascript" src= "view.js"></script>
+	<script type="text/javascript" src= "models.js"></script>
 
 	<script>
 		function getRandomColor() {
@@ -30,64 +31,6 @@
 			}
 			return a;
 		}
-		function constituency (name,color,blocks){
-			var constituency = {};
-			
-			constituency.name = name;
-			constituency.color = color;
-			constituency.blocks = ko.observableArray(blocks);
-			
-			constituency.canLoose = function(location){
-				var blocks = constituency.blocks()
-				var toRemove = blocks.filter(loc=>loc[0]==location[0] && loc[1]==location[1])[0]
-				if(!toRemove)return false;
-				var remaining = blocks.slice()
-				remaining.splice(blocks.indexOf(toRemove),1);
-				var connected = [remaining.pop()];
-				
-				while(remaining.length>0){
-					
-					var found = false;
-					for(var i =0;i<remaining.length && !found;i++)
-						for(var j =0;j<connected.length && !found;j++){
-							var a = remaining[i];
-							var b = connected[j]
-							if((Math.abs(a[0]-b[0])==1 && a[1]==b[1]) 
-								|| (Math.abs(a[1]-b[1])==1 && a[0]==b[0])){
-								remaining.splice(i,1);
-								connected.push(a);
-								found = true;
-							}
-						}
-					if(!found){
-						return false;
-					}
-				}
-				return true;
-			}
-			
-			return constituency;
-		}
-		function square(x,y,party){
-			var square = {};
-			
-			square.x = x;
-			square.y = y;
-			square.party = ko.observable(party);
-			square.contents = ko.observableArray();
-			
-			return square;
-		}
-		function Party(name,icon){
-			var party = {};
-			party.name = name;
-			party.icon = icon;
-			party.momentum = ko.observable(0);
-			party.staff = ko.observable(4);
-			party.readyStaff = ko.observable(0);
-			party.score = ko.observable(0);
-			return party;
-		}
 		
 		var root = {};
 		function setup(){
@@ -97,12 +40,13 @@
 			game.init();
 			var view = View(game);
 			root.view = view;
+			view.suggestNextPlayer();
 			return root;
 		}
 		
 		function main (){
 			var seed = Math.floor(Math.random()*10000);
-			seed = 1031;
+			//seed = 1031;
 			Math.seedrandom(seed);
 			console.log("seed",seed);
 			setup();
@@ -112,8 +56,28 @@
 </head>
 <body onload="main()">
 	<div id = "content">
+		<div data-bind="if: game.turns()==0">
+			<input type="text" data-bind="value:playerName"></input>
+			<select data-bind="options:game.parties, optionsText:'name', value: playerParty"></select>
+			<select data-bind="options:unclaimedConstits, optionsText:'name', value: playerConstit"></select>
+			<button data-bind="click:addPlayer">Add Player</button>
+			<button data-bind="click:endTurn">Start Game</button>
+		</div>			
+		<div data-bind="foreach:game.players" class="players">
+			<div class="player">
+				<div data-bind="style:{'background-color':constit().color}" class="constitBlock">
+					<img data-bind="attr:{'src':party().icon}" class="blockIcon"></img>
+				</div>
+				<div>
+					<span data-bind="text:name"></span>:
+					<span data-bind="text:readyStaff"></span>/
+					<span data-bind="text:staff"></span>:
+					<span data-bind="text:score"></span>
+				</div>
+			</div>
+		</div>
 		<div id="actions">
-			<h3 data-bind="text:game.currentParty() && game.currentParty().name"></h3>
+			<h3 data-bind="text:game.currentPlayer() && game.currentPlayer().name"></h3>
 			<span data-bind="text: game.governmentParty()?game.governmentParty().party: 'no one'"></span> is the government<br>
 			turn: <span data-bind="text:game.turns"></span> <br>
 			<button data-bind="click:gerryMander">Gerrymander!</button>
@@ -121,6 +85,7 @@
 			(<span data-bind="text:campaignCost"></span>)
 			<button data-bind="click:zone">Zone!</button>
 			<button data-bind="click:build">Build!</button>
+			<button data-bind="click:headquarters">Headquarters!</button>
 			<button data-bind="click:redistrict">Redistrict!</button>
 			<button data-bind="click:undo">Undo!</button>
 			<button data-bind="click:endTurn">End Turn!</button>
@@ -135,9 +100,6 @@
 					<span data-bind="text:$root.game.totalVotes()[$data.name]"></span> ->
 					<span data-bind="text:$root.game.partyPower()[$data.name].length"></span>
 					(<span data-bind="text:momentum"></span>)
-					<span data-bind="text:readyStaff"></span>/
-					<span data-bind="text:staff"></span>:
-					<span data-bind="text:score"></span>
 				</div>
 			</div>
 			<div data-bind="foreach:game.constits">

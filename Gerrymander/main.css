@@ -1,3 +1,6 @@
+.player{
+	display:inline-block;
+}
 .constitBlock{
 	border: solid black 2px;
 	/*text-align:center;*/

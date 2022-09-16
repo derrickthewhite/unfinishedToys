@@ -1,7 +1,9 @@
 var config = {};
+config.numPlayers = 6;
+config.playerNames = ["Adam","Brittany","Chelsea","Derrick","Eli","Frank","Gary","Heather","Ivalou","James","Krystal"]
 config.numParties = 4;
-config.partyNames = ["up","down","strange","charmed","top","bottom"];
-config.partyIcons = ["diamond.svg","circle.svg","star.svg","spiral.svg"];
+config.partyNames = ["up","down","strange","charmed","practical","noble","vision","wild"];
+config.partyIcons = ["diamond.svg","circle.svg","spiral.svg","star.svg","bars.svg","cross.svg","widget.svg","galaxy.svg"];
 var nextName = 0;
 config.constitNames = ["Inner","Outer","Upper","Lower","Hither","Yonder"];
 var adjacents = [
@@ -11,7 +13,7 @@ var adjacents = [
 	[0,1],
 ]
 var constits = [
-	{name:"North West", color:"#008000",blocks:
+	{name:"North-West", color:"#008000",blocks:
 		[
 			[0,0],
 			[1,0],
@@ -39,7 +41,7 @@ var constits = [
 			[5,2],
 		]
 	},
-	{name:"NorthEast", color:"#800000",blocks:
+	{name:"North-East", color:"#800000",blocks:
 		[
 			[7,0],
 			[8,0],
@@ -81,7 +83,7 @@ var constits = [
 			[6,9],
 		]
 	},
-	{name:"South West", color:"#0000ff",blocks:
+	{name:"South-West", color:"#0000ff",blocks:
 		[
 			[0,6],
 			[1,6],
@@ -95,7 +97,7 @@ var constits = [
 			[2,9],
 		]
 	},
-	{name:"South East", color:"#00ff00",blocks:
+	{name:"South-East", color:"#00ff00",blocks:
 		[
 			[8,6],
 			[9,6],
@@ -123,7 +125,7 @@ var constits = [
 			[9,5],
 		]
 	},
-	{name:"West Central", color:"#cccccc",blocks:
+	{name:"West-Central", color:"#cccccc",blocks:
 		[
 			[4,3],
 			[3,4],
@@ -137,7 +139,7 @@ var constits = [
 			[3,7],
 		]
 	},
-	{name:"East Central", color:"#800080",blocks:
+	{name:"East-Central", color:"#800080",blocks:
 		[
 			[5,3],
 			[5,4],

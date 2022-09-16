@@ -3,8 +3,9 @@ function Game (){
 	game.constits = ko.observableArray([]);
 	game.squares = ko.observableArray([]);
 	game.parties = ko.observableArray([]);
+	game.players = ko.observableArray([]);
 	
-	game.currentParty = ko.observable();
+	game.currentPlayer = ko.observable();
 	game.governmentParty = ko.observable();
 	
 	game.undoAction = ko.observable();
@@ -63,6 +64,17 @@ function Game (){
 		}
 		return result;
 	});
+	game.constitControlRank = ko.pureComputed(function (){
+		var result = [];
+		var election = game.election();
+		for(var constit in game.election()){
+			var votes = Object.keys(game.election()[constit])
+				.map((party)=>{return {name:party,votes:game.election()[constit][party]}})
+				.sort((a,b)=>b.votes-a.votes);
+			result[constit] = votes[0].votes - votes[1].votes
+		}
+		return result;
+	});
 	game.partyPower = ko.pureComputed(function (){
 		var partyPower = {};
 		for(var p of game.parties())partyPower[p.name]=[];
@@ -99,22 +111,24 @@ function Game (){
 		return result;
 	});
 	game.endTurn = function (keepStaff,noScore){
+		if(game.players().length == 0)return;
 		game.undoAction(undefined);
-		if (game.currentParty() && !keepStaff)
-			game.currentParty().readyStaff(0);
-		var readyParties = game.parties().filter(p=>p.readyStaff())
+		if (game.currentPlayer() && !keepStaff)
+			game.currentPlayer().readyStaff(0);
+
+		var readyPlayers = game.players().filter(p=>p.readyStaff())
 			.sort((a,b)=>
 				a.score()!=b.score()?b.score()-a.score()
-				:game.partyPower()[a.name]!=game.partyPower()[b.name]
-					?game.partyPower()[b.name]-game.partyPower()[a.name]
-				:game.totalVotes()[b.name]-game.totalVotes()[a.name]
+				:game.partyPower()[a.party().name]!=game.partyPower()[b.party().name]
+					?game.partyPower()[b.party().name]-game.partyPower()[a.party().name]
+				:game.totalVotes()[b.party().name]-game.totalVotes()[a.party().name]
 			);
-		if(readyParties.length){
-			game.currentParty(readyParties[0]);
-			game.parties(game.parties().sort((a,b)=>a==game.currentParty()?-1:1));
+		if(readyPlayers.length){
+			game.currentPlayer(readyPlayers[0]);
+			game.parties(game.parties().sort((a,b)=>a==game.currentPlayer()?-1:1));
 			game.constits(game.constits().sort((a,b)=>
-				game.election()[b.name][game.currentParty().name]
-				-game.election()[a.name][game.currentParty().name]
+				game.election()[b.name][game.currentPlayer().party().name]
+				-game.election()[a.name][game.currentPlayer().party().name]
 			));
 			// assign a zone to be live
 			game.assignRandomZoningissue();
@@ -139,20 +153,22 @@ function Game (){
 						.forEach(p=>p.momentum(p.momentum()+Math.ceil(game.constits().length/game.parties().length)))
 				partiesByPower.forEach(partyPower=>{
 					var party = game.parties().filter(p=>partyPower.party==p.name)[0];
-					party.score(party.score()+partyPower.power);
+					//party.score(party.score()+partyPower.power);
+					game.players().filter(player=>player.party()==party)
+						.forEach(player=>player.score(player.score()+partyPower.power))
 				});
 				game.turns(game.turns()+1);
 			}
 			//*/
 			//ready Staff and pick next player
-			game.parties().forEach(p=>p.readyStaff(p.staff()));
+			game.players().forEach(p=>p.readyStaff(p.staff()));
 			game.endTurn(true,false);
 		}
 	}
 	game.undo = function (){
 		if(!game.undoAction())return;
 		var action = game.undoAction();
-		game.currentParty().readyStaff(action.staff);
+		game.currentPlayer().readyStaff(action.staff);
 		if(action.act == "gerrymander"){
 			game.gerryMander(action.block,action.constit);
 		}
@@ -162,42 +178,42 @@ function Game (){
 		if(action.act == "build" || action.act == "zone"){
 			action.block.contents(action.contents);
 		}
-		game.currentParty().readyStaff(action.staff);
+		game.currentPlayer().readyStaff(action.staff);
 		return action;
 	}
 	game.gerryMander = function (block,destination){
 		if(!block || !destination 
-			|| !game.currentParty() || !game.currentParty().readyStaff()) return;
+			|| !game.currentPlayer() || !game.currentPlayer().readyStaff()) return;
 		var toMove = block;
 		var looser = game.blockConstits()[toMove.x][toMove.y]
 		game.undoAction({
 			act:"gerrymander",
 			block:block,
 			constit:looser,
-			staff:game.currentParty().readyStaff()
+			staff:game.currentPlayer().readyStaff()
 		});
 		destination.blocks.push([toMove.x,toMove.y]);
 		looser.blocks.remove(looser.blocks().filter(b => b[0] == toMove.x && b[1] == toMove.y)[0]);
-		game.currentParty().readyStaff(game.currentParty().readyStaff()-1);
+		game.currentPlayer().readyStaff(game.currentPlayer().readyStaff()-1);
 	}
 	game.campaign = function (block,party){
 		if(!block || !party
-			|| !game.currentParty() || game.currentParty().readyStaff()<2)
+			|| !game.currentPlayer() || game.currentPlayer().readyStaff()<2)
 				return;
 		game.undoAction({
 			act:"campaign",
 			block:block,
 			party:block.party(),
-			staff:game.currentParty().readyStaff()
+			staff:game.currentPlayer().readyStaff()
 		});
 		block.party(party);
 		//TODO: vary cost of campaigning!
-		game.currentParty().readyStaff(game.currentParty().readyStaff()-2);
+		game.currentPlayer().readyStaff(game.currentPlayer().readyStaff()-2);
 
 	}
 	game.build = function (block,building){
 		if(!block || !building
-			|| !game.currentParty() || game.currentParty().readyStaff()<1) 
+			|| !game.currentPlayer() || game.currentPlayer().readyStaff()<1) 
 				return;
 		// yes, building projects can exceed gerrymander limits
 		//if(building=="housing" && game.constitSize()[game.blockConstits()[block.x][block.y].name]>=12) return;
@@ -206,27 +222,26 @@ function Game (){
 			act:"build",
 			block:block,
 			contents:block.contents(),
-			staff:game.currentParty().readyStaff()
+			staff:game.currentPlayer().readyStaff()
 		});
 		block.contents([{name:building}]);
-		game.currentParty().readyStaff(game.currentParty().readyStaff()-1);
+		game.currentPlayer().readyStaff(game.currentPlayer().readyStaff()-1);
 	}
 	game.zone = function (){
-		if(!game.currentParty() || game.currentParty().readyStaff()<1) return;
+		if(!game.currentPlayer() || game.currentPlayer().readyStaff()<1) return;
 		var block = game.assignRandomZoningissue();
 		game.undoAction({
 			act:"zone",
 			block:block,
 			contents:block.contents(),
-			staff:game.currentParty().readyStaff()
+			staff:game.currentPlayer().readyStaff()
 		});
-		game.currentParty().readyStaff(game.currentParty().readyStaff()-1);
+		game.currentPlayer().readyStaff(game.currentPlayer().readyStaff()-1);
 	}
 	game.redistrict = function (districtA,districtB){
 		console.log(districtA,districtB);
 		var blocks = districtA.blocks().concat(districtB.blocks());
-		if(blocks.length<24) return;
-		
+		//check for proper length at some point!
 		//blocks.sort((a,b)=>a[0]!=b[0]?a[0]-b[0]:a[1]-b[1]);
 		var divisions = [[blocks.pop()],[blocks.splice(Math.floor(blocks.length/2),1)[0]],[blocks.shift()]];
 		shuffleArray(blocks);
@@ -262,6 +277,19 @@ function Game (){
 		game.squares()[x]()[y].contents.push({name:"zone"});
 		return game.squares()[x]()[y];
 	}
+	game.addPlayer = function(name,constit,party){
+		game.players.push(Player(name,constit,party));
+	}
+	game.headquarters = function(action,block,moveFrom){
+		//TODO: less "Overriding" of contents
+		if(action == "remove")block.contents.remove(block.contents().filter(c=>c.name=="HQ")[0]);
+		if(action == "create")block.contents.push({name:"HQ"});
+		if(action == "move"){
+			moveFrom.contents.remove(moveFrom.contents().filter(c=>c.name=="HQ")[0]);
+			block.contents.push({name:"HQ"});
+		}
+		game.currentPlayer().readyStaff(game.currentPlayer().readyStaff()-1);
+	}
 	game.init= function (){
 		game.constits(constits.map(c=>constituency(c.name,c.color,c.blocks)));
 		for(var i =0;i<config.numParties;i++)
@@ -275,7 +303,41 @@ function Game (){
 			game.squares.push(ko.observableArray([]));
 			for(var j =0;j<10;j++)game.squares()[i]()[j]=square(i,j,partyDeck[i*10+j]);
 		}
-		game.endTurn(true,true);
+	}
+	game.save = function (){
+		var save = {};
+		save.constits = game.constits().map(c=>c.save());
+		save.squares = game.squares().map(row=>row().map(s=>s.save()));
+		save.parties = game.parties().map(p=>p.save());
+		save.players = game.players().map(p=>p.save());
+		
+		save.currentPlayer = game.currentPlayer().name();
+
+		save.governmentParty = game.governmentParty();
+		save.undoAction = game.undoAction();
+		save.turns = game.turns();
+		
+		return save;
+	}
+	game.load= function (save){
+		game.constits(save.constits.map(c=>constituency(c.name,c.color,c.blocks)));
+		game.parties(save.parties.map(p=>Party(p.name,p.icon.p.momentum)));
+		game.squares().forEach((row,index,array)=>row(save.squares
+			.map(s=>square(s.x,s.y,game.parties().filter(p=>p.name == s.party)[0]))
+		));
+		game.players(save.players.map(p=>Player(
+			p.name,
+			game.constits().filter(c=>c.name == p.constit)[0],
+			game.parties().filter(party=>party.name == p.party)[0],
+			p.staff,
+			p.readyStaff,
+			p.score
+		)));
+		game.currentPlayer(game.players().filter(p=>p.name == save.currentPlayer)[0]);
+		
+		game.governmentParty(save.governmentParty);
+		game.undoAction(save.undoAction);
+		game.turns(save.turns);
 	}
 	return game;
 }
