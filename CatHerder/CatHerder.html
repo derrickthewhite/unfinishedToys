@@ -1,0 +1,360 @@
+<html>
+<head>
+	<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
+	<script>
+		var config = {
+			scale:10,
+			side: 100,
+			distanceScale: 9,
+			magnitudeScale: 1.5,
+			species: [
+			/*
+				{
+					m: 5,
+					speed: 1,
+					initialSpeed: 1,
+					color: "#ffffff",
+					inertia: 1,
+					name: "littleZoomer",
+					svg:"greenHollowBullet.svg"
+				},
+				*/
+				{
+					m: 15,
+					speed: 1,
+					initialSpeed: 1,
+					color: "#ffffff",
+					inertia: 1,
+					name: "littleZoomer",
+					svg:"angelpuss.svg",
+					simple: true
+				},
+				{
+					m: 15,
+					speed: 1,
+					initialSpeed: 1,
+					color: "#ffffff",
+					inertia: 1,
+					name: "moash",
+					svg:"moash.svg",
+					simple: true
+				},
+				{
+					m: 15,
+					speed: 1,
+					initialSpeed: 1,
+					color: "#ffffff",
+					inertia: 1,
+					name: "winry",
+					svg:"winry.svg",
+					simple: true
+				},
+				/*
+				{
+					m: 10,
+					speed: .7,
+					initialSpeed: .7,
+					color: "#880088",
+					inertia: 2,
+					name: "slowClonker",
+					svg: "blueCorvet.svg"
+				},
+				*/
+				{
+					m: 15,
+					speed: .7,
+					initialSpeed: .7,
+					color: "#880088",
+					inertia: 2,
+					name: "slowClonker",
+					svg: "kaladin.svg",
+					simple: true
+				},
+				{
+					m: 15,
+					speed: .7,
+					initialSpeed: .7,
+					color: "#880088",
+					inertia: 2,
+					name: "persephone",
+					svg: "persephone.svg",
+					simple: true
+				},
+				/*
+				{
+					m: 5,
+					speed: 5,
+					initialSpeed: 2,
+					color: "#ff0000",
+					inertia: 2,
+					name: "sprinter",
+					svg: "redArrow.svg"
+				}
+				*/
+				
+				{
+					m: 15,
+					speed: 5,
+					initialSpeed: 2,
+					color: "#ff0000",
+					inertia: 2,
+					name: "sprinter",
+					svg: "tiny.svg",
+					simple: true
+				}
+
+			]
+		};
+		var game;
+		
+		var creature = function (name, position,speed,maxSpeed,move,draw){
+			return {
+				name: name,
+				position: position,
+				speed: speed,
+				maxSpeed: maxSpeed,
+				move: move,
+				draw:draw
+			}
+		}
+		function distance(a,b) {
+			return Math.sqrt(Math.pow(a.x-b.x,2) + Math.pow(a.y-b.y,2))
+		}
+		function length(a) {
+			return distance({x:0,y:0},a);
+		}
+		function angleToBoxSides (angle){
+			var x = Math.sin(angle);
+			var y = Math.cos (angle);
+			var multiplier = 50;
+			if(Math.abs(x) < Math.abs(y)){
+				multiplier = 50/Math.abs(y)
+			}
+			else {
+				multiplier = 50/Math.abs(x)
+			}
+			return {x:x*multiplier,y:y*multiplier};
+		}
+		
+		function generateCreature(){
+			var angle = Math.random()*2*Math.PI;
+			var direction = (angle+ ((Math.random()*2) -1)*Math.PI/6 +Math.PI)%360;
+			//var direction = (angle +Math.PI)%360;
+			var species = config.species[Math.floor(Math.random()*config.species.length)];
+			var velocity = {x:Math.sin(direction) * species.initialSpeed,y:Math.cos(direction) * species.initialSpeed};
+			var creature =  simpleCreature(species.name, angleToBoxSides(angle), velocity, species.color, species.m, species.speed, species.inertia, species.svg);
+			if(species.simple) creature.simple = true;
+			return creature
+		}
+		
+		function simpleCreature (name, position, velocity, color, magnitude, maxSpeed, inertia, image) {
+			var creature =  {
+				name: name,
+				position: position,
+				velocity: velocity,
+				color: color,
+				m: magnitude,
+				maxSpeed: maxSpeed,
+				inertia: inertia,
+				image: new Image(),
+				src: image,
+				forces: {x:0,y:0}
+			}
+			if(image) creature.image.src = image;
+			return creature
+		}
+		
+		function moveSpots(spots) {
+			for(var spot of spots) {
+				spot.position.x = spot.position.x +spot.velocity.x;
+				spot.position.y = spot.position.y + spot.velocity.y;
+			}
+		}
+		
+		function draw(game){
+			var canvas = document.getElementById('display');
+			var frame = document.getElementById('canvasFrame');
+			frame.width = config.displayDimensions;
+			frame.height = config.displayDimensions;
+			canvas.width = config.displayDimensions;
+			canvas.height = config.displayDimensions;
+
+
+			if(canvas.getContext){
+				var ctx = canvas.getContext('2d');
+				ctx.fillStyle="#aaaaaa";
+				ctx.fillRect(0,0,config.displayDimensions,config.displayDimensions);
+				ctx.strokeStyle = "#333333";
+				var corner = (config.displayDimensions - config.side*config.distanceScale)/2
+				ctx.strokeRect(corner,corner,config.side*config.distanceScale, config.side*config.distanceScale )
+
+				ctx.fillStyle = '#333333';
+				var spots = game.creatures.concat([game.herder, game.lady]);
+
+				for(var spot of spots){
+					if(spot.src){
+						if(spot.simple) {
+							ctx.drawImage(spot.image, 
+								config.displayDimensions / 2 +spot.position.x*config.distanceScale-spot.m*config.magnitudeScale,
+								config.displayDimensions / 2 +spot.position.y*config.distanceScale-spot.m*config.magnitudeScale, 
+								spot.m*2*config.magnitudeScale, 
+								spot.m*2*config.magnitudeScale
+							);
+						}
+						else {
+							ctx.setTransform(1,0,0,1,
+								config.displayDimensions / 2 +spot.position.x*config.distanceScale, 
+								config.displayDimensions / 2 +spot.position.y*config.distanceScale
+							);
+							ctx.rotate(Math.atan2(spot.velocity.y, spot.velocity.x) +Math.PI/2)
+							ctx.drawImage(spot.image, -spot.m*config.magnitudeScale,-spot.m*config.magnitudeScale, spot.m*2*config.magnitudeScale, spot.m*2*config.magnitudeScale)
+							ctx.setTransform(1,0,0,1,0,0);
+						}
+					} else {
+						ctx.fillStyle = spot.color;
+						ctx.strokeStyle = spot.color;
+						ctx.beginPath();
+						ctx.arc(
+							config.displayDimensions/2 +spot.position.x*config.distanceScale,
+							config.displayDimensions/2 +spot.position.y*config.distanceScale,
+							spot.m*config.magnitudeScale,
+							0,
+							Math.PI*2
+						);
+						ctx.fill();
+					}
+					
+					if(!spot.simple) {
+						ctx.strokeStyle = "#000000";
+						ctx.beginPath();
+						ctx.lineTo(config.displayDimensions/2 +spot.position.x*config.distanceScale,
+							config.displayDimensions/2 +spot.position.y*config.distanceScale);
+						ctx.lineTo(config.displayDimensions/2 +(spot.position.x - spot.velocity.x*5)*config.distanceScale,
+							config.displayDimensions/2 +(spot.position.y - spot.velocity.y*5)*config.distanceScale);
+						ctx.stroke();
+					}
+				}
+				
+				ctx.strokeStyle = "#ff0000";
+				ctx.beginPath();
+				ctx.arc(
+					config.displayDimensions/2 +game.pointer.x*config.distanceScale,
+					config.displayDimensions/2 +game.pointer.y*config.distanceScale,
+					10*config.magnitudeScale,
+					0,
+					Math.PI*2
+				);
+				ctx.stroke();
+			}
+		}
+		
+		function attract(attracted, attractor, force) {
+			var dX = (attracted.position.x - attractor.x);
+			var dY = (attracted.position.y - attractor.y);
+			
+			var L = distance(attracted.position, attractor);
+			
+			attracted.forces.x +=dX * -force/L;
+			attracted.forces.y +=dY * -force/L;
+		}
+		function adjustVelocity(creature) {
+			creature.velocity.x += creature.forces.x / creature.inertia;
+			creature.velocity.y += creature.forces.y / creature.inertia;
+			
+			var velLength = length(creature.velocity);
+			if(velLength > creature.maxSpeed) { 
+				creature.velocity.x = creature.velocity.x * creature.maxSpeed/velLength;
+				creature.velocity.y = creature.velocity.y * creature.maxSpeed/velLength;
+			}
+			creature.forces = {x:0,y:0};
+		}
+		
+		function updatePointer(game, event){
+			game.pointer.x = (event.offsetX - config.displayDimensions/2)/config.distanceScale;
+			game.pointer.y = (event.offsetY - config.displayDimensions/2)/config.distanceScale;
+			if(Math.abs(game.pointer.x) > config.side/2) {
+				game.pointer.x = 50* (game.pointer.x >0 ? 1: -1);
+			}
+			if(Math.abs(game.pointer.y) > config.side/2) {
+				game.pointer.y = 50* (game.pointer.y >0 ? 1: -1);
+			}
+		}
+		
+		function togglePause() {
+			console.log("toggle pause");
+			game.pause = !game.pause;
+		}
+		
+		function tick (game) {
+			if(!game.pause){
+						if(Math.random() <.1) game.creatures.push(generateCreature());
+		
+			attract(game.herder, game.pointer, Math.min(2, distance(game.herder.position, game.pointer)))
+			attract(game.lady, game.herder.position, .5)
+			
+			for(var creature of game.creatures) {
+				var distanceFromLady = distance(creature.position, game.lady.position)
+				attract(creature, game.lady.position, Math.min(5,5/distanceFromLady));
+				var distanceFromHerder = distance(creature.position, game.herder.position)
+				attract(creature, game.herder.position, Math.max(-5,-5/distanceFromHerder));
+			}
+			var creatures = game.creatures.concat(game.lady).concat(game.herder);
+			creatures.forEach(creature => adjustVelocity(creature))
+			moveSpots(creatures);
+			var aquiredCreatures = game.creatures.filter(creature => distance(creature.position, game.lady.position)< 3)
+			game.aquiredCreatures = game.aquiredCreatures.concat(aquiredCreatures);
+			game.creatures = game.creatures.filter(creature => distance(creature.position, game.lady.position) <config.side+10 && !aquiredCreatures.includes(creature))
+			draw(game);
+			var aquiredList = game.aquiredCreatures.map(c=>c.name).filter((c,i,a) => a.indexOf(c) == i)
+				.map(name => game.aquiredCreatures.filter(c => c.name == name));
+			var points = document.getElementById("points");
+			var speciesReport = ""
+			for(var speicies of aquiredList) {
+				speciesReport+="<image height='50px' width='50px' src='"+speicies[0].src+"'></image<span> : "+speicies.length+"</span>"
+			}
+			points.innerHTML = speciesReport;
+
+			}
+			setTimeout(() => tick(game), 100)
+		}
+		
+		function main(){
+			//var seed = 1;
+			//var seed = 3208;
+			seed = Math.floor(Math.random()*10000);
+			Math.seedrandom(seed);
+			console.log(seed);
+			
+			config.displayDimensions = config.scale*config.side;
+			game = {};
+			game.herder = simpleCreature("herder",{ x: 0, y: 10}, {x:0,y:0},"#008800",10, 1.5, .1, "yellowHat.svg");
+			game.herder.simple = true;
+			game.lady = simpleCreature("lady", { x: 0, y: 0}, {x:0,y:0},"#880000",10, .5, 1, "purplePurse.svg");
+			game.lady.simple = true;
+			game.pointer = {x:0, y:0};
+			game.aquiredCreatures = [];
+			
+			game.creatures = [];
+			for(var i = 0;i< 1; i++) {
+				game.creatures.push(generateCreature());
+			}
+			document.getElementById("canvasFrame").onmousemove = function (event) { updatePointer(game, event)}
+			document.addEventListener("keyup", (event) => {
+				if(event.code == "Space") {
+					togglePause();
+				}
+			});
+			tick(game);
+		}
+
+	</script>
+</head>
+<body onload="main()">
+	<div id="canvasFrame">
+	<canvas id="display" ></canvas>
+	</div>
+	<div id="points">
+	</div>
+	<button onclick="togglePause()">Pause</button
+</body>
+</html>
