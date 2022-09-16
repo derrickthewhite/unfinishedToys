@@ -30,8 +30,11 @@ function Model(){
 		var steel = new ConstructionType("Steel",[],"starting");
 		var costsSteel = effects.fuel2C;
 		costsSteel.target = "Steel";
+		var costsLessSteel = effects.fuel1C;
+		costsLessSteel.target = "Steel";
 		var robot = new ConstructionType("Robots",[effects.worthless,effects.manipulator,effects.automatic,costsSteel,effects.limit1],"starting");
 		var digger = new ConstructionType("Digger",[effects.miner],"starting");
+		var superDigger = new ConstructionType("Super Digger",[effects.miner4,costsLessSteel],"starting");
 		model.mode("mainView");
 		model.players().forEach((player,index)=>{
 			var color = config.colors[index];
@@ -40,6 +43,7 @@ function Model(){
 			var factory = new ConstructionType(color+" Factory",[factoryEffect],player.name);
 			player.addConstruction(robot,5);
 			player.addConstruction(digger,1);
+			player.addConstruction(superDigger,1);
 			player.addConstruction(steel,3);
 			player.addConstruction(factory,1);
 			player.addConstruction(new ConstructionType(color,[]),0)
@@ -51,6 +55,7 @@ function Model(){
 	
 	
 	model.runBuildPhase = function(orders,attacks,research){
+		console.log(orders,attacks,research);
 		var currentPlayer = model.players()[model.currentPlayer()];
 		var nextPlayer = (model.currentPlayer()+1)%model.players().length;
 		

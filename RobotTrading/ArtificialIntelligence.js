@@ -2,9 +2,10 @@ function ArtificialIntelligence(){
 	var ai = {};
 	
 	ai.identifyTools = function (constructions){
-		return machines.filter(m=>!m.type.free)
+		
+		return constructions.filter(c=>c.type.isMachine).filter(m=>!m.type.free)
 			.map(m=>{
-				var output = manipulatorCost({name:m.type.name,attribute:"useOutput"},constructions);
+				var output = manipulatorCost({name:m.type.name,attribute:"useOutput"},constructions,true);
 				var activation = manipulatorCost({name:m.type.name,attribute:"activateRequirements"},constructions);
 				//TODO: why is manipulator always 0?
 				var primaryOutput = Object.keys(output).sort((a,b)=>output[b]-output[a])[1];
@@ -14,11 +15,18 @@ function ArtificialIntelligence(){
 					name:m.name,
 					tool:m
 				}
-			});
+			})
+			.filter(m=>m.ratio !=0);
 	}
 	
 	ai.buildInfrastructure = function (constructions,target){
 		//Increase capabilities in target the most!
+		var orders = {
+			burn:{},
+			build:{},
+			activate:{},
+			convert:{}
+		};
 		
 		var machines = constructions.filter(c=>c.type.isMachine);
 		
@@ -31,6 +39,11 @@ function ArtificialIntelligence(){
 				out[a.resource]+=a.value;
 				return out;
 			},{});
+		machines.filter(c=>c.type.free)
+			.forEach(c => {
+				orders.activate[c.name]=c.number();
+			});
+
 		var burnableGoods = constructions.filter(c=>!c.type.isMachine)
 			.map(c=>{return {resource:c.name,value:c.number()}});
 		var startingSupplyArray = Object.keys(startingSupply)
@@ -64,21 +77,32 @@ function ArtificialIntelligence(){
 		})
 		usefulMachineCosts.sort((a,b)=>b.cost.effectiveManip - a.cost.effectiveManip);
 		var haveResources = true;
-		var orders = {};
+		var loops = 0;
 		while(haveResources){
-			var excessGoodsCount = burnableGoods.length;
 			var toBuild = cheapestMachine(usefulMachines,burnableGoods,constructions);
-			console.log(toBuild,burnableGoods);
+			console.log(toBuild);
 			for(consuming in toBuild.burn){
 				burnableGoods.filter(existing=>existing.resource==consuming).forEach((existing,index)=>{
 					//THERE SHOULD NOT BE MORE THAN 1!
 					existing.value-= toBuild.burn[consuming];
 				});
+				if(!orders.burn[consuming])orders.burn[consuming]=0;
+				orders.burn[consuming]+=toBuild.burn[consuming];
 			}
-			haveResources = false;
+			if(!orders.build[toBuild.name])orders.build[toBuild.name]=0;
+			orders.build[toBuild.name]+=1;
+			for(var i of config.manipUses)
+			{
+				if(!orders.convert[i])orders.convert[i]=0;
+				orders.convert[i]+=toBuild.cost[i];
+			}
+			console.log(startingSupplyArray,burnableGoods);
+			var resourceCount = burnableGoods.concat(startingSupplyArray).map(r=>r.value).reduce((a,b)=>a+b);
+			console.log(resourceCount)
+			if(resourceCount<=0 || loops++>10)haveResources = false;
 		}
 		
-		return usefulMachines;
+		return orders;
 	}
 	
 	var possibleConstructionCosts = function (machine){
@@ -113,6 +137,8 @@ function ArtificialIntelligence(){
 			machine:m
 		}});
 		
+		var tools = ai.identifyTools(machines);
+		
 		usefulMachineCosts.forEach(m=>{
 			m.cost.effectiveManip = 0;
 			Object.keys(m.cost)
@@ -132,6 +158,8 @@ function ArtificialIntelligence(){
 	
 	var selfBuildingSystem = function (constructions,target){
 		var usefulMachines = ai.usefulMachines(constructions,target);
+		
+		
 	}
 	
 	var cheapestMachine = function (usefulMachines,existingResources,constructions,target){
@@ -204,7 +232,7 @@ function ArtificialIntelligence(){
 		return {cost:effectiveCost,tools:toolsUsed};
 	};
 	
-	var manipulatorCost = function (toEval,constructions){
+	var manipulatorCost = function (toEval,constructions,noRecursion){
 		var result = {
 			manipulator:0,
 			trades:0
@@ -225,6 +253,10 @@ function ArtificialIntelligence(){
 				}
 				else if(i=="manipulator")
 					result.manipulator+=toEval[i];
+				else if(noRecursion){
+					if(!result[i])result[i]=0;
+					result[i]+=toEval[i]
+				}
 				else{
 					//TODO: should this always be buildRequirements?
 					var subCost = manipulatorCost({name:i,attribute:"buildRequirements"},constructions);
