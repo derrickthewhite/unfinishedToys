@@ -1,0 +1,28 @@
+Weapons:
+	Chance To Hit (Equation)
+	Number of Attacks
+	Fire Rate
+	Delivery Type
+		Projectile
+		Missile
+		Energy (instant)
+		Energy (Slow)
+	Damage Type
+		High Energy 
+	Damage <= Range, Target Material
+	Power Requirements
+	Ammo Requirements
+	Fuel Requirements
+
+Defenses
+	Armor
+		Reduction (By Damage Type, Health)
+		Divisor (By Damage Type, Health)
+		Regeneration
+		Damage Taken (By Damage Type)
+		Health
+
+
+Ship:
+	Size
+	

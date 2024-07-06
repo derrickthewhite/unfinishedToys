@@ -1,0 +1,295 @@
+<html>
+<head>
+    <title>Generated Graphs</title>
+		<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+		<script type="text/javascript" src= "../Tools/randomGenerators.js"></script>
+    <script>
+	var config = {};
+	//config.initialPairList = [[3,8],[9,5],[7,0],[0,1]]; //Petersen
+	//config.initialPairList = [[3,8],[9,5],[7,0],[0,3]]; //pyramid+
+	//config.initialPairList = [[1,2],[1,4],[6,9],[8,9]];
+	//config.initialPairList = [[7,5],[9,1],[5,9],[8,3]]; // 13 min pop seed
+	//config.initialPairList = [[9,5],[8,3],[6,2],[3,2]]; // 16 min pop seed
+	
+	//*
+	//*/
+	
+	//TODO: check what graphs aren't showing up and make sure they're calculated correctly
+	var circuitGraph = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,0],[0,2],[1,4],[3,5],[6,8],[7,9]];
+	var DiamondGraph = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,0],[0,2],[1,3],[4,9],[5,7],[6,8]];
+	var prismGraph = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,0],[0,6],[1,5],[2,9],[3,8],[4,7]];
+	var mobiesGraph = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,0],[0,5],[1,6],[2,7],[3,8],[4,9]];
+	
+	var graphCycleCounts=[
+		{name:"Gem",squares:3,triangles:3},
+		{name:"Stalk",squares:6,triangles:2},
+		{name:"Diamond|Circuit",squares:2,triangles:4,distinguish:(graph)=>girth(graph)==4?"Diamond":"Circuit"},
+		{name:"Barbell",squares:6,triangles:4},
+		
+		
+		{name:"D-Train",squares:3,triangles:2},
+		{name:"X-Train",squares:1,triangles:2},
+		{name:"S-Train",squares:4,triangles:1},
+		{name:"B-Train",squares:2,triangles:1},
+		
+		
+		{name:"Squares",squares:2,triangles:0},
+		{name:"Triangles",squares:0,triangles:3},
+		{name:"Cube",squares:3,triangles:1},
+		
+		
+		{name:"Houses",squares:2,triangles:2},
+		{name:"Flowers",squares:6,triangles:0},
+		{name:"Plane",squares:0,triangles:2},
+		{name:"Capital",squares:3,triangles:0},
+		
+		
+		{name:"Petersen",squares:0,triangles:0},
+		{name:"Prism|Mobius",squares:5,triangles:0, distinguish:(graph)=>isBipartite(graph)?"Mobius":"Prism"}, //Mobius is bipartite
+		
+		{name:"Pyramid + Prism",squares:6,triangles:6},
+		{name:"Pyramid + M-Prism",squares:12,triangles:4},
+	]
+	
+	function cycleCount(edgeList){
+		//console.log(edgeList)
+		var result ={
+			triangles:0,
+			squares:0
+		}
+		for(var node = 0;node<10;node++){
+			var firstLevel = edgeList.filter(edge => edge.indexOf(node)!=-1)
+				.map(edge=>edge[0]==node?edge[1]:edge[0])
+				.filter(a=> a>node);
+			var secondLevel = firstLevel.map(n=>edgeList.filter(edge=> edge.indexOf(n)!=-1)
+				.map(edge=>edge[0]==n?edge[1]:edge[0]))
+				.reduce((a,b)=>a.concat(b),[])
+				.filter(a=>a!=node && a>node);
+				
+			var opposingNodes = secondLevel.filter((node,index,array)=>array.indexOf(node)!=index);
+			var tripleSquareStacks = opposingNodes.filter((node,index,array)=>array.indexOf(node)!=index);
+			//check for both simple opposites and for triple shaped stacks (which will show up three times)
+			var squares = opposingNodes.filter(node => tripleSquareStacks.indexOf(node)==-1).length+tripleSquareStacks.length*3
+			result.squares += squares;
+			result.triangles += secondLevel.filter(node=> firstLevel.indexOf(node)!=-1).length/2; //TODO: test this! not 100% sure!
+			
+			//console.log(node,firstLevel,secondLevel,result);
+		}
+		return result;
+	}
+	function adjacent(node,edgeList){
+		return edgeList.filter(edge=>edge.indexOf(node)!=-1).map(edge => edge[0]==node?edge[1]:edge[0])
+	}
+	function isBipartite(edgeList){
+		var redNodes =[0];
+		var blueNodes = [];
+		var nodesToProccess = [{node:0,color:"red"}];
+		
+		while(nodesToProccess.length!=0){
+			var current = nodesToProccess.shift();
+			var group = current.color=="red"?redNodes:blueNodes;
+			var neighborGroup = current.color=="red"?blueNodes:redNodes;
+			var neighborColor = current.color=="red"?"blue":"red";
+			if(adjacent(current.node,edgeList).map(neighbor=>{
+				if(group.indexOf(neighbor)!=-1) return false;
+				if(neighborGroup.indexOf(neighbor)==-1) {
+					neighborGroup.push(neighbor);
+					nodesToProccess.push({node:neighbor,color:neighborColor});
+				}
+				return true;
+			}).reduce((a,b)=>a&&b)==false) return false;
+		}
+		return true;
+	}
+	function girth(edgeList){ // is this the right concept? I think it is
+		var girth = 0;
+		for(var i = 0;i<10;i++){
+			var nodesReached = [i];
+			var nodesActive = [i];
+			var count = 0;
+			while(nodesReached.length < 10){
+				nodesActive = nodesActive.map(node=>adjacent(node,edgeList)).reduce((a,b)=>a.concat(b)).filter((node,index,array)=>array.indexOf(node)==index);
+				nodesReached = nodesReached.concat(nodesActive).filter((node,index,array)=>array.indexOf(node)==index); 
+				count++
+			}
+			girth = Math.max(count,girth);
+		}
+		return girth;
+	}
+	
+	function identifyGraph(graph){
+		counts = cycleCount(graph);
+		var result = graphCycleCounts.filter(shape=>shape.squares==counts.squares && shape.triangles == counts.triangles)[0];
+		return result.distinguish?result.distinguish(graph):result.name;
+	}
+	
+	function edgeCount(node,list){
+		return list.filter(a=>a.indexOf(node)!=-1).length
+	}
+	function edgeIn(edge,list){
+		return list.filter(
+			a=> (a[0]==edge[0] && a[1]==edge[1]) || (a[1]==edge[0] && a[0]==edge[1])
+		).length>=1
+	}
+	
+	function buildGraph(baseString){
+		var inputs = baseString.split("");
+		var invalidPairs = Array(11).fill([]);
+		var edgeList = ([]).concat(config.initialPairList);
+		var loopCount;
+		while(edgeList.length <15){
+			var lastPair = edgeList[edgeList.length-1];
+			var source = (lastPair[0]+1)%10
+			var destination = (lastPair[1]+1)%10
+			while(edgeCount(source,edgeList)==3) source = (source+1)%10;
+			loopCount = 0;
+			var destinationSkips = 0;
+			var addEdge = true;
+			while(edgeCount(destination,edgeList)==3
+				|| destination == source
+				|| edgeIn([source,destination],edgeList)
+				|| edgeIn([source,destination],invalidPairs[edgeList.length-4])
+				|| (destinationSkips++ == 0 && baseString[edgeList.length-4]=="1") // TODO: let this line reset loop count
+			){
+				if( loopCount > 20){
+					invalidPairs[edgeList.length-4] = []; //clear invalid pairs for next pair
+					invalidPairs[edgeList.length-4-1].push(edgeList.pop());
+					//console.log("pop",lastPair[0],lastPair[1]);
+					addEdge=false;
+					break;
+				}
+				destination = (destination+1)%10;
+				loopCount+=1;
+			}
+			if(addEdge){
+				edgeList.push([source,destination]);
+				//console.log("add",source,destination);
+			}
+		}
+		return edgeList;
+	}
+	
+	function numToBinString(dec){
+		var base =  (dec >>> 0).toString(2);
+		return Array(10-base.length).fill("0").reduce((a,b)=>a+b,"") +base;
+	}
+	
+	function testSeed(seed){
+		config.initialPairList=[];
+		while(config.initialPairList.length < 4){
+			var a = Math.floor(Math.random()*10);
+			var b = Math.floor(Math.random()*10);
+			
+			if(a!=b && config.initialPairList.filter(edge=>(edge[0]==a && edge[1]==b)||(edge[0]==b && edge[1]==a)).length==0)
+				config.initialPairList.push([a,b])
+		}
+		return testConfig();
+	}
+	
+	function testConfig(){
+		var score = [];
+		var typeNames = [];
+		for(var i = 0;i<1024;i++){
+			
+			var id = numToBinString(i);
+			var graph = buildGraph(id);
+			var name = identifyGraph(graph);
+			if(!score[name]) 
+			{	
+				score[name]=0;
+				typeNames.push(name)
+			}
+			score[name]++;
+			//console.log(id,graph,name);
+		}
+		var leftOut = graphCycleCounts.map(a=>a.distinguish?a.name.split("|"):[a.name]).reduce((a,b)=>a.concat(b)).filter(shape=>typeNames.indexOf(shape)==-1);
+		return{
+			score:score,
+			typeNames:typeNames,
+			leftOut:leftOut,
+			minimumPopulation:typeNames.map(type=>score[type]).reduce((a,b) => Math.min(a,b)),
+			validGraph:leftOut.length ==2 && leftOut.filter(name => name!="Pyramid + Prism" && name!="Pyramid + M-Prism").length==0
+		};
+	}
+	function generateAllPossibleSeedsOnce(){
+		
+		var count =0;
+		var seeds = [];
+		for(var a=9;a>=0;a--) // this could take a very long time to run
+		//for(var a=6;a>=0;a--) // just for testing
+		{
+			console.log("cycle",a);
+		for(var b=a-1;b>=0;b--)
+		for(var c=a;c>=0;c--)
+		for(var d=c-1;d>=0;d--)
+		for(var e=c;e>=0;e--)
+		for(var f=e-1;f>=0;f--)
+		for(var g=e;g>=0;g--)
+		for(var h=g-1;h>=0;h--){
+			var list = [a,b,c,d,e,f,g,h];
+			var mostDuplicates = new Array(10).fill(0).map((n,i)=>list.filter(x=>x==i).length).reduce((a,b)=>Math.max(a,b))
+			if(mostDuplicates>3) continue;
+			if(([a*10+b,c*10+d,e*10+f,g*10+h]).filter((n,index,array)=>array.indexOf(n)!=index).length !=0) continue;
+			//console.log([[a,b],[c,d],[e,f],[g,h]]);
+			seeds.push([[a,b],[c,d],[e,f],[g,h]]);
+			count++;
+		}
+		}
+		console.log(count);
+		return seeds;
+	}
+
+	function main(){
+		/*
+		var maxResult = {minimumPopulation:0};
+		var maxSeed = 0;
+		var maxConfig = [];
+		var seeds = generateAllPossibleSeedsOnce();
+		for(var i = 29800;i<seeds.length;i++){
+		//for(var i = 0;i<2000;i++){
+				/*
+				var seed = Math.floor(Math.random()*10000);
+				Math.seedrandom(seed);
+				var result = testSeed();
+				//*/
+				/*
+				if(i%20 == 0) console.log(i,maxConfig);
+				config.initialPairList = seeds[i];
+				var result = testConfig();
+				if(result.validGraph && maxResult.minimumPopulation<result.minimumPopulation){
+					//console.log("seed",seed);
+					console.log("config",config.initialPairList);
+					console.log("min pop",result.minimumPopulation);
+					console.log("result",result);
+					//maxSeed=seed;
+					maxResult=result;
+					maxConfig=config.initialPairList;
+				}
+		}
+		//*/
+		//*
+		config.initialPairList = [[3,8],[9,5],[7,0],[0,1]]
+		console.log(testConfig());
+		
+		config.initialPairList = [[9,5],[8,3],[7,0],[0,1]]
+		console.log(testConfig());
+		
+		config.initialPairList = [[7,5],[9,1],[5,9],[8,3]];
+		console.log(testConfig());
+		
+		config.initialPairList = [[9,5],[8,3],[6,2],[3,2]]
+		console.log(testConfig());
+		//*/
+
+	}
+	
+    </script>
+</head>
+
+<body onload="">
+<div id='display'> 
+	<button onclick="main()">run</button>
+</div>
+</body>
+
+</html>

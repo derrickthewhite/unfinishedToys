@@ -1,0 +1,13 @@
+.scionList{
+	overflow-y: scroll;
+	height:100%
+}
+#bachelors{
+	float:left;
+}
+#bachelorettes{
+	float:left;
+}
+.selected{
+	background:#aaffaa
+}

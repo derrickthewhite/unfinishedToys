@@ -1,0 +1,45 @@
+<html>
+<head>
+	<title>Random Generators</title>
+	
+	<script>
+		var testString = 
+`Table: CultureValues
+[!{1d3+1d2} Values >> implode]`;
+
+		var values = `
+Table: Values
+Charity
+Courage
+Cunning
+Indepedence
+Innocence
+Mysticism
+Prestige
+Reliability
+Restraint
+Tolerance
+Tradition
+Nationalism`;
+
+	function parseTable(table) {
+		var lines = table.split("\n")
+		.map(line => line.replace("\r",""))
+		.filter(line => line.indexOf("Table:")== -1 && line.length != 0)
+		.map(line =>parseLine(line));
+		return lines;
+	}
+	function parseLine(line) {
+		if()
+		return {chance: 1, content: line};
+	}
+	function main() {
+		console.log(parseTable(values));
+	}
+	</script>
+</head>
+<body onload="main()">
+	<div id="main">
+	</div>
+</body>
+</html>

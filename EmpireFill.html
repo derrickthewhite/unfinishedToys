@@ -1,0 +1,112 @@
+<html>
+<head>
+    <title>Empires</title>
+		<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+		<script type="text/javascript" src= "../Tools/randomGenerators.js"></script>
+    <script>
+	var config = {
+		time:120,
+		space:10,
+		empires:15,
+		area:40,
+		//names:["V1","V2","V3","P1","P2","P3","C1","C2","C3"],
+		//defaultName:"00"
+		names:["red","blue","yellow","green","black","orange","purple","brown","teal",
+			"pink","lightgrey","darkgreen","darkblue","tan","darkred","darkgey"],
+		defaultName:"grey"
+	};
+	function locationMatch(a,b){
+		return a.time==b.time && a.space==b.space;
+	}
+	function initTimeline(){
+		var timeline = [];
+		for(var i = 0;i<config.time;i++)
+			timeline[i]=new Array(config.space);
+		timeline.forEach(a=>a.fill(config.defaultName));
+		return timeline;
+	}
+	function addEmpire(timeline,empire){
+		do{
+			var location = {space:randInt(config.space), time:randInt(config.time)};
+		} while (timeline[location.time][location.space] !=config.defaultName)
+		timeline[location.time][location.space]=empire;
+	}
+	function empireLocations(timeline,empire){
+		var existing = [];
+		for(var time in timeline)
+		for(var space in timeline[time])
+		if(timeline[time][space] == empire)
+			existing.push({time:Number(time),space:Number(space)});
+		return existing;
+	}
+	function empireAdjacent(timeline, empire,locations){
+		if(!locations) locations = empireLocations(timeline,empire);
+		var adjacent = [];
+		var directions = [
+			{time:-1,space:0}, 
+			{time:0,space:-1},
+			{time:1,space:0},
+			{time:0,space:1}//empires start out in one location!
+		]
+		for(loc of locations)
+		for(direction of directions)
+			adjacent.push({time:loc.time+direction.time,space:loc.space+direction.space});
+		return adjacent.filter(a=>locations.findIndex((b)=>locationMatch(a,b))==-1)
+			.filter(a=>a.space>=0 && a.space<config.space && a.time<config.time && a.time >=0);
+	}
+	function expandEmpire (timeline,empire){
+		expansions = empireAdjacent(timeline,empire).filter(a=>timeline[a.time][a.space] == config.defaultName);
+		if(expansions.length){
+			var location = expansions[randInt(expansions.length)];
+			timeline[location.time][location.space] = empire;
+			return true;
+		}
+		return false;
+	}
+	function showTimeLine(timeline){
+		//return timeline.map(a=>a.join(" ")).join("<br>");
+		var result = "";
+		for(var time of timeline){
+			for(var space of time)
+				result+="<div style='display:inline-block; background:"+space+"; width:10px; height:10px'></div>";
+			result+="<br>";
+		}
+		return result;
+	}
+	function main(){
+		seed = Math.floor(Math.random()*10000);
+		//seed = "derrick";
+		seed = 0;
+		Math.seedrandom(seed);
+		console.log(seed);
+		var timeline = initTimeline();
+		var sizes = [];
+		for(var i = 0;i<config.empires;i++){
+			addEmpire(timeline,config.names[i]);
+			//sizes[i] = Math.round(randomGausian(config.area,config.area/2.5));
+			var base = 1.5;
+			var logAverage = Math.log(config.area)/Math.log(base);
+			sizes[i] = Math.round(Math.pow(base,randomGausian(logAverage,1)));
+		}
+		console.log(sizes);
+		var max = Math.max(...sizes);
+		for(var j = 0;j<max-1;j++) // TODO: random sizes
+		for(var i = 0;i<config.empires;i++)
+			if(j<sizes[i]-1)
+				expandEmpire(timeline,config.names[i]);
+		console.log(empireLocations(timeline,"A"));
+		console.log(timeline);
+		document.getElementById("display").innerHTML=showTimeLine(timeline);
+	}
+	
+    </script>
+</head>
+
+<body onload="main()">
+
+<button onclick="">Draw Card</button><br>
+<div id='display' style="font-family:monospace"> 
+</div>
+</body>
+
+</html>

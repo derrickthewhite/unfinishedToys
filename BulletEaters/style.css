@@ -4,3 +4,80 @@
 #teamNav{
 	border:blue solid 2px;
 }
+.unitDisplay {
+	display: table;
+}
+.unit {
+	display: block;
+}
+.unitName, .unitType, .unitHP, .unitStatus, .unitActions, .unitKey {
+	display: inline-block;
+}
+.unitName {
+	width: 120px;
+}
+.unitType, .unitStatus {
+	width: 75px;
+}
+/*
+.unitActions{
+	width: 150px;
+}
+*/
+.unitHP{
+	width: 45px;
+}
+.unitKey {
+	width: 100px;
+	border-right: 2px solid black
+}
+
+.tileKey {
+	width: 100px;
+	display: inline-block;
+}
+.statItem {
+	padding-left: 5px;
+}
+
+.navigationPane {
+	width: 500px;
+	height: 500px;
+	border: 2px solid black;
+	background: #eeeeee;
+	overflow-y: scroll;
+	display: inline-block;
+	position: relative;
+}
+.basicPane {
+	width: 500px;
+	height: 500px;
+	display: inline-block;
+}
+.actionBar{
+	height: 30px;
+	border: 2px solid black;
+}
+.panelLable{
+	float: right;
+	margin: 5px;
+	padding: 2px;
+	border: 2px solid black;
+}
+
+.smallIcon {
+	height: 20px;
+	width: 20px;
+}
+
+.referenceIcon {
+	height: 50px;
+	width: 50px
+}
+.stackingImage {
+	position: absolute;
+	height: 200px;
+	width: 200px;
+	bottom: 0px;
+	right: 0px;
+}

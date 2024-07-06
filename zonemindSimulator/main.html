@@ -1,0 +1,172 @@
+<html>
+	<head>
+		<title> Zonemind Research Simulator</title>
+		<link rel="stylesheet" type="text/css" href="main.css">
+		<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+		<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
+		<script type="text/javascript" src= "../../Tools/mersenne-twister.js"></script>
+		<script type="text/javascript" src= "research.js"> </script>
+		<script type="text/javascript" src= "detective.js"> </script>
+		<script type="text/javascript" src= "geography.js"> </script>
+		<script>
+		
+			
+			var display = {};
+			var data = {};
+			
+			MersenneTwister.prototype.dice = function (){
+				return ([1,2,3]).map(a=>Math.floor(this.random()*6)+1).reduce((a,b)=>a+b);
+			}
+			MersenneTwister.prototype.die = function (){
+				return Math.floor(this.random()*6)+1
+			}
+
+			
+			function main(){
+				var masterRandom = new MersenneTwister(parseInt("chelsea",36))
+				console.log(masterRandom.random());
+				console.log(masterRandom.random());
+				console.log(masterRandom.random());
+				console.log(masterRandom.random());
+				
+				
+				data.cities = cities(new MersenneTwister(masterRandom.random() *1e20))
+
+				data.teams = researchManager(new MersenneTwister(masterRandom.random() *1e20));
+				data.teams.addTeam([],1e6);
+				data.date = 0;
+				data.cycleSize = 30;
+				
+				
+				data.detectives = clueManager(new MersenneTwister(masterRandom.random() *1e20)); 
+				
+				//data.teams.fundingCap = data.cycleSize/15*data.teams.teams[0].prototypeValue
+				data.teams.fundingCap = data.cycleSize/30*data.teams.teams[0].prototypeValue
+				var runCycles= function (n){
+					for(var i = 0;i<n;i++){
+						data.date+=data.cycleSize;
+						data.teams.runCycle(data.cycleSize,data.date);
+					}
+					display.teams(JSON.parse(JSON.stringify(data.teams.teams)));
+					display.date(data.date);
+					display.output(data.teams.parachronicTechs());
+					display.TechsByDate(data.teams.parachronicTechsByDate());
+				}
+
+				display.teams = ko.observableArray([]);
+				display.date = ko.observable(0);
+				display.output = ko.observableArray([]);
+				display.TechsByDate = ko.observableArray([]);
+				
+				display.clueBuilder = {};
+				display.clueBuilder.modifier = ko.observable(-5);
+				display.clueBuilder.date = ko.observable('2019-01-01');
+				display.clueBuilder.category = ko.observable("who");
+				display.clueBuilder.categories = ko.observableArray(clueTypes);
+				display.clueBuilder.location = ko.observable("Shanghai");
+				display.clueBuilder.locations = ko.observableArray(data.cities.cities); // TODO: namespace this!
+				
+				display.clues = ko.observableArray([]);
+				display.suspicions = ko.observableArray([]);
+				
+				display.nukedCities = ko.observableArray(data.cities.nukedCities);
+				display.baseCities = ko.observableArray(data.cities.baseCities);
+				
+				display.clueBuilder.addClue = function (){
+					var c=display.clueBuilder
+					var clue = {
+						modifier:c.modifier(),
+						date:c.date(),
+						category:c.category(),
+						location:c.location(),
+						guid: getGuid()
+					}
+					
+					data.detectives.analyzeClue(clue)
+					
+					display.clues(data.detectives.clues);
+					display.suspicions(JSON.parse(JSON.stringify(data.detectives.findings())));
+				}
+				
+				display.runCycle = function (){
+					runCycles(1);
+				}
+				display.runCycle10 = function (){
+					runCycles(10);
+				}
+				display.runCycle100 = function (){
+					runCycles(100);
+				}
+				display.addTeam = function (){
+					data.teams.addTeam([],1e6) //this is just a test!
+				}
+			
+				ko.applyBindings(display,document.getElementById('display'));
+			}
+		</script>
+	</head>
+	<body onload="main()">
+		<div id = "display">
+			<div><span>date:<span><span data-bind="text:date"></span></div>
+			<div data-bind='foreach:output'>
+				<span data-bind="text:$data"></span>
+			</div>
+			<button data-bind="click:runCycle">Run Cycle</button>
+			<button data-bind="click:runCycle10">Run 10 Cycles</button>
+			<button data-bind="click:runCycle100">Run 100 Cycles</button>
+			<button data-bind="click:addTeam">Add Team</button>
+			<div data-bind="with:clueBuilder" id="cluebuilder">
+				<div>Modifier<input type="text" data-bind="value:modifier"></input></div>
+				<div>Date:<input type = "date" data-bind="value:date"></input></div>
+				<div>Category:<select data-bind="value:category, options: categories"></select></div>
+				<div>Location:<select data-bind="value:location, options: locations"></select></div>
+				<button data-bind="click:addClue">Add Clue</button>
+
+			</div>
+			<div data-bind='foreach:TechsByDate' id="techList">
+				<div class ="tech">
+				<span data-bind="text:type.name"></span>
+				(<span data-bind="text:guid"></span>)
+				<span data-bind="text:team"></span>
+				<span data-bind="text:date"></span>
+				</div>
+			</div>
+			<div data-bind="foreach:clues" id="clueList">
+				<div>
+					<div class = "clue">
+						<span data-bind="text:modifier>0?'+':''"></span>
+						<span data-bind="text:modifier"></span> 
+						<span data-bind="text:category"></span> 
+						<span data-bind="text:location"></span> 
+						<span data-bind="text:date"></span>
+					</div>
+				</div>
+			</div>
+			<div data-bind="foreach:suspicions" id="suspicionsList">
+				<div>
+					<div class = "suspicion">
+						<span data-bind="text:bestSuccess"></span> 
+						<span data-bind="text:type"></span>
+						<span data-bind="text:name"></span>
+						(<span data-bind="text:basePenalty"></span>)
+					</div>
+				</div>
+			</div>
+			<div data-bind="foreach:teams" id="teamList">
+				<div class="team">
+					<div><span>name:<span><span data-bind="text:name"></span></div>
+					<div><span>focus:<span><span data-bind="text:parachronicLikelihood"></span></div>
+					<div><span>days Researched:<span><span data-bind="text:daysResearched"></span></div>
+					<div><span>funds:<span><span data-bind="text:fundsSpent"></span></div>
+				</div>
+			</div>
+			<div data-bind="foreach:nukedCities" id="nukedCities">
+					<div><span>nuked: <span><span data-bind="text:$data"></span></div>
+			</div>
+			<div data-bind="foreach:baseCities" id="baseCities">
+					<div><span>base: <span><span data-bind="text:$data"></span></div>
+			</div>
+		</div>
+
+	</body>
+</html>

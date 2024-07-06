@@ -1,0 +1,36 @@
+<html>
+<head>
+    <title>Card Set</title>
+		<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+    <script>
+
+	function die(){
+		return Math.ceil(Math.random()*6);
+	}
+	function dice(){
+		return die()+die()+die();
+	}
+	function progress(seed,target,months,bonuses){
+		Math.seedrandom(seed);
+		var result=0;
+		for(var i =0;i<months;i++){
+			if(dice()<target + (bonuses[i]?bonuses[i]:0)) result++
+		}
+		return result
+	}
+	function main(){
+		console.log(progress("derrick",10,10,[]))
+	}
+    </script>
+</head>
+
+<body>
+
+<button onclick="main()">Edit</button><br>
+<!--
+Seed: <input type="text"></input><br>
+TargetNumber: <input type="number"></input>
+-->
+</body>
+
+</html>

@@ -1,0 +1,442 @@
+<html>
+	<head>
+		<title>Gurps DF Demon Generator</title>
+		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+		<script>
+			function die() {
+				return Math.floor(Math.random()*6)+1;
+			}
+			function dice(num,mod) {
+				var result = mod;
+				for(var i = 0; i< num;i++)result+=die();
+				return result;
+			}
+			function generateSTFromSM(sm) {
+				var result = 0;
+				switch (sm) {
+					case -3: return dice(1,2);
+					case -2: return dice(1,4);
+					case -1: return dice(2,5);
+					case 0: return dice(2,8);
+					case 1: return dice(3,12);
+					case 2: return dice(5,20);
+					case 3: return dice(7,28);
+					case 4: return dice(10, 40);
+					case 5: return dice(15, 60);
+					case 6: return dice(20, 80);
+				}
+				throw sm + " is not a valid SM for ST";
+			}
+			function selectOption(options) {
+				var optionsCopy = [...options];
+				var optionsTotal = options.reduce((sofar,a)=> a.odds +sofar,0);
+				var firstRoll = Math.random()*optionsTotal;
+				var roll = firstRoll;
+				var currentOption = optionsCopy.pop();
+				while(roll >= currentOption.odds ) {
+					roll -= currentOption.odds;
+					currentOption = optionsCopy.pop();
+				}
+				return currentOption;
+			}
+			function damageFromST(ST, sw) {
+				var value = {dice: sw? Math.floor((ST-5)/4): Math.floor((ST-3)/8), mod: sw? (ST+2)%4 -1 : (Math.floor(ST/2+2.5)%4 -1) };
+				
+				if(value.dice == 0){
+					value.dice=1
+					value.mod -=4
+				}
+				return value;
+			}
+			function generateNaturalWeapons(demon) {
+				var options = [
+				//TODO: super long limbs
+					{value:{name: "Sharp Claws", damageType:"cut", damageBase: "thr", mod: -1}, odds: 27},
+					{value:{name: "Talons", damageType:"imp", damageBase: "thr", mod: -1}, odds: 18},
+					{value:{name: "Long Talons", damageType:"imp", damageBase: "thr", mod: 2}, odds: 9},
+					
+					{value:{name: "Sharp Teeth", damageType:"cut", damageBase: "thr", mod: -1}, odds: 27},
+					{value:{name: "Fangs", damageType:"imp", damageBase: "thr", mod: -1}, odds: 18},
+					{value:{name: "Blunt Teeth", damageType:"cr", damageBase: "thr", mod: -1}, odds: 9},
+					
+					{value:{name: "Sharp Horns", damageType:"imp", damageBase: "thr", mod: 2}, odds: 16},
+					{value:{name: "Ram Horns", damageType:"cr", damageBase: "thr", mod: 2}, odds: 8},
+					
+					{value:{name: "Short Spines", damageType:"cut", damageBase: "spines", mod: -2}, odds: 8},
+					{value:{name: "Long Spines", damageType:"cut", damageBase: "spines", mod: 0}, odds: 4},
+					
+					{value:{name: "Cutting Barbs/Spikes", damageType:"cut", damageBase: "thr", mod: 2}, odds: 6},
+					{value:{name: "Impaling Barbs/Spikes", damageType:"imp", damageBase: "thr", mod: 2}, odds: 6},
+					
+					{value:{name: "pi Stinger/Tounges", damageType:"pi", damageBase: "thr", mod: 2}, odds: 2},
+					{value:{name: "pi+ Stinger/Tounges", damageType:"pi+", damageBase: "thr", mod: 2}, odds: 4},
+					{value:{name: "Impaling Stinger/Tounges", damageType:"imp", damageBase: "thr", mod: 2}, odds: 6},
+					{value:{name: "Hooves", damageType:"imp", damageBase: "thr", mod: 2}, odds: 12},
+					{value:{name: "roll twice more", damageType:"imp", damageBase: "thr", mod: 2}, odds: 36},
+
+				];
+				option = selectOption(options).value;
+				/*
+				if(option.name.indexOf("Stinger/Tounges")!=-1)
+					return [option.name + " reach " + (die() >4 ? 1: 2) +" plus sm"]
+				*/
+				if(option.name == "roll twice more") return generateNaturalWeapons(demon).concat(generateNaturalWeapons(demon));
+				option.amount = damageFromST(demon.ST, option.damageBase=="sw");
+				option.amount.mod+=option.mod; //TODO: +2 usually means +1 per die
+				console.log("damage", option.amount.dice, option.amount.mod);
+				return [option];
+			}
+			function generateElementalType () {
+				var options = [
+				//TODO: cold notes, fire damage boost, acid reduce
+					{value:{name: "acid", damageType: "cor"}, odds: 1},
+					{value:{name: "fire", damageType: "bur"}, odds: 1},
+					{value:{name: "cold", damageType: "bur"}, odds: 1},
+				]
+				return selectOption(options).value;
+			}
+			function generateBreathWeapon(demon) {
+				//TODO: add limitations for high rolls
+				//TODO: add skill
+				var damageOptions = [
+					{value: 1, odds: 3},
+					{value: 2, odds: 2},
+					{value: 3, odds: 1}
+				];
+				var shapeOptions = [
+					{value: "jet", odds: 5},
+					{value: "cone", odds: 1}
+				]
+				var damageMultiplier = selectOption(damageOptions).value;
+				var shape = selectOption(shapeOptions).value;
+				var element = generateElementalType();
+				var baseDamage = damageFromST(demon.ST,false);
+				baseDamage.dice*=damageMultiplier;
+				baseDamage.mod*=damageMultiplier;
+				return [{
+					name: element.name +" Breath Weapon",
+					damageType: element.damageType,
+					damageBase: "thr*"+damageMultiplier,
+					amount: baseDamage
+				}]
+			}
+			function generateAura(demon) {
+				var element = generateElementalType();
+				var baseDamage = damageFromST(demon.ST,false);
+				if(baseDamage.dice <1 || (baseDamage.dice==1 && baseDamage.mod <0)) {
+					baseDamage.dice = 1;
+					baseDamage.mod =0;
+				}
+				return [{
+					name: element.name+" Aura",
+					damageType: element.damageType,
+					damageBase: "thr",
+					amount: baseDamage
+				}]
+			}
+			function generateTouchDamage() {
+				var damageTypeOptions = [
+					{value:{dice:0,mod:2}, odds: 2},
+					{value:{dice:1,mod:0}, odds: 3},
+					{value:"roll twice", odds: 1},
+				];
+				var damage = selectOption(damageTypeOptions).value;
+				if(damage == "roll twice") {
+					return [generateTouchDamage(),generateTouchDamage()]
+						.reduce((a,b) => ({dice:a.dice+b.dice, mod:a.mod+b.mod}));
+				}
+				return damage;
+			}
+			function generateTouchAttack() {
+				var damageTypeOptions = [
+					{value:"tox", odds: 4},
+					{value:"fat", odds: 1},
+					{value:"tox,fat", odds: 1},
+				];
+				var vampireOptions = [
+					{value:"", odds: 3},
+					{value:"1/2 drain", odds: 2},
+					{value:"full drain", odds: 1},
+				]
+				return [{
+					name: "Touch Attack",
+					damageType: selectOption(damageTypeOptions).value + " " +selectOption(vampireOptions).value ,
+					damageBase: "touch",
+					amount:generateTouchDamage()
+				}]
+			}
+			function generatePoison() {
+				var damageOptions = [
+					{value:"none", odds: 1},
+					{value:"tox", odds: 4},
+					{value:"fat", odds: 1},
+				];
+				var afflictionOptions = [
+					{value:"Nausea(-2 stats)", odds: 1},
+					{value:"Weakness(-3 ST)", odds: 1},
+					{value:"Severe Pain(-3 stats)", odds: 1},
+					{value:"Terrible Pain(-4 stats)", odds: 1},
+					{value:"Agony Or Ectasy(incapacitates)", odds: 1},
+					{value:"Paralysis(incapacitates)", odds: 1},
+				];
+				var resistenceMoments = [
+					{value: "on failed resistance", odds: 1},
+					{value: "on 1/3 HP", odds: 1},
+					{value: "on 1/2 HP", odds: 2},
+					{value: "on 2/3 HP", odds: 2},
+				];
+				var resistanceEffect = (die()>3?"halved":"none") +" on HT-"+(die()-1);
+				var damageType = selectOption(damageOptions).value;
+				var affliction = "no affliction";
+				if(damageType == "none" || die() > 3) {
+					affliction = selectOption(afflictionOptions).value;
+					
+					var moment = damageType=="none"? "on failed resistance": selectOption(resistenceMoments).value;
+					affliction+=moment;
+				}
+				return {
+					resistanceEffect: resistanceEffect,
+					affliction: affliction,
+					damageType: damageType
+				}
+			}
+			function generatePoisonDamage() {
+				var options = [
+					{value:{dice: 0, mod: 2}, odds:1},
+					{value:{dice: 1, mod: 0}, odds:1},
+					{value:{dice: 2, mod: 0}, odds:1},
+					{value:{dice: 3, mod: 0}, odds:1},
+					{value:{dice: 4, mod: 0}, odds:1},
+					{value:{dice: 6, mod: 0}, odds:1},
+				]
+				return selectOption(options).value;
+			}
+			function generatePoisonCloud(demon) {
+				var radius = Math.ceil(die()/2);
+				var methodOptions = [
+					{value: "Respiratory", odds: 4},
+					{value: "Contact", odds: 2}
+				];
+				var method = selectOption(methodOptions).value;
+				var poison = generatePoison(); 
+				//TODO: poison damage table;
+				var baseDamage = damageFromST(Math.ceil(demon.ST/2));
+				if(baseDamage.dice <1 || (baseDamage.dice==1 && baseDamage.mod <0)) {
+					baseDamage.dice = 1;
+					baseDamage.mod =0;
+				}
+				if(poison.damageType == "none"){
+					baseDamage.dice = 0;
+					baseDamage.mod = 0;
+				}
+				return [{
+					name: radius + "yard "+method+" Poison Cloud(" + poison.affliction + ")"+poison.resistanceEffect,
+					damageType: poison.damageType,
+					damageBase: "thr",
+					amount: baseDamage
+				}]
+			}
+			function generateInnateMissile(demon) {
+				var attacks = [
+					{value:{name:"acid ball", notes:"(acc 1 range 20/40)", damageType:"cor", mod:0}, odds:1},
+					{value:{name:"Explosive Fireball", notes:"(acc 1 range 25/50)", damageType:"bur", mod:0}, odds:1},
+					{value:{name:"Fireball", notes:"(acc 1 range 25/50)", damageType:"bur", mod:0}, odds:1},
+					{value:{name:"Ice Dagger", notes:"(acc 3 range 30/60)", damageType:"imp", mod:0}, odds:1},
+					{value:{name:"Ice Sphere", notes:"(acc 2 range 40/80)", damageType:"cr", mod:0}, odds:1},
+					{value:{name:"Winged Knife", notes:"(acc 1 range 20/40)", damageType:"cr", mod:1}, odds:1}
+				];
+				var attack = selectOption(attacks).value;
+				var fp = die();
+				var damage = attack.name == "Explosive Fireball"? {dice: Math.max(1,Math.floor(fp/2)), mod:0}:
+				attack.name == "Winged Knife"? [damageFromST(demon.ST, false)].map(d => ({dice: d.dice, mod: d.mod+1})):
+				{dice: fp, mod: fp*attack.mod}
+				//TODO: limit over-powered attacks
+				return [{
+					name: attack.name +" "+ attack.notes,
+					damageType: attack.damageType,
+					damageBase: "innate attack",
+					amount: damage
+				}]
+			}
+			function generateSupernaturalEffect(demon) {
+			//TODO: Add horrific powers
+				var options = [
+					{value:"Madness vs "+demon.will +" Halucinating for mintues", odds: 1},
+					{value:"Mindlessness vs "+demon.will+" -5 IQ for minutes", odds: 1},
+					//TODO: not for tangible
+					//{value:"Posession vs"+demon.will+" -5 IQ for minutes", odds: 1},
+					{value: "Terror", odds: 2},
+					{value: "Terror Gaze (targeted, repeatable)", odds:1}
+				];
+				return [{
+					name: selectOption(options).value,
+					damageType: "",
+					damageBase: "",
+					amount: {dice:0, mod: 0}
+				}] 
+			}
+			function generateImbuedAttack(demon) {
+				//TODO: weapons
+				var damageSourceOptions = [
+					{value:{name: "Poison", damageType: "tox"}, odds:2},
+					{value:{name: "Unholy", damageType: "tox"}, odds:1},
+					{value:{name: "Magical", damageType: "tox"}, odds:1},
+					{value:{name: "Fire", damageType: "bur"}, odds:4},
+					{value:{name: "Cold", damageType: "bur"}, odds:2},
+					{value:{name: "Acid", damageType: "cor"}, odds:2},
+				];
+				var source = selectOption(damageSourceOptions).value;
+				if(source.name == "Unholy" || source.name == "Magical"){
+					var touchAttack = generateTouchAttack(demon)[0];
+					touchAttack.name = "imbued with "+source.name + " "+ touchAttack.name
+					return [touchAttack]
+				}
+				if(source.name == "Poison") {
+					var poison = generatePoison();
+					var damage = generatePoisonDamage();
+					return [{
+						name: "imbued with poison("+ poison.affliction +")" +poison.resistanceEffect,
+						damageType: poison.damageType,
+						damageBase: "poison",
+						amount: damage
+					}]
+				}
+				return [{
+					name: "imbued with "+source.name,
+					damageType: source.damageType,
+					damageBase: "imbued",
+					amount: {dice:0, mod: 2}
+					
+				}]
+			}
+			function generateAttacks(demon) {
+				console.log("generating attacks!");
+				var options = [
+					{name: "natural weapon", odds: 18},
+					{name: "touch", odds: 1}, 
+					{name: "imbued", odds: 1000}, 
+					{name: "breath weapon", odds: 2}, 
+					{name: "innate missile", odds: 2},
+					{name: "poison cloud", odds: 2},
+					{name: "elemental aura", odds: 2},
+					{name: "supernatural effect", odds: 2},
+					{name: "roll twice more", odds: 6},
+				];
+				option = selectOption(options);
+				if(option.name == "innate missile")
+					return generateInnateMissile(demon);
+				if(option.name == "elemental aura")
+					return generateAura(demon);
+				if(option.name == "touch")
+					return generateTouchAttack();
+				if(option.name == "imbued")
+					return generateImbuedAttack();
+				if(option.name == "poison cloud")
+					return generatePoisonCloud(demon);
+				if(option.name == "natural weapon")
+					return generateNaturalWeapons(demon);
+				if(option.name == "breath weapon")
+					return generateBreathWeapon(demon);
+				if(option.name == "supernatural effect")
+					return generateSupernaturalEffect(demon);
+				if(option.name == "roll twice more") {
+					return generateAttacks(demon).concat(generateAttacks(demon));
+				}
+				"returning base attack"
+				return [option.name];
+			}
+			function generateExtras(demon) {
+				var options = [
+					{value:"Lots of Arms", odds:2},
+					{value:"All the Legs", odds:2},
+					{value:"Its a Snake", odds:2},
+					{value:"Wings", odds:1},
+					{value:"Small Wings", odds:1},
+					{value:"roll twice more", odds:2},
+					{value:"nothing", odds:2},
+				];
+				var option = selectOption(options).value;
+				if(option == "nothing") return [];
+				if(option == "All the Legs") return [ (die()+2) +" legs "];
+				if(option == "Lots of Arms") return [ (die()+2) +" arms "];
+				if(option == "roll twice more") {
+					return generateExtras(demon).concat(generateExtras(demon));
+				}
+				return [option]
+				
+			}
+			function generateSenses(demon){
+				var senses = [
+					"Danger Sense",
+					"Detect(Good)",
+					"Detect(Life)",
+					"Detect(Supernatural)",
+					"Discriminatory Smell",
+					"Peripheral Vision",
+					"See Invisible"
+				];
+				return senses.filter(sense => dice(3,0)<=9);
+			}
+			function generateCorporealDemon(sm, weak, caster, oppositionStrength) {
+				var demon = {};
+				demon.ST = generateSTFromSM(sm);
+				demon.DX = 7 + die() + (weak? 0: 3);
+				demon.HT = 7 + die() + (weak? 0: 3);
+				demon.IQ = (caster? 10+die(): 10);
+				demon.HP = Math.max(demon.ST, generateSTFromSM(sm));
+				demon.will = demon.IQ + die();
+				demon.per = Math.max(10, demon.IQ+die())
+				demon.fp = demon.HT;
+				var erChunk = Math.max(demon.fp, demon.ST);
+				demon.ER = !caster?0:
+					oppositionStrength=="fodder"? erChunk:
+					oppositionStrength=="worthy"? erChunk*2:
+					oppositionStrength=="boss"? erChunk*3:
+					"oppositionSTrength not valid";
+				demon.speed = (demon.DX+demon.HT)/4;
+				demon.move = Math.floor(demon.speed);
+				demon.SM=sm;
+				
+				demon.attacks = generateAttacks(demon);
+				demon.DR = (die()-1)+Math.max(demon.SM,0)
+				demon.extras = generateExtras(demon);
+				demon.extras.push("Night Vision "+ (die() +die()-2));
+				generateSenses(demon).forEach(sense => demon.extras.push(sense));
+				return demon;
+			}
+			function main() {
+				
+				var results = {};
+				
+				results.generateDemon = function () {
+					
+				}
+				results.demons = ko.observableArray([generateCorporealDemon(0,false, true, "worthy")]);
+				results.attributes = ["ST","DX","IQ","HT","HP","will","per","fp","ER","speed","move","SM","DR"];
+				ko.applyBindings(results,document.getElementById('display'));
+				
+			}
+		</script>
+	</head>
+	<body onload="main()">
+		<div id = "display" >
+			<div data-bind="foreach:demons">
+				<div data-bind="foreach:$parent.attributes"  style = "column-count:2">
+					<div><span data-bind="text:$data"></span>:<span data-bind="text:$parent[$data]"></span></div>
+				</div>
+				<div data-bind="foreach: attacks">
+					<div >
+						<span data-bind="text:name"></span>
+						<span data-bind="text:damageType"></span>
+						<span data-bind="text:damageBase"></span>
+						<span data-bind="if:amount.dice!=0"><span data-bind="text:amount.dice"></span>d</span>
+						<span data-bind="if:amount.mod!=0">+<span data-bind="text:amount.mod"></span></span>
+					</div>
+				</div>
+				<div data-bind="foreach:extras">
+					<div data-bind="text:$data"></div>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

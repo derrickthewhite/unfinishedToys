@@ -1,0 +1,68 @@
+<!doctype html>
+<html class="no-js" lang="">
+
+<head>
+  <title>Harn Family Tree Generator</title>
+
+	<script>
+		var tables = {};
+		tables.ageAtDeath = [320,347,373,392,410,422,434,440,446,452,457,462,467,472,477,483,488,493,499,505,511,516,522,528,535,541,547,553,560,566,573,579,586,592,599,606,613,619,626,633,639,646,653,659,666,673,680,688,695,703,711,718,726,734,742,750,758,766,774,782,791,800,810,821,831,843,856,869,882,895,907,919,931,941,951,959,966,973,978,983,987,990,993,995,997,998,999];
+		tables.currentAge = [25,49,72,94,115,136,156,176,196,216,236,255,274,293,312,331,349,367,385,403,421,438,455,472,489,506,522,538,554,570,585,600,615,630,644,658,672,686,699,712,725,738,751,763,775,787,799,810,821,832,842,852,862,872,881,890,899,907,915,923,931,938,945,951,957,963,968,973,977,981,984,987,989,991,993,994,995,996,997,998,999];
+		tables.ageAtBirth = [undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined, 7,21,43,72,108,151,198,247,300,356,412,466,516,564,610,653,693,731,766,799,829,856,880,901,919,935,949,961,971,978,984,989,993,996,998,999];
+		tables.ageAtInfertility = [undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,9,18,27,36,45,54,63,72,81,90,99,108,117,126,135,144,153,162,171,180,189,198,207,216,230,254,283,319,360,405,464,528,594,659,727,796,857,907,944,972,];
+		function d6() {
+			return Math.floor(Math.random()*6)+1;
+		}
+		function explode6(dice) {
+			result = 0;
+			for(var i = 0;i<dice;i++){
+				var roll = d6();
+				result += roll + (roll == 6? explode6(1): 0);
+			}
+			return result;
+		}
+		function d1000(){
+			return Math.floor(Math.random()*1000)+1;
+		}
+		function ageFromTable(table){
+			var seed = d1000();
+			var age = table[0]?0:15;
+			for(; table[age] < seed && age< table.length; age++) {}
+			return age;
+		}
+		function childGap() {
+			var rolls = [d6(), d6()].sort((a,b)=>a-b);
+			if(rolls[1] == 1) return 1;
+			if(rolls[0] == 1) return d6();
+			return rolls[0];
+		}
+		function person(birthYear){
+			var person = {};
+			person.birthYear = birthYear;
+			person.ageAtDeath = ageFromTable(tables.ageAtDeath);
+			person.ageAtInfertility = ageFromTable(tables.ageAtInfertility);
+			person.sex = Math.random() < .5 ? "F":"M";
+			return person;
+		}
+		
+		function generateChildren(woman) {
+			var ageAtChild = [explode6(2)+14];
+			while(ageAtChild[0] < woman.ageAtInfertility && ageAtChild[0] < woman.ageAtDeath){
+				ageAtChild.unshift(ageAtChild[0]+childGap());
+			}
+			return ageAtChild.map(age => person(woman.birthYear+age))
+		}
+		function main() {
+			var grandmother = person(500);
+			grandmother.ageAtDeath = Math.max(ageFromTable(tables.ageAtDeath),ageFromTable(tables.ageAtDeath),ageFromTable(tables.ageAtDeath),ageFromTable(tables.ageAtDeath));
+			grandmother.sex = "F";
+			var children = generateChildren(grandmother);
+			children.forEach(c => console.log(c));
+		}
+	</script>
+</head>
+
+<body onload="main()">
+</body>
+
+</html>

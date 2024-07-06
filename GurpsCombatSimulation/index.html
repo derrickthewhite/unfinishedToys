@@ -1,0 +1,545 @@
+<html>
+<head>
+	<title>Combat Simulation</title>
+	<script>
+		var library;
+		var DEBUG = false;
+		function roll() {
+			return Math.floor(Math.random()*6)+1;
+		}
+		function standardRoll() {
+			var result =  roll() + roll() + roll();
+			return result;
+		}
+		function smartRoll(name, target) {
+			var result =  roll() + roll() + roll();
+			if(DEBUG)console.log(name + ":" +result+ " vs " + target + (result <= target? " succeeded": " failed"));
+			return result <= target;
+		}
+		function Damage() {
+			var dam = {};
+			dam.dice = 1;
+			dam.modifier = 2;
+			dam.roll = function () {
+				var result = dam.modifier;
+				for(var i = 0;i<dam.dice;i++) result += roll();
+				return result;
+			}
+			return dam;
+		}
+		function Weapon (name, attackModes, defenseModes, modifiers, weight) {
+			var weapon = {};
+			weapon.name = name;
+			weapon.attackModes = attackModes;
+			weapon.defenseModes = defenseModes;
+			weapon.modifiers = modifiers? modifiers : [];
+			weapon.modifier = (stat) => weapon.modifiers.filter(mod => mod.applies == stat).reduce((sofar,a)=>sofar+a.modifier,0);
+			weapon.weight = weight? weight: 0;
+			weapon.withSkill = (skill) => {
+				var result = Weapon(weapon.name, weapon.attackModes, weapon.defenseModes, weapon.modifiers);
+				result.skill = skill;
+				return result;
+			}
+			return weapon;
+		}
+		function WeaponMode (name, damageType, attackType, modifier, isSwing) {
+			var weaponMode = {};
+			weaponMode.name = name;
+			weaponMode.damageType = damageType;
+			weaponMode.attackType = attackType;
+			weaponMode.modifier = modifier;
+			weaponMode.isSwing = isSwing;
+
+			return weaponMode;
+		}
+		function DefenseMode (name, defenseType, skillBonus, repeatPenalty, retreatBonus) {
+			var defenseMode = {};
+			defenseMode.name = name;
+			defenseMode.defenseType = defenseType;
+			defenseMode.skillBonus = skillBonus;
+			defenseMode.repeatPenalty = repeatPenalty;
+			defenseMode.retreatBonus = retreatBonus;
+			return defenseMode;
+		}
+		function Attack(weaponMode,weapon,skill,ST) {
+			var attack = {};
+			attack.name = weaponMode.name
+			attack.skill = skill;
+			attack.weapon = weapon;
+			attack.attackType = weaponMode.attackType;
+			attack.damageType = weaponMode.damageType;
+			attack.damage = DamageFromST(ST, weaponMode.isSwing);
+			attack.damage.modifier += weaponMode.modifier;
+			return attack;
+		}
+		function Defense(defenseMode, weapon, skill) {
+			var defense = {};
+			defense.name = defenseMode.name;
+			defense.defenseType = defenseMode.defenseType;
+			defense.defense = skill + defenseMode.skillBonus;
+			defense.repeatPenalty = defenseMode.repeatPenalty;
+			defense.retreatBonus = defenseMode.retreatBonus;
+			return defense;
+		}
+		function DamageFromST (ST, isSwing) {
+			var result = Damage();
+			if(isSwing) {
+				result.dice = Math.ceil(ST/4 -2);
+				result.modifier = (ST+3)%4 -1;
+			}
+			else if (ST <=10) {
+				result.dice = 1;
+				result.modifier = -Math.ceil((14-ST)/2)
+			}
+			else {
+				result.dice = Math.ceil((ST-10)/8);
+				result.modifier = Math.ceil(((ST-10)%8)/2)-1;
+			}
+			return result;
+		}
+		function HitLocation(name, target, armor, wounding) {
+			var hl = {};
+			hl.name = name?name:"Default";
+			hl.target = target?target:0;
+			hl.wounding = wounding? wounding: Wounding();
+			hl.armor = armor? armor: 0;
+			hl.withArmor = (armor) => {return HitLocation(hl.name, hl.target, armor, hl.wounding)}
+			return hl;
+		}
+		function Armor(name, location, DR, weight) {
+			var armor = {};
+			armor.name = name;
+			armor.location = location;
+			armor.DR = DR;
+			armor.weight = weight;
+			return armor;
+		}
+		function Wounding(imp,piHuge, piLarge, pi, piSmall, cut, cr, tox, bur, cor) {
+			return {
+				"Imp": imp?imp:2,
+				"Pi++": piHuge?piHuge:2,
+				"Pi+": piLarge?piLarge:1.5,
+				"P": pi?pi:1,
+				"P-": piSmall?piSmall:.5,
+				"Cut":cut?cut:1.5,
+				"Cr": cr?cr:1,
+				"Tox": tox?tox:1,
+				"Bur": bur?bur:1,
+				"Corr": cor?cor:1
+			};
+		}
+		function Status (name, effects, modifiers, recovery) {
+			var status = {};
+			status.name = name;
+			status.effects = effects? effects: [];
+			status.modifiers = modifiers? modifiers: [];
+			status.canAct = () => status.effects.reduce((sofar, a)=> sofar && a.canAct, true);
+			status.canDefend = () => status.effects.reduce((sofar, a)=> sofar && a.canDefend, true);
+			status.defeated = () => status.effects.reduce((sofar, a)=> sofar || a.defeated, false);
+			status.modifier = (stat) => status.modifiers.filter(mod => mod.applies == stat).reduce((sofar,a)=>sofar+a.modifier,0);
+			status.recovery = recovery;
+			return status;
+		}
+		function Recovery(possible, stat, modifier) {
+			//TODO: time
+			var recovery = {};
+			recovery.possible = possible;
+			recovery.stat = stat;
+			recovery.modifier = modifier;
+			return recovery;
+		}
+		function Effect (name, canAct, canDefend, permenant, defeated) {
+			var effect = {};
+			effect.name = name;
+			effect.permenant = permenant;
+			effect.canAct = canAct;
+			effect.canDefend = canDefend;
+			effect.defeated = defeated;
+			return effect;
+		}
+		function Modifier (name, applies, modifier) {
+			var mod = {};
+			mod.name = name;
+			mod.applies = applies;
+			mod.modifier = modifier;
+			return mod;
+		}
+		var warriorID = 1000;
+		function Warrior(name, weapons, ST, HT, hitLocations) {
+			var war = {};
+			war.name = name;
+			war.ID = warriorID++;
+			war.ST = ST?ST:10;
+			war.DX = 10;
+			war.IQ = 10;
+			war.HT = HT?HT:10;
+			war.maxHP = ST?ST:10;;
+			war.HP = ST?ST:10;;
+			war.Per = 10;
+			war.Will = 10;
+			war.FP = 10;
+			war.speed = 5;
+			war.move = 5;
+			war.shock = 0;
+			war.defenses = [];
+			war.attacks = [];
+			war.weapons = weapons?weapons:[];
+			war.hitLocations = hitLocations? hitLocations:[HitLocation()];
+			war.statusList = [];
+			war.canAct = (() => war.statusList.reduce((sofar, a) => a.canAct() && sofar, true));
+			war.canDefend = (() => war.statusList.reduce((sofar, a) => a.canDefend() && sofar, true));
+			war.defeated = (() => war.statusList.reduce((sofar, a) => a.defeated() || sofar, false));
+			war.modifier = (stat) => war.statusList.map(status => status.modifier(stat))
+				.concat(war.weapons.map(weapon => weapon.modifier(stat)))
+				.reduce((a,b)=>a+b,0);
+			war.reset = () => {
+				war.statusList = [];
+				war.HP = war.maxHP;
+			}
+			war.updateWeaponStats = () => {
+				war.defenses = [];
+				war.attacks = [];
+				war.weapons.forEach(weapon => {
+					var attackSkill = weapon.skill?weapon.skill:10;
+					var defenseSkill = Math.floor(attackSkill/2)+3;
+					weapon.attackModes.forEach( attackMode => {
+						war.attacks.push(Attack(attackMode, weapon,attackSkill ,war.ST))
+					})
+					weapon.defenseModes.forEach( defenseMode => {
+						war.defenses.push(Defense(defenseMode, weapon,defenseSkill))
+					});
+				});
+			}
+			war.bestDefense = () => {
+				return war.defenses.sort((a,b) =>  b.defense - a.defense)[0];
+			}
+			war.encumbranceLevel = (penalty) => {
+				return (war.ST*war.ST)/5 * (penalty <=2 ? (penalty+1) : penalty == 3? 1.2 : 2);
+			}
+			war.updateWeaponStats();
+			return war;
+		}
+		function Team(name, warriors) {
+			var team = {
+				name: name,
+				warriors : warriors
+			};
+			team.defeated = () => team.warriors.reduce((sofar,war) => sofar || war.defeated(), false);
+			return team;
+		}
+		function calculateDeceptive(attackSkill, defenseSkill) {
+			// returns negative value
+			// TODO: exceptions with more analysis
+			if(attackSkill <=9) return 2;
+			if(attackSkill <=13) return 0;
+			return Math.floor(6- attackSkill/2);
+		}
+		function Library () {
+			var library = {};
+			library.wounding = {
+				"Default": Wounding(),
+				"Limb": Wounding(1,1,1,1),
+				"Unliving": Wounding(1,.7,.5,.25),
+				"Skull": Wounding(4,4,4,4,4,4,4,4,4,4),
+			}
+			library.hitLocation = {
+				"Torso": HitLocation("Torso", 0, 0, library.wounding.Default),
+				"Arm": HitLocation("Arm", -2, 0, library.wounding.Limb),
+				"Skull": HitLocation("Skull", -7, 2, library.wounding.Skull),
+				"SkeletonTorso": HitLocation("SkeletonTorso", 0, 0, library.wounding.Unliving),
+			}
+			library.hitLocationSet = {
+				"Human": [library.hitLocation.Torso, library.hitLocation.Arm, library.hitLocation.Skull]
+			}
+			library.effect = {
+				"Incapacitated": Effect("Incapacitated", false, false, true, true),
+				"Stunned": Effect("Stunned", false, true, false, false) //TODO: maybe not defeated?
+			};
+			library.recovery = {
+				"None": Recovery(false, "None", 0),
+				"HT0": Recovery(true, "HT", 0)
+			};
+			library.modifier = {
+				"StunnedDefense": Modifier("StunnedDefense", "defend", -4),
+				"MediumSheild": Modifier("MediumSheild", "defend", 2),
+			}
+			library.status = {
+				"KnockedDown" : Status("KnockedDown", [library.effect.Stunned], [library.modifier.StunnedDefense], library.recovery.HT0),
+				"Unconscious" : Status("Unconscious", [library.effect.Incapacitated], [], library.recovery.None),
+				"Dead" : Status("Unconscious", [library.effect.Incapacitated], [], library.recovery.None),
+			};
+			library.weaponMode = {
+				"SpearThrust": WeaponMode("Spear Thrust", "Imp", "Thr", 2, false),
+				"BigSpearThrust": WeaponMode("Big Spear Thrust", "Imp", "Thr", 3, false),
+				"SwordSwing": WeaponMode("Sword Swing", "Cut", "Sw", 1, true),
+				"Punch": WeaponMode("Punch", "Cr", "Thr", -1, false),
+				"SheildBash": WeaponMode("SheildBash", "Cr", "Thr", 0, false),
+				"ClubBash": WeaponMode("ClubBash", "Cr", "Sw", 0, true),
+			}
+			library.defenseMode = {
+				"StandardParry": DefenseMode("Standard Parry", "parry", 0, -4, 1),
+				"Dodge": DefenseMode("Dodge", "dodge", 0, 0, 3),
+				"Block": DefenseMode("Block", "block", 0, 0, 1), // No bonus given because DB is a modifier applied to all defenses!
+			}
+			library.weapon = {
+				"NaturalWeapons": Weapon("Natural Weapons", [library.weaponMode.Punch], [library.defenseMode.Dodge], [], 0),
+				"Spear": Weapon("Spear", [library.weaponMode.BigSpearThrust], [library.defenseMode.StandardParry], [], 4),
+				"SmallSpear": Weapon("SmallSpear", [library.weaponMode.SpearThrust], [library.defenseMode.StandardParry], [], 4),
+				"Sword": Weapon("Sword", [library.weaponMode.SwordSwing], [library.defenseMode.StandardParry], [], 5),
+				"Sheild": Weapon("Sheild", [library.weaponMode.SheildBash], [library.defenseMode.Block], [library.modifier.MediumSheild], 15),
+				"Club": Weapon("Club", [library.weaponMode.ClubBash], [library.defenseMode.StandardParry], 12),
+			};
+			library.armor = {
+				"Cloth": Armor("Cloth", "Torso", 1, 6),
+				"Leather": Armor("Leather", "Torso", 2, 10),
+				"LightScale": Armor("LightScale", "Torso", 3, 15),
+				"LoricaSegmentata": Armor("LoricaSegmentata", "Torso", 5, 26),
+				"LeatherLimbs": Armor("LeatherLimbs", "Arm", 2, 6),
+				"MailLimbs": Armor("MailLimbs", "Arm", 3, 24),
+				"PlateLimbs": Armor("PlateLimbs", "Arm", 6, 35),
+				"HeavyPlateLimbs": Armor("HeavyPlateLimbs", "Arm", 7, 45),
+				"Cap": Armor("Cap", "Skull", 1, 0),
+				"LeatherHelm": Armor("LeatherHelm", "Skull", 2, .5),
+				"Coif": Armor("Coif", "Skull", 3, 4),
+				"PotHelm": Armor("PotHelm", "Skull", 4, 5),
+			}
+			library.warrior = {
+				"Conscript": Warrior("Conscript", [library.weapon.Spear.withSkill(10), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"Spear12": Warrior("Spear12", [library.weapon.Spear.withSkill(12), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"BigConscript": Warrior("BigConscript",[library.weapon.Spear.withSkill(10), library.weapon.NaturalWeapons], 12, 10, library.hitLocationSet.Human ),
+				"ToughConscript": Warrior("ToughConscript",[library.weapon.Spear.withSkill(10), library.weapon.NaturalWeapons], 10, 12 , library.hitLocationSet.Human),
+				"Spear13": Warrior("Spear13",[library.weapon.Spear.withSkill(13), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human ),
+				"Spear14": Warrior("Spear14",[library.weapon.Spear.withSkill(14), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human ),
+				"Spear15": Warrior("Spear15",[library.weapon.Spear.withSkill(15), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human ),
+				"Spear16": Warrior("Spear16",[library.weapon.Spear.withSkill(16), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human ),
+				"Spear17": Warrior("Spear17",[library.weapon.Spear.withSkill(17), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human ),
+				"Spear18": Warrior("Spear18",[library.weapon.Spear.withSkill(18), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human ),
+				"Spear19": Warrior("Spear19",[library.weapon.Spear.withSkill(19), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human ),
+				"Spear20": Warrior("Spear20",[library.weapon.Spear.withSkill(20), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human ),
+				"Spear12Rounded": Warrior("Spear12Rounded",[library.weapon.Spear.withSkill(12), library.weapon.NaturalWeapons], 12, 12, library.hitLocationSet.Human ),
+				"Spear12Strong": Warrior("Spear12Strong",[library.weapon.Spear.withSkill(12), library.weapon.NaturalWeapons], 14, 10, library.hitLocationSet.Human ),
+				"Spear12Tough": Warrior("Spear12Tough",[library.weapon.Spear.withSkill(12), library.weapon.NaturalWeapons], 10, 14, library.hitLocationSet.Human ),
+				"Spear12Armor": Warrior("Spear12Armor",[library.weapon.Spear.withSkill(12), library.weapon.NaturalWeapons], 10, 10, [library.hitLocation.Torso.withArmor(3), library.hitLocation.Arm, library.hitLocation.Skull]),
+				"Spear14Armor": Warrior("Spear14Armor",[library.weapon.Spear.withSkill(14), library.weapon.NaturalWeapons], 10, 10, [library.hitLocation.Torso.withArmor(3), library.hitLocation.Arm, library.hitLocation.Skull]),
+				"Ogre": Warrior("Ogre",[library.weapon.Spear.withSkill(10), library.weapon.NaturalWeapons], 20, 10 ),
+				"Skeleton10": Warrior("Skeleton10", [library.weapon.Spear.withSkill(10), library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"SkeletonSwordBoard12": Warrior("SkeletonSwordBoard12", [library.weapon.Sword.withSkill(12), library.weapon.Sheild.withSkill(10),library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"SwordBoard": Warrior("SwordBoard", [library.weapon.Sword.withSkill(10), library.weapon.Sheild.withSkill(10),library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"SheildSpear15": Warrior("SheildSpear15", [library.weapon.SmallSpear.withSkill(15), library.weapon.Sheild.withSkill(12),library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"SheildSpear14": Warrior("SheildSpear14", [library.weapon.SmallSpear.withSkill(14), library.weapon.Sheild.withSkill(12),library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"SheildSpear13": Warrior("SheildSpear13", [library.weapon.SmallSpear.withSkill(13), library.weapon.Sheild.withSkill(12),library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"SheildSpear12": Warrior("SheildSpear12", [library.weapon.SmallSpear.withSkill(12), library.weapon.Sheild.withSkill(12),library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+				"SheildSpear11": Warrior("SheildSpear11", [library.weapon.SmallSpear.withSkill(11), library.weapon.Sheild.withSkill(12),library.weapon.NaturalWeapons], 10, 10, library.hitLocationSet.Human),
+			}
+			library.warrior.Skeleton10.hitLocations = [library.hitLocation.SkeletonTorso];
+			library.warrior.Spear12Armor.hitLocations[0].armor = 3;
+			return library;
+		}
+		function attack(attacker, attack, defender, hitLocation, defense) {
+			if(DEBUG)console.log(attacker.name+" attacks "+ defender.name+"'s " + hitLocation.name+" with "+ attack.name+ " vs " + defense.name);
+			var result = {
+				description: "miss",
+				damage: 0,
+				injury: 0
+			};
+			var attackerSkill = attack.skill + hitLocation.target-attacker.shock + attacker.modifier("attack");
+			var defenderSkill = defense.defense + defender.modifier("defend");
+			if(DEBUG)console.log("Attack", attackerSkill, "Defense", defenderSkill);
+			var deceptive = calculateDeceptive(attackerSkill, defenderSkill);
+			if(!smartRoll("attack",attackerSkill + 2 * deceptive)) return result;
+			result.description = defense.defenseType
+			if(smartRoll("defense:"+defense.defenseType, defenderSkill + deceptive)) return result;
+			result.damage = Math.max(0, attack.damage.roll() - hitLocation.armor);
+			//TODO: minimum 1 damage for non-crushing
+			result.injury = Math.floor(result.damage * hitLocation.wounding[attack.damageType]);
+			if(DEBUG)console.log(defender.name, "damage", result.damage, "injury", result.injury);
+			result.description = result.damage? "Damaged": "Damage Resisted";
+			if(DEBUG)console.log(result);
+			return result;
+		}
+		attackOptionCalc={};
+		function evaluateAttackOptions(attacker, defender) {
+			var name = attacker.name+attacker.ID+"vs"+defender.name+defender.ID;
+			if(attackOptionCalc[name])return attackOptionCalc[name];
+			var options = [];
+			for(var attackOption of attacker.attacks){
+				for(var hitLocation of defender.hitLocations){
+					options.push({attack: attackOption, hitLocation: hitLocation, name: attacker.name +" "+attackOption.name+ " "+ hitLocation.name +" " +defender.name, sampleDamage: 0});
+				}
+			}
+			
+			for(var option of options) {
+				for(var i = 0;i<100;i++) {
+					var damage = attack(attacker, option.attack, defender, option.hitLocation, defender.bestDefense());
+					option.sampleDamage += damage.injury;
+				}
+			}
+			attackOptionCalc[name]=options;
+			return options;
+		}
+		function applyDamage(unit, attackResult) {
+			if(attackResult.injury == 0)return "unharmed";
+			var previousHP = unit.HP;
+			unit.HP -= attackResult.injury;
+			unit.shock = Math.min(4, attackResult.injury);
+			if( unit.HP<= -unit.maxHP 
+				&& Math.floor(previousHP/unit.maxHP) !== Math.floor(unit.HP/unit.maxHP) 
+				&& standardRoll() > unit.HT + Math.floor(unit.HP/unit.maxHP)
+			) {
+				unit.statusList.push(library.status.Dead);
+				return "Dead";
+			}
+			if(attackResult.injury > unit.maxHP/2 && standardRoll() > unit.HT && !unit.statusList.includes(library.status.KnockedDown)) {
+				unit.statusList.push(library.status.KnockedDown);
+				return "KnockedDown"; //TODO: inflict status 
+			}
+			if(DEBUG) console.log(unit.name + " at " + unit.HP);
+			return "Injured";
+		}
+		function turn(unit, opponents){
+			var result = "";
+			if(unit.HP<=0 && standardRoll() > unit.HT) {
+				unit.statusList.push(library.status.Unconscious);
+				return "Unconscious";
+			}
+			if(unit.canAct()) {
+				var target = opponents[0];
+				var attackOption = evaluateAttackOptions(unit, target).sort((a,b) => b.sampleDamage - a.sampleDamage)[0];
+				//var attackResult = attack(unit, unit.attacks[0], target, target.hitLocations[0], target.bestDefense());
+				var attackResult = attack(unit, attackOption.attack, target, attackOption.hitLocation, target.bestDefense());
+				result = applyDamage(target, attackResult);
+			} else {
+				if(DEBUG)console.log(unit.name+ " cannot act due to "+unit.statusList.map(status=>status.name));
+				result = "cannot act!"
+			}
+			var statusToRemove = []
+			for(var status of unit.statusList) {
+				if(status.recovery.possible && smartRoll("recovery", unit[status.recovery.stat] + status.recovery.modifier)){
+					statusToRemove.push(status);
+					if(DEBUG)console.log(unit.name + " recovered from " + status.name);
+				}
+			}
+			unit.statusList = unit.statusList.filter(status => !statusToRemove.includes(status));
+
+			unit.shock =0;
+			return result;
+		}
+		function combat(redTeam,blueTeam) {
+			redTeam.warriors.forEach(war => war.team="red");
+			blueTeam.warriors.forEach(war => war.team="blue");
+			var combatants = redTeam.warriors.concat(blueTeam.warriors);
+			for(var i = 0; i<10;i++){
+				var u = Math.floor(Math.random() * combatants.length);
+				var v = Math.floor(Math.random() * combatants.length);
+				var temp = combatants[u];
+				combatants[u] = combatants[v];
+				combatants[v] = temp;
+			}
+			combatants.sort((a,b) => a.speed - b.speed);
+			var count = 0;
+			while (!redTeam.defeated() && !blueTeam.defeated()) {
+				var combatant = combatants.shift();
+				var foes = combatant.team == "red" ? blueTeam : redTeam;
+				var result = turn(combatant,foes.warriors);
+				if(DEBUG) console.log(result);
+				combatants.push(combatant);
+			}
+			return redTeam.defeated()? blueTeam: redTeam;
+		}
+		function evaluate(a,b) {
+			var results = [];
+			results[a.name] = 0;
+			results[b.name] = 0;
+			for(var i = 0; i< 1000; i++) {
+				var winners = combat(Team(a.name,[a]),Team(b.name,[b]));
+				a.reset();
+				b.reset();
+				results[winners.name] = results[winners.name]? results[winners.name]+1: 1;
+				if(DEBUG)console.log("v:", winners.name)
+			}
+			return results;
+		}
+		function main() {
+			console.log("starting combat");
+			library = Library();
+
+			//*
+			var league = [
+				/*
+				library.warrior.Spear12Rounded,
+				library.warrior.Spear12Strong,
+				library.warrior.Spear12Tough,
+				*/
+				library.warrior.Spear12Armor,
+				library.warrior.Spear14Armor,
+				library.warrior.Spear16,
+				library.warrior.Spear17,
+				library.warrior.Spear18,
+				library.warrior.Spear19,
+				library.warrior.Spear20,
+				/*
+				library.warrior.Spear15,
+				library.warrior.Spear14,
+				library.warrior.SheildSpear13,
+				library.warrior.SheildSpear14,
+				library.warrior.SheildSpear15,
+				*/
+			];
+			var scores = [];
+			for(var warrior of league) {
+				var wins = 0;
+				for(var challenger of league){
+					if(challenger != warrior) {
+						var results =evaluate(warrior, challenger);
+						console.log(results);
+						wins+=results[warrior.name];
+					}
+				}
+				console.log(warrior.name, wins/(league.length-1)/10);
+				scores.push({name: warrior.name, score: wins/(league.length-1)/10});
+			}
+			console.log(scores.sort((a,b) => a.score-b.score).map(score => score.name+" " + score.score));
+			//*/
+
+			/*
+			var scores = [];
+			for(var warrior of Object.keys(library.warrior)) {
+				var wins = 0;
+				for(var challenger of Object.keys(library.warrior)){
+					if(challenger != warrior) {
+						var results =evaluate(library.warrior[warrior], library.warrior[challenger]);
+						console.log(results);
+						wins+=results[library.warrior[warrior].name];
+					}
+				}
+				console.log(warrior, wins/Object.keys(library.warrior).length/10);
+				scores.push({name: warrior, score: wins/Object.keys(library.warrior).length/10});
+			}
+			console.log(scores.sort((a,b) => a.score-b.score).map(score => score.name+" " + score.score));
+			//*/
+			
+			/*
+			console.log(evaluate(library.warrior.Spear12, library.warrior.SheildSpear11));
+			console.log(evaluate(library.warrior.Spear13, library.warrior.SheildSpear12));
+			console.log(evaluate(library.warrior.Spear14, library.warrior.SheildSpear13));
+			console.log(evaluate(library.warrior.Spear15, library.warrior.SheildSpear14));
+			console.log(evaluate(library.warrior.Spear16, library.warrior.SheildSpear15));
+			*/
+			
+			/*
+			DEBUG = true;
+			var a = library.warrior.Spear12Armor;
+			var b = library.warrior.Spear16;
+			console.log(a,b)
+			var result = combat(Team(a.name, [a]), Team(b.name, [b]));
+			console.log(result);
+			DEBUG = false;
+			//*/
+		}
+	</script>
+</head>
+<body onload="main()">
+	<div id="main">
+	</div>
+</body>
+</html>

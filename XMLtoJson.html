@@ -1,0 +1,252 @@
+<html>
+	<head>
+		<title>Spell Generator</title>
+		<script type="text/javascript" src= "spellList.js"></script>
+		<script>
+		//*
+			spells = spells.spell_list.spell;
+			for(var spell of spells)if(!Array.isArray(spell.categories.category)) spell.categories.category= [spell.categories.category];
+			/*
+			var plantSpells = [];
+			for(var spell of spells)if(spell.categories.category.indexOf('Plant')!=-1) plantSpells.push(spell);
+			spells=plantSpells;
+			*/
+			var spellTable = {};
+			for(spell of spells)spellTable[spell.name.toLowerCase()]=spell;
+			console.log(spells);
+			
+			var colledgeTable = {};
+			for(var spell of spells)
+			{
+				if(spell.categories.category.length)
+				{
+					for(var cat of spell.categories.category)
+					{
+						if(!colledgeTable[cat])colledgeTable[cat]=[];
+						colledgeTable[cat].push(spell.name.toLowerCase());
+					}
+				}
+				if(!colledgeTable[spell.categories.category])colledgeTable[spell.categories.category]=[];
+				colledgeTable[spell.categories.category].push(spell.name.toLowerCase());
+			}
+			//*/
+			
+			function arrayAdd(previous,addition,sameLevel)
+			{
+				if(sameLevel)return previous.concat(addition);
+				previous.push(addition);
+				return previous;
+			}
+			function getSpellPreReqs(prereq)
+			{
+				if(prereq.length) 
+					return prereq.map(prereq => getSpellPreReqs(prereq)).reduce((a,b)=>a.concat(b));
+				if(prereq.name && prereq.name['-compare']=="is anything") return [(prereq.quantity?prereq.quantity['#text']:1) + " spells from anywhere"];
+				if(prereq.name) {
+					return [prereq.name['#text']].concat(spellToPrereqs(prereq.name['#text']));
+				}
+				if(prereq.college_count) return ["College Count : " +prereq.college_count['#text']];
+				if(prereq.college) return [(prereq.quantity?prereq.quantity['#text']:1) + " spells from "+prereq.college['#text']];
+				
+				return [];
+			}
+			function getAdvantagePreReqs(prereq,indpendent)
+			{
+				if(prereq.length) 
+					return prereq.map(prereq => getAdvantagePreReqs(prereq)).reduce((a,b)=>a.concat(b));
+				if(prereq.name && prereq.name['#text'] == 'magery')
+					return ["M"+prereq.level['#text']];
+				if(prereq.name) return [prereq.name['#text']]
+				return [];
+			}
+			var spellsBeingProcessed = [];
+			var spellPrereqs = [];
+			function spellToPrereqs(spellName)
+			{
+				spellName = spellName.toLowerCase();
+				
+				if(spellPrereqs[spellName])return spellPrereqs[spellName]; 
+				if(!spellTable[spellName.toLowerCase()])
+				{
+					//plane shift
+					//shapeshifting
+					console.log("Could not find spell ",spellName);
+					return [];
+				}
+				var spell = spellTable[spellName];
+				if(!spell.prereq_list) return [];
+				
+				if(!spellsBeingProcessed[spellName])
+				{
+					spellsBeingProcessed[spellName]=true;
+					var result =  getPreReqs(spell.prereq_list);
+					spellPrereqs[spellName]=result;
+					spellsBeingProcessed[spellName]=false;
+				}
+				else 
+				{
+					return undefined; //recursion has happened, which means this path is dead
+				}
+				//console.log("prereqs",spellName,result);
+				return result;
+			}
+			function getPreReqs(prereqs)
+			{
+				if(prereqs.length) return prereqs.map(list => getPreReqs(list)).reduce((a,b)=>a.concat(b));
+				
+				var allRequired = prereqs['-all']=='yes';
+				
+				var result = [];
+				if(prereqs.prereq_list) 
+					result = arrayAdd(result,getPreReqs(prereqs.prereq_list),allRequired);
+				if(prereqs.spell_prereq && prereqs.spell_prereq.length && !allRequired)
+				{
+					for(var prereq of prereqs.spell_prereq)
+						result = arrayAdd(result,getSpellPreReqs(prereq),allRequired);
+				}
+				else if(prereqs.spell_prereq) 
+					result = arrayAdd(result,getSpellPreReqs(prereqs.spell_prereq),allRequired);
+				if(prereqs.advantage_prereq && prereqs.advantage_prereq.length && !allRequired)
+				{
+					for(var prereq of prereqs.advantage_prereq)
+						result = arrayAdd(result,getAdvantagePreReqs(prereq),allRequired);
+				}
+				else if(prereqs.advantage_prereq)
+					result = arrayAdd(result,getAdvantagePreReqs(prereqs.advantage_prereq),allRequired); //magery is weird like that until we specify colleges
+					
+				result.sort();
+				result = result.sort().reduce((a,b)=>{
+					if (a.slice(-1)[0] !== b) 
+						a.push(b); 
+					return a;
+				},[]);
+				if(!allRequired) result = [result];
+				return result;
+			}
+			
+			function chooseSpellPath (spellRequirements,tries)
+			{
+				tries = tries?tries:0;
+				var result = [];
+				for(var requirement of spellRequirements)
+				{
+					if(Array.isArray(requirement))
+					{
+						var optionSelected = Math.floor(Math.random()*requirement.length);
+						result = result.concat(chooseSpellPath(requirement[optionSelected]));
+						//result = result.concat(requirement[optionSelected]);
+					}else result.push(requirement);
+				}
+				if(result.indexOf(undefined)!=-1 && tries < 20) 
+				{
+					console.log("searching new path...",result);
+					return chooseSpellPath(spellRequirements,tries+1);
+				}
+				return result
+			}
+			function toTitleCase(str)
+			{
+				return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+			}
+
+			function chooseXspells(X,list,otherSpells,mageryLimit){
+				var spellsChosen = [];
+				var extraAttributes = [];
+				var cycles = 0;
+				var tooManyTimes = 1000;
+				while(spellsChosen.length < X && cycles++<tooManyTimes)
+				{
+					var spell = list[Math.floor(Math.random()*list.length)];
+					var spellName = spell;
+					if(spell.name) spellName = spell.name;
+					else spell = spellTable[spell.toLowerCase()];
+					spellName.toLowerCase();
+					
+					if(spellsChosen.indexOf(spell.name)!=-1) continue;
+					console.log(spell.name);
+					
+					if(spell.prereq_list)
+					{
+						var prereqs = chooseSpellPath(spellToPrereqs(spell.name));
+						var mageryReq = prereqs.filter(a=>['M1','M2','M3'].indexOf(a)!=-1).sort();
+						if(mageryReq.length && mageryReq[mageryReq.length-1]>'M'+mageryLimit)
+						{
+							console.log(spell.name+" rejected for having too high magery");
+							continue;
+						}
+						
+						var newSpells= [];
+						var newAttributes = [];
+						
+						for(var prereq of prereqs)
+						{
+							if(spellTable[prereq.toLowerCase()] 
+								&&otherSpells.indexOf(prereq)==-1
+								&&spellsChosen.indexOf(prereq)==-1
+								&& newSpells.indexOf(prereq)
+							)
+								newSpells.push(prereq);
+							else if (prereq.indexOf('spells from')!=-1)
+							{
+								var number = Number(prereq.split(" spells from ")[0]);
+								var college = toTitleCase(prereq.split(" spells from ")[1]);
+								var previousCount = spellsChosen.filter(spell=>spell.categories.category.indexOf(college)!=-1).length;
+								var spellsToAdd = Math.max(0,number-previousCount);
+								if(college!="Anywhere") 
+									var collegeSpells = chooseXspells(spellsToAdd,colledgeTable[college],spellsChosen.concat(otherSpells).concat(newSpells),mageryLimit);
+								else if(X+otherSpells.length<number)continue;
+							}
+							else if(['M1','M2','M3'].indexOf(prereq)==-1 && extraAttributes.indexOf(prereq)==-1)
+								newAttributes.push(prereq);
+						}
+						if(newSpells.length+1 + spellsChosen.length <= X)
+						{
+							spellsChosen.push(spell);
+							spellsChosen= spellsChosen.concat(newSpells.map(a=>spellTable[a.toLowerCase()]));
+							extraAttributes= extraAttributes.concat(newAttributes);
+						}
+						else console.log(spell.name+" rejected for having",newSpells.length+1, " spells to learn out of ",X-spellsChosen.length );
+					} else spellsChosen.push(spell);
+				}
+				if(cycles==tooManyTimes) console.log("FAILED CYCLE COUNTER");
+				return {spellsChosen:spellsChosen,extraAttributes:extraAttributes};
+			}
+
+			function listSpells(){
+				var spellCount = Number(document.getElementById("spellCount").value);
+				var magery = Number(document.getElementById("mageryLevel").value);
+				//TODO: highlight "crown" spells
+				var choices = chooseXspells(spellCount,spells,[],magery);
+				var spellsChosen = choices.spellsChosen;
+				var extraAttributes = choices.extraAttributes;
+				//*
+				//*/
+				//var testSpell = "Teleport";
+				//var testSpell = "Animate Plant";
+				//var testSpell = "Resurrection";
+				//var testSpell = "Telecast";
+				//var testSpell = "Repel Animal (Bird)";
+				//var testSpell = "Resist Disease";
+				//var testSpell = "Suspend Magic";
+				//var testSpell = "Possession";
+				//console.log(testSpell,spellToPrereqs(testSpell),chooseSpellPath(spellToPrereqs(testSpell)),spellTable[testSpell.toLowerCase()]);
+				
+				var display = document.getElementById('display');
+				var text = "<ul>";
+				for(var spell of spellsChosen)
+				{
+					text+="<li>"+spell.name;
+				}
+				for(var extra of extraAttributes)
+					text+="<br>"+extra;
+				display.innerHTML = text;
+			}
+		</script>
+	</head>
+	<body>
+		Number of Spells<input id="spellCount" value = 30 min=0 max=100 step=1 type = "number"></input><br>
+		Magery Level<input id = "mageryLevel" value=3 min=0 max=3 step=1 type = "number"></input><br>
+		<button onclick="listSpells()"> List Spells </button>
+		<div id = "display"></div>
+	</body>
+<html>

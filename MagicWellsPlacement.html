@@ -1,0 +1,124 @@
+<html>
+<head>
+	<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+	<script>
+		var config = {
+			magnitudeFactor: .5,
+			magnitudeCutoff: 1,
+			startingMagnitude: 10,
+			spawn: [4,1],
+			displayDimensions:900,
+			stDevFactor:1,
+			distanceScale:30,
+			magnitudeScale:1.5,
+		};
+		function randomGausian(average,dev)
+		{
+			var u = 0, v = 0;
+			while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+			while(v === 0) v = Math.random();
+			var r = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+			return average+r*dev;
+		}
+		
+		function baseLocation(){
+			return [0,0];
+		}
+		var killed = 0;
+		function sublocation (location){
+			var magnitude = location.m*config.magnitudeFactor;
+			var stDev = magnitude*config.stDevFactor;
+			var newMag = randomGausian(magnitude,stDev);
+			if(newMag < config.magnitudeCutoff || newMag > location.m){
+				killed++;
+				return undefined;
+			}
+			
+			var x = randomGausian(location.x,stDev);
+			var y = randomGausian(location.y,stDev);
+			
+			var result = {x:x,y:y,m:newMag}
+			
+			return [result].concat(spawnSubs(result));
+		}
+		var count = 0;
+		var max = 5000;
+		function spawnSubs(location){
+			if(count++ > max) {
+				return;
+			}
+			var spawn = Math.max(0,
+				Math.round(
+				randomGausian(config.spawn[0],config.spawn[1])
+				));
+			var result = [];
+			for(var i =0;i<spawn;i++)
+			{
+				result = result.concat(sublocation(location));
+			}
+			return result.filter(a=>a);
+		}
+		
+		function draw(spots){
+			var canvas = document.getElementById('display');
+			var frame = document.getElementById('canvasFrame');
+			frame.width = config.displayDimensions;
+			frame.height = config.displayDimensions;
+			canvas.width = config.displayDimensions;
+			canvas.height = config.displayDimensions;
+
+
+			if(canvas.getContext){
+				var ctx = canvas.getContext('2d');
+				ctx.fillStyle="#aaaaaa";
+				ctx.fillRect(0,0,config.displayDimensions,config.displayDimensions);
+
+				ctx.fillStyle = '#333333';
+				for(var spot of spots){
+					ctx.beginPath();
+					ctx.arc(
+						config.displayDimensions/2 +spot.x*config.distanceScale,
+						config.displayDimensions/2 +spot.y*config.distanceScale,
+						spot.m*config.magnitudeScale,
+						0,
+						Math.PI*2
+					);
+					ctx.stroke();
+				}
+				console.log(spots.sort((a,b)=>b.m-a.m));
+			}
+		}
+		
+		function placeWells(){
+			var seed = document.getElementById('seed').value;
+			Math.seedrandom(seed);
+			var center = {x:0,y:0,m:config.startingMagnitude}
+			var spots = spawnSubs(center);
+			spots.push(center);
+			draw(spots);
+			console.log(killed,count);
+			document.getElementById('seedArea').innerHTML= Math.round(spots.reduce((out,a)=>out+a.m,0));
+		}
+		function newSeed(){
+		
+			seed = Math.floor(Math.random()*10000);
+			document.getElementById('seed').value=seed;
+			placeWells();
+
+		}
+		function main(){
+			newSeed();
+		}
+
+	</script>
+</head>
+<body onload="main()">
+	seed: <input id = "seed"></input>
+	<button onclick="placeWells()">Place Wells</button>
+	<button onclick="newSeed()">New Seed</button>
+	<span id = "seedArea"></span>
+	<div id="canvasFrame">
+	<canvas id="display" ></canvas>
+	</div>
+</body>
+</html>

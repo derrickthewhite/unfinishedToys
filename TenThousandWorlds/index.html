@@ -1,0 +1,143 @@
+
+<html>
+<head>
+    <title>10 thousand worlds</title>
+	<style>
+		.path{
+			display:inline-block;
+		}
+	</style>
+	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+	<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
+	<script type="text/javascript" src= "graph.js"></script>
+	<script type="text/javascript" src= "worldAttributes.js"></script>
+    <script>
+
+
+		function editableDestination(){
+			var result = {};
+			//result.coordinates = ko.observableArray((new Array(10)).map(a=>ko.observable(true)));
+			result.coordinates = ko.observableArray([]);
+			result.PetersonPos = ko.observable("0");
+			result.coords = [0,1,2,3,4,5,6,7,8,9];
+			result.string = ko.pureComputed(function (){
+				//return result.coordinates().reduce((out,a)=>out+(a?"1":"0"),"")+result.PetersonPos();
+				return result.coords.map(n=>result.coordinates().indexOf(n+"")!=-1?"1":"0").reduce((a,b)=>a+b)+result.PetersonPos();
+
+			});
+			result.world = ko.pureComputed(function (){
+				return getWorld(result.string());
+			})
+			result.build = function (destination){
+				//destination.split("").slice(0,10).forEach((n,i)=>result.coordinates()[i]=n=="1");
+				result.coordinates(destination.split("").slice(0,10).map((d,i)=>d=="1"?i+"":"-").filter(d=>d!="-"));
+				result.PetersonPos(destination.split("")[10]);
+			}
+			return result;
+		}
+
+		var data={};
+        function main(){
+			var seed = Math.floor(Math.random()*10240);
+			//seed = 1000; //5 for distance 3, 15 for distance 2
+			Math.seedrandom(seed);
+			console.log("seed",seed);
+			
+			var a = generatenextCrossing();
+			var b = generatenextCrossing();
+			
+			
+			data.workingStart = editableDestination();
+			data.workingEnd = editableDestination();
+			data.workingStart.build(a);
+			data.workingEnd.build(b);
+			
+			data.start = ko.observable();
+			data.end = ko.observable();
+			data.route = ko.observable();
+			data.minPaths = ko.observable();
+			data.absoluteDistance = ko.observable();
+			data.calculate = function (a,b){
+				console.log(a,b);
+				/*
+				var travel = routes(a,b,(a)=>a.gear.length);
+				var numMinRoutes = travel.filter(r=>r.gear.length == travel[0].gear.length);
+				*/
+				//*
+				var travel = routes(a,b,(a)=>a.jumps);
+				var numMinRoutes = travel.filter(r=>r.jumps == travel[0].jumps);
+				//*/
+				
+				data.start(a);
+				data.end(b);
+				data.route(travel);
+				data.minPaths(numMinRoutes);
+				data.absoluteDistance(switchesNeeded(a,b).split("").filter(d=>d!="-").length);
+			}
+			data.setInputs = function (){
+				data.calculate(data.workingStart.string(),data.workingEnd.string());
+			}
+			
+			data.calculate(a,b);
+			
+			ko.applyBindings(data,document.getElementById('display'));
+		}
+
+    </script>
+</head>
+
+<body onload = "main()">
+<div id='display'> 
+	<span data-bind="foreach:workingStart.coords">
+		<span data-bind="text:names[$data]"></span>
+	</span>
+	<br>
+	<span data-bind="foreach:workingStart.coords">
+		<input type="checkbox" data-bind="checked:$parent.workingStart.coordinates, attr: {value:$data}"></input>
+	</span>
+	<input type="number" data-bind="value:workingStart.PetersonPos"></input>
+	<span data-bind="text:names[workingStart.PetersonPos()]"></span>
+	<br>
+	<span data-bind="foreach:workingEnd.coords">
+		<input type="checkbox" data-bind="checked:$parent.workingEnd.coordinates, attr: {value:$data}"></input>
+	</span>
+	<input type="number" data-bind="value:workingEnd.PetersonPos"></input>
+	<span data-bind="text:names[workingEnd.PetersonPos()]"></span>
+	<br>
+	<button data-bind="click:setInputs">Set Inputs</button>
+	<br>
+	Start: <span data-bind="text:start"></span><br>
+	End: <span data-bind="text:end"></span><br>
+	Jumps: <span data-bind="text:route()[0].jumps"></span><br>
+	Long Jumps: <span data-bind="text:route()[route().length-1].jumps"></span><br>
+	Num Paths: <span data-bind="text:route().length"></span><br>
+	Num Min Paths: <span data-bind="text:minPaths().length"></span><br>
+	Distance: <span data-bind="text:absoluteDistance"></span><br>
+	Paths:
+	<div data-bind="foreach:minPaths" >
+		<div class="path">
+		<span data-bind="text:jumps"></span>
+		<span data-bind="text:gear.length"></span>
+		<div data-bind="foreach:fullPath">
+				<span data-bind="text:$data"></span>
+				<span data-bind="with:getWorld($data.split('(')[0])">
+					<span data-bind="text:life"></span>
+					<span data-bind="text:temperature"></span>F
+					<span data-bind="text:Math.round(hydro*100)"></span>%
+					<span data-bind="text:atmos.oxygen"></span>/
+					<span data-bind="text:atmos.CO2"></span>
+					<span data-bind="text:atmos.pressure"></span> atm
+					<span data-bind="foreach:gearRequired($data)"> 
+						<span data-bind="text:$data"></span> 
+					</span>
+				</span><br>
+			</div>
+			<div data-bind="foreach:gear">
+				<span data-bind="text:$data"></span>
+			</div>
+		</div>
+	</div>
+</div>
+</body>
+
+</html>

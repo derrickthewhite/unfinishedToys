@@ -1,0 +1,25 @@
+#cluebuilder{
+	background:#ffdddd;
+}
+#techList{
+	background:#ddffdd;
+}
+#clueList{
+	background:#ddddff;
+}
+#teamList{
+	background:#ffddff;
+}
+#nukedCities{
+	background:#ffff88;
+}
+#baseCities{
+	background:#8888ff;
+}
+#suspicionsList{
+	background:#ddffff;
+}
+
+.team,.clue,.suspicion{
+	border: black solid 2px
+}

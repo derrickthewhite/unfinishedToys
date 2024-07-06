@@ -1,0 +1,257 @@
+<html>
+<head>
+	<title>Turret Generator</title>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+	<script>
+		var dice = function(count,sides) {
+			return (new Array(count?count:1))
+				.fill(0)
+				.map(a=>Math.floor(Math.random()*(sides?sides:6)+1))
+				.reduce((out,a)=>out+a,0);
+		}
+		var selectFromArray = function (array){
+			return array[dice(undefined,array.length)-1];
+		}
+		var generateWeaponType = function () {
+			var weaponOptions = [
+				"Plasma",
+				"Kinetic",
+				"Tractor",
+				"Telepathic",
+				"Stasis"
+			]
+			return selectFromArray(weaponOptions);
+		}
+		var generateWeaponRelativeSize = function () {
+			var weaponOptions = [
+				1,
+				0,
+				-1,
+				-2
+			]
+			return selectFromArray(weaponOptions);
+		}
+		var generateWeaponCount = function () {
+			var weaponOptions = [
+				1,
+				2,
+				3,
+				4,
+				5,
+				6
+			]
+			return selectFromArray(weaponOptions);
+		}
+		var generateArmor = function () {
+			var armorOptions = [
+				"stone",
+				"steel",
+				"alloy",
+				"metallic Laminate",
+				"Advanced Laminate",
+				"Nanocomposite"
+			];
+			return selectFromArray(armorOptions);
+		}
+		var generateSheilding  = function() {
+			var shieldingOptions = [
+				0,
+				0,
+				0,
+				0,
+				.5,
+				1,
+				1,
+				1.5,
+				2,
+				3
+			];
+			return selectFromArray(shieldingOptions);
+		}
+		var generateTurretSize = function (){
+			var sizeOptions = [
+				8,
+				9,
+				10,
+				11
+			];
+			return selectFromArray(sizeOptions);
+		}
+		var calculateWeaponDamage = function(turret){
+			if (turret.weapon == "Kinetic") {
+				switch(turret.weaponSize){
+					case 6: return "4dx50";
+					case 7: return "3dx100";
+					case 8: return "4dx100";
+					case 9: return "6dx100";
+					case 10: return "5dx200";
+					case 11: return "3dx500";
+					case 12: return "4dx500";
+					default: return "unknown kinetic for "+turret.weaponSize;
+				}
+			}
+			if (turret.weapon == "Plasma") {
+				switch(turret.weaponSize){
+					case 6: return "6dx20 (2) exp"; //30mj
+					case 7: return "4dx50 (2) exp";
+					case 8: return "3dx100 (2) exp";
+					case 9: return "4dx100 (2) exp";
+					case 10: return "6dx100 (2) exp";
+					case 11: return "5dx200 (2) exp";
+					case 12: return "3dx500 (2) exp";
+					default: return "unknown plasma for "+turret.weaponSize;
+				}
+			}
+			if (turret.weapon == "Stasis" || turret.weapon == "Tractor") {
+				switch(turret.weaponSize){
+					case 6: return 3*turret.weaponCount + " tons"; //30mj
+					case 7: return 10*turret.weaponCount + " tons";
+					case 8: return 30*turret.weaponCount + " tons";
+					case 9: return 100*turret.weaponCount + " tons";
+					case 10: return 300*turret.weaponCount + " tons";
+					case 11: return 1000*turret.weaponCount + " tons";
+					case 12: return 3000*turret.weaponCount + " tons";
+					default: return "unknown "+ turret.weapon+" for "+turret.weaponSize;
+				}
+			}
+			if (turret.weapon == "Telepathic") {
+				var telepathicOptions = [
+					"Insanity",
+					"Death",
+					"Hypnogogic",
+					"Fear",
+					"Psi Supressing"
+				];
+				var option = selectFromArray(telepathicOptions);
+				switch(turret.weaponSize){
+					case 6: return "3dx20 " + option; //30mj
+					case 7: return "2dx50 " + option;
+					case 8: return "3dx50 " + option;
+					case 9: return "4dx50 " + option;
+					case 10: return "6dx50 " + option;
+					case 11: return "5dx100 " + option;
+					case 12: return "3dx250 " + option;
+					default: return "unknown Telepathic for "+turret.weaponSize;
+				}
+			}
+
+			return turret.weapon;
+		}
+		var relativeSizeToRelativeCount = function(size){
+			switch (size) {
+				case 1: return 1/3;
+				case 0: return 1;
+				case -1: return 3;
+				case -2: return 10;
+				default: return -1;
+			}
+		}
+		var calculateSheilding = function (size) {
+			switch(size){
+				case 8: return 700;
+				case 9: return 1000;
+				case 10: return 1500;
+				case 11: return 2000;
+				default: return -1000;
+			}
+		}
+		var getArmorValue = function (turret){
+			switch (turret.armor) {
+				case "stone": return 3;
+				case "steel": return 6;
+				case "alloy": return 7;
+				case "metallic Laminate": return 8;
+				case "Advanced Laminate": return 9;
+				case "Nanocomposite": return 10;
+				default: return -1;
+			}
+		}
+		var calculateArmor = function (turret) {
+			var armorValue = turret.size + getArmorValue(turret);
+			switch(armorValue){
+				case 11: return 45;
+				case 12: return 60;
+				case 13: return 90; 
+				case 14: return 150; 
+				case 15: return 210; 
+				case 16: return 300; 
+				case 17: return 450; 
+				case 18: return 600; 
+				case 19: return 900; 
+				case 20: return 1500; 
+				case 21: return 2100; 
+				case 22: return 3000;
+				default: return -1;
+			}
+		}
+		var calculateDensityBonus = function (systems) {
+			if(systems <= 4) return 1;
+			if(systems <= 6) return 1.2;
+			if(systems <= 7) return 1.3;
+			if(systems <= 9) return 1.4;
+			if(systems <= 10) return 1.5;
+			if(systems <= 11) return 1.6;
+			if(systems <= 13) return 1.8;
+			if(systems <= 14) return 2;
+			if(systems <= 15) return 2.3;
+			if(systems <= 16) return 2.6;
+			if(systems <= 17) return 3;
+			if(systems <= 18) return 3.6;
+		}
+		function run (){
+			var model = {}
+			model.turrets = ko.observableArray([]);
+			model.addTurret = () => {
+				var turret = {
+					size: generateTurretSize(),
+					weapon: generateWeaponType(),
+					weaponRelativeSize: generateWeaponRelativeSize(),
+					weaponSystemCount: generateWeaponCount(),
+					armor: generateArmor(),
+					sheilding: generateSheilding()
+				};
+				if(turret.weaponRelativeSize > 0){
+					turret.weaponSystemCount = Math.max(3,Math.round(turret.weaponSystemCount/3)*3)
+				}
+				if(turret.weapon == "Tractor") turret.weaponRelativeSize = 0;
+				turret.weaponSize = turret.size + turret.weaponRelativeSize;
+				turret.weaponCount = turret.weaponSystemCount * relativeSizeToRelativeCount(turret.weaponRelativeSize);
+				turret.weaponDamage = calculateWeaponDamage(turret);
+				if(turret.weapon == "Stasis" || turret.weapon == "Tractor") turret.weaponCount = 1;
+				turret.sheildDR = turret.sheilding * calculateSheilding(turret.size);
+				turret.powerRequired = turret.weaponSystemCount + turret.sheilding;
+				turret.armorSystems = 20 - turret.powerRequired*5/4 -1;
+				turret.armorDR = turret.armorSystems * calculateArmor(turret) /3 * calculateDensityBonus(turret.armorSystems);
+				model.turrets.push(turret);
+			}
+			
+			ko.applyBindings(model,document.getElementById('main'));
+		}
+	</script>
+</head>
+<body onload="run()">
+	<div id="main">
+		<button data-bind="click:addTurret">Add Turret</button>
+		<div data-bind="foreach:turrets">
+			<div>
+				<div><span>Size: SM+</span><span data-bind="text:size"></span></div>
+				<div>
+					<span>Weapon: </span>
+					<span data-bind="text:weapon"></span>
+					<span data-bind="text:weaponDamage"></span>
+					x<span data-bind="text:weaponCount"></span>
+					(<span data-bind="text:weaponSystemCount"></span>)
+				</div>
+				<div>
+					<span>Armor: </span>
+					<span data-bind="text:armorDR"></span>
+					<span data-bind="text:armor"></span>
+					x<span data-bind="text:armorSystems"></span>
+				</div>
+				<div><span>Shielding: </span><span data-bind="text:sheildDR"></span></div>
+				<br/>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

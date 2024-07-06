@@ -1,0 +1,36 @@
+<html>
+	<head>
+		<title> Zonemind Track</title>
+		<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+		<script>
+			var main = function (){
+				var seed = document.getElementById("seed").value
+				Math.seedrandom(seed);
+				
+				var who = document.getElementById("who").value
+				var what = document.getElementById("what").value
+				var whereTarget = document.getElementById("whereTarget").value
+				var whereHome = document.getElementById("whereHome").value
+				var whyDestruct = document.getElementById("whyDestruct").value
+				var whyPara = document.getElementById("whyPara").value
+				
+				console.log("hello world")
+				console.log(Math.random())
+			}
+		</script>
+	</head>
+	<body>
+		Seed:<input type="text" id="seed"></input><br><br>
+		
+		Who:<input type="number" id="who"></input><br>
+		What:<input type="number" id="what"></input><br>
+		<!--When:<input type="number" id="current"></input><br>-->
+		Where (targets):<input type="whereTarget" id="current"></input><br>
+		Where (home world):<input type="whereHome" id="current"></input><br>
+		Why (destruction):<input type="whyDestruct" id="current"></input><br>
+		Why (parachronics):<input type="whyPara" id="current"></input><br>
+		
+		<button onclick="main()">Calculate!</button>
+
+	</body>
+</html>

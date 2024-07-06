@@ -1,0 +1,49 @@
+<html>
+<head>
+	<title>Traveller World</title>
+	
+	<script>
+		var dice = function(count,sides) {
+			return (new Array(count?count:1))
+				.map(a=>Math.floor(Math.random()*(sides?sides:6)+1))
+				.reduce((out,a)=>out+a,0);
+		}
+		var atmosphereModifier = function (number){
+			switch(number){
+				case 0:
+				case 1:
+				case 6:
+				case 7:
+				return 0;
+				case 2:
+				case 3:
+				return -1;
+				case 4:
+				case 5:
+				case 14:
+				return -1
+				case 8:
+				case 9:
+				return 1;
+				case 10:
+				case 13:
+				case 15:
+				return 2;
+				case 12:
+				case 14:
+				return 6;
+			}
+		}
+		var Planet = function (){
+			var planet = {};
+			planet.size = dice(2,6)-2;
+			planet.atmosphere = dice(2,6)-7+planet.size;
+			planet.temperature = dice(2,6);
+		}
+	</script>
+</head>
+<body>
+	<div id="main">
+	</div>
+</body>
+</html>

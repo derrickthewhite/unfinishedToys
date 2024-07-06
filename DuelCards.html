@@ -1,0 +1,537 @@
+<html>
+<head>
+    <title>Card Set</title>
+		<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+		<script type="text/javascript" src= "../Tools/randomGenerators.js"></script>
+		<script type="text/javascript" src= "../Tools/saveFile.js"></script>
+    <script>
+	var config = {};
+	config.colors = ['purple','yellow','brown','teal','grey'];
+	//config.abilities = ['Haste','Vigilence','Flying','Reach','Trample','First Strike','Defender','Big','Damage','Aura','Bonus'];
+	config.abilities = ['Haste','Vigilence','Flying','Reach','Trample','First Strike','Defender','Big','Damage'];
+	var nextPlayerID = 0;
+	function selectFromArray(options){
+		return shuffleArray([...options])[0];
+	}
+	function generateStats(n){
+		var result = [];
+		for(var i = Math.floor(n/3*2);i<=Math.ceil(n/3*4);i++){
+			result.push([i,2*n-i]);
+			result.push([i,2*n-i-1]);
+		}
+		result.pop();
+		result.push([n,n]);
+		result = result.filter(a=>a[1]>0 && a[0]>0);
+		return result;
+	}
+	function addThemes(factions){
+		var abilities = shuffleArray([...config.abilities]);
+		for(var faction of factions){
+			//TODO: custom number of abiities added
+			faction.themes = [abilities.pop(),abilities.pop()];
+		}
+		return factions;
+	}
+	function addCards(factions){
+	
+		for(var i = 1;i<=6;i++){
+			factions.forEach(faction=>{
+				addCardsbyValue(faction,i)
+			});
+		}
+	}
+	function cleanCard(card){
+		if(card.ability =='Defender'){
+			card.stats[1]+=card.stats[0];
+			card.stats[0]=0;
+		}
+		if(card.ability == 'Big'){
+			card.stats[1]+=1;
+		}
+		if(card.ability == 'Damage'){
+			card.stats[0] = Math.floor((card.stats[0]+card.stats[1])/2+1)
+			card.description = card.stats[0]+" damage";
+		}
+		else if (card.ability == 'Bonus'){
+			card.description = "+"+card.stats[0]+"/+"+card.stats[1]+" for 1 turn";
+		}
+		else if (card.ability == "Aura"){
+			card.description = "+"+card.stats[0]+"/+"+card.stats[1]+" aura";
+		}
+		else {
+			card.description = card.color+" "+card.stats[0]+"/"+card.stats[1]+" "+(card.ability=="none"?"vanilla":card.ability);
+		}
+		return card;
+	}
+	function addCardsbyValue(faction,value){
+		var abilities = [
+			'none',
+			'none',
+			selectFromArray(faction.themes),
+			selectFromArray(faction.themes),
+			selectFromArray(config.abilities),
+			selectFromArray(config.abilities)
+		];
+		var possibleStats = generateStats(value);
+		for(var ability of abilities){
+			var card = new Object();
+			card.ability = ability;
+			card.value = value;
+			card.stats = selectFromArray(possibleStats).slice();
+			card.color = faction.color;
+			faction.cards.push(cleanCard(card));
+		}
+		return faction;
+	}
+	function generateDeck(factions){
+		var pool = factions.map(f=>shuffleArray(f.cards.slice()));
+		var deck = [];
+		while(deck.length <36){
+			var card =  pool[randInt(pool.length)].pop();
+			var copies = randInt(4)+1;
+			for(var i =0;i<copies && deck.length<36;i++)deck.push(card);
+		}
+		var colors = deck.map(c=>c.color).sort();
+		var colorCounts = colors.filter((c,i,array)=>array.indexOf(c)==i).map(color=>{ return {color:color,count:colors.filter(c=>c==color).length}});
+		colorCounts.forEach(count=> count.count=Math.round(count.count*2/3));
+		colorCounts.forEach(count=>{
+			for(var i = 0;i<count.count;i++)deck.push({ability:"mana",value:"land",color:count.color,description:count.color+" land"})
+		})
+		deck =  JSON.parse(JSON.stringify(deck));
+		deck.forEach((card,index) => card.index=index);
+		return deck;
+	}
+	function powerSet( list ){
+		var set = [],
+			listSize = list.length,
+			combinationsCount = (1 << listSize),
+			combination;
+
+		for (var i = 1; i < combinationsCount ; i++ ){
+			var combination = [];
+			for (var j=0;j<listSize;j++){
+				if ((i & (1 << j))){
+					combination.push(list[j]);
+				}
+			}
+			set.push(combination);
+		}
+		return set;
+	}
+	function isCastable(lands,handLands,spells,playLand){
+		var colorsHad = lands.reduce((out,a)=>{ out[a]=1+(out[a]?out[a]:0); return out;},{});
+		var colorsNeeded = spells.reduce((out,a)=>{ out[a.color]=1+(out[a.color]?out[a.color]:0); return out;},{});
+		var playLand = true;
+		var colorPlayed = "any";
+		for(var color in colorsNeeded)
+			if(colorsNeeded[color]>colorsHad[color] || !colorsHad[color])
+				if(playLand && handLands.map(land=>land.color).indexOf(color)!=-1) {
+					playLand = false;
+					colorPlayed = color;
+				}
+				else return false;
+		return spells.reduce((out,a)=>out+a.value,0)<=lands.length+(handLands.length?1:0)?colorPlayed:false;
+
+	}
+	function castingPossibilities (lands,handLands,spells){
+		var combos = powerSet(spells);
+		var colorsHad = lands.reduce((out,a)=>{ out[a]=1+(out[a]?out[a]:0); return out;},{});
+		return combos.filter(set =>isCastable(lands,handLands,set,true));
+	}
+	function attackPossibilities(battlefield){
+		return powerSet(battlefield.getAttackers());
+	}
+	function chooseBlock(attack,defender){
+		var blocks = powerSet(defender.battlefield.getDefenders());
+		console.log();
+		blocks.push([]);
+		var blocks = allBlocks(attack,defender.battlefield.getDefenders());
+		//TODO: intelligent blocking!
+		var block =  blocks[randInt(blocks.length)];
+		return block;
+	}
+	function allBlocks(attack,blockers){
+		var baseArrangement = [];
+		var blocksSoFar = [baseArrangement];
+		attack.forEach(attacker => baseArrangement[attacker.index] ={attacker:attacker,blockers:[]});
+		for(var blocker of blockers){
+			var currentBlockLayer = [];
+			for(arrangement of blocksSoFar){
+				for(attacker of attack){
+					var arrangementVariation = JSON.parse(JSON.stringify(arrangement));
+					arrangementVariation[attacker.index].blockers.push(blocker);
+					currentBlockLayer.push(arrangementVariation);
+				}
+				currentBlockLayer.push(arrangement);
+			}
+			blocksSoFar = currentBlockLayer;
+		}
+		return blocksSoFar.map(arrangement => arrangement.filter(a=>a));
+	}
+	function scoreBlock(battle){
+		var result = {damage:0,loss:0,gain:0};
+		for(var fight of battle){
+			if(fight.blockers.length){
+				
+			}
+			else
+				result.damage+=attacker.stats[0];
+		}
+		return result;
+	}
+	function battleResults(battle){
+		var killPile = [];
+		var lifeLost = 0;
+		battle.blockers.sort((a,b)=> a.stats[0]-b.stats[0]);
+		if(battle.attacker.ability == "Flight")
+			battle.blockers= battle.blockers.filter(d=>['Flight','Reach'].indexOf(d.ability)!=-1);
+
+		if(battle.blockers.length==0) lifeLost+= battle.attacker.stats[0];
+		else{
+			var kill;
+			var blockersToughness = battle.blockers.reduce((out,blocker)=>out+blocker.stats[1],0);
+			if(blockersToughness<=battle.attacker.stats[0])
+				kill= battle.blockers;
+			else{
+				//TODO: intelligent killing!
+				var kills = powerSet(battle.blockers)
+				.filter(kill=> kill.reduce((out,a)=>out+a.stats[1],0) <= battle.attacker.stats[0]);
+				var weakKills = [];
+				for(var killScheme of kills)
+					for(var alternate of kills)
+						if(killScheme.filter(target=>alternate.indexOf(target)==-1).length ==0 && killScheme.length<alternate.length)
+							weakKills.push(killScheme);
+				kills = kills.filter(kill=>weakKills.indexOf(kill)==-1);
+				//TODO: filter out strictly worse kills
+				if(kills.length ==0)kill=[];
+				else kill = kills[randInt(kills.length)];
+			}
+			killPile= killPile.concat(kill);
+			if(battle.attacker.ability == "First Strike"){
+				battle.blockers.filter(blocker => kill.indexOf(blocker)==-1);
+			}
+			if(battle.blockers.reduce((out,a)=>out+a.stats[0],0)>=battle.attacker.stats[1])
+				killPile.push(battle.attacker);
+			if(battle.attacker.ability == "Trample" && blockersToughness<=battle.attacker.stats[0]){
+				lifeLost += battle.attacker.stats[0]-blockersToughness;
+			}
+		}
+		return {kills:killPile,lifeLost:lifeLost};
+	}
+	function runAttack(attack,player,game){
+		var defender = game.players.filter(p=>p!=player)[0];
+		var block = chooseBlock(attack,defender);
+		var killPile = [];
+		var lifeLost = 0;
+		for(var battle of block){
+			game.log(battle.attacker.description+" blocked by ",battle.blockers);
+			battle.blockers.sort((a,b)=> a.stats[0]-b.stats[0]);
+			if(battle.attacker.ability == "Flight")
+				battle.blockers= battle.blockers.filter(d=>['Flight','Reach'].indexOf(d.ability)!=-1);
+			if(battle.blockers.length==0) lifeLost+= battle.attacker.stats[0];
+			else{
+				var kill;
+				var blockersToughness = battle.blockers.reduce((out,blocker)=>out+blocker.stats[1],0);
+				if(blockersToughness<=battle.attacker.stats[0])
+					kill= battle.blockers;
+				else{
+					//TODO: intelligent killing!
+					var kills = powerSet(battle.blockers)
+					.filter(kill=> kill.reduce((out,a)=>out+a.stats[1],0) <= battle.attacker.stats[0]);
+					var weakKills = [];
+					for(var killScheme of kills)
+						for(var alternate of kills)
+							if(killScheme.filter(target=>alternate.indexOf(target)==-1).length ==0 && killScheme.length<alternate.length)
+								weakKills.push(killScheme);
+					kills = kills.filter(kill=>weakKills.indexOf(kill)==-1);
+					//TODO: filter out strictly worse kills
+					if(kills.length ==0)kill=[];
+					else kill = kills[randInt(kills.length)];
+				}
+				killPile= killPile.concat(kill);
+				if(battle.attacker.ability == "First Strike"){
+					battle.blockers.filter(blocker => kill.indexOf(blocker)==-1);
+				}
+				if(battle.blockers.reduce((out,a)=>out+a.stats[0],0)>=battle.attacker.stats[1])
+					killPile.push(battle.attacker);
+				if(battle.attacker.ability == "Trample" && blockersToughness<=battle.attacker.stats[0]){
+					lifeLost += battle.attacker.stats[0]-blockersToughness;
+				}
+			}
+		}
+		if(lifeLost) game.log(lifeLost+ " life was lost!",[]);
+		defender.life-=lifeLost;
+		console.log("kill Pile",killPile);
+		if(killPile.length){
+			game.log("died in glorious combat!",killPile);
+			//TODO: unquely identify cards in different decks
+			player.battlefield.kill(killPile);
+			defender.battlefield.kill(killPile);
+		}
+		return block;
+	}
+	function runDirectDamage(damages,player,game){
+		var defender = game.players.filter(p=>p!=player)[0];
+		var targets = defender.battlefield.getCreatures();
+		var availableDamage = damages.slice().sort((a,b)=>a.stats[0]-b.stats[0]);
+		var strikes = [];
+		//TODO: intelligent target picking
+		while(availableDamage.length){
+			var totalDamage = availableDamage.reduce((out,a)=>out+a.stats[0],0);
+			targets = targets.filter(target=>target.stats[1]<=totalDamage);
+			targets.push("face");
+			var target = targets[randInt(targets.length)];
+			if(target == "face" || availableDamage>defender.life){
+				strikes.push({target:"face",attacks:availableDamage});
+				availableDamage=[];
+			}
+			else{
+				var possibleStrikes = powerSet(availableDamage).filter(strikes=>strikes.reduce((out,a)=>out+a.stats[0],0)>=target.stats[1]);
+				var strike = possibleStrikes[randInt(possibleStrikes.length)];
+				availableDamage = availableDamage.filter(damage=>strike.indexOf(damage)==-1);
+				strikes.push({target:target,attacks:strike});
+				targets = targets.filter(t=>t!=target);
+				targets = targets.filter(t=>t!="face");
+			}
+		}
+		console.log("STRIKES",strikes);
+		var killPile = [];
+		var damage = 0;
+		for(var strike of strikes){
+			if(strike.target=="face") damage+=strike.attacks.reduce((out,a)=>out+a.stats[0],0);
+			killPile = killPile.concat(strike.attacks);
+			killPile.push(strike.target);
+		}
+		if(killPile.length){
+			game.log("removed from the game directy!",killPile);
+			//TODO: unquely identify cards in different decks
+			player.battlefield.kill(killPile);
+			defender.battlefield.kill(killPile);
+		}
+		if(damage){
+			game.log(damage+" life was lost directly!",[])
+			defender.life -=damage;
+		}
+	}
+	function runTurn(player,game,draw){
+		var history = {};
+		history.startingState = game.players.map(p=>reportPlayer(p));
+		history.currentPlayer = player.id;
+		player.battlefield.startTurn();
+		if(draw)player.hand.push(player.library.pop());
+		
+		var handLands = player.hand.filter(c=>c.value=="land");
+		var activeLand = player.battlefield.getLands();
+		var spells = player.hand.filter(c=>c.value!="land");
+		
+		var plays = castingPossibilities(activeLand,handLands,spells);
+		if(plays.length){
+			//TODO: intelligent casting!
+			var play = plays[randInt(plays.length)];
+			var landColor = isCastable(activeLand,handLands,play,true);
+			var landToPlay = handLands.filter(land=> land.color == landColor || landColor == "any")[0]
+			if(landToPlay){
+				player.battlefield.add(landToPlay);
+				player.hand = player.hand.filter(card => card!=landToPlay);
+			}
+			for(var card of play){
+				player.battlefield.add(card);
+				player.hand = player.hand.filter(c => c!=card);
+
+			}
+			console.log("cards to play",JSON.stringify(play));
+			console.log("cards to play",JSON.stringify(play));
+			game.log("played",play);
+		}
+		else {
+			//TODO: sloppy algorithm
+			//TODO: play optimal future card!
+			var landToPlay = handLands[0];
+			if(landToPlay){
+				player.battlefield.add(landToPlay);
+				player.hand = player.hand.filter(card => card!=landToPlay);
+			}
+		}
+		history.plays = JSON.parse(JSON.stringify(plays));
+		var damage = player.battlefield.getActiveDamage();
+		if(damage.length){
+			runDirectDamage(damage,player,game);
+		}
+		var attacks = powerSet(player.battlefield.getAttackers());
+		//TODO: intelligent attacking!
+		var attack = attacks[randInt(attacks.length)];
+		if(attack){
+			var blocks = runAttack(attack,player,game);
+			history.battle = JSON.parse(JSON.stringify(blocks));
+		}
+		history.endingState = game.players.map(p=>reportPlayer(p));
+		game.objectHistory.push(history);
+		player.battlefield.endTurn();
+	}
+	function BattleField(bfStruct){
+		var bf = this;
+		
+		bf.cards = [];
+		bf.untappedCards = [];
+		bf.summonSickCards = [];
+		if(bfStruct){
+			bf.cards = bfStruct.cards;
+			bf.untappedCards = bfStruct.untappedCards;
+			bf.summonSickCards = bfStruct.summonSickCards;
+		}
+		
+		bf.add = function (card,target){
+			if(card.value == "land") bf.addLand(card);
+			else if(card.ability == "Bonus" || card.ability == "Aura") bf.addBonus(card,target);
+			else if(card.ability == "Damage") bf.directDamage(card,target);
+			else bf.addCreature(card);
+		}
+		bf.addLand = function (card){
+			bf.cards.push(card);
+			bf.untappedCards.push(card);
+		}
+		bf.addCreature = function (card){
+			bf.cards.push(card);
+			if(card.ability!="Haste")bf.summonSickCards.push(card);
+			else bf.untappedCards.push(card);
+		}
+		bf.addBonus = function (card,target){
+			console.log("bonuses not implemented!");
+		}
+		bf.directDamage = function (card,target){
+			bf.cards.push(card);
+		}
+		bf.kill= function(cardList){
+			bf.cards=bf.cards.filter(card=>cardList.indexOf(card)==-1);
+			bf.untappedCards=bf.untappedCards.filter(card=>cardList.indexOf(card)==-1);
+			bf.summonSickCards=bf.summonSickCards.filter(card=>cardList.indexOf(card)==-1);
+		}
+		
+		bf.getLands = function (){
+			return bf.untappedCards.filter(card=>card.value == "land");
+		}
+		bf.getCreatures = function (){
+			return bf.cards.filter(card=>["Bonus","Aura","mana","Damage"].indexOf(card.ability)==-1);
+		}
+		bf.getAttackers = function (){
+			return bf.untappedCards.filter(card=>["Defender","Bonus","Aura","mana","Damage"].indexOf(card.ability)==-1);
+		}
+		bf.getDefenders = function (){
+			return bf.untappedCards.filter(card=>["Bonus","Aura","mana","Damage"].indexOf(card.ability)==-1);
+		}
+		bf.getActiveDamage = function(){
+			return bf.cards.filter(card =>card.ability == 'Damage');
+		}
+		
+		bf.startTurn = function (){
+			bf.untappedCards = bf.cards.slice();
+		}
+		bf.endTurn  = function (){
+			bf.untappedCards= bf.untappedCards.concat(bf.summonSickCards);
+			bf.summonSickCards = [];
+		}
+		
+		bf.serialize = function (){
+			return JSON.stringify(bf);
+		}
+		
+		return bf;
+	}
+	function setUpPlayer(deck){
+		var cards = shuffleArray(deck.slice())
+		return {
+			library: cards,
+			hand: cards.splice(-7,7),
+			discard:[],
+			battlefield:new BattleField(),
+			life:20,
+			id:nextPlayerID++,
+		}
+	}
+	function restorePlayer (player){
+		player.battlefield = new BattleField(player.battlefield);
+		return player;
+	}
+	function reportPlayer (player){
+		var p = JSON.parse(JSON.stringify(player));
+		p.library=cardIds(p.library);
+		p.hand=cardIds(p.hand);
+		p.battlefield.cards=cardIds(p.battlefield.cards);
+		p.battlefield.untappedCards=cardIds(p.battlefield.untappedCards);
+		p.battlefield.summonSickCards=cardIds(p.battlefield.summonSickCards);
+		return p;
+	}
+	function cardIds(cardList){
+		return cardList.map(card=>card.index);
+	}
+	function setUpGame(decks){
+		var game = {
+			players:decks.map(deck =>setUpPlayer(deck)),
+			turn:0
+		};
+		game.history = [];
+		game.log = function (action,cards){
+			game.history.push(action+" : "+cardReport(cards));
+		}
+		game.objectHistory = [];
+		return game;
+	}
+	function cardReport(cardList){
+		return cardList.sort((a,b)=>a.value-b.value).map(card=>card.description).join(' , ');
+	}
+	function playerState(player){
+		return "Life :"+player.life+"<br>"+
+		"Hand :"+cardReport(player.hand)+"<br>"+
+		"Creatures :"+cardReport(player.battlefield.getCreatures())+"<br>"+
+		"Field :"+cardReport(player.battlefield.getLands())+"<br>";
+	}
+	function report(game){
+		
+		document.getElementById("currentGameState").innerHTML = playerState(game.players[0])+"<br>"+playerState(game.players[1]);
+		document.getElementById("actionLog").innerHTML = game.history.join("<br>");
+	}
+	function main(){
+		seed = Math.floor(Math.random()*10000);
+		//seed = 3839;
+		//seed = 4684;
+		seed = 5290;
+		Math.seedrandom(seed);
+		console.log(seed);
+		
+		var factions = config.colors.map(c=> {return {color:c,cards:[]}});
+		addThemes(factions);
+		addCards(factions);
+		console.log(factions);
+		
+		var deckA = generateDeck(factions.slice(0,2));
+		var deckB = generateDeck(factions.slice(2,4));
+		var game = setUpGame([deckA,deckB]);
+		tick(game,0);
+	}
+	var gamePointer;
+	function tick(game,turn){
+			game.log("Turn "+(turn%2)+"/"+Math.ceil(turn/2+.5),[]);
+			runTurn(game.players[turn%2],game,turn);
+			report(game);
+			
+			if(game.players[(turn+1)%2].life>0)setTimeout(()=>tick(game,turn+1),10);
+			else {
+				download(JSON.stringify(game.objectHistory),"gameHistory.json","text/plain");
+			}
+			gamePointer=game;
+	}
+	
+    </script>
+</head>
+
+<body onload="main()">
+
+<button onclick="">Draw Card</button><br>
+<div id='display'> 
+	<div id="currentGameState"></div>
+	<br>
+	<div id="actionLog"></div>
+</div>
+</body>
+
+</html>

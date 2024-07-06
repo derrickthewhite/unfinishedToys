@@ -1,12 +1,19 @@
 function createMap(config) {
 	var map = [];
+	map.index = [];
+	map.generateTileID = function () {
+		return Math.random().toString(36).slice(2)+ Math.random().toString(36).slice(2)
+	}
 	map.createTile = function (i,j) {
 		var tile = {
 			x: i,
 			y: j,
 			name: randomLocationName(),
-			exploration: "none"
+			exploration: "none",
+			id: map.generateTileID()
 		};
+		
+		map.index[tile.id] = tile;
 		
 		if(i%2==0 && j%2==0){
 			tile.type = "cave";
@@ -58,6 +65,7 @@ function createMap(config) {
 			if(environments.length) return environments.map(f=>f.name()).join(",");
 			return "[]"
 		}
+		//TODO: this should not be the same list for everyone
 		tile.exploredFeatures = [];
 		tile.stealth = ko.observable();
 		tile.sightlines = ko.observable();
@@ -75,48 +83,10 @@ function createMap(config) {
 			tile.sightlines(tile.terrainBonus("sightlines",20)+""); 
 			tile.cover(tile.terrainBonus("cover",0)+"");
 		}
+		tile.updateTerrain();
 		return tile;
 	}
 
-	//TODO: move this somewhere better
-	map.updateAfterBattle = function (battle, loosingTeam) {
-		battle.attackers().concat(battle.defenders())
-		.forEach(unit => unit.log(""))
-		var dead = loosingTeam.units();
-		var gear = dead.map(unit => unit.gear())
-			.reduce((sofar, a) => sofar.concat(a), [])
-			.filter((gear) => !gear.handling.includes("embedded"));
-		var corpses = dead.map(unit => createCorpse(unit));
-		var itemsToAdd = gear.concat(corpses);
-		var stackableItemsToAdd = itemsToAdd.filter(item => item.handling.includes("countable"));
-		itemsToAdd = itemsToAdd.filter(item => !item.handling.includes("countable"))
-		
-		battle.location().contents = battle.location().contents.filter(item => item!=loosingTeam);
-
-		stackableItemsToAdd.forEach(item => {
-			var stack = itemsToAdd.find(stack => stack.featureType == "GearStack" && stack.itemName == item.name()); 
-			if(!stack){
-				stack = gearStack(item);
-				itemsToAdd.push(stack);
-			}
-			stack.items.push(item);
-		});
-		
-		var battlesite = createBattlesite("Battle " +Math.floor(Math.random()*1000000).toString(16));
-		battlesite.contents = itemsToAdd;
-		
-		battle.location().contents.push(battlesite);
-		//TODO: remove map-base exploredFeatures from use
-		if(battle.mode() != "aiFight")battle.location().exploredFeatures.push(battlesite);
-		var winners = [battle.attackingTeam(),battle.defendingTeam()].filter(team => team != loosingTeam)[0]; 
-		winners.featureMap[battle.location().x][battle.location().y].push(battlesite);
-		
-		results.mapNavigation.updateTileDisplay(); //TODO: using results!
-		if(battle.mode()!= "aiFight")results.mapNavigation.enterStructure(battlesite);
-		// ends the fight
-		battle.mode("over");
-		draw(); //TODO: currently universal!
-	}
 	map.neighbors = function(tile, includeClosed, includePotential) {
 		var result = [];
 		var tileX = tile.x;
@@ -145,8 +115,9 @@ function createMap(config) {
 	map.obviousContents = function (tile) {
 		return tile.contents.filter(feature => feature.featureType == "Terrain");
 	}
+	//TODO: get rid of this... it doesn't track anything anymore!
 	map.explore = function (tile) {
-		//TODO: this needs to be replaced by exit exploration;
+		console.log("I THOUGH THIS WAS REPLACED!")
 		if(tile.exploration != "explored"){
 			if(tile.type!= "corner" 
 				|| map.neighbors(tile).filter(n=>n.exploration == "explored").length
@@ -199,22 +170,46 @@ function createMap(config) {
 			 map[i][j] = tile;
 		}
 	}
-	map.initialTile = map[Math.floor(config.cellsWide()/2)*2][Math.floor(config.cellsHigh()/2)*2];
-	map.initialTile.exploration = "seen";
-	map.initialTile.contents.push(copyStructure(results.library.structures.portal));
-	
-	return map;
-}
-function createFeatureMap () {
-	//TODO: make config generic
-	var fm = [];
-	for(var i = 0;i<results.config.height();i++){
-		fm[i] = [];
-		for(var j = 0;j<results.config.width();j++){
-			 fm[i][j] = [];
+	//todo: this feels so sloppy and non-elegant
+	for(i=0;i<config.height();i++)
+		for(j=0;j<config.width();j++) {
+			tile = map[i][j];
+			if(tile.type == "corner" && tile.layout == "open/") {
+				if(map[i-1][j-1]){
+					createPassages("cave", ["NE passage", "SW end"], [map[i-1][j+1], tile], "assets/blank.svg");
+				}
+				if(map[i+1][j+1]){
+					createPassages("cave", ["SW passage", "NE end"], [map[i+1][j-1], tile], "assets/blank.svg");
+				}
+			}
+			if(tile.type == "corner" && tile.layout == "open\\") {
+				if(map[i+1][j-1]){
+					createPassages("cave", ["NW passage", "SE end"], [map[i+1][j+1], tile], "assets/blank.svg");
+				}
+				if(map[i-1][j+1]){
+					createPassages("cave", ["SE passage", "NW end"], [map[i-1][j-1], tile], "assets/blank.svg");
+				}
+			}
+			if(tile.type == "passageH"&& tile.layout == "open"){
+				if(map[i-1][j]){
+					createPassages("cave", ["E passage", "W end"], [map[i-1][j], tile], "assets/blank.svg");
+				}
+				if(map[i+1][j]){
+					createPassages("cave", ["W passage", "E end"], [map[i+1][j], tile], "assets/blank.svg");
+				}
+			}
+			if(tile.type == "passageV"&& tile.layout == "open"){
+				if(map[i][j-1]){
+					createPassages("cave", ["S passage", "N end"], [map[i][j-1], tile], "assets/blank.svg");
+				}
+				if(map[i][j+1]){
+					createPassages("cave", ["N passage", "S end"], [map[i][j+1], tile], "assets/blank.svg");
+				}
+			}
+
 		}
-	}
-	return fm;
+		map.initialTile = map[Math.floor(config.cellsHigh()/2)*2][Math.floor(config.cellsWide()/2)*2];
+	return map;
 }
 function randomLocationName() {
 	var descriptors = ["red","orange","yellow","green","blue","purple","black","white", "grey", "brown", "tall","wide","narrow","short", "wet","dry"];
@@ -222,45 +217,68 @@ function randomLocationName() {
 	
 	return randomElement(descriptors)+" "+randomElement(locations);
 }
+function randomUnitFromProportionedList(list) {
+	var total = list.map(u => u.proportion).reduce((a,b)=> a+b, 0);
+	var selection = Math.floor(Math.random()*total);
+	for (currentIndex = 0; currentIndex <= list.length; currentIndex++) {
+		if(selection < list[currentIndex].proportion) return list[currentIndex];
+		selection -= list[currentIndex].proportion;
+	}
+	console.log("you have errors in this function!");
+}
 function populateTile (tile) {
 	tile.contents = [];
-	var terrainCount = randInt(3);
+	var terrainCount = randInt(3); //0 is possible
 	for(var i = 0; i< terrainCount; i++ ){
 		tile.contents.push(results.library.terrain[randomTerrain()]);
 	}
 	
-	var monsterName = randomMonster();
-	var monsterFaction = monsterName == "goblin"? "Goblin": 
-		monsterName == "skeleton"? "Undead" :"Monster"
+	var monsterFaction = randomFaction();
+	var monsterName = monsterFaction.name;
+	var factionName = monsterFaction.faction;
+
+	var monsterImage = monsterFaction.image;
 	var ambushTypes = ["worm", "ooze"];
 	var monsterPosture = ambushTypes.includes(monsterName) ? "Stalk": "Patrol";
-	var team = createTeam(monsterName+Math.floor(Math.random()*1000), [], monsterFaction, monsterPosture);
-	if(monsterName == "worm" || monsterName == "ooze"){
-		team.units.push(copyUnit(results.library.units[monsterName]));
+	var consumableList = Object.values(results.library.consumables);
+	var team = createTeam(monsterName+Math.floor(Math.random()*1000), consumableList.map(c=>copyConsumable(c)), factionName, monsterPosture, monsterImage);
+	var count = monsterFaction.teamSize();
+	var factionSelectionSize = monsterFaction.units.map(u => u.proportion).reduce((a,b) => a+b, 0);
+	for(var monsters = 0; monsters < count; monsters++){
+		team.units.push(copyUnit(randomUnitFromProportionedList(monsterFaction.units).unit));
 	}
-	if(monsterName == "goblin" || monsterName == "skeleton") {
-		var count = randInt(10);
-		for(var monsters = 0; monsters < count; monsters++)
-			team.units.push(copyUnit(results.library.units[monsterName]));
-	}
+	team.setSupply("food", team.units().length*5);
+
 	tile.contents.push(team);
 	if(monsterName == "worm") {
 		var nest = copyStructure(results.library.structures.wormNest)
-		nest.contents.push(copyUnit(results.library.units.worm));
 		nest.contents.push(copyUnit(results.library.units.worm));
 		tile.contents.push(nest);
 	}
 	if(monsterName == "goblin"){
 		var town = copyStructure(results.library.structures.goblinTown);
-		var count = randInt(6)+randInt(6);
-		for(var i = 0; i<count;i++)
-			town.contents.push(copyUnit(results.library.units.goblin));
+		//TODO: town population as configuration rather than hard coded
+		var count = randInt(6)+randInt(6) +2;
+		for(var i = 0; i<count;i++){
+			var monster = randomElement([
+				results.library.units.goblin,
+				results.library.units.goblinWizard,
+				results.library.units.goblinArcher
+			]);
+			town.contents.push(copyUnit(monster));
+		}
+		town.setSupply("food", 500);
+		town.setSupply("gold", 1000);
+		town.setSupply("magic", 400);
 		tile.contents.push(town);
 	}
 	if(team) {
-		team.featureMap[tile.x][tile.y] = team.featureMap[tile.x][tile.y].concat(tile.contents);
+		tile.contents.forEach(f => team.explorationMap().add(tile,f));
+		team.explorationMap().setStatus(tile, "explored");
+		team.tile(tile);
 	}
 }
+
 function randomTerrain () {
 	var terrain = [
 		"glowshrooms",
@@ -278,13 +296,23 @@ function randomStructure () {
 	return randomElement(structures);
 }
 function randomMonster () {
-	//TODO: undo
-	return "worm";
 	var monsters = [
 		"worm",
 		"skeleton",
 		"ooze",
-		"goblin"
+		"goblin",
+		"squidling"
 	];
 	return randomElement(monsters);
+}
+function randomFaction () {
+	var library = results.library;
+	var factions = [
+		library.faction.goblin,
+		library.faction.ooze,
+		library.faction.worm,
+		library.faction.undead,
+		library.faction.squidling,
+	];
+	return randomElement(factions);
 }

@@ -1,0 +1,176 @@
+<html>
+	<head>
+		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
+		<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+		<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
+		<script>
+			//fisher-yates shuffle algorithm
+			function shuffleArray(a)
+			{
+				 var j, x, i;
+				for (i = a.length - 1; i > 0; i--) {
+					j = Math.floor(Math.random() * (i + 1));
+					x = a[i];
+					a[i] = a[j];
+					a[j] = x;
+				}
+				return a;
+			}
+			var numericStats = ["wettness","gravity","pressure","temperature"];
+			var planetStatName = function (stat,value){
+				if(stat=="wettness") return (value<0?"dry":"wet")+" ("+value+")";
+				if(stat=="temperature") return (value<0?"cold":"hot")+" ("+value+")";
+				return stat+" ("+value+")";
+			}
+			function Planet(wettness,gravity,pressure,temperature,bounty,duration){
+				var planet = {
+					wettness:wettness,
+					gravity: gravity,
+					pressure: pressure,
+					temperature: temperature,
+					bounty: bounty,
+					duration: duration,
+					attributes : numericStats.concat(["bounty","duration"])
+				};
+				
+				return planet;
+			}
+			function generatePlanet(){
+				function roll(){
+					return Math.floor(Math.random()*2)-Math.floor(Math.random()*2);
+					//return Math.floor(Math.random()*3)-1;
+				}
+				return Planet(
+					roll(),
+					roll(),
+					roll(),
+					roll(),
+					4+roll(),
+					5
+				);
+			}
+			var raceBonuses = [
+				{name:"dry",effect:"ignore",target:"wettness",value:1},
+				{name:"wet",effect:"ignore",target:"wettness",value:-1},
+				{name:"cold",effect:"ignore",target:"temperature",value:-1},
+				{name:"hot",effect:"ignore",target:"temperature",value:1},
+				{name:"High G",effect:"ignore",target:"gravity",value:1},
+				{name:"Low Pressure",effect:"ignore",target:"gravity",value:-1},
+				{name:"High Pressure",effect:"ignore",target:"gravity",value:1},
+				{name:"Warriors",effect:"production",target:"warship",value:1.5},
+				{name:"Builders",effect:"production",target:"habitat",value:1.5},
+				{name:"Traders",effect:"production",target:"economy",value:1.5}
+			]
+			function Race(name,bonuses){
+				var race = {};
+				race.name = name;
+				race.bonuses = bonuses
+				return race;
+			}
+			function InhabitedPlanet(planet,race){
+				var inhabitedPlanet ={};
+				inhabitedPlanet.planet = planet;
+				inhabitedPlanet.race = ko.observable(race);
+				inhabitedPlanet.time = ko.observable(0);
+				
+				inhabitedPlanet.production = ko.pureComputed(function (){
+					return planetProduction(inhabitedPlanet.planet,inhabitedPlanet.race());
+				});
+				
+				return inhabitedPlanet;
+			}
+			function planetProduction (planet,race){
+				var result = numericStats.reduce((out,stat)=>out-Math.abs(planet[stat]),0);
+				for(var bonus of race.bonuses){
+					if(bonus.effect = "ignore" && planet[bonus.target]*bonus.value>0)
+						result+= Math.abs(planet[bonus.target]); //TODO: remove lower of the two numbers, not just override;
+				}
+				result+=planet.bounty;
+				return result;
+			}
+			function Resources (values){
+				var resources = {};
+				values = values?values:[];
+				resources.attributes = ["economy","warships","habitats","science"];
+				resources.attributes.forEach((resource,index)=>{
+					resources[resource] = ko.observable(values[index]?values[index]:0);
+				});
+				
+				resources.total = ko.pureComputed(function (){
+					return resources.attributes.reduce((out,resource)=>out+resources[resource](),0)
+				});
+				return resources;
+			}
+			function Influence(values){
+				var influence = {};
+				values = values?values:[];
+				influence.institutes = ["library","migration","warfare"];
+				influence.galactic = ko.observable(galactic?galactic:0);
+				influence.institutes.forEach((institute,index)=>{
+					influence[institute] = ko.observable(values[index]?values[index]:0);
+				});
+				resources.cost = ko.pureComputed(function (){
+					var subs = influence.institutes.reduce((out,institute)=>out+influence[institute](),0);
+					return Math.max(subs,influence.galactic()); //TODO: half value for galactic or full value? -- full for now!
+				});
+				return influence;
+			}
+			function Player(){
+				var player = {};
+				
+				player.races = ko.observableArray([]);
+				player.planets = ko.observableArray([]);
+				player.influence = Influence();
+				player.resources = Resources();
+
+				
+				player.production = ko.pureComputed(function (){
+					return player.planets.reduce((out,planet)=>{
+						out + planet.production()
+					},0);
+				});
+				
+				player.influenceToBuy = Influence();
+				player.resourcesToBuy = Resources();
+				
+				return player;
+			}
+			function Game(){
+				var game = {};
+				
+				game.players = ko.observableArray([]);
+				game.planetsForPurchase = ko.observableArray([]);
+				
+				return game;
+			}
+			function setup(){
+				shuffleArray(raceBonuses);
+				root.race = Race("first",[raceBonuses.pop(),raceBonuses.pop()]);
+				root.planet = InhabitedPlanet(generatePlanet(),root.race);
+			}
+			var root = {};
+			function main (){
+			var seed = Math.floor(Math.random()*10000);
+			//seed = 1031;
+			Math.seedrandom(seed);
+			console.log("seed",seed);
+			setup();
+			ko.applyBindings(root,document.getElementById('content'));
+		}
+		</script>
+	</head>
+	<body onload="main()">
+		<div id = "content">
+			<div data-bind="with:race">
+				<div>name: <span data-bind="text:name"></span></div>
+				<div data-bind="foreach:bonuses">
+					<div><span data-bind="text:name"></span></div>
+				</div>
+			</div>
+			<div data-bind="foreach:planet.planet.attributes">
+				<div><span data-bind="text:planetStatName($data,$parent.planet.planet[$data])"></span></div>
+			</div>
+			<div data-bind = "text:planet.production"></div>
+		<div>
+	</body>
+</html>

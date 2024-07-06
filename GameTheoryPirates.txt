@@ -1,0 +1,53 @@
+function generateGold (givers,rejectors) {
+	var results = {givers:[],rejectors:[]};
+	
+	for(var giver of givers)
+		for(var rejector of rejectors)
+		{
+			if(100- giver >= rejector)
+			{
+				if(!results.givers[giver])results.givers[giver]=0;
+				if(!results.rejectors[rejector])results.rejectors[rejector]=0;
+				
+				results.givers[giver]+=giver;
+				results.rejectors[rejector]+= 100- giver;
+			}
+		}
+	return results;
+}
+var startingArrays = {givers:[],rejectors:[]};
+for(var i = 0;i<=100;i+=2) {
+	startingArrays.givers.push(i); startingArrays.rejectors.push(i);
+}
+
+function newArrays(incomes){
+	giverTotal =  incomes.givers.reduce((a,b)=>a+b);
+	rejectorTotal = incomes.rejectors.reduce((a,b)=>a+b);
+	var giverUnit = giverTotal/1000;
+	var rejectorUnit = rejectorTotal/1000;
+	
+	
+	var results = {givers:[],rejectors:[]};
+	for(var i in incomes.givers)
+	{
+		i= Number(i);
+		for(var count = 0; count < Math.round(incomes.givers[i]/giverUnit);count++)
+			results.givers.push(i);
+	}
+	for(var i in incomes.rejectors)
+	{
+		i= Number(i);
+		for(var count = 0; count < Math.round(incomes.rejectors[i]/rejectorUnit);count++)
+			results.rejectors.push(i);
+	}
+	return results;
+}
+
+var firstRun = generateGold(startingArrays.givers,startingArrays.rejectors);
+var currentRun = newArrays(firstRun);
+
+do {
+	lastRun = currentRun;
+	currentRun= newArrays(generateGold(currentRun.givers,currentRun.rejectors));
+}while (JSON.stringify(lastRun)!=JSON.stringify(currentRun));
+	

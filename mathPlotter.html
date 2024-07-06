@@ -1,0 +1,94 @@
+<html>
+<head>
+	<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+	<script>
+		var config = {
+			magnitudeFactor: .5,
+			magnitudeCutoff: 1,
+			startingMagnitude: 10,
+			displayDimensions:900,
+			stDevFactor:1,
+			distanceScale:30,
+			magnitudeScale:1,
+		};
+		function randomGausian(average,dev)
+		{
+			var u = 0, v = 0;
+			while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+			while(v === 0) v = Math.random();
+			var r = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+			return average+r*dev;
+		}
+		function randomSquare(side){
+			return {x:Math.random()*side*2-side,y:Math.random()*side*2-side};
+		}
+		function analyze(points){
+			points.forEach(point=>{
+				if(Math.abs(2*Math.sin(Math.atan2(point.y,point.x)/2))*10<2*(10 - Math.sqrt(point.x*point.x+point.y*point.y)))
+					point.color="red"; 
+				else point.color="blue"; 
+				//console.log(point.x,point.y,Math.atan2(point.y,point.x)*180/Math.PI,Math.atan2(point.y,point.x)*180/Math.PI/2,Math.sin(Math.atan2(point.y,point.x)/2));
+			})
+		}
+		function draw(spots){
+			var canvas = document.getElementById('display');
+			var frame = document.getElementById('canvasFrame');
+			frame.width = config.displayDimensions;
+			frame.height = config.displayDimensions;
+			canvas.width = config.displayDimensions;
+			canvas.height = config.displayDimensions;
+
+
+			if(canvas.getContext){
+				var ctx = canvas.getContext('2d');
+				ctx.fillStyle="#aaaaaa";
+				ctx.fillRect(0,0,config.displayDimensions,config.displayDimensions);
+
+				for(var spot of spots){
+					if(spot.color)ctx.fillStyle=spot.color;
+					else ctx.fillStyle = '#333333';
+					ctx.beginPath();
+					ctx.arc(
+						config.displayDimensions/2 +spot.x*config.distanceScale,
+						config.displayDimensions/2 +spot.y*config.distanceScale,
+						config.magnitudeScale,
+						0,
+						Math.PI*2
+					);
+					ctx.fill();
+				}
+			}
+		}
+		function generateDots(count){
+			return Array.from({length:count},()=>randomSquare(10));
+		}
+		
+		function placeWells(){
+			var seed = document.getElementById('seed').value;
+			Math.seedrandom(seed);
+			var spots = generateDots(30000);
+			analyze(spots)
+			draw(spots);
+		}
+		function newSeed(){
+		
+			seed = Math.floor(Math.random()*10000);
+			document.getElementById('seed').value=seed;
+			placeWells();
+
+		}
+		function main(){
+			newSeed();
+		}
+
+	</script>
+</head>
+<body onload="main()">
+	seed: <input id = "seed"></input>
+	<button onclick="newSeed()">New Seed</button>
+	<span id = "seedArea"></span>
+	<div id="canvasFrame">
+	<canvas id="display" ></canvas>
+	</div>
+</body>
+</html>

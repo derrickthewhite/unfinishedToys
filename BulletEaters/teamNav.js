@@ -2,58 +2,107 @@ function createTeamNavigation() {
 	var consumableList = Object.values(results.library.consumables);
 	var teamNav = {
 		teams: ko.observableArray([
-			createTeam(getTeamName(), consumableList.map(c=>copyConsumable(c)), "modern", "Patrol"),
+			createTeam(getTeamName(), consumableList.map(c=>copyConsumable(c)), "modern", "Patrol", "assets/modern.svg"),
 		]),
 		currentTeam: ko.observable()
 	};
+	teamNav.turnCount = 1;
 	teamNav.endTurn = function (){
-		//TODO: actually run enemy action
 		var factionsToRun = ["Goblin", "Undead", "Monster"];
-		//TODO: results.map is not the idea way
+		var wormCount = 0;
+		//TODO: results.map to get all the faction Pieces is not the ideal way
 		var toMove = factionsToRun.map(faction => ({faction: faction, pieces: results.map.getFactionPieces(faction)}))
 		.forEach(faction => {
+			results.factionManager.currentFaction(results.factionManager.getFaction(faction.faction));
 			faction.pieces.teams.forEach(team => {
-				
+				//Its possible that teams have killed each other since then (especially monsters)
+				if(team.team.units().filter(u => u.status() != "dead").length == 0) return;
 				//console.log("this team can move", team.team.name(), team.team.faction());
+				if(faction.faction == "Goblin") {
+					var tile = team.tile;
+					var exploredFeatures = team.team.explorationMap().features(tile).concat(team.team);
+					var discovery = results.mapNavigation.exploreResult(tile, exploredFeatures);
+					console.log(team.team.name(), "discovered", discovery.name())
+					if(discovery.featureType == "Team") {
+						var reaction = results.diplomacy.getReaction(team.team, discovery);
+						var opposingReaction = results.diplomacy.getReaction(discovery, team.team);
+						
+						if(reaction == "Hostile") {
+							console.log("fight between" + team.team.name() + " and ", discovery.name())
+							var distance = results.encounterZone.stealthDistances(team.team, discovery, tile).distance;
+							//TODO: give players control at some point
+							//TODO: detail other opposing reactions
+							if(opposingReaction == "Player Driven"){
+								results.battleground.setUpPlayerBattle(discovery,team.team, tile, distance);
+							}else {
+								results.battleground.setUpAiBattle(team.team, discovery, tile, distance);
+							}
+							console.log("battle is over, battle is active? ",results.battleground.active());
+						}
+						if(reaction == "Wary") {
+							//TODO: set the team! -- was this already done?
+							teamNav.selectTeam(discovery);
+							results.encounterZone.setEncounter(team.team, team.tile);
+						}
+					}
+				}
 				if(team.team.units().map(u => u.type()).includes("worm")) {
+					wormCount++;
 					//TODO: move the worm!
 					var tile = team.tile;
-					var discovery = results.mapNavigation.exploreResult(tile, team.team.featureMap[tile.x][tile.y].concat(team.team));
-					//console.log("this worm can move to...");
-					//console.log("this worm needs to go exploring!");
-					console.log(team.team.name() + " found ", discovery.name());
+					var exploredFeatures = team.team.explorationMap().features(tile).concat(team.team);
+					var discovery = results.mapNavigation.exploreResult(tile, exploredFeatures);
+					//console.log(team.team.name() + " found ", discovery.name());
 					if(discovery.featureType == "Team"){
+						console.log("fight between" + team.team.name() + " and ", discovery.name())
 						var distance = results.encounterZone.stealthDistances(team.team, discovery, tile).distance;
 						if(discovery.faction() == "modern"){
 							results.battleground.setUpPlayerBattle(discovery,team.team, tile, distance);
 						}else {
 							results.battleground.setUpAiBattle(team.team, discovery, tile, distance);
 						}
+						console.log("battle is over, battle is: ",results.battleground.active());
+					}
+					if(discovery.featureType == "Passage") {
+						results.mapNavigation.moveIntoTile(team.team, discovery.destination);
+						console.log("worm moved into ", discovery.destination.x, discovery.destination.y, discovery.destination.name);
 					}
 				}
 			});
+			
 			faction.pieces.structures.forEach(structure => {
-				
+				//TODO: other structures
 				if(structure.structure.type() == "Worm Nest") {
 					if(Math.random()*10 <1){
-						var newWorms = createTeam("worm"+Math.floor(Math.random()*1000), [], "Monster", "Stalk");
+						//TODO: better way to construct consumables for teams
+						var consumableList = Object.values(results.library.consumables);
+						var newWorms = createTeam("worm"+Math.floor(Math.random()*1000), consumableList.map(c=>copyConsumable(c)), "Monster", "Stalk", "assets/worm.svg");
 						var tile = structure.tile;
 						newWorms.units.push(copyUnit(results.library.units.worm));
 						tile.contents.push(newWorms);
 						newWorms.tile(tile);
-						//TODO: don't rely on results to get the map... maybe it should live somewhere better?
-						newWorms.featureMap[tile.x][tile.y] = results.map.obviousContents(tile);
-						console.log("a new worm at ", tile.x, tile.y);
+						results.map.obviousContents(tile).forEach(f => newWorms.explorationMap(). add(tile,f));
 					}
 				}
-				//console.log("this structure can do things", structure.name(), structure.faction());
 			})
-
 		});
+		
+		
+		
+		//player only
 		teamNav.teams().forEach((team) => {
 			team.setSupply("moves",3);
 			team.addSupply("food",-1*team.units().length);
+			if(team.getSupply("food") <0){
+				team.units().forEach(unit => {
+					if(!unit.buffs().includes(results.library.buffs.hungry))
+						unit.buffs.push(results.library.buffs.hungry)
+				});
+			} else {
+				team.units().forEach(unit => unit.buffs.remove(results.library.buffs.hungry));
+			}
 		});
+		results.factionManager.currentFaction(results.factionManager.getFaction("modern"));
 	}
 	teamNav.drop = function (object) {
 		if(results.groupNavigation.currentGroup()){
@@ -93,17 +142,19 @@ function createTeamNavigation() {
 		teamNav.currentTeam(team);
 		results.mapNavigation.currentTile(team.tile())
 		results.mapNavigation.updateTileDisplay();
-		centerCameraOnTile(team.tile());
-		draw();
+		results.artist.centerCameraOnTile(team.tile());
+		results.artist.draw();
 	};
 	teamNav.unselectTeam = function () {
 		teamNav.currentTeam(undefined);
-		draw();
+		results.artist.draw();
 	}
 	teamNav.formNewTeam = function () {
-		//TODO: associate with stuctures?
-		var team = createTeam(getTeamName(), consumableList.map(c=>copyConsumable(c)), "modern", "Patrol");
-		team.tile(teamNav.homeTile);
+		var team = createTeam(getTeamName(), consumableList.map(c=>copyConsumable(c)), "modern", "Patrol", "assets/modern.svg");
+		//TODO: place in tile associated with structure
+		team.tile(results.map.homeTile);
+		//TODO: Maybe get base faction instead?
+		results.factionManager.currentFaction().explorationMap().share(team.explorationMap());
 		teamNav.teams.push(team);
 	}
 	teamNav.disbandTeam = function (team) {
@@ -114,23 +165,30 @@ function createTeamNavigation() {
 		team.tile().contents = team.tile().contents.concat(team.loot());
 		teamNav.teams.remove(team);
 		results.mapNavigation.updateTileDisplay();
-		draw();
+		results.artist.draw();
 	}
 	teamNav.transferUnit = function (unit) {
 		results.groupNavigation.currentGroup().contents.push(unit);
 		teamNav.currentTeam().units.remove(unit);
 		results.groupNavigation.updateGroupDisplay();
 	}
-	teamNav.unitActions = function(unit){
-		return [{
-			name:"Transfer",
-			click: () => {teamNav.transferUnit(unit)}
-		}]
-		.concat(unit.gear().map((gear) => ({
-			name: "unequip "+gear.name(),
-			click: () => {teamNav.unequip(gear, unit)}
-		})));
-	}
+	teamNav.unitActions = ko.pureComputed(() => {
+		return teamNav.currentTeam().units().map(unit => {
+			return ( results.groupNavigation.currentGroup()? 
+			[{
+				name:"Transfer",
+				svg: "assets/transfer.svg",
+				click: () => {teamNav.transferUnit(unit)}
+			}]
+			:[])
+			.concat(unit.gear().map((gear) => ({
+				name: "unequip "+gear.name(),
+				svg: "assets/unequip_"+gear.name()+".svg",
+				//svg: gear.svg,
+				click: () => {teamNav.unequip(gear, unit)}
+			})));
+		})
+	});
 	return teamNav;
 }
 function registerTeamNav () {
@@ -140,9 +198,11 @@ function registerTeamNav () {
 		this.root = params.root;
 	},
 	template: 
-	`<div data-bind="with: teamNavigation" id="teamNav"> 
+	`<div data-bind="with: teamNavigation" id="teamNav" class="navigationPane"> 
+		<div class="panelLable">Team Navigation</div>
 		<div data-bind="foreach:teams">
 			<div>
+				<image data-bind="attr:{src:svg}" class="smallIcon"></image>
 				<span data-bind="text:name"></span>
 				<span data-bind="text:tile().name"></span>
 				<button data-bind="click:$parent.selectTeam">Select</button>
@@ -153,12 +213,34 @@ function registerTeamNav () {
 		<div><button data-bind="click:formNewTeam">Form New Team</button></div>
 		<div><button data-bind="click:endTurn">End Turn</button></div>
 		<div data-bind="with: currentTeam">
-			<h4 data-bind="text:name"></h4>
-			<div>Stealth: <span data-bind="text:stealth"></span></div>
-			<div>Per: <span data-bind="text:per"></span></div>
-			<div data-bind="foreach: units">
-				<unit-stats params="unit:$data, actions: $parents[1].unitActions($data)"/>
+			<h4>
+				<span data-bind="text:name"></span>
+				<image data-bind="attr:{src:svg}" class="referenceIcon"></image>
+				<image data-bind="attr:{src:'assets/transfer.svg'}" class="smallIcon"></image>
+				<span data-bind="text:getSupply('moves')"></span>
+				<image data-bind="attr:{src:'assets/food.svg'}" class="smallIcon"></image>
+				<span data-bind="text:getSupply('food')"></span>
+				<image data-bind="attr:{src:'assets/ammo.svg'}" class="smallIcon"></image>
+				<span data-bind="text:getSupply('ammo')"></span>
+			</h4>
+			<div>Stealth: <span data-bind="text:stealth().toFixed(2)"></span></div>
+			<div data-bind="foreach: stealthComponents" class="statBreakdown">
+				<div class="statItem">
+					<span data-bind="text:name"></span>
+					<span data-bind="text:value.toFixed(2)"></span>
+				</div>
 			</div>
+			<div>Per: <span data-bind="text:per().toFixed(2)"></span></div>
+			<div data-bind="foreach: perComponents" class="statBreakdown">
+				<div class="statItem">
+					<span data-bind="text:name"></span>
+					<span data-bind="text:value.toFixed(2)"></span>
+				</div>
+			</div>
+			<!--div data-bind="foreach: units">
+				<unit-stats params="unit:$data, actions: $parents[1].unitActions($data)"/>
+			</div-->
+			<unit-list params="units: units, actions: $parent.unitActions, style:''"></unit-list>
 			<div>Loot:</div>
 			<div data-bind="foreach: loot">
 				<div>

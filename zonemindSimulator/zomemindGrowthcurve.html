@@ -1,0 +1,47 @@
+<html>
+	<head>
+		<title> Zonemind Track</title>
+		<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+		<script>
+			var main = function (){
+					
+				var seed = Math.floor(Math.random() * 100000);
+				Math.seedrandom(seed);
+				
+				var output = seed;
+				
+				var odds = [];
+				var iterations = 20;
+				var improvement = .05;
+				
+				odds[0]=[1]
+				odds[1]=[1]
+				
+				var lastCount = 1;
+				
+				for(var j = 2;j< iterations;j++){
+					odds[j]=[];
+					for(var i = 0; i<lastCount || odds[j-1][i-1]; i++)
+					{
+						var fromSuccess = odds[j-1][i-1];
+						var fromFailure = odds[j-1][i];
+						fromSuccess = fromSuccess?fromSuccess:0;
+						fromFailure = fromFailure?fromFailure:0;
+						var fromSuccessOdss = (j-i)*improvement;
+						var fromFailureOdds = 1-(j-i-1)*improvement;
+						odds [j][i] = fromSuccess*fromSuccessOdss +fromFailure*fromFailureOdds
+					}
+					lastCount=i;
+					console.log(odds[j].reduce((a,b)=>a+b))
+				}
+				console.log(odds)
+				
+				document.getElementById("output").innerHTML=output
+			}
+		</script>
+	</head>
+	<body onload="main()">
+		<div id = "output"></div>
+
+	</body>
+</html>

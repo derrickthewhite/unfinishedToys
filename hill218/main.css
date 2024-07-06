@@ -1,0 +1,22 @@
+.board{
+	display:table-block;
+}
+.row{
+	display:table-row;
+}
+.space{
+	display:table-cell;
+	width:100px;
+	height:50px;
+	border:2px solid black;
+}
+.unitCard{
+	display:inline-block;
+	border:2px solid black;
+}
+.current{
+	border:4px solid green;
+}
+.attack{
+	border:4px solid red;
+}

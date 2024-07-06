@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Space Traders</title>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+	<script>
+		function run (){
+			function Planet (){
+				var planet = {};
+				planet.population = 1000;
+				planet.satisfaction =[
+					{agricultural:2, industrial:0},
+					{agricultural:3, industrial:2},
+					{agricultural:4, industrial:4},
+					{agricultural:5, industrial:8}
+				];
+				planet.production = {agricultural:};
+			}
+
+			ko.applyBindings(model,document.getElementById('main'));
+
+		}
+	</script>
+</head>
+<body onload="run()">
+	<div id = "main">
+		Damage <input type="number" data-bind="value:dice"> d6 <br>
+		Type <select data-bind="value:beam,options:BeamTypes,optionsText:'name'"></select><br>
+		Focus<select data-bind="value:focus,options:focalArrays,optionsText:'rangeMult'"></select>
+		ROF <select data-bind="value:rof,options:shotGenerators,optionsText:'shots'"></select><br>
+		<select data-bind="value:config,options:configs,optionsText:'name'"></select><br>
+		Power Size<input type="number" data-bind="value:powerSize"><br>
+		Weapon TL <input type="number" data-bind="value:weaponTL">
+		<input type = "checkbox" data-bind="checked: weaponSuperScience">^<br>
+		Power TL <input type="number" data-bind="value:powerTL">
+		<input type = "checkbox" data-bind="checked: powerSuperScience">^<br>
+
+		<div>Weight <span data-bind="text:totalWeight"></span> (<span data-bind="text:powerWeight"></span>)</div>
+		<div>Cost <span data-bind="text:cost"></span>$</div>
+		<div>Shots <span data-bind="text:shots"></span> Shots</div>
+		<div>Range <span data-bind="text:range"></span>/<span data-bind="text:longRange"></span> Yards</div>
+		<div><span data-bind="text:miles"></span> Miles</div>
+		<div>ST <span data-bind="text:ST"></span></div>
+	</div>
+
+</body>
+</html>

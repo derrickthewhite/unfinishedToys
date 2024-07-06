@@ -1,0 +1,350 @@
+<html>
+	<head>
+		<title>Hill 218</title>
+		<link href="main.css" rel="stylesheet">
+		<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+		<script>
+			//fisher-yates shuffle algorithm
+			function shuffleArray(a)
+			{
+				 var j, x, i;
+				for (i = a.length - 1; i > 0; i--) {
+					j = Math.floor(Math.random() * (i + 1));
+					x = a[i];
+					a[i] = a[j];
+					a[j] = x;
+				}
+				return a;
+			}
+			var mirrorDirection = function (direction){
+				var result =[];
+				result.push({x:direction.x,y:direction.y});
+				result.push({x:direction.y,y:-direction.x});
+				result.push({x:-direction.x,y:-direction.y});
+				result.push({x:-direction.y,y:direction.x});
+				return result;
+			}
+			var relativeLocation = function (directions){
+				var relLoc = {};
+				relLoc.directions = directions;
+				relLoc.adjacent = function (A,B){
+					return directions.filter(d=>{
+						return A.x+d.x==B.x && A.y+d.y==B.y
+					}).length !=0;
+				}
+				return relLoc;
+			};
+			var accessedLocations = function(position,directions){
+				return directions.map(dir=>{return{x:position.x+dir.x,y:position.y+dir.y}});
+			}
+			var Card = function (name,supply,attack,support,strong,cost){
+				var card = {};
+				card.name = name;
+				card.supply = supply;
+				card.attack = attack;
+				card.support = support;
+				card.strong=strong;
+				card.cost = cost;
+				
+				card.copy = function (){
+					return Card(card.name,card.supply,card.attack,card.support,card.strong);
+				}
+				
+				return card;
+			};
+			var standardMove = mirrorDirection({x:1,y:0});
+			var corners = mirrorDirection({x:1,y:1});
+			var surround = standardMove.concat(corners);
+			var artillary = ([{x:2,y:0},{x:2,y:-1},{x:2,y:1},{x:3,y:0}]).map(c=>mirrorDirection(c)).reduce((a,b)=>a.concat(b));
+			var cards = [];
+			var reference = {};
+			for(var i =0;i<5;i++)cards.push(Card("Infantry",standardMove,standardMove,standardMove,false,10));
+			for(var i =0;i<3;i++){
+				//*
+				cards.push(Card("Paratrooper",standardMove,standardMove,standardMove,false,15));
+				cards.push(Card("Tank",standardMove,standardMove,standardMove,true,25));
+				cards.push(Card("Heavy Weapons",standardMove,corners,surround,false,15));
+				cards.push(Card("Special Forces",corners,standardMove,standardMove,false,15));
+				//*/
+				cards.push(Card("Artillary",standardMove,artillary,standardMove,true,25));
+			}
+			cards.forEach(card=>reference[card.name]=card);
+			
+			var Unit = function (card,side,position){
+				var unit = {};
+				unit.card = card;
+				unit.side = side;
+				unit.position = position;
+				return unit;
+			}
+			var space = function (position){
+				var space = {};
+				
+				space.position = position;
+				space.unit = ko.observable(false);
+				
+				return space;
+			}
+			var board = function(){
+				var board = {}
+				board.map = ko.observableArray([]);
+				for(var i = 0;i<=10;i++){
+					board.map()[i]=ko.observableArray([]);
+					for(var j = 0;j<=10;j++)
+						board.map()[i]()[j]=space({x:j,y:i});
+				}
+				board.square = function (location){
+					if(location.y<board.map().length && location.y >=0 
+						&& location.x < board.map()[location.y]().length && location.x>=0)
+						return board.map()[location.y]()[location.x];
+					return undefined;
+				}
+				board.all = ko.pureComputed(function (){
+					return board.map().reduce((out,a)=>out.concat(a()),[]);
+				})
+				board.add= function(card,side,position){
+					board.map()[position.y]()[position.x]
+					.unit(Unit(card,side,position));
+				};
+				return board;
+			}
+			var player = function (deck,color,HQ){
+				var player = {};
+				player.hand=ko.observableArray([]);
+				player.deck = deck;
+				player.color = color;
+				player.HQ = HQ;
+				player.moves = ko.observable(0);
+				
+				player.shuffle = function (){
+					shuffleArray(player.deck);
+				};
+				player.startingHand = function (){
+					for(var i = 0;i<5;i++)
+						player.hand.push(player.deck.pop());
+				};
+				player.draw = function(count){
+					count=count?count:2;
+					for(var i = 0;i<count && player.deck.length;i++)
+						player.hand.push(player.deck.pop());
+				};
+				return player;
+			}
+			var suggestedMove = function (game){
+				var bases = game.supportingSquares();
+				var cards = game.currentPlayer().hand();
+				var moves = [];
+				function locationValue(location){
+					//TODO: MAGIC NUMBERS!
+					if(location.x==5 && location.y==5) return 0; //THE HILL:
+					var HQs= game.players.map(p=>p.HQ);
+					var distances = game.players.map(p=>Math.abs(location.x-p.HQ.x)+Math.abs(location.y-p.HQ.y));
+					return distances.map(d=>10*Math.pow(1/2,d)).reduce((out,a)=>out+a,0);
+				}
+				function locationHoldValue(location,card){
+					return locationValue(location) + accessedLocations(location,card.support).map(location=>locationValue(location)/2).reduce((a,b)=>a+b);
+				}
+				return cards.map(card=>
+					bases.map(base =>accessedLocations(base.position,card.supply))
+					.reduce((out,a)=>out.concat(a),[]).concat(game.currentPlayer().HQ)
+					.filter(location =>!game.board.square(location).unit())
+					.map(location=>{
+						
+						return accessedLocations(location,card.attack).filter(location=>{
+						
+							var square = game.threatenedSquares().filter(threatSquare=>threatSquare.x == location.x && threatSquare.y == location.y)[0]
+							return (square || card.strong) && game.board.square(location) &&game.board.square(location).unit() && game.board.square(location).unit().side!=game.currentPlayer()
+							&& game.board.square(location).unit().card.name != "Hill";
+						}).concat([undefined]).map(attack => {
+							return {
+								location:location,
+								card:card,
+								value:locationHoldValue(location,card)
+									+(attack?locationHoldValue(attack,game.board.square(attack).unit().card):0),
+								attack: attack
+							}
+						})
+					}).reduce((out,a)=>out.concat(a),[])
+				).reduce((out,a)=>out.concat(a),[])
+				.sort((a,b)=>b.value/b.card.cost - a.value/a.card.cost);
+			}
+			var Game = function (){
+				var game = {};
+				game.players = [player(cards.map(c=>c.copy()),"#ff8888",{x:5,y:4}),player(cards.slice(),"#8888ff",{x:5,y:6})];
+				game.board = board();
+				
+				game.currentPlayer = ko.observable(game.players[0]);
+				game.playerCount = ko.observable(0);
+				game.currentUnit = ko.observable();
+				game.currentCard = ko.observable();
+				game.currentLocation = ko.observable();
+				game.currentAttack = ko.observable();
+				game.message = ko.observable();
+				game.gridMode = ko.observable("Place");
+				game.gridModes = ["Place","Attack"];
+				
+				game.ai = 1;
+				
+				game.threatenedSquares = ko.pureComputed(function (){
+					return game.board.all()
+					.filter(space=>space.unit()&&space.unit().side==game.currentPlayer()).map(space => 
+						accessedLocations(space.unit().position,space.unit().card.support)
+					).reduce((out,a)=>out.concat(a),[])
+					.filter((p,index,array)=>array.indexOf(p)==index);
+				});
+				game.supportingSquares = ko.pureComputed(function (){
+					var hq = game.currentPlayer().HQ;
+					var occupiedSquares = game.board.all()
+					.filter(space=>space.unit()&&space.unit().side==game.currentPlayer());
+					
+					occupiedSquares.forEach(s=>s.hasSupply=s.position.x==hq.x && s.position.y==hq.y?true:false);
+					var change = true;
+					while(change){
+						 change= false;
+						for(var square of occupiedSquares){
+							if(square.hasSupply)continue;
+							var draws = accessedLocations(square.position,square.unit().card.supply);
+							for(var draw of draws){
+								var neighbor = game.board.square(draw);
+								if(neighbor.unit() && neighbor.unit().side == game.currentPlayer() && neighbor.hasSupply){
+									square.hasSupply=true;
+									change= true;
+								}
+							}
+						}
+					}
+					return occupiedSquares.filter(s=>s.hasSupply);
+				})
+				
+				game.clickSpace = function (space){
+					if(!game.currentCard())
+						game.currentCard(game.currentPlayer().hand()[0])
+					if(game.gridMode()=="Place"){
+						var supporters = game.supportingSquares();
+						if(game.currentCard().name != "Paratrooper"){ //TODO: make it an actual attribute
+							if(supporters.length==0){
+								if(space.position.x!= game.currentPlayer().HQ.x || space.position.y!= game.currentPlayer().HQ.y){
+									game.message("Only the HQ is supported!");
+									return;
+								}
+							}
+							else if(!supporters.filter(supplier=>relativeLocation(game.currentCard().supply).adjacent(space.position,supplier.position))[0]){
+								game.message("That space is not supported!");
+								return;
+							}
+						}
+						game.currentLocation(space);
+					}
+					else if(game.gridMode()=="Attack" && game.currentLocation() && game.currentCard()){
+						var position = game.currentLocation().position;
+						if(accessedLocations(position,game.currentCard().attack)
+							.filter(location=>
+								location.x==space.position.x 
+								&& location.y==space.position.y)
+							[0])
+						game.currentAttack(space);
+					}
+				};
+				game.clickCard = function (card){
+					if(game.currentPlayer().hand().indexOf(card)!=-1)
+						game.currentCard(card);
+				};
+				game.cancelAttack = function (){
+					game.currentAttack(undefined);
+				}
+				game.makeMove = function (){
+					if(!game.currentCard()||!game.currentLocation())
+						game.message("Incomplete Move!");
+					else if(game.currentPlayer().hand().indexOf(game.currentCard())==-1)
+						game.message("Invalid Card");
+					else{
+						var threatenedSquares = game.threatenedSquares();
+						game.board.add(game.currentCard(),game.currentPlayer(),game.currentLocation().position);
+						game.currentPlayer().hand.remove(game.currentCard());
+						game.currentPlayer().moves(game.currentPlayer().moves()-1);
+						if(game.currentAttack() && game.currentAttack().unit()
+							&& game.currentAttack().unit().side != game.currentPlayer()
+						){
+							var attackLoc = game.currentAttack().position;
+							var supported = threatenedSquares.filter(pos=>pos.x==attackLoc.x && pos.y==attackLoc.y);
+							if(supported.length || game.currentCard().strong){
+								game.currentAttack().unit(undefined);
+							}
+						}
+						game.currentLocation(undefined);
+						game.currentCard(undefined);
+						game.currentAttack(undefined);
+						game.gridMode("Place");
+						if(game.currentPlayer().moves()==0) game.nextPlayer();
+					}
+				};
+				game.start = function (){
+					game.players.forEach(p=>{
+						p.shuffle();
+						p.startingHand();
+					});
+					var hill = Card("Hill",[],[],[]);
+					game.board.add(hill,player([],'#88ff88'),{x:5,y:5});
+					game.currentPlayer().moves(1);
+				}
+				game.nextPlayer = function(){
+					game.currentPlayer().draw();
+					game.playerCount((game.playerCount()+1)%2);
+					game.currentPlayer(game.players[game.playerCount()]);
+					game.currentPlayer().moves(2);
+				}
+				game.runAI = function (){
+					if(game.playerCount()==game.ai){
+						var moves = suggestedMove(game);
+						console.log(moves);
+						var move = moves[0];
+						game.currentCard(move.card);
+						game.currentLocation(game.board.square(move.location));
+						game.currentAttack(move.attack?game.board.square(move.attack):move.attack);
+						game.makeMove();
+					}
+				}
+				return game;
+			}
+			var game = Game();
+			game.start();
+			function load()
+			{	
+				ko.applyBindings(game,document.getElementById('main'));
+				setInterval(game.runAI,1000);
+			}
+		</script>
+	</head>
+	<body onload="load()">
+		<div id="main">
+			<h3 data-bind="text:currentPlayer().moves"></h3>
+			<div data-bind="foreach:players">
+				<div data-bind="foreach:hand">
+					<div data-bind="text:name,click:$root.clickCard, css: {current: $data==$root.currentCard()} " class = "unitCard"></div>
+				</div>
+			</div>
+			<select data-bind="value:gridMode, options:gridModes"></select>
+			<button data-bind="click:makeMove">Finalize</button>
+			<button data-bind="click:cancelAttack">Cancel Attack</button>
+			<div data-bind = "foreach:board.map" class="board">
+				<div data-bind = "foreach:$data" class="row">
+					<div class = "space" data-bind="click:$root.clickSpace
+						,css: {current: $data==$root.currentLocation(), attack: $data==$root.currentAttack() }
+						,style: {'background-color':unit() && unit().side? unit().side.color: '#eeeeee'}">
+						<!-- ko if:unit() -->
+						<span data-bind="text:unit().card.name"></span>
+						<!-- /ko -->
+						<!-- ko foreach:$root.players -->
+						<!-- ko if:$parent.position.x == HQ.x && $parent.position.y == HQ.y -->
+							<span data-bind="text:'HQ'"></span>
+						<!-- /ko -->
+						<!-- /ko -->
+						
+					</div>
+					
+				</div>
+			</div>
+			<div data-bind="text:message"></div>
+		</div>
+	</body>
+<html>

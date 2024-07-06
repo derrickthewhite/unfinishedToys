@@ -1,0 +1,290 @@
+<html>
+	<head>
+		<title>Noble Breeding</title>
+		<link href="main.css" rel="stylesheet">
+		<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
+		<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
+		<script type="text/javascript" src= "../../Tools/randomGenerators.js"></script>
+
+		<script>
+			var colors = ["R","G","B"];
+			var fields = ["V","T","E"];
+			var alphabet = "abcdefghijklmnopqrstuvwxyz";
+			var deathRate = function (age,gender){
+				if(age<15) return .0002;
+				if(age<30) return gender=="M"?.0012:.0006;
+				if(age<40) return gender=="M"?.0018:.0009;
+				if(age<50) return gender=="M"?.003:.002;
+				if(age<60) return gender=="M"?.0075:.0045;
+				if(age<70) return gender=="M"?.015:.009;
+				if(age<75) return gender=="M"?.027:.028;
+				if(age<80) return gender=="M"?.04:.03;
+				if(age<85) return gender=="M"?.07:.05;
+				return gender=="M"?.15:.13;
+			}
+			var birthRate = function (age){
+				//TODO: factor in existing kids!
+				if(age<20)return .311;
+				if(age<25)return .219;
+				if(age<30)return .164;
+				if(age<35)return .113;
+				if(age<40)return .046;
+				if(age<45)return .009;
+				return 0;
+			}
+			var generateAgeGap = function(){
+				var category = Math.random();
+				if(category < .01) return 20 + randInt(10);
+				if(category < .026) return 15 + randInt(5);
+				if(category < .074) return 10 + randInt(5);
+				if(category < .19) return 6 + randInt(4);
+				if(category < .323) return 4 + randInt(2);
+				if(category < .527) return 2 + randInt(2);
+				if(category < .859) return -1 + randInt(3);
+				if(category < .924) return -2 - randInt(2);
+				if(category < .957) return -4 - randInt(2);
+				if(category < .984) return -6 - randInt(4);
+				if(category < .994) return -10 - randInt(5);
+				if(category < .997) return -15 - randInt(5);
+				return -20 - randInt(10);
+			}
+			var mutateString = function (string,possibilities,count){
+				for(var i = 0;i<count;i++){
+					var index = randInt(string.length);
+					var mutation = possibilities[randInt(possibilities.length)];
+					string = string.substr(0,index)+mutation+string.substr(index+1);
+				}
+				return string;
+			}
+			var breedString = function (mother,father){
+				mother = chunkString(mother);
+				father = chunkString(father)
+				return mother.map((a,i)=>mother[i][randInt(2)]+father[i][randInt(2)]).join("");
+			}
+			var chunkString = function(string){
+				var chunks = [];
+				for(var i = 0;i*2<string.length;i++)
+					chunks[i]=string.slice(i*2,i*2+2);
+				return chunks;
+			}
+			var dominantTrait = function (genes,list){
+				if(genes[0]=='0' || genes[0]==genes[1]) return genes[1];
+				if(genes[1]=='0') return genes[0];
+				var distance = list.indexOf(genes[0])-list.indexOf(genes[1]);
+				if(distance == 1 || distance == -2) return genes[1]
+				else return genes[0];
+			}
+			var Scion = function (rank){
+				var scion = {};
+				scion.gender = ""+(randInt(2)?"M":"F");
+				scion.rank = rank;
+				scion.circle = "000000000000";
+				scion.colors = "000000"; //R>B>G
+				scion.fields = "0000" // V>T>E
+				scion.age  = ko.observable(0);
+				scion.marriage  = ko.observable();
+				scion.kids = ko.observableArray([]);
+				//TODO: personality!
+				scion.defects = [];
+				return scion;
+			}
+			var generateFamily = function (rank){
+				var ageGap= generateAgeGap();
+				var younger = randInt(63)+17; 
+				var older = younger+Math.abs(ageGap);
+				var maleAge = ageGap>0?older:younger;
+				var femaleAge = ageGap<0?older:younger;
+				
+				var husband = generateScionGenetics(rank,'M');
+				var wife = generateScionGenetics(rank+randInt(3)-1,'F');
+				husband.age(maleAge);
+				wife.age(femaleAge);
+				wife.rank = rank;
+				husband.marriage(wife);
+				wife.marriage(husband);
+				var kids = quickKids(husband,wife);
+				for(var k of kids)game.scions.push(k);
+				game.scions.push(husband);
+				game.scions.push(wife);
+				//TODO: kill some of them?
+				//TODO: should this be interacting with game?
+			}
+			var marryExtras = function (singles){
+				singles.sort((a,b)=>{
+					if(a.rank!=b.rank) return b.rank-a.rank;
+					return b.age()-a.age();
+				});
+				var guys = singles.filter(a=>a.gender=="M");
+				var gals = singles.filter(a=>a.gender=="F");
+				for(var i = 0;i<Math.min(guys.length,gals.length);i++){
+					guys[i].marriage(gals[i]);
+					gals[i].marriage(guys[i]);
+					//*
+					var kids = quickKids(guys[i],gals[i]);
+					for(var k of kids)game.scions.push(k);
+					//*/
+					//TODO: should this be interacting with game?
+				}
+			}
+			var quickKids = function (husband,wife){
+				var kids = [];
+				var marriageAge = 16+randInt(8);
+				marriageAge = Math.max(marriageAge,18+wife.age()-husband.age());
+				for(var i = marriageAge;i<wife.age();i++)
+				{
+					if(Math.random()<birthRate(i)){
+						console.log("BIRTH!");
+						var baby = breedScion(wife,husband);
+						baby.age(wife.age()-i);
+						kids.push(baby);
+					}
+				}
+				return kids;
+			}
+			var generateScionGenetics = function (rank,gender){
+				var scion = Scion(rank);
+				var power=rank+2;
+				scion.circle = mutateString(scion.circle,["1"],power);
+				scion.colors = mutateString(scion.colors,colors,power);
+				scion.fields = mutateString(scion.fields,fields,power);
+				if(gender)scion.gender =gender;
+				return scion;
+			}
+			var breedScion = function (mother,father){
+				var scion = Scion(father.rank);
+				scion.circle = breedString(mother.circle,father.circle);
+				scion.colors = breedString(mother.colors,father.colors);
+				scion.fields = breedString(mother.fields,father.fields);
+				scion.defects = mother.defects.filter(a=>randInt(2)).concat(father.defects.filter(a=>randInt(2)));
+				if(randInt(2)) scion.defects.push(alphabet[randInt(26)]+alphabet[randInt(26)]);
+				//TODO: penalize defect expression
+				var expressed = scion.defects.filter((a,index)=>scion.defects.indexOf(a)!=index);
+				if(expressed.length)console.log(expressed);
+				return scion;
+			}
+			var circlePower = function (circle){
+				return chunkString(circle).map(chunk=>chunk[0]|chunk[1]).filter((a,index,array)=>a!=array[(index+3)%6]).reduce((a,b)=>a+b,0);
+			}
+			var colorsShown = function (scionColors){
+				return chunkString(scionColors).map(chunk =>dominantTrait(chunk,colors));
+			}
+			var colorPower = function(scionColors){
+				var counts = [];
+				colorsShown(scionColors).forEach(a=>counts[a] = (counts[a] | 0) +1);
+				return Object.keys(counts).map(a=>counts[a]).sort((a,b)=>a-b)[1] || 0;
+			}
+			var fieldPower = function (scionFields){
+				return chunkString(scionFields).map(chunk =>dominantTrait(chunk,fields));
+			}
+			var scionSummary = function (scion){
+				return scion.gender+scion.age()+" "+("A").repeat(scion.rank) 
+					+ " "+("P").repeat(circlePower(scion.circle)+colorPower(scion.colors))
+					+ " "+fieldPower(scion.fields).filter(a=>a!="0").join("")
+					+ " "+colorsShown(scion.colors).filter(a=>a!="0").join("")
+					+ " ["+scion.defects.join(",")+"]";
+			}
+
+			var Game = function (){
+				//Math.seedrandom(2);
+				var game = {};
+				game.scions = ko.observableArray([]);
+				//TODO: generate families
+				game.populate = function (){
+					for(var i =0;i<4;i++)generateFamily(3);
+					for(var i =0;i<16;i++)generateFamily(2);
+					//for(var i =0;i<64;i++)generateFamily(1);
+					marryExtras(game.scions().filter(scion=>!scion.marriage() && scion.age()>24));
+					game.scions.sort((a,b)=>a.age()-b.age());
+				}
+				
+				var filteredScions = function (func){
+					return ko.pureComputed( function (){return game.scions().filter(func);});
+				}
+				//TODO: make age adjustable!
+				game.bachelors = filteredScions(scion=>scion.gender=="M" && !scion.marriage() && scion.age()>=14 && scion.age()<60);
+				game.bachelorettes = filteredScions(scion=>scion.gender=="F" && !scion.marriage() && scion.age()>=14&& scion.age()<40);
+				
+				game.currentBachelor= ko.observable();
+				game.currentBachelorette = ko.observable();
+				
+				game.count = ko.pureComputed(()=> game.scions.count());
+				
+				game.select = function (scion){
+					if(!scion.marriage()){
+						if(scion.gender=='M') game.currentBachelor(scion);
+						else game.currentBachelorette(scion);
+					}
+				}
+				game.marry = function (){
+					if(game.currentBachelorette() && game.currentBachelor){
+						game.currentBachelorette().marriage(game.currentBachelor());
+						game.currentBachelor().marriage(game.currentBachelorette());
+						game.currentBachelor(undefined);
+						game.currentBachelorette(undefined);
+					}
+				}
+				game.ejectBachelor = function (){
+					game.scions.remove(game.currentBachelor());
+					game.currentBachelor(undefined);
+				}
+				game.ejectBachelorette = function (){
+					game.scions.remove(game.currentBachelorette());
+						game.currentBachelorette(undefined);
+				}
+				
+				
+				game.year = function (){
+					for(var scion of game.scions()){
+						scion.age(scion.age()+1);
+						if(scion.gender == "F" && scion.marriage() && Math.random()<birthRate(scion.age())){
+							//Birth!
+							console.log("BIRTH!");
+							game.scions.unshift(breedScion(scion,scion.marriage()));
+						}
+						if(Math.random()<deathRate(scion.age())){
+							//They Died
+							console.log("DEATH!",scion.age(),scion.gender);
+							game.scions.remove(scion);
+							if(scion.marriage())scion.marriage().marriage(undefined);
+						}
+					}
+				}
+				
+				return game;
+			}
+			var game = Game();
+			game.populate();
+			function load()
+			{
+				ko.applyBindings(game,document.getElementById('main'));
+				setInterval(game.runAI,1000);
+			}
+		</script>
+	</head>
+	<body onload="load()">
+		<div id="main">
+			<div data-bind="foreach:bachelors" id = "bachelors" class="scionList" >
+				<div data-bind="css: {selected:$data == $root.currentBachelor()} , click:$root.select ">
+					<div data-bind="text:scionSummary($data)"></div>
+					<div data-bind="text:circle"></div>
+					<div data-bind="text:colors"></div>
+					<div data-bind="text:fields"></div>
+					<div data-bind="text:defects"></div>
+				</div>
+			</div>
+			<div data-bind="foreach:bachelorettes"id = "bachelorettes" class="scionList" >
+				<div data-bind="css: {selected:$data == $root.currentBachelorette()} , click:$root.select ">
+					<div data-bind="text:scionSummary($data)"></div>
+					<div data-bind="text:circle"></div>
+					<div data-bind="text:colors"></div>
+					<div data-bind="text:fields"></div>
+					<div data-bind="text:defects"></div>
+				</div>
+			</div>
+			<button data-bind="click:marry">Marry</button>
+			<button data-bind="click:year"> Next Year</button>
+			<button data-bind="click:ejectBachelor"> Eject Male</button>
+			<button data-bind="click:ejectBachelorette"> Eject Female</button>
+		</div>
+	</body>
+<html>

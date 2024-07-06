@@ -1,0 +1,140 @@
+<html>
+	<head>
+		<title>mtg clone</title>
+		<script src="../../tools/knockout-3.4.0.js"></script>
+		<script src="../../tools/mersenne-twister.js"></script>
+		<script src="meta.js"></script>
+		<script src="card.js"></script>
+		<script src="player.js"></script>
+		<script src="game.js"></script>
+		<script src="artificialInteligence.js"></script>
+		<script src="HumanInterface.js"></script>
+		<script>
+			var nextCardNameId = 100000;
+			var nextCardId = 200000;
+			
+			var config = {};
+			config.colors = [
+				"brown",
+				"purple",
+				"green",
+				"orange",
+				"teal"
+			];
+			
+			config.abilities = [
+				"lifelink",
+				"vigilance",
+				"first strike",
+				"flying",
+				"reach",
+				"indestructible",
+				"deathtouch",
+				"trample",
+				"haste",
+				"hexproof",
+				"defender"
+			];
+			
+			config.shapes = {
+				"vanilla" : function (x) { return [x,x]},
+				"tough" : function (x) { return [x, x+1]},
+				"powerful" : function (x) {return [x+1,x]},
+				"offensive": function (x) {return [x+1,x-1]},
+				"defensive": function (x) {return [x-1,x+1]},
+				"cannon": function (x) {return [x+2, 1]},
+				"wall": function (x) {return [x>3?1:0,x+3]}
+			};
+			
+			config.costVariations = [
+				0,
+				4,
+				6,
+				4,
+				3,
+				2,
+				1
+			];
+			config.seed = 4377457;
+			
+			var shuffleArray = function (array, random) {
+				array = array.map(a=>a); //shallow copy
+				for(var i = 0; i< array.length; i++){
+					var a = Math.floor(random.random() * array.length);
+					var b = Math.floor(random.random() * array.length);
+					var tmp = array[a];
+					array[a] = array[b];
+					array[b] = tmp;
+				}
+				return array;
+			}
+			var selectItem = function (array, random) {
+				return array[Math.floor(random.random()*array.length)];
+			}
+			var copyUntilLargerThan = function (array, targetSize) {
+				var result = [];
+				while(result.length < targetSize) {
+					result = result.concat(array);
+				}
+				return result;
+			}
+			
+			var main = function () {
+				var random = new MersenneTwister(config.seed);
+				var colors = generateColors(random);
+				var meta = generateMeta(colors,random);
+				var deck1 = generateDeck(meta, config.colors.slice(0,2), random);
+				var deck2 = generateDeck(meta, config.colors.slice(2,4), random);
+				console.log(meta, colors, deck1, deck2);
+				
+				var hi = HumanInterface();
+				hi.initializeView();
+				
+				var game = Game();
+				game.setUpGame(
+					[Player(deck1),Player(deck2)],
+					[hi, Intelligence(new MersenneTwister(random.random()*100000000))], 
+					random.random()*100000000
+				);
+				game.startGame();
+			}
+			
+		</script>
+		<style>
+			.card {
+				display:inline-block;
+				border: 3px solid black;
+				margin: 5px;
+
+			}
+			.cardList {
+				border: 5px solid black;
+			}
+			.selected {
+				border-width: 5px;
+				margin: 3px;
+			}
+		</style>
+	</head>
+	<body onload="main()">
+		<div id = "humanInterface">
+			<div data-bind="text:state"></div>
+			<div>
+				Life: <span data-bind="text:playerLife"></span>
+				vs <span data-bind="text:opponentLife"></span>
+			</div>
+			<cardlist params="cards:hand,name:'hand', color:'green',click:onClick"></cardlist>
+			<cardlist params="cards:creatures,name:'creatures', color:'green',click:onClick"></cardlist>
+			<cardlist params="cards:lands,name:'lands', color:'green',click:onClick"></cardlist>
+			<cardlist params="cards:toSelect ,name:'toSelect', color:'blue', click:onClick"></cardlist>
+			<div data-bind="foreach: battles">
+				<blocklist params = "blockers: blockers, attacker: attacker, onClick:$parent.onClick "></blocklist>
+			</div>
+			<cardlist params="cards:opponentCreatures ,name:'opponentCreatures', color:'red', click:onClick"></cardlist>
+			<cardlist params="cards:opponentLands ,name:'opponentLands', color:'red', click:onClick"></cardlist>
+			<cardlist params="cards:opponentHand ,name:'opponentHand', color:'red', click:onClick"></cardlist>
+
+			<button data-bind="click:onSubmit, enable: isSubmitValid">Submit</button>
+		</div>
+	</body>
+</html>

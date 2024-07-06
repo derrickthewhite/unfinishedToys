@@ -5,6 +5,7 @@
 	<link href="style.css" rel="stylesheet"></link>
 	<!script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script-->
 	<script type="text/javascript" src="../../tools/knockout-3.4.0.js"></script>
+	<script type="text/javascript" src= "../../tools/seededGenerator.js"></script>
 	<script type="text/javascript" src="../../tools/randomGenerators.js"></script>
 	<script type="text/javascript" src="ztable.js"></script>
 	<script type="text/javascript" src="nameGenerator.js"></script>
@@ -17,18 +18,15 @@
 	<script type="text/javascript" src="events.js"></script>
 	<script type="text/javascript" src="teamNav.js"></script>
 	<script type="text/javascript" src="mapNav.js"></script>
+	<script type="text/javascript" src="groupNav.js"></script>
 	<script>
 		var results = {};
 		results.config = {
-			cellsHigh: ko.observable(1),
-			cellsWide: ko.observable(1),
+			cellsHigh: ko.observable(10), // default is 10
+			cellsWide: ko.observable(10), // default is 10
 
-		/*
-			cellsHigh: ko.observable(10),
-			cellsWide: ko.observable(10),
-			*/
 			scale: ko.observable(25),
-			aiTurnLength: ko.observable(1000),
+			aiTurnLength: ko.observable(100),
 		}
 		var camera = {
 			width: 500,
@@ -39,6 +37,9 @@
 			moveX: 0,
 			moveY: 0
 		}
+		var battleMapConfig = {
+			scale: 30
+		}
 		function randNum(number) {
 			Math.floor(Math.random() * number);
 		}
@@ -47,30 +48,43 @@
 				name: ko.observable(name),
 				teams: ko.observableArray(teams),
 				structures: ko.observableArray(structures),
-				
+				explorationMap: ko.observable(createExplorationMap())
 			}
 			return faction;
 		}
 		function main()
 		{
+			var seed = Math.random().toString(36).slice(2)
+			//var seed = "g4pjzxtuprg"; // ooze
+			//var seed = "ehvj4erertd"; // squidling
+			//var seed = "l400phuzdy"; //goblin
+			//var seed = "4tpoxs5p9i9"; //worms
+			var seed = "fytb3jmyqkh"; //1x3 worm vs gob
+			Math.seedrandom(seed);
+			console.log("using", seed);
 			var config = results.config
 			config.width = ko.pureComputed(() => config.cellsWide()*2-1);
 			config.height = ko.pureComputed(() => config.cellsHigh()*2-1);
 			
 			results.library = buildLibrary();
 			registerUnitStats();
+			registerUnitList();
 			registerTeamNav();
 			registerMapNav();
-			
+			registerGroupNav();
+			registerBattleground();
+			registerBattleReport();
 			results.map = createMap(config);
+			var map = results.map;
 			
 			var factionManager = {
 				factions: [],
-				factionNames: ["modern","Goblin", "Undead", "Monster" ]
+				factionNames: ["modern","Goblin", "Undead", "Monster", "Squidling", "None" ],
+				currentFaction: ko.observable()
 			};
 			//TODO: populate faction teams and structures properly... or remove them from object
-			factionManager.factions = factionManager.factionNames.map(name => createFaction(name,[],[]))
-			
+			factionManager.factions = factionManager.factionNames.map(name => createFaction(name,[],[]));
+			results.factionManager = factionManager;
 			
 			//TODO: populate diplomacy
 			results.diplomacy = {
@@ -78,21 +92,68 @@
 				teamRelations: {}
 			}
 			var diplomacy = results.diplomacy;
-			diplomacy.getReaction = function (subjectTeam, objectTeam) {
-				// TODO: apply this to the diplomacy screen
-				if(subjectTeam.faction == "Monster") return "Hungery";
-				if(subjectTeam.faction == "Undead") return "Hostile";
-				if(subjectTeam.faction == "modern") return "Player Driven";
-				if(subjectTeam.faction == "Goblin") {
-					if(objectTeam.faction == "Monster") return "Hostile";
-					if(objectTeam.faction == "Undead") return "Hostile";
-					if(objectTeam.faction == "Modern") {
-						if(factionManager.factions["Goblin"]["Modern"] === undefined) return "Wary";
-						else return factionManager.factions["Goblin"]["Modern"];
-					}
-					if(objectTeam.faction == subjectTeam.faction ) return "Allied"
+			factionManager.factions.forEach(faction => {
+				var result = {};
+				diplomacy.factionRelations[faction.name()] = result;
+				factionManager.factions.forEach(faction => result[faction.name()]="Wary");
+			});
+			factionManager.factions.forEach(faction => {
+				diplomacy.factionRelations["Monster"][faction.name()] = "Hungery";
+			});
+			factionManager.getFaction = function (factionName) {
+				return factionManager.factions.find(f => f.name() == factionName)
+			}
+			var perfectMap = 			{
+				getStatus: ()=> "explored",
+				setStatus: ()=>({}),
+				features: (tileId) => {
+					if(tileId.id) tileId = tileId.id;
+					return results.map.index[tileId].contents;
 				}
 			}
+			factionManager.getFaction("None").explorationMap(perfectMap);
+			factionManager.currentFaction(factionManager.getFaction("modern"));
+			results.factionManager = factionManager;
+			diplomacy.getReaction = function (subjectTeam, objectTeam) {
+				// possible reactions: "hungry", "hostile", "player driven", "wary", "allied"
+				// TODO: apply this to the diplomacy screen
+				// TODO: Player Driven determines fights, but not other interactions
+				if(subjectTeam.faction() == "Monster") return "Hungery";
+				if(subjectTeam.faction() == "Undead") return "Hostile";
+				if(subjectTeam.faction() == "modern") return "Player Driven";
+				if(subjectTeam.faction() == "Goblin" || subjectTeam.faction() == "Squidling") {
+					if(objectTeam.faction() == "Monster") return "Hostile";
+					if(objectTeam.faction() == "Undead") return "Hostile";
+					if(objectTeam.faction() == "modern") {
+						if(diplomacy.factionRelations[subjectTeam.faction()]["modern"] === undefined) return "Wary";
+						else return diplomacy.factionRelations[subjectTeam.faction()]["modern"];
+					}
+					if(objectTeam.faction() == subjectTeam.faction() ) return "Allied"
+					return "Hostile"
+				}
+			}
+			
+			results.trading = {};
+			var tradNav = results.trading; 
+			tradNav.offerGet = ko.observableArray([]);
+			tradNav.offerGive = ko.observableArray([]);
+			
+			tradNav.addGet = function () {
+				tradNav.offerGet.push(tradNav.selectedGet());
+			}
+			tradNav.addGive = function () {
+				tradNav.offerGive.push(tradNav.selectedGive());
+			}
+			tradNav.removeGet = function (a) {
+				tradNav.offerGet.remove(a);
+			}
+			tradNav.removeGive = function (a) {
+				tradNav.offerGive.remove(a);
+			}
+			tradNav.selectedGive = ko.observable();
+			tradNav.selectedGet = ko.observable();
+			tradNav.giveOptions = ko.observableArray(["a","b","c"]);
+			tradNav.getOptions = ko.observableArray(["x","y","z"]);
 			
 			results.message = ko.observable("Welcome to Bullet Eaters!");
 			
@@ -103,18 +164,19 @@
 			
 			var teamNav = results.teamNavigation;
 			var base = copyStructure(results.library.structures.base);
-			teamNav.homeTile = {
-				contents: teamNav.teams().concat(base, copyStructure(results.library.structures.portal)),
-				name: "home tile"
+			map.homeTile = {
+				contents: teamNav.teams().concat(base),
+				name: "home tile",
+				stealth: () => 0,
+				cover: () =>  0,
+				id: "hometile"
 			};
-			teamNav.homeTile.exploredFeatures = teamNav.homeTile.contents;
-			base.featureMap["home tile"] = teamNav.homeTile.contents;
-			// sticking the home tile in the feature map is hard!
 			
-			teamNav.homeTile.contents.find(item=>item.name()=="Portal").destination = results.map.initialTile;
-			results.map.initialTile.contents.find(item=>item.name()=="Portal").destination = teamNav.homeTile;
-			teamNav.teams().forEach(team => team.tile(teamNav.homeTile));
+			createPassages("Portal", ["Portal", "Portal"], [map.initialTile, map.homeTile], "assets/portal.svg");
+			teamNav.teams().forEach(team => team.tile(map.homeTile));
 			var alphaTeam = teamNav.teams()[0]
+			map.homeTile.contents.forEach( f  => alphaTeam.explorationMap().add("hometile", f))
+			alphaTeam.explorationMap().share(factionManager.getFaction("modern").explorationMap());
 			base.contents.push(copyUnit(results.library.units.conscript));
 			base.contents.push(copyUnit(results.library.units.scout));
 			base.contents.push(copyUnit(results.library.units.scout));
@@ -123,126 +185,124 @@
 			base.supply.addSupply("food",500);
 			base.supply.addSupply("ammo",500);
 			
-			results.groupNavigation = {
-				currentGroup: ko.observable(),
-				units: ko.observableArray([]),
-				gear: ko.observableArray([])
-			}
-			var groupNav = results.groupNavigation;
-			groupNav.updateGroupDisplay = function () {
-				if(groupNav.currentGroup()){
-					groupNav.units(groupNav.currentGroup().contents.filter(feature => feature.featureType == "Unit"));
-					groupNav.gear(groupNav.currentGroup().contents.filter(feature => feature.featureType == "Gear" || feature.featureType == "GearStack"));
-				} else {
-					groupNav.units([]);
-					groupNav.gear([]);
-				}
-			}
-			groupNav.transferUnit = function (unit){
-				//make transfering conditional on diplomacy
-				results.teamNavigation.currentTeam().units.push(unit);
-				groupNav.currentGroup().contents = groupNav.currentGroup().contents.filter(a=> a!= unit);
-				groupNav.updateGroupDisplay();
-			}
-			groupNav.unitActions = function (unit) {
-				return [{
-						name: "transfer",
-						click: () => groupNav.transferUnit(unit)
-				}];
-			}
-			groupNav.pickUp = function (object) {
-				//make picking it up conditional on diplomacy
-				results.teamNavigation.currentTeam().loot.push(object);
-				groupNav.gear.remove(object);
-				groupNav.currentGroup().contents = groupNav.currentGroup().contents.filter(item => item != object);
-				groupNav.updateGroupDisplay();
-			}
+			results.groupNavigation = createGroupNavigation();
 			
 			ko.applyBindings(results,document.getElementById('main'));
-			drawBigMap();
-			drawMoveMap();
+			results.artist = createArtist();
+			results.artist.draw();
+			results.artist.drawBattleMap();
 			attatchCanvasListeners();
 			tick();
-		}
+	}
 		
 	</script>
 </head>
 <body onload="main()">
 	<div id= "main">
 		<h2 data-bind="text:message"></h2>
-		<div data-bind="if:battleground.active() && battleground.mode() != 'aiFight'">
-			<div data-bind="with:battleground"  id = "battleground">
-				<h1 data-bind="text:message"></h1>
-				<div data-bind="text:mode"></div>
-				<div data-bind="if:mode() != 'enemyTurn'">
-					<button data-bind="click:allAttack">All Attack</button>
-					<button data-bind="click:allRetreat">All Move Back</button>
-					<button data-bind="click:allAdvance">All Move Forward</button>
-				</div>
-				<div data-bind="foreach:targetOptions()">
-					<span data-bind="if:$data.length">
-						<button data-bind="click:$parent.target, clickBubble:false">All foes at <span data-bind ="text:$data[0].distance()"></span></button>0
-						<span data-bind="text:$root.battleground.attackOdds($root.battleground.currentUnit(),$root.battleground.currentWeapon(),$data) +'%'"></span>
-					</span>
-				</div>
-				<div data-bind="foreach: attackers">
-					<span>
-						<unit-stats params="unit:$data, actions: $parent.attackerOptions()[$index()], style: '#000088'"/>
-					</span>
-				</div>
-				<div data-bind="foreach: defenders">
-					<unit-stats params="unit:$data, actions: $parent.targetUnitOptions($data), style: '#880000'"/>
-				</div>
-			</div>
-		</div>
-		<div data-bind="if: encounterZone.active">
-			<div data-bind="with: encounterZone">
-				<h3 data-bind="text:message"></h3>
-				<h3 data-bind="text:question"></h3>
-				<div data-bind="foreach:options">
-					<button data-bind="text:text,click:click"></button>
-				</div>
-			</div>
-		</div>
-		<div data-bind = "if:!battleground.active() && !encounterZone.active()">
-			<team-nav params="teamNav:teamNavigation,root:$data"></team-nav>
-			<map-nav params="mapNav:mapNavigation,root:$data"></map-nav>
-			<div data-bind="with:groupNavigation">
-				<div data-bind="with:currentGroup">
-					<h3 data-bind="text:name"></h3>
-					<div data-bind="foreach:$parent.units">
-						<unit-stats params="unit:$data, actions: $parents[1].unitActions($data), style: ''"/>
+		<select data-bind="value: factionManager.currentFaction, options: factionManager.factions, optionsText: 'name'">
+		</select>
+		<div>
+			<span>
+				<team-nav params="teamNav:teamNavigation,root:$data"></team-nav>
+				<span data-bind="if: encounterZone.active">
+					<div class="navigationPane">
+						<div class="panelLable">Encounter</div>
+						<div data-bind="with: encounterZone">
+							<h3>
+								<span data-bind="text: message"></span>(<span data-bind="text:mood"></span>)
+							</h3>
+							<h3 data-bind="text:question"></h3>
+							<div data-bind="foreach:options">
+								<button data-bind="text:text,click:click"></button>
+							</div>
+							<div data-bind="if: showImage"><img data-bind="attr:{src:image}"></img></div>
+						</div>
 					</div>
-					<div data-bind="foreach: $parent.gear">
-						<div>
-							<span data-bind="text:name"></span>
-							<span data-bind="if:types.includes('weapon')">
-								<!-- TODO: weapon types served more gracefully-->
-								<span data-bind="text:weaponTypes.join(',')"></span>
-								[<span data-bind="text:damage"></span>]
+				</span>
+				<!-- ko if:battleground.active() && battleground.mode() != 'aiFight'-->
+					<battle-ground params="battleground: battleground, root: $data"></battle-ground>
+				<!-- /ko -->
+				<span data-bind="visible:battleground.active() && battleground.mode() != 'aiFight'">
+					<div id = "battleCanvasFrame" class="navigationPane">
+						<div data-bind = "with: battleground" class="actionBar">
+							<span data-bind="if: currentUnit">
+								<span data-bind="foreach:moveOptions()[unitIndex(currentUnit())]">
+									<!-- TODO: make this a component?-->
+									<button data-bind="clickBubble:false, click:click">
+										<span data-bind="if:svg">
+											<img data-bind="attr:{src:svg, title: name}" class="smallIcon"></img>
+										</span>
+										<span data-bind="if: !svg">
+											<span data-bind="text:name"></span>
+										</span>
+									</button>
+								</span>
 							</span>
-							<button data-bind="click:$parents[1].pickUp">pick up</button>
 						</div>
+						<!-- canvas only shrinks properly if placed inside a div and THAT is manipulated-->
+						<canvas id = "battleMap" width="200" height="200"></canvas>
 					</div>
-					<div>Supplies:</div>
-					<div data-bind="foreach: supply.getSupplies()">
-						<div>
-							<span data-bind="text:name"></span>
-							:
-							<span data-bind="text:amount"></span>
-							<button data-bind="click:() =>$parent.supply.transferSupply(name,1,$root.teamNavigation.currentTeam().supply)">transfer</button>
-							<button data-bind="click:()=>$parent.supply.transferSupply(name,5,$root.teamNavigation.currentTeam().supply)">transfer 5</button>
-						</div>
-					</div>
+				</span>
+				<map-nav params="mapNav:mapNavigation,root:$data"></map-nav>
+				<!-- ko if: groupNavigation.currentGroup-->
+					<group-nav params="groupNav: groupNavigation, root: $data"></group-nav>
+				<!-- /ko -->
+				<div class="navigationPane">
+					<div class="panelLable">Diplomacy</div>
+					<h3>Relationship Grid</h3>
+					<table>
+						<tr>
+							<td></td>
+							<!-- ko foreach: factionManager.factions -->
+								<td data-bind="text: name"></td>
+							<!-- /ko -->
+						</tr>
+						<!-- ko foreach: factionManager.factions -->
+						<tr>
+							<td data-bind="text: name"></td>
+							<!-- ko foreach: $parent.factionManager.factions -->
+								<td data-bind="text:$parents[1].diplomacy.factionRelations[$parent.name()][name()]"></td>
+							<!-- /ko -->
+						</tr>
+						<!-- /ko -->
+					</table>
 				</div>
+				<div class= "navigationPane">
+					<div class="panelLable">Unit</div>
+				</div>
+				<!--div class="navigationPane">
+					<div class="panelLable">Trade</div>
+					<select data-bind="value: trading.selectedGive, options: trading.giveOptions">
+					</select>
+					<button data-bind="click: trading.addGive">Add</button>
+					<select data-bind="value: trading.selectedGet, options: trading.getOptions">
+					</select>
+					<button data-bind="click: trading.addGet">Add</button>
+					<div data-bind="foreach: trading.offerGive">
+						<div>
+							<span data-bind="text:$data">
+							<button data-bind="click:$root.removeGive">Remove</button>
+						</div>
+					</div>
+					<div data-bind="foreach: trading.offerGet">
+						<div>
+							<span data-bind="text:$data">
+							<button data-bind="click:$root.removeGet">Remove</button>
+						</div>
+					</div>
+				</div-->
+				<!-- ko if:battleground.active() && battleground.mode() != 'aiFight'-->
+					<battle-report params="battleground: battleground, root: $data"></battle-report>
+				<!-- /ko -->
+			</span>		
+			<div id = "moveCanvasFrame" class="basicPane">
+				<!-- canvas only shrinks properly if placed inside a div and THAT is manipulated-->
+				<canvas id = "moveMap" width="200" height="200"></canvas>
 			</div>
 		</div>
 	</div>
-	<div id = "moveCanvasFrame">
-		<!-- canvas only shrinks properly if placed inside a div and THAT is manipulated-->
-		<canvas id = "moveMap" width="200" height="200"></canvas>
-	</div>
-		<div id = "canvasFrame">
+	<div id = "canvasFrame">
 		<!-- canvas only shrinks properly if placed inside a div and THAT is manipulated-->
 		<canvas id = "bigMap" width="200" height="200"></canvas>
 	</div>
