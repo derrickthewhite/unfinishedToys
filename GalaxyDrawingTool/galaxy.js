@@ -147,7 +147,7 @@ function generateArms(controlPrefix) {
         const armAngle = (i / armCount) * Math.PI * 2;
         drawSpiralArm(centerX, centerY, radius, armAngle, armSharpness, armRotations, starDensity, armRadiusCoefficient, starFuzziness, thetaStep, galaxyColor, nebulaDensity, nebulaColor, nebulaSize);
     }
-}
+} 
 
 function generateBulge(controlPrefix) {
     const armCount = parseInt(document.getElementById(`armCount${controlPrefix}`).value);
