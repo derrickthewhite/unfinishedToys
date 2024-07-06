@@ -1,0 +1,93 @@
+; Magic.ipt
+; created 12/18/2015 7:51:17 AM
+
+Table: MagicDescription
+[!{1d6-4} MagicLimits >> implode] [@PowerTypes]
+
+Table: PowerTypes
+Conjuring [@Conjuration] 
+[@MindCreation] Illusion
+[!{1d4} MindMagic >> implode]
+[!{max(1,1d6-3)} ESP >> implode]
+[@EnergyManip]
+[@ObjectAnimation]
+[!{max(min(1d4,1d4,1d4),min(1d4,1d4,1d4))} Healing >> implode]
+[@Transformation]
+Fate Manipulation
+
+Table: Transformation
+Elemental Transmutation
+Organic into (Dead) Organic (and elemental)
+Monstrous Twisting of Life
+Change Substances Properties
+Transform Like into Like
+Full Transformations
+
+Table: ObjectAnimation
+[@MindCreation] Undead
+[@MindCreation] Golems
+Animate [@MindCreation] Class of Objects
+Animate [@MindCreation] Objects
+
+Table: MindCreation
+Mindless 
+Programable
+Soul Bound
+Simple Minded
+Mysteriously Motivated
+Person-like
+
+Table: MindMagic
+Mind Reading
+Emotion Influencing
+Body Puppetry
+Mind Rewriting
+Mind Commanding
+Mind Movement
+
+Table: MagicLimits
+Time Consuming
+Fleeting
+Trapping Heavy
+Energy Intensive
+Connection Requiring
+Corrupting
+Non-Portable
+Substance Consuming
+
+Table: EnergyManip
+5: [@{1d6} EnergyManipTypes >> implode]
+Full Energy Manipulation
+
+Table: EnergyManipTypes
+[|Limited TK|Full TK|[@MindCreation] TK]
+Blasts of [|Fire|Ice|Pure Energy|Electricty|Kinetic Energy]
+Energy Storage ([|Biological|Magical|Mechanical|Raw (fire,electricty)])
+[|Ponderous|Slow|Fast] Movement of Raw Matter
+
+Table: ESP
+Distant Vision
+Future Prediction
+Past Viewing
+Question Revealing
+Death Speaking
+
+Table: Conjuration
+Elemental Substances
+Substances
+Shaped Elemental Substances
+Organic Items
+Shaped Ectoplasm
+[@MindCreation] Mystic Creatures
+[@MindCreation] Natural Creatures 
+
+Table: Healing
+1:Immortality
+4:Disease Curing
+2:Unwellness Curing
+4:Wound Regeneration   
+
+Table: WindowDressing
+Insubstantiality
+Gates
+Demons

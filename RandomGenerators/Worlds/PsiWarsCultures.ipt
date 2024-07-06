@@ -1,0 +1,38 @@
+; PsiWarsCultures.ipt
+; created 1/11/2017 4:33:21 PM
+
+Table: PsiWarsCulture
+[@Language] [| |unique money] [@Food]
+
+Table: Language
+Galactic Basic
+[@accent]
+[@newLang]
+
+Table: accent
+Alternate words
+Alternate word-order
+Diminuitives
+Contractions
+Articles
+Rhotic
+Non-rhotic
+Diagraphs
+
+Table: newLang
+Regional Common Lanuage
+Dead Language
+Minority Dialect
+Isolate Language
+The Black Tounge
+Prestige Language
+Street Language 
+
+Table: Food
+[|Low|High|Common] Status [|Local|Exotic] Derived [|Organic|Industrial] Food [| | |"additives"|that serves special needs]
+
+Table: Intoxicants
+Helpful
+Harmless
+Harmful
+Social [|reflects refinement| community enjoyment]

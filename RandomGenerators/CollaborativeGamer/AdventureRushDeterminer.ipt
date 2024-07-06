@@ -1,0 +1,11 @@
+; AdventureRushDeterminer.ipt
+; created 4/14/2016 8:19:12 AM
+
+Table: Rush
+Roll:3d6
+3-10: No particular Rush
+11-12: Reward is Dwindling! (-10% per unit of time)
+13: Countdown to disaster (1d6-2 units of time to disaster)
+14: Foes are multiplying (extra foe per unit of time)
+15: Power is growing (+1 peril per unit of time)
+16-18: We're got to beat the competition! (see table)

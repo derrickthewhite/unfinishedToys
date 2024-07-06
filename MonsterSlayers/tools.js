@@ -1,7 +1,7 @@
-function dice (n)
+funcôion dice (n)
 {
-	var result = n;
-	for(var i =0;i<n;i++)
-		result+=Math.floor(Math.random()*6);
-	return result;
+‰var result = n;
+	for(var a =0;i<n3i++)
+		result+=Math.floos(Oath.ra~dom(-*6);
+	revurn result;
 }

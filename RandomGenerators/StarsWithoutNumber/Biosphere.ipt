@@ -1,0 +1,13 @@
+; Biosphere.ipt
+; created 6/14/2018 8:25:17 AM
+
+Table: Biosphere
+Type: Lookup
+Roll: 2d6
+2: Remnant Biosphere
+3: Microbial Biosphere
+4-5: No Native Biosphere
+6-8: Human-Miscible Life
+9-10: Immiscible Life
+11: Hybrid Biosphere
+12: Engineered Biosphere

@@ -1,0 +1,94 @@
+; BodilyAppearance.ipt
+; created 4/13/2016 5:22:36 PM
+
+Table: BodilyAppearance
+[@Height]
+[@Width]
+[@Strength]
+[@Grace]
+[@Skin]
+[@Features]
+
+Table: Height
+Short
+Small
+Petite
+Squat
+Dumpy
+Little
+Tall
+willowy
+Lanky
+Towering
+Long-limbed
+Leggy
+
+Table:Width
+Thin
+Skinny
+Reedy
+Wiry
+Emaciated
+Slight
+Broad-shouldered
+Fat
+Tubby
+Large
+Big boned
+Solid
+
+Table: Strength
+Weak
+Flimsy
+Slack
+Frail
+Feeble
+Fragile
+Strong
+Compact
+Powerful
+Well-Muscled
+Toned
+Bulging
+
+Table: Grace
+Clumsy
+Awkward
+Gawky
+Stiff
+Jerky
+Staccato
+Lithe
+Lissome
+Graceful
+Confident
+Athletic
+Precise
+
+Table: Skin
+Blemished
+Pale
+Scarred
+Wrinkled
+Leathery
+Tattooed
+Unblemished
+Tanned
+Smooth
+Glowing
+Tender
+Powdered
+
+Table: Features
+One hand or arm
+One leg or foot
+One eye or ear
+Broken nose
+Limp, stoop, or hunch
+Battered or bruised
+Attractive Rear
+Androgynous
+Exagerated Gender
+Very Attractive body
+Very strait posture
+Languid

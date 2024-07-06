@@ -1,0 +1,29 @@
+; GovernmentType.ipt
+; created 4/29/2016 11:55:18 AM
+
+Table: AlternateWorldsPolitics
+[@PoliticalStructure] [@Unity]
+
+Table: PoliticalStructure
+roll:3d6
+3:anarchy
+4:technocracy
+5:Caste
+6-8: Feudal
+9-11: Dictatorship
+12: Oligarchy
+13: Representative Democracy
+14-15: Clan/Tribal
+16: Theocracy
+17: Corporate State
+18: Athenian Democracy
+
+Table: Unity
+roll: 2d6
+2: Unitary
+3-4: Empire
+5-6: Empire with satalites
+7: Empire with rivals
+8: Bipolar
+9-11: Multipolar ({1d6+2})
+12:Diffuse

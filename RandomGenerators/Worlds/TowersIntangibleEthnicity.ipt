@@ -1,0 +1,25 @@
+; TowersIntangibleEthnicity.ipt
+; created 7/18/2018 8:07:26 AM
+
+Table: Corporate
+[@Gender] [@Background]
+
+Table: Background
+3:North American
+2:European
+French
+3:Commonwealth
+2:Middle Eastern
+4:Chineese
+2:Japaneese
+Korean
+4:Indonesian
+2:Indian
+2: Thai, Cambodian, Veitnamese, phillipino
+African
+Central Asian
+Hispanic
+
+Table: Gender
+3: Male
+2: Female

@@ -1,9 +1,35 @@
+var nextSystemNumber = 10000;
+var lastSystemSeed;
 function System(){
 	var system = {};
 	
 	system.stars = ko.observableArray([]);
 	system.planets = ko.observableArray([]);
 	system.gasGiantArrangement = ko.observable("conventional");
+	
+	system.location = {};
+	system.location.x = ko.observable();
+	system.location.y = ko.observable();
+	system.location.z = ko.observable();
+	
+	/*
+	if(lastSystemSeed != root.seed()){
+		lastSystemSeed = root.seed();
+		nextSystemNumber = 10000;
+	}
+	*/
+	//system.name = ko.observable((nextSystemNumber++).toString(36));
+	system.name = ko.observable(root.names.getName());
+	
+	system.habitability = ko.pureComputed(function () {
+		return Math.max(...system.planets().map(p => p.habitability()));
+	});
+	system.affinity = ko.pureComputed(function () {
+		return Math.max(...system.planets().map(p => p.affinity()));
+	});
+	system.resourceValue = ko.pureComputed(function () {
+		return Math.max(...system.planets().map(p => p.resourceValue()));
+	});
 	
 	system.orbitalZones = ko.pureComputed(function (){
 		var starZones = [];
@@ -63,6 +89,12 @@ function System(){
 		return false;
 	});
 	
+	system.population = ko.pureComputed(function () {
+		return system.planets().reduce((sofar, planet) => {
+			return sofar + planet.population();
+		},0);
+	});
+	
 	function getBestOrbitByStar(star,planets)
 	{
 		var planets = system.planets()
@@ -91,22 +123,66 @@ function System(){
 		}
 		return result;
 	});
+	
+	system.dryCopy = function () {
+		var copy = {};
+		copy.stars = system.stars().map(star => star.dryCopy());
+		copy.planets = system.planets().map(planet => planet.dryCopy());
+		copy.gasGiantArrangement = system.gasGiantArrangement();
+		copy.name = system.name();
+		
+		copy.location = {};
+		copy.location.x = system.location.x()
+		copy.location.y = system.location.y()
+		copy.location.z = system.location.z()
+		return copy;
+	}
+	
+	system.water = function (struct) {
+		var guidMap = [];
+		system.stars(struct.stars.map(starStruct => {
+			var star = Star();
+			star.water(starStruct);
+			guidMap[star.guid] = star;
+			star.system(system);
+			return star;
+		}));
+		system.planets(struct.planets.map(planetStruct => {
+			var planet = Planet();
+			planet.water(planetStruct);
+			guidMap[planet.guid] = planet;
+			return planet;
+		}));
+		system.planets().forEach(planet => {
+			planet.orbit().connect(guidMap);
+		})
+		system.stars().forEach(star => {
+			star.orbit().connect(guidMap);
+		})
+		system.location.x(struct.location.x)
+		system.location.y(struct.location.y)
+		system.location.z(struct.location.z)
+
+	}
+	
 	return system;
 }
 
-function generateSystem(cosmos)
+function generateSystem()
 {
 	var system = System();
-	system.location = {};
 	var position = generateStarPosition();
-	system.location.x = ko.observable(position[0]);
-	system.location.y = ko.observable(position[1]);
-	system.location.z = ko.observable(position[2]);
+	system.location.x(position[0])
+	system.location.y(position[1])
+	system.location.z(position[2])
 	
 	var age = starAge();
 	var primaryMass = starMass();
 	var primaryStar = Star(primaryMass,age, new Orbit(0,0))
 	system.stars.push(primaryStar);
+	primaryStar.system(system);
+	primaryStar.name(system.name()+"-I")
+	
 	var numStars = starCount(); // TODO: companions of distant companions
 	for(var i =1; i< numStars; i++)
 	{
@@ -114,7 +190,10 @@ function generateSystem(cosmos)
 		var eccentrictyModifier = Math.min(0, Math.floor(Math.log(distanceMultiplier)/ Math.log(10)-1)*2);
 		var eccentricty = getStellarOrbitEccentricity(eccentrictyModifier);
 		var distance = distanceMultiplier*dice(2);
-		system.stars.push(Star(companionMass(primaryMass),age, new Orbit(distance,eccentricty,primaryStar)));
+		var star = Star(companionMass(primaryMass),age, new Orbit(distance,eccentricty,primaryStar));
+		system.stars.push(star);
+		star.system(system);
+		star.name(system.name()+"-"+(system.stars().length==2?"II":"III"))
 	}
 	
 	var inZone = function(distance,zones){
@@ -154,7 +233,16 @@ function generateSystem(cosmos)
 		}
 		for(var distance of orbits)
 		{
-			system.planets.push(generatePlanet(system.gasGiantArrangement(),distance,star));
+			var planet = generatePlanet(system.gasGiantArrangement(),distance,star);
+			var modifier = system.gasGiantArrangement() == "conventional"?-6: 
+				system.gasGiantArrangement() == "eccentric" && star.snowLine()>= distance? 4:
+				system.gasGiantArrangement() == "epistellar" && distance == initialOrbit? -6 : 0;
+			var eccentricty = Distribution(random.planetEccentricity).get(dice(3)+modifier);
+			planet.orbit().eccentricty(eccentricty);
+			if(planet.size() != -1){ // means no planet in this orbit
+				system.planets.push(planet);
+				planet.name(star.name()+"" +system.planets().length);
+			}
 		}
 	}
 	
@@ -166,5 +254,56 @@ function generateSystem(cosmos)
 	}
 	for(var moon of moons)system.planets.push(moon);
 	
+	//place main settlement
+	var settlementRandom = new MersenneTwister(parseInt(Math.random().toString(36).slice(2),36));
+	settlementRandom.dice = function (count){
+		if(!count)return Math.floor(settlementRandom.random()*6)+1;
+		var total = 0;
+		for(var i = 0;i<count;i++)
+			total+=dice();
+		return total;
+	}
+	var planetsByAffinity = system.planets()
+	.filter(p => p.type() != "giant")
+	.sort((a,b) => b.affinity() - a.affinity());
+	var mainPlanet = planetsByAffinity[0]
+	mainPlanet.settlementType("colony");
+	mainPlanet.worldUnity(generateWorldUnity(mainPlanet));
+	mainPlanet.government(Distribution(root.generation.govGenerator()).get(settlementRandom.dice(3) + Math.min(10,Math.round(mainPlanet.techLevel()))));
+
+	// place other settlements
+	var planetOrbitDistance = mainPlanet.isMoon()? mainPlanet.orbit().center().orbit().distance(): mainPlanet.orbit().distance();
+	var techLevel = Math.round(mainPlanet.techLevel());
+	var accessablePlanets = planetsByAffinity.filter( p => {
+		if(p == mainPlanet) return false;
+		if(techLevel <7) return false;
+		var distance = Number.Infinity;
+		var pOrbitDistance = p.isMoon()? p.orbit().center().orbit().distance(): p.orbit().distance();
+		if(p.star() == mainPlanet.star()) distance = Math.abs(planetOrbitDistance - pOrbitDistance);
+		else distance = Math.abs((p.star().orbit().distance() + mainPlanet.star().orbit().distance())-pOrbitDistance - planetOrbitDistance);
+		
+		if(techLevel ==7) return distance <= .1;
+		if(techLevel ==8) return distance <= 1;
+		if(techLevel ==9) return distance <= 10;
+		if(techLevel <= 10) return true;
+	});
+	//TODO: base tech level off of "main colony"
+	accessablePlanets.forEach( p => {
+		if(p.affinity() > 0) p.settlementType("colony");
+		else {
+			var roll = settlementRandom.dice(3);
+			if(techLevel >= 10 && roll<= 9) p.settlementType("outpost");
+			else if (roll <= techLevel-2) p.settlementType("outpost");
+			
+		}
+		if(settlementRandom.dice(3 )+ p.populationRating() >= 20){
+			p.government(Distribution(root.generation.govGenerator()).get(settlementRandom.dice(3) + Math.min(10,Math.round(p.techLevel()))));
+			p.worldUnity(generateWorldUnity(p));
+		}
+		else {
+			p.government(mainPlanet.government());
+			p.worldUnity(mainPlanet.worldUnity());
+		}
+	});
 	return system;
 }

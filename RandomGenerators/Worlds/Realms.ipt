@@ -1,0 +1,44 @@
+; Realms.ipt
+; created 9/6/2018 4:14:31 PM
+
+Table: FortyElementalRealms
+Water-Earth
+Air-Metal
+Wood-Mind
+Light-Body
+Dark-Fire
+Water-Metal
+Wood-Light
+Dark-Earth
+Air-Mind
+Body-Fire
+Water-Mind
+Body-Earth
+Air-Light
+Dark-Metal
+Wood-Fire
+Water-Light
+Dark-Mind
+Body-Metal
+Wood-Earth
+Air-Fire
+Water-Dark
+Light-Mind
+Body-Wood
+Metal-Earth
+Air-Water
+Fire-Light
+Dark-Body
+Mind-Metal
+Wood-Air
+Earth-Fire
+Water-Body
+Mind-Earth
+Air-Dark
+Light-Metal
+Wood-Water
+Fire-Mind
+Body-Air
+Earth-Light
+Dark-Wood
+Metal-Fire

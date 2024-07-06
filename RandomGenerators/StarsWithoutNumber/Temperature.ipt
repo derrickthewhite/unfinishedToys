@@ -1,0 +1,13 @@
+; Temperature.ipt
+; created 6/14/2018 8:23:37 AM
+
+Table: Temperature
+Type: Lookup
+Roll: 2d6
+2: Frozen
+3: Cold
+4-5: Variable Cold
+6-8: Temperate
+9-10: Variable Warm
+11: Warm
+12: Burning

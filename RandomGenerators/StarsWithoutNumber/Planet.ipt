@@ -1,0 +1,14 @@
+; Planet.ipt
+; created 6/14/2018 8:35:47 AM
+Use: ../Generators/SpaceGenerators/starsWithoutNumber/Atmosphere.ipt
+Use: ../Generators/SpaceGenerators/starsWithoutNumber/Biosphere.ipt
+Use: ../Generators/SpaceGenerators/starsWithoutNumber/population.ipt
+Use: ../Generators/SpaceGenerators/starsWithoutNumber/TechLevel.ipt
+Use: ../Generators/SpaceGenerators/starsWithoutNumber/Temperature.ipt
+Use: ../Generators/SpaceGenerators/starsWithoutNumber/worldTags.ipt
+
+Table: StarsWoNumberPlanet
+([@Position]):[@Population] TL [@TL] on [@Temperature][@atmosphere] air with [@Biosphere] ([@worldTags],[@worldTags])
+
+Table: Position
+{1d8},{1d10}

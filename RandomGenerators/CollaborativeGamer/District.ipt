@@ -1,0 +1,27 @@
+; District.ipt
+; created 11/7/2016 8:18:43 AM
+
+Table: District
+Academic
+2: Craft
+Culture
+Foreign
+Graveyard
+Green
+Hazardous
+Historic
+Law and Order
+Military
+Money
+Plaza
+2: Poor
+Portage
+Public Amenity
+Religious
+Rich
+Ruling
+2: Trade
+Underworld
+3: Choose Governing (ruling, religious, law and order, military). Or poor
+3: Thematic. or poor
+6: Your Choice or [@District]

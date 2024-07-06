@@ -1,0 +1,160 @@
+; AlienLife.ipt
+; created 12/18/2015 4:09:15 PM
+
+Table: BizarreLife
+10:A Humanoid [@AnimalInspiration]
+7: Halfway between a [@AnimalInspiration] and a [@AnimalInspiration]
+5:A talking [@AnimalInspiration] but [@AntatomicalChange]
+1:a [@AnimalInspiration] centauroid
+10:a highly evolved [@animalInspiration] but [@AntatomicalChange]
+3: People who turn into [|[@animalInspiration]|[@AnimalGroups]][| Monsters |s]
+
+Table: AnimalInspiration
+5:[@MamalianPredator]
+5:[@MammalianHerbivore]
+2:[@Birds]
+5:[@Arthropods]
+5:[@Dinosaurs]
+5:[@SoftBodied]
+5:[@ScaledThings]
+5:[@OtherMammals]
+
+Table: AntatomicalChange
+with [|More|Fewer] Legs
+with more arms
+with [|More|Less] Fur
+4:it [|Flies|Swims|Burrows|Climbs]
+with more spikes
+its cuter and [@AntatomicalChange]
+[|Bigger|Smaller]
+[|Beefer|Scrawnier]
+slimier
+Brightly Colored
+with more eyes
+it walks upright
+
+Table: AnimalGroups
+Predator
+Large Herbivore
+Small Vertabrate
+Dinosaurs
+Bug
+Fish
+
+Table: ScaledThings
+Frog
+Salamander
+Flat Fish
+Glow Fish
+Fish
+Shark
+Lizard
+Snake
+
+
+;no, these are not all dinosuars
+;they are however all prehistoric reptiles
+Table: Dinosaurs
+Sauropod (long neck)
+T-rex
+Allosaurus
+Velociraptor
+Triceretops (Three horns)
+Stegosaurus (spiked tail)
+Ankylosaurus  (armored back)
+Hardosaur (things on heads)
+Ichthosaur (fish shaped)
+Mausosuar (crocdile shaped)
+Pleisosaur (long necked sea creature)
+Pteradactyl (flying)
+Dimotrodon (sailed back)
+
+Table: SoftBodied
+Octopus
+Cuttlefish
+Squid
+JellyFish 
+Clam
+Snail 
+Slug
+Coral
+Parasite of [@AnimalInspiration]
+Worm
+Leech
+Starfish
+Sea Urchin
+ 
+
+Table: Arthropods
+Termite
+Ant
+Beetle
+Fly
+Butterfly
+Preying Mantis
+Dragon Fly
+Spider
+Scorpion
+Lobster
+Centipede
+FireFly
+Wood Louse (rolly polly)
+
+Table: Birds
+Hummingbird
+Chicken
+Sparrow
+Hawk
+Sea Bird
+Moa
+Penguin
+
+Table: MammalianHerbivore
+Bull
+Deer
+Boar
+gazelle
+Elk
+Moose
+Elephant
+Hippo
+Rhino
+Bison
+Beaver
+Armadillo
+Rabbit
+Rat
+Goat
+Sheep 
+Kangaroo
+
+
+Table: MamalianPredator
+Wolf
+Dog
+Fox
+Coyote
+Tiger
+Lion
+Cat
+Panther
+Oceolot
+Wild Cat
+Badger
+Raccoon
+Weasle
+Skunk
+Civet
+Hyena
+Bear
+Panda
+
+Table: OtherMammals
+Shrew
+Baboon
+Monkey
+Gorilla
+Chimpanzee
+Aardavark
+Hedgehog
+Bat

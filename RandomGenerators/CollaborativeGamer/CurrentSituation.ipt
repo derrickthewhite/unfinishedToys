@@ -1,0 +1,93 @@
+; CurrentSituation.ipt
+; created 4/13/2016 5:10:49 PM
+
+Table: CurrentSituation
+[@Occupied]
+[@withOthers]
+[@conditions]
+[@Moods]
+[@Location]
+[@attitudeTowards]
+
+Table: Occupied
+In a rush
+Physically Active
+Playing Music
+Working
+Reading
+Eating
+In no Hurry at All
+Waiting for You
+Making Something
+Dozing
+Getting Drunk
+Staring into Space
+
+Table: withOthers
+In conversation
+In a meeting
+In an argument
+In a game
+At a meal
+Working
+With a lover
+With children
+Laughing
+Celebrating
+With family
+Giving or taking Orders
+
+Table: conditions
+Has a cold or is ill
+Desprate for help
+Messy or Dirty
+Tired or Hungry
+Grieving
+Sweaty
+Drunk
+Injured
+Perfect, neat, clean
+In love
+Just received news
+
+Table: Moods
+Angry or Inwards
+Upset or Paranoid
+Lonely or Anxious
+Irritable or Grim
+Distracted
+Gloomy or Sad
+Content or Curious
+Relieved or Cheery
+Elated or Carefree
+Reflective
+Hopeful
+Thinking about the past
+
+Table: Location
+At Home
+At Work
+In Transit
+Disguisting Place
+In nature
+In the dark
+Place of Authority
+Place of Recreation
+A 3rd parties' place
+in the doorway
+Iconic place
+Where they shouldn't be
+
+Table: attitudeTowards
+Miserly
+Dimmissive
+Suspicious
+Imperious
+Wheedling
+Dislike
+Welcoming
+Trusting
+Admiring
+Romantic
+Eager to please
+Generous

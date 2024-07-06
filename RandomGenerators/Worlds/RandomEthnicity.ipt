@@ -1,0 +1,26 @@
+; RandomEthnicity.ipt
+; created 4/21/2016 1:45:37 PM
+
+Table: RandomModernNationality
+10:[@Anglophone]
+India
+5:China
+5:France
+5:Russia
+2:Japan
+MiddleEast
+2:Greater Europe
+West Africa
+East Africa
+South Africa
+South East Asia
+Pacific Islander
+3:Hispanic
+Korea
+
+Table: Anglophone
+United States
+United Kingdom
+Ireland
+Canada
+ANZAC

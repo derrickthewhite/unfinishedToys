@@ -1,0 +1,14 @@
+; IW_workforceDemographics.ipt
+; created 4/21/2016 4:38:08 PM
+
+Table: Workforce
+14: 18 to 24
+64: 25 to 29
+104: 30 to 34
+119: 35 to 39
+141: 40 to 44
+158: 45 to 49
+164: 50 to 54
+133: 55 to 59
+74: 60 to 64
+30: 65 or older

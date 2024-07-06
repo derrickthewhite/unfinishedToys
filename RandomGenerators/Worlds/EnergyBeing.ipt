@@ -1,0 +1,41 @@
+; EnergyBeing.ipt
+; created 12/19/2015 7:03:24 AM
+
+Table: EnergyBeing
+A [@EnergyShape] [@EnergyBodyColor] [@EnergyBody] [@EnergyVoice] that [@EnergyFood]
+
+Table: EnergyFood
+Absorbs Sunlight
+Burns Fuel
+Needs Radiation
+Consumes Ambient Thoughts
+Lives off Souls
+Eats normal Food
+
+Table: EnergyBody
+Light
+Fire
+Mist
+
+Table: EnergyShape
+human-shaped
+glowing ball of
+Amorphous
+
+
+Table: EnergyBodyColor
+White
+Yellow
+Orange
+Blue
+Red
+Purple
+Red Yellow and Orange
+Rainbow Colored
+
+
+Table: EnergyVoice
+with no voice
+with an echoing voice
+with thundering voice
+speaking mind to mind

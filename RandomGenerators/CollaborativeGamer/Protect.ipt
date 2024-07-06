@@ -1,0 +1,20 @@
+Table: Protect
+[@mannerOfProtection] [@targetToProtect]
+
+Table: targetToProtect
+roll: 3d6
+3-8: A valuable object
+9-10: A person
+11-12: A group of People
+13-18: A place
+
+Table: mannerOfProtection
+roll:3d6
+3-7:guide
+8: gaurd
+9-10: escort
+11-12: defend
+13: guide and gaurd
+14: guide and escort
+15: guard and escort
+16-18: guide, escort, and guard

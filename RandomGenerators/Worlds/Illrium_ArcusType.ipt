@@ -1,0 +1,21 @@
+; Illrium_ArcusType.ipt
+; created 10/21/2016 8:14:24 AM
+
+Table: Weapon
+[@energy] [@Size]
+
+Table: energy
+Forcas
+Mortifier
+Scorpus
+Blasting
+Kinetus
+
+Table: Size
+Gauntlet
+Heavy Gauntlet
+Long Guantlet
+Soldier's Guantlet
+Arcus
+Heavy Arcus
+Long Arcus

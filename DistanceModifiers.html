@@ -1,0 +1,235 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Distance Tool</title>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+  <script>
+	var results = {};
+	function main(){
+		results = {
+			mode: ko.observable("spotting distance"), // spotting modifier, shooting modifier, spotting skill, shootingSkill
+			lighting: ko.observable(),
+			gear: ko.observable(),
+			timeTaken: ko.observable(),
+			sizeModifier: ko.observable(0),
+			skill: ko.observable(10),
+			cameoflage: ko.observable(0),
+			distance: ko.observable(100),
+			gunAcc: ko.observable(5),
+			timeAimed: ko.observable(1),
+			rof: ko.observable(1),
+			driving: ko.observable(),
+			adHocModifier: ko.observable(0)
+		};
+		results.modeOptions = [
+			"spotting distance",
+			"spotting modifier",
+			"spotting skill",
+			"shooting modifier",
+			"shooting skill"
+		];
+
+		results.lightingOptions = [
+			{name: "daylight (0)", value: 0},
+			{name: "overcast (-1)", value: -1},
+			{name: "dusk (-2)", value: -2},
+			{name: "full moon (-4)", value: -4},
+			{name: "half moon (-6)", value: -6},
+			{name: "no moon (-8)", value: -8},
+			{name: "none (-10)", value: -8},
+		];
+		results.gearOptions = [
+			{name: "eyes (0)", value: 0, nightVision: 0, acc: 0},
+			{name: "scope (3/1/3)", value: 3, nightVision: 1, acc: 3},
+			{name: "scope (5/1/5)", value: 5, nightVision: 1, acc: 5},
+			{name: "night scope (2/5/2)", value: 2, nightVision: 5, acc: 2},
+			{name: "2034 night scope (2/7/2)", value: 2, nightVision: 7, acc: 2},
+			{name: "binoculars (3/1/0) TL7", value: 3, nightVision:1, acc: 0},
+			{name: "Night Vision Binoculars (4/9/0) TL8", value: 4, nightVision:9, acc: 0},
+			{name: "Night Vision Goggles (0/9/0) TL8", value: 0, nightVision:9, acc: 0},
+		];
+		results.timeTakenOptions = [
+			{name: "none (0)", value: 0},
+			{name: "2 seconds (1)", value: 1},
+			{name: "4 seconds (2)", value: 2},
+			{name: "8 seconds (3)", value: 3},
+			{name: "16 seconds (4)", value: 4},
+			{name: "32 seconds (5)", value: 5},
+		];
+		
+		results.drivingOptions = [
+			{name: "dismounted (0)", value: 0},
+			{name: "driving flat (-2)", value: -2},
+			{name: "driving bumpy (-3)", value: -3},
+			{name: "driving ocean (-4)", value: -4},
+			{name: "driving rough (-4)", value: -4}
+		]
+		function baseOfBase(num) {
+			num = Math.round(num);
+			num = ((num%6)+6)%6;
+			switch (num%6){
+				case 0: return 2;
+				case 1: return 3;
+				case 2: return 5;
+				case 3: return 7;
+				case 4: return 10;
+				case 5: return 15;
+				case 6: return 20;
+			}
+		}
+		results.rangeTable = function(num) {
+			return baseOfBase(num)*Math.pow(10, Math.floor(num/6));
+		}
+		results.rangeModifier = ko.pureComputed(() => {
+			var num = 0;
+			while(results.rangeTable(num)<Number(results.distance())) num++;
+			return -num;
+		});
+		results.nightEffect = ko.pureComputed(() => {
+			return Math.min(0,results.gear().nightVision + results.lighting().value);
+		});
+		results.aimBonus = ko.pureComputed(() => {
+			var time = Number(results.timeAimed());
+			if(time < 1) return 0;
+			var gunAcc = Number(results.gunAcc());
+			if(time == 1) return gunAcc + (results.gear().acc? 1: 0);
+			return gunAcc + Math.min(time -1, 2) + Math.min(time, results.gear().acc);
+			//return Math.min(gunAcc + time -1, gunAcc + 2 + results.gear().acc);
+		});
+		results.isShooting = ko.pureComputed(() => {
+			return ["shooting skill", "shooting modifier"].includes(results.mode());
+		});
+		//TODO: night vision
+		results.shootingModifier = ko.pureComputed(() => {
+			return results.nightEffect() 
+			+results.timeTaken().value
+			+Number(results.sizeModifier())
+			+Number(results.cameoflage())
+			//+Number(results.skill())
+			+results.aimBonus()
+			+results.rangeModifier()
+			+results.rofBonus()
+			+results.driving().value
+			+Number(results.adHocModifier());
+		});
+		results.shootingSkill = ko.pureComputed(() => {
+			return results.shootingModifier() + Number(results.skill());
+		})
+		results.spottingModifier = ko.pureComputed(() => {
+			return results.nightEffect() 
+				+ results.gear().value
+				+results.timeTaken().value
+				+Number(results.sizeModifier())
+				+Number(results.cameoflage())
+				//+Number(results.skill())
+				+results.rangeModifier()
+				+Number(results.adHocModifier())
+				+10; // plain sight
+		});
+		results.spottingSkill = ko.pureComputed(() => {
+			return results.spottingModifier() + Number(results.skill());
+		})
+		results.spottingDistance = ko.pureComputed(() => {
+			var base = results.nightEffect() 
+				+ results.gear().value
+				+results.timeTaken().value
+				+Number(results.sizeModifier())
+				+Number(results.cameoflage())
+				+Number(results.skill())
+				+Number(results.adHocModifier());
+			return results.rangeTable(base);
+		});
+		
+		results.rofBonus = ko.pureComputed(() => {
+			var rof = Number(results.rof());
+			if(rof<5) return 0;
+			if(rof<9) return 1; 
+			if(rof<13) return 2; 
+			if(rof<17) return 3; 
+			if(rof<25) return 4; 
+			if(rof<50) return 5; 
+			return 6;
+		})
+
+		ko.applyBindings(results,document.getElementById('display'));
+	}
+  </script>
+</head>
+	<body onload="main()">
+		<div id="display">
+			<table>
+				<tr>
+					<td>Mode:</td>
+					<td><select data-bind="options: modeOptions, value: mode"></select></td>
+				</tr>
+				<tr><td>skill: </td><td><input type = "number" data-bind="value:skill"></input></td></tr>
+				<tr>
+					<td>lighting:</td>
+					<td><select data-bind="options: lightingOptions, optionsText: 'name', value: lighting"></select></td>
+				</tr>
+				<tr>
+					<td>gear:</td>
+					<td><select data-bind="options: gearOptions, optionsText: 'name', value: gear"></select></td>
+				</tr>
+				<tr data-bind="if:isShooting()">
+					<td>Driving: </td>
+					<td><select data-bind="options: drivingOptions, optionsText: 'name', value: driving"></select></td>
+				</tr>
+
+				<tr data-bind="if:!isShooting()">
+					<td>time taken:</td>
+					<td><select data-bind="options: timeTakenOptions, optionsText: 'name', value: timeTaken"></select></td>
+				</tr>
+				<tr data-bind="if:isShooting()">
+					<td>Time Aimed: </td><td><input type = "number" data-bind="value:timeAimed"></input></td>
+				</tr>
+
+				<tr><td>SM: </td><td><input type = "number" data-bind="value:sizeModifier"></input></td></tr>
+				<tr><td>Cameoflage: </td><td><input type = "number" data-bind="value:cameoflage"></input></td></tr>
+				<tr data-bind="if:mode() == 'spotting distance'">
+					<td>Spotting distance: </td><td data-bind="text:spottingDistance"></td>
+				</tr>
+				<tr data-bind="if:mode() != 'spotting distance'">
+					<td>distance: </td><td><input type = "number" data-bind="value:distance"></input></td>
+				</tr>
+				<tr data-bind="if:mode() != 'spotting distance'">
+					<td></td><td>
+					(<span data-bind="text:rangeTable(-1*rangeModifier() -1)"></span>
+					-
+					<span data-bind="text:rangeTable(-1*rangeModifier())"></span>)
+					</td>
+				</tr>
+
+				<tr data-bind="if:isShooting()">
+					<td>Gun Acc: </td><td><input type = "number" data-bind="value:gunAcc"></input></td>
+				</tr>
+				<tr data-bind="if:isShooting()">
+					<td>ROF: </td>
+					<td><input type = "number" data-bind="value:rof"></input>(+<span data-bind="text:rofBonus"></span>)</td>
+				</tr>
+				<tr>
+					<td>Custom Modifier:</td>
+					<td><input type = "number" data-bind="value:adHocModifier"></input></td>
+				</tr>
+				<tr data-bind="if:mode() == 'spotting modifier'">
+					<td>Modifier: </td><td data-bind="text:spottingModifier"></td>
+				</tr>
+				<tr data-bind="if:mode() == 'shooting modifier'">
+					<td>Modifier: </td><td data-bind="text:shootingModifier"></td>
+				</tr>
+				<tr data-bind="if:mode() == 'spotting skill'">
+					<td>Effective Skill: </td><td data-bind="text:spottingSkill"></td>
+				</tr>
+				<tr data-bind="if:mode() == 'shooting skill'">
+					<td>Effective Skill: </td><td data-bind="text:shootingSkill"></td>
+				</tr>
+
+			</table>
+			<!--div>***************************************</div>
+			<div>Aim Bonus: <span data-bind="text:aimBonus"></span></div>
+			<div>Night Effect: <span data-bind="text:nightEffect"></span></div-->
+		</div>
+	</body>
+</html>

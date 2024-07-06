@@ -1,0 +1,32 @@
+; Relationship.ipt
+; created 6/14/2018 9:34:41 AM
+
+Table: SwoNLesserWorld
+the lesser is a [@Origin] with shared [@Contact] that [@feelings] the other
+
+Table:Origin
+Recent colony
+Refuge for exiles
+Founded Long before
+Ancient Lost Colony
+Long standing Cooperative Colony
+Recent Colony from elsewhere
+
+Table: feelings
+Confirmed Hatred
+Active Cold War
+Old Grudges and Resentments
+Cultural Disguist and Avoidance
+Polite interchange and trade
+Cultural Admiration
+Long standing freindship
+Unflinching loyalty
+
+Table: Contact
+Trade in Vital Goods
+Religion
+Entertainment content
+Research
+Threat
+Elite Families
+Resource

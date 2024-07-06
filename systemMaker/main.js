@@ -1,9 +1,9 @@
-var nextGuid = 1000;
+var nextGuid = 100000;
+//TODO: this is not a guid!
 var makeGUID = function ()
 {
 	return nextGuid++;
 }
-
 var dice = function(count)
 {
 	if(!count)return Math.floor(Math.random()*6)+1;
@@ -94,7 +94,7 @@ function starAge()
 {
 	//TODO: this is wonky! I should not be getting 20;s!
 	var base = Distribution(random.starAge).get(dice(3));
-	return base[0]*(dice()-1)+base[1]*(dice()-1)+base[2]*(dice()-1);
+	return base[0]+base[1]*(dice()-1)+base[2]*(dice()-1);
 }
 
 function generateStarPosition()
@@ -134,6 +134,10 @@ function findInRangeTable(table,value)
 	console.log("VALUE NOT FOUND IN TABLE",table,value);
 }
 
+function lookupValue (table, value) {
+	
+}
+
 var lookup = {};
 var random = {};
 var display = {};
@@ -144,6 +148,65 @@ lookup.planetTypes = [
 	"terrestrial",
 	"giant",
 	"asteroid"
+];
+lookup.settlementTypes = [
+	"none",
+	"colony",
+	"outpost",
+	"homeworld"
+];
+lookup.worldUnity = [
+	"diffuse",
+	"Factionalized",
+	"Coalition",
+	"World Gov*",
+	"World Gov"
+];
+
+lookup.governmentTypes = [
+	"Anarchy",
+	"Clan/Tribal",
+	"Caste",
+	"Feudal",
+	"Theocracy",
+	"Dictatorship",
+	"Democractic Republic",
+	"Athenian Democracy",
+	"Corporate",
+	"Technocracy",
+	"Caste",
+	"Anarchy",
+];
+
+lookup.specialGovs = [
+	"Subjugated*",
+	"Sanctuary",
+	"Military Rule",
+	"Socialist*",
+	"Bureaucracy",
+	"Colony",
+	"Oligarchy*",
+	"Meritocracy*",
+	"Matriarchy",
+	"Patriarchy",
+	"Utopia",
+	"Cybercrazcy",
+];
+
+lookup.baseTLIncomeTable = [
+	7500,
+	7800,
+	8100,
+	8400,
+	9600,
+	13000,
+	19000,
+	25000,
+	31000,
+	43000,
+	67000,
+	97000,
+	130000
 ];
 
 random.starCount = [
@@ -277,6 +340,25 @@ lookup.gasGiantSize =[
 	{mass:3500,density:1.4},
 	{mass:4000,density:1.6},
 ];
+
+lookup.rotationModifier = {
+	"giant1": 6 ,
+	"giant2": 0 ,
+	"giant3": 0 ,
+	"terrestrial4": 6 ,
+	"terrestrial3": 10 ,
+	"terrestrial2": 14 ,
+	"terrestrial1": 18 
+};
+random.specialRotation = [
+	{start:2, end: 6, value: "original"},
+	{start:7, value: 2},
+	{start:8, value: 5},
+	{start:9, value: 10},
+	{start:10, value: 20},
+	{start:11, value: 50},
+	{start:12, value: 100},
+]
 random.coreDensity = [
 	{start:3,end:6,value:.3},
 	{start:7,end:10,value:.4},
@@ -324,8 +406,9 @@ random.GasGiantMass =[
 	{start:15,value:[60,400,3000]},
 	{start:16,value:[70,450,3500]},
 	{start:17,end:18,value:[80,500,4000]},
+];
 
-]
+random.GasGiantMassSelect = [0,1,2].map(size => random.GasGiantMass.map(v => ({value: v.start, mass: v.value[size]})));
 
 random.planetSpacing = [
 	{start:3,end:4,value:1.4},
@@ -350,6 +433,30 @@ random.gasPlanetSize = [
 	{start:-10,end:10,value:1},
 	{start:11,end:16,value:2},
 	{start:17,end:30,value:3}
+];
+
+random.resourceValue = [
+	{start:-10,end:2,value:-3},
+	{start:3,end:4,value:-2},
+	{start:5,end:7,value:-1},
+	{start:8,end:13,value:0},
+	{start:14,end:16,value:1},
+	{start:17,end:18,value:2},
+	{start:19,end:30,value:3}
+];
+
+random.asteroidResourceValue = [
+	{start:3,value:-5},
+	{start:4,value:-4},
+	{start:5,value:-3},
+	{start:6,end:7,value:-2},
+	{start:8,end:9,value:-1},
+	{start:10,end:11,value:0},
+	{start:12,end:13,value:1},
+	{start:14,end:15,value:2},
+	{start:16, value:3},
+	{start:17, value:3},
+	{start:18, value:3},
 ];
 
 random.moonSize = [
@@ -380,3 +487,188 @@ random.resourceValue = [
 	{start:19,end:30,value:3},
 ]
 
+random.planetEccentricity = [
+	{start:-10,end:3,value:0},
+	{start:4,end:6,value:.05},
+	{start:7,end:9,value:.10},
+	{start:10,end:11,value:.15},
+	{start:12,value:.2},
+	{start:13,value:.3},
+	{start:14,value:.4},
+	{start:15,value:.5},
+	{start:16,value:.6},
+	{start:17,value:.7},
+	{start:18,end:30,value:.8},
+];
+
+random.baseAxialTilt = [
+	{start:3,end:6,value:0},
+	{start:7,end:9,value:10},
+	{start:10,end:12,value:20},
+	{start:13,end:14,value:30},
+	{start:15,end:16,value:40},
+	{start:17,end:18,value:"extended"}
+];
+random.extendedAxialTilt = [
+	{start:1,value:50},
+	{start:2,value:50},
+	{start:3,value:60},
+	{start:4,value:60},
+	{start:5,value:70},
+	{start:6,value:80},
+];
+random.tectonicActivity =  [
+	{start:-10,end:6,value:"None"},
+	{start:7,end:10,value:"Light"},
+	{start:11,end:14,value:"Moderate"},
+	{start:15,end:18,value:"Heavy"},
+	{start:19,end:30,value:"Extreme"}
+];
+random.techLevel = [
+	{start:-10, end: 3, value:"Primitive"},
+	{start:4,value:-3},
+	{start:5,value:-2},
+	{start:6,end:7,value:-1},
+	{start:8,end:11,value:-.25},
+	{start:12,end:15,value:0},
+	{start:16,end:30,value:.25}
+];
+
+random.outpostPopulation = [
+	{start:3,value:100},
+	{start:4,value:150},
+	{start:5,value:250},
+	{start:6,value:400},
+	{start:7,value:600},
+	{start:8,value:1000},
+	{start:9,value:1500},
+	{start:10,value:2500},
+	{start:11,value:4000},
+	{start:12,value:6000},
+	{start:13,value:10000},
+	{start:14,value:15000},
+	{start:15,value:25000},
+	{start:16,value:40000},
+	{start:17,value:60000},
+	{start:17,value:100000}
+];
+
+random.outpostPopulation = [
+	{start:3,value:100},
+	{start:4,value:150},
+	{start:5,value:250},
+	{start:6,value:400},
+	{start:7,value:600},
+	{start:8,value:1000},
+	{start:9,value:1500},
+	{start:10,value:2500},
+	{start:11,value:4000},
+	{start:12,value:6000},
+	{start:13,value:10000},
+	{start:14,value:15000},
+	{start:15,value:25000},
+	{start:16,value:40000},
+	{start:17,value:60000},
+	{start:18,value:100000}
+];
+
+random.colonyPopulation = [
+  { start: 0, value: 30 },
+  { start: 1, value: 40 },
+  { start: 2, value: 50 },
+  { start: 3, value: 60 },
+  { start: 4, value: 80 },
+  { start: 5, value: 100 },
+  { start: 6, value: 130 },
+  { start: 7, value: 150 },
+  { start: 8, value: 200 },
+  { start: 9, value: 250 },
+];
+
+random.worldUnity = [
+	{start:2, end: 5, value:"diffuse"},
+	{start:6,value:"Factionalized"},
+	{start:7,value:"Coalition"},
+	{start:8,value:"World Gov*"},
+	{start:9, end: 20, value:"World Gov"}
+];
+
+random.specialGovCondition = [
+	{start:3, end: 5, value:"Subjugated*"},
+	{start:6,value:"Sanctuary"},
+	{start:7, end: 8, value:"Military Rule"},
+	{start:9,value:"Socialist*"},
+	{start:10, value:"Bureaucracy"},
+	{start:11, end: 12, value:"Colony"},
+	{start:13, end: 14, value:"Oligarchy*"},
+	{start:15, value:"Meritocracy*"},
+	{start:16,  value:"Matriarchy or Patriarchy"},
+	{start:17, value:"Utopia"},
+	{start:18, value:"Cybercracy"},
+];
+
+random.AllianceGovs = [
+	{start:3, end: 6, value:"Anarchy"},
+	{start:7, end: 8, value:"Clan/Tribal"},
+	{start:9, value:"Caste"},
+	{start:10, end: 11, value:"Feudal"},
+	{start:12, value:"Theocracy"},
+	{start:13, end: 15, value:"Dictatorship"},
+	{start:16, end: 18, value:"Democractic Republic"},
+	{start:19, end: 20, value:"Athenian Democracy"},
+	{start:21, end: 22, value:"Corporate"},
+	{start:23, end: 25, value:"Technocracy"},
+	{start:26, end: 27, value:"Caste"},
+	{start:28, end: 30, value:"Anarchy"},
+];
+
+random.FederationGovs = [
+	{start:3, end: 6, value:"Anarchy"},
+	{start:7, end: 8, value:"Clan/Tribal"},
+	{start:9, value:"Caste"},
+	{start:10, value:"Feudal"},
+	{start:11, value:"Theocracy"},
+	{start:12, end: 14, value:"Dictatorship"},
+	{start:15, end: 19, value:"Democractic Republic"},
+	{start:20, end: 22, value:"Athenian Democracy"},
+	{start:23, value:"Corporate"},
+	{start:24, end: 25, value:"Technocracy"},
+	{start:26, end: 27, value:"Caste"},
+	{start:28, end: 30, value:"Anarchy"},
+];
+
+random.CorporateGovs = [
+	{start:3, end: 6, value:"Anarchy"},
+	{start:7, end: 8, value:"Clan/Tribal"},
+	{start:9, value:"Caste"},
+	{start:10, value:"Theocracy"},
+	{start:11, end: 12, value:"Feudal"},
+	{start:13, end: 15, value:"Dictatorship"},
+	{start:16, end: 17, value:"Democractic Republic"},
+	{start:18, value:"Athenian Democracy"},
+	{start:19, end: 21, value:"Corporate"},
+	{start:22, end: 25, value:"Technocracy"},
+	{start:26, end: 27, value:"Caste"},
+	{start:28, end: 30, value:"Anarchy"},
+];
+
+random.EmpireGovs = [
+	{start:3, end: 6, value:"Anarchy"},
+	{start:7, end: 8, value:"Clan/Tribal"},
+	{start:9, value:"Caste"},
+	{start:10, end: 12, value:"Feudal"},
+	{start:13, value:"Theocracy"},
+	{start:14, end: 17, value:"Dictatorship"},
+	{start:18, end: 19, value:"Democractic Republic"},
+	{start:20, end: 22, value:"Corporate"},
+	{start:23, end: 25, value:"Technocracy"},
+	{start:26, end: 27, value:"Caste"},
+	{start:28, end: 30, value:"Anarchy"},
+];
+
+lookup.govGenerators = [
+	{name: "Alliance/Anarchy", value: random.AllianceGovs},
+	{name: "Federation", value: random.FederationGovs},
+	{name: "Corporate", value: random.CorporateGovs},
+	{name: "Empire", value: random.EmpireGovs},
+]

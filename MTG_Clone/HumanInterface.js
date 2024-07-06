@@ -68,7 +68,7 @@ var HumanInterface = function (){
 			});
 		}
 		else if(hi.state() == "attacking") {
-			var attackers = hi.model.creatures().filter(card => card.display.selected());
+			var attackers = hi.model.toSelect().filter(card => card.display.selected());
 			hi.nextCallback(attackers.map(card => card.original));
 		}
 		else if (hi.state() == "assigningDamage"){
@@ -157,6 +157,7 @@ ko.components.register("cardlist", {
 		this.click = function (card) {
 			params.click(params.name, card)
 		};
+		console.log("cardlist", this.cards());
 	},
 	template: `<div data-bind="foreach:cards, style:{'border-color':borderColor}" class = "cardList">
 				<card params="card:$data, list:name, click:$parent.click"></card>
@@ -184,6 +185,7 @@ ko.components.register("blocklist", {
 		this.blockers = params.blockers;
 		this.attacker = params.attacker;
 		this.onClick = params.onClick;
+		console.log("blocklist", params);
 	},
 	template: 
 	`

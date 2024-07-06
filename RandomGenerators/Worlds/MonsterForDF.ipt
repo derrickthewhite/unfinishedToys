@@ -1,0 +1,16 @@
+; MonsterForDF.ipt
+; created 10/26/2022 5:06:27 PM
+
+Table: DF_MonsterType
+Dire Animal
+Giant Animal
+Construct
+Demon
+Elder Thing
+Elemental
+Faerie
+Hybrid
+Mundane
+Plant
+Slime
+Undead

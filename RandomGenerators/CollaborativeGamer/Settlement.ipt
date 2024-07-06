@@ -1,0 +1,13 @@
+; Settlement.ipt
+; created 11/7/2016 8:41:20 AM
+Use: ../Generators/CollaborativeGamer/Settlement/District.ipt
+Use: ../Generators/CollaborativeGamer/Settlement/MemorableFeatures.ipt
+Use: ../Generators/CollaborativeGamer/Settlement/Theme.ipt
+
+Table: Settlement
+Set: districts = {2d3+3}
+A [@Theme] {districts}-district Settlement with [@MemorableFeature] \n [@{districts} FullDistrict]
+
+
+Table: FullDistrict
+&nbsp;&nbsp;&nbsp;&nbsp;[@District] (with [@MemorableFeature])\n

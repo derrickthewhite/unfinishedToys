@@ -1,0 +1,35 @@
+; Compete.ipt
+; created 4/14/2016 8:41:09 AM
+Table: Compete
+Compete: [@CompetitionTypes]
+
+Table: CompetitionTypes
+roll: 3d6
+3-6: Learned Debate:  [@LearnedCompetition]
+7-9: Festival: [@GeneralCompetition] and [@GeneralCompetition]
+10-14: Single Competition: [@GeneralCompetition]
+15-18: Underworld Competition: [@UnderworldCompetition]
+
+Table: LearnedCompetition
+Heraldry
+Philosophy
+Public Speaking
+Thaumatology
+Theology
+GM Choice
+
+Table: UnderworldCompetition
+Lockpicking
+Pickpocket
+Shadowing
+Smuggling
+Stealth
+Traps
+
+Table: GeneralCompetition
+Martial
+Artistic
+Craft
+Race
+Physical
+Miscellaneous

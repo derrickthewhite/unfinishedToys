@@ -1,0 +1,9 @@
+; AdventureDistanceDeterminer.ipt
+; created 4/14/2016 8:14:54 AM
+
+Table: AdventureDistanceDeterminer
+roll: 3d6
+3-9: Its Here! (1d6-2 Hours, 1 hour tick)
+10-11: Nearby ( 1d3 days, 12 hour tick)
+12-14: Far Way ( 1d6+Peril Days, 1 day tick)
+15-18: Very Far Away (2d6*Peril Days, 1 week tick)

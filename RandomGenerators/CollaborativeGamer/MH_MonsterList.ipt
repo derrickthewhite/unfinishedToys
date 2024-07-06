@@ -1,0 +1,42 @@
+; MH_MonsterList.ipt
+; created 4/14/2016 9:28:46 AM
+
+Table: MonsterType
+[@Undead]
+[@Spirit]
+[@Living]
+[@Humans]
+[@Aliens]
+
+Table: Undead
+2:Vampires
+Ghosts
+Mummies
+Zombies (curse)
+Zombies (infection)
+
+Table: Spirit
+Rouge Angel
+In betweener
+2:Demons
+2:Fae
+
+Table: Living
+3:Lycanthrope [|Eagle|Wolf|Wolf|Bear|Tiger|Random]
+Mutant Animal
+Legendary Creature
+Custom Curse
+
+Table: Humans
+Rouge Crusader
+Cultists (no leader)
+Rouge Psi
+2:Rouge Witch
+Rouge Experiment
+
+Table: Aliens
+Greys
+Nordics
+Monster: [|Insectoids|Phasites|Devourers]
+Reptoids
+Stalkers

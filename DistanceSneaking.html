@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Stealth Contests</title>
+  <style>
+		.diceInput {
+			width: 50px;
+		}
+  </style>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+  <script>
+	var results={};
+	function faction() {
+		var faction = {
+			sizeModifier: ko.observable(0),
+			cameoflage: ko.observable(0),
+			plainSight: ko.observable(true),
+			stealth: ko.observable(10),
+			perception: ko.observable(10),
+			magnificationBonus: ko.observable(0),
+			nightVision: ko.observable(0),
+			perRoll: ko.observable(10),
+			stealthRoll: ko.observable(10)
+		};
+		
+		return faction;
+	}
+	function main(){
+		results = {
+			left: faction(),
+			right: faction(),
+			lighting: ko.observable(),
+			timeTaken: ko.observable(),
+			distance: ko.observable(100),
+		};
+		results.lightingOptions = [
+			{name: "daylight (0)", value: 0},
+			{name: "overcast (-1)", value: -1},
+			{name: "dusk (-2)", value: -2},
+			{name: "full moon (-4)", value: -4},
+			{name: "half moon (-6)", value: -6},
+			{name: "no moon (-8)", value: -8},
+			{name: "none (-10)", value: -8},
+		];
+		results.timeTakenOptions = [
+			{name: "none (0)", value: 0},
+			{name: "2 seconds (1)", value: 1},
+			{name: "4 seconds (2)", value: 2},
+			{name: "8 seconds (3)", value: 3},
+			{name: "16 seconds (4)", value: 4},
+			{name: "32 seconds (5)", value: 5},
+		];
+		function baseOfBase(num) {
+			num = Math.round(num);
+			num = ((num%6)+6)%6;
+			switch (num%6){
+				case 0: return 2;
+				case 1: return 3;
+				case 2: return 5;
+				case 3: return 7;
+				case 4: return 10;
+				case 5: return 15;
+				case 6: return 20;
+			}
+		}
+		function rangeTable(num) {
+			return baseOfBase(num)*Math.pow(10, Math.floor(num/6));
+		}
+		results.rangeModifier = ko.pureComputed(() => {
+			var num = 0;
+			while(rangeTable(num)<Number(results.distance())) num++;
+			return -num;
+		});
+		
+		results.leftPerception = ko.pureComputed(() => {
+			return results.rangeModifier()
+				+results.timeTaken().value
+				+Math.min(0, results.lighting().value + Number(results.left.nightVision()))
+				+Number(results.left.perception())
+				+Number(results.left.magnificationBonus())
+			+(results.right.plainSight()?10:0)
+		});
+		results.rightPerception = ko.pureComputed(() => {
+			return results.rangeModifier()
+				+results.timeTaken().value
+				+Math.min(0, results.lighting().value + Number(results.right.nightVision()))
+				+Number(results.right.perception())
+				+Number(results.right.magnificationBonus())
+			+(results.left.plainSight()?10:0)
+		});
+		
+		results.leftStealth = ko.pureComputed(() => {
+			return Number(results.left.stealth())
+			-Number(results.left.sizeModifier())
+			+Number(results.left.cameoflage())
+		});
+		
+		results.rightStealth = ko.pureComputed(() => {
+			return Number(results.right.stealth())
+			-Number(results.right.sizeModifier())
+			+Number(results.right.cameoflage())
+		});
+		
+		results.leftSpottingRight = ko.pureComputed(() => {
+			return (results.leftPerception() - results.left.perRoll())
+				-(results.rightStealth() - results.right.stealthRoll())
+				+"";
+		});
+		
+		results.rightSpottingLeft = ko.pureComputed(() => {
+			return (results.rightPerception() - results.right.perRoll())
+				-(results.leftStealth() - results.left.stealthRoll())
+				+"";
+		});
+		
+		results.roll3d6 = function () {
+			return [0,0,0].map(a=>Math.floor(Math.random()*6)+1).reduce((a,b)=>a+b);
+		}
+		results.rollDice = function (){
+			results.left.stealthRoll(results.roll3d6());
+			results.right.stealthRoll(results.roll3d6());
+			results.left.perRoll(results.roll3d6());
+			results.right.perRoll(results.roll3d6());
+		}
+		
+		ko.applyBindings(results,document.getElementById('display'));
+	}
+  </script>
+</head>
+	<body onload="main()">
+		<div id="display">
+			<table>
+				<tr>
+					<td>lighting:</td>
+					<td><select data-bind="options: lightingOptions, optionsText: 'name', value: lighting"></select></td>
+				</tr>
+				<tr>
+					<td>time taken:</td>
+					<td><select data-bind="options: timeTakenOptions, optionsText: 'name', value: timeTaken"></select></td>
+				</tr>
+				<tr>
+					<td>distance: </td><td><input type = "number" data-bind="value:distance"></input></td>
+				</tr>
+			</table>
+			<button data-bind="click:rollDice">Roll Dice</button>
+			<div style="display:block-inline">
+				<div style="display:inline-block">
+					<h3>Blue Team</h3>
+					<table>
+						<tr><td>SM: </td><td><input type = "number" data-bind="value:left.sizeModifier"></input></td></tr>
+						<tr><td>Cameoflage: </td><td><input type = "number" data-bind="value:left.cameoflage"></input></td></tr>
+						<tr><td>Stealth: </td><td><input type = "number" data-bind="value:left.stealth"></input></td></tr>
+						<tr><td>Per: </td><td><input type = "number" data-bind="value:left.perception"></input></td></tr>
+						<tr><td>Magnification Bonus: </td><td><input type = "number" data-bind="value:left.magnificationBonus"></input></td></tr>
+						<tr><td>Night vision: </td><td><input type = "number" data-bind="value:left.nightVision"></input></td></tr>
+						<tr><td>Effective Perception: </td><td><span data-bind="text:leftPerception"></span></td></tr>
+						<tr><td>Effective Stealth: </td><td><span data-bind="text:leftStealth"></span></td></tr>
+						<tr><td>Perception Roll: </td><td><input type = "number" data-bind="value:left.perRoll"></input></td></tr>
+						<tr><td>Stealth Roll: </td><td><input type = "number" data-bind="value:left.stealthRoll"></input></td></tr>
+						<tr><td>Spotting Result: </td><td><span data-bind="text:leftSpottingRight"></span></td></tr>
+					</table>
+				</div>
+				<div style="display:inline-block">
+					<h3>Red Team</h3>
+					<table>
+						<tr><td>SM: </td><td><input type = "number" data-bind="value:right.sizeModifier"></input></td></tr>
+						<tr><td>Cameoflage: </td><td><input type = "number" data-bind="value:right.cameoflage"></input></td></tr>
+						<tr><td>Stealth: </td><td><input type = "number" data-bind="value:right.stealth"></input></td></tr>
+						<tr><td>Per: </td><td><input type = "number" data-bind="value:right.perception"></input></td></tr>
+						<tr><td>Magnification Bonus: </td><td><input type = "number" data-bind="value:right.magnificationBonus"></input></td></tr>
+						<tr><td>Night vision: </td><td><input type = "number" data-bind="value:right.nightVision"></input></td></tr>
+						<tr><td>Effective Perception: </td><td><span data-bind="text:rightPerception"></span></td></tr>
+						<tr><td>Effective Stealth: </td><td><span data-bind="text:rightStealth"></span></td></tr>
+						<tr><td>Perception Roll: </td><td><input class="diceInput" type = "number" data-bind="value:right.perRoll"></input></td></tr>
+						<tr><td>Stealth Roll: </td><td><input class="diceInput" type = "number" data-bind="value:right.stealthRoll"></input></td></tr>
+						<tr><td>Spotting Result: </td><td><span data-bind="text:rightSpottingLeft"></span></td></tr>
+					</table>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

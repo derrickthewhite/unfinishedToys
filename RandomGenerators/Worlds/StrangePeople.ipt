@@ -1,0 +1,41 @@
+; StrangePeople.ipt
+; created 12/19/2015 7:28:29 AM
+Use: ../Generators/Worlds/EnergyBeing.ipt
+Use: ../Generators/Worlds/BizarreLife.ipt
+Use: ../Generators/Worlds/HumanoidChanges.ipt
+
+Table: StrangePeople
+2:[@EnergyBeing]
+10:[@BizarreLife]
+5:[@Humanoid]
+5:Human
+10: [@ClassicFantasyRace]
+
+
+Table: ClassicFantasyRace
+30:Elf
+30:Dwarf
+30:Goblin
+15:Gnome/Halfing
+15:Beast Man
+10:Dragon
+15:Necromancer
+20:Orc
+5: Giant
+10: Spirit (own race)
+10: Spirit (deceased)
+5: Djinn
+10:[@TerrainForPeople] Person
+
+Table: TerrainForPeople
+Desert
+Snow
+Forest
+River
+Swamp
+Cave
+Jungle
+Lake
+Ocean
+Cliff
+Sky 

@@ -6,6 +6,9 @@ function Star(mass,age,orbit){
 	star.age = ko.observable(age);
 	star.orbit = ko.observable(orbit);
 	star.guid = makeGUID();
+	star.name = ko.observable();
+	star.system = ko.observable();
+	star.notes = ko.observable("");
 	
 	star.size = ko.pureComputed(function (){
 		var result = extrapolateFromTable(lookup.starSize,'mass',star.mass());
@@ -26,6 +29,7 @@ function Star(mass,age,orbit){
 	
 	star.drawnRadius = ko.pureComputed(function (){
 		//TODO: include stages!
+		if(star.stage() == "white dwarf") return 25;
 		return star.mass()*200;
 	});
 	star.drawnColor = ko.pureComputed(function (){
@@ -34,7 +38,7 @@ function Star(mass,age,orbit){
 		case 'K': return "orange";
 		case 'G': return "yellow";
 		case 'F': return "white";
-		case 'G': return "blue";
+		case 'A': return "blue";
 		}
 		return "purple";
 	});
@@ -90,5 +94,27 @@ function Star(mass,age,orbit){
 	star.outerLimit = ko.pureComputed(function (){
 		return star.mass()*40;
 	});
+	
+	star.dryCopy = function () {
+		var copy = {};
+		
+		copy.mass = star.mass();
+		copy.age = star.age();
+		copy.orbit = star.orbit().dryCopy();
+		copy.guid = star.guid;
+		copy.notes = star.notes();
+		copy.name = star.name();
+
+		return copy;
+	}
+	star.water = function (starStruct) {
+		star.mass(starStruct.mass);
+		star.age(starStruct.age);
+		star.guid = starStruct.guid;
+		star.notes(starStruct.notes);
+		star.name(starStruct.name);
+		star.orbit(Orbit());
+		star.orbit().water(starStruct.orbit);
+	}
 	return star;
 }

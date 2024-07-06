@@ -6,15 +6,15 @@
 	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.1/knockout-debug.js"></script>
 	<!--<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>-->
 	<script type="text/javascript" src= "../../Tools/knockout-3.4.0.js"></script>
-	<script src="https://cdn.rawgit.com/konvajs/konva/1.6.5/konva.js"></script>
-	<script type="text/javascript" src= "../../Tools/knockout-konva.js"></script>
+	<script type="text/javascript" src= "../../Tools/seededGenerator.js"></script>
+	<script type="text/javascript" src= "../../Tools/mersenne-twister.js"></script>
 	<script type="text/javascript" src= "main.js"></script>
 	<script type="text/javascript" src= "planet.js"></script>
 	<script type="text/javascript" src= "star.js"></script>
 	<script type="text/javascript" src= "system.js"></script>
+	<script type="text/javascript" src= "draw.js"></script>
+	<script type="text/javascript" src= "names.js"></script>
 	<script >
-
-
 		
 		function Orbit ( distance, eccentricty, center){
 			var orbit = {};
@@ -29,13 +29,179 @@
 			});
 			orbit.center = ko.observable(center);
 			
-			orbit.minDistance = ko.pureComputed(()=>(1-orbit.eccentricty())*orbit.distance());
-			orbit.maxDistance = ko.pureComputed(()=>(1+orbit.eccentricty())*orbit.distance());
+			orbit.minDistance = ko.pureComputed(()=>(1-Number(orbit.eccentricty()))*orbit.distance());
+			orbit.maxDistance = ko.pureComputed(()=>(1+Number(orbit.eccentricty()))*orbit.distance());
+			
+			orbit.dryCopy = function () {
+				var copy = {};
+				copy.eccentricty = orbit.eccentricty();
+				copy.baseDistance = orbit.baseDistance();
+				copy.center = orbit.center()?orbit.center().guid: undefined;
+				return copy;
+			}
+			orbit.water = function (oStruct) {
+				orbit.eccentricty(oStruct.eccentricty);
+				orbit.baseDistance(oStruct.baseDistance);
+				orbit.center(oStruct.center);
+			}
+			orbit.connect = function (guidMap) {
+				orbit.center(guidMap[orbit.center()]);
+			}
 			
 			return orbit;
 		}
-
+		function sigFigs(number, precision){
+			return parseFloat(number.toPrecision(precision))
+		}
+		function formatNumberWithMagnitude(number) {
+			  const absNumber = Math.abs(number);
+			  if (absNumber >= 1e12) {
+				return (number / 1e12).toFixed(1) + 'T';
+			  } else if (absNumber >= 1e9) {
+				return (number / 1e9).toFixed(1) + 'B';
+			  } else if (absNumber >= 1e6) {
+				return (number / 1e6).toFixed(1) + 'M';
+			  } else if (absNumber >= 1e3) {
+				return (number / 1e3).toFixed(1) + 'K';
+			  } else {
+				return number.toFixed(0);
+			  }
+		}
+		function formatTechLevel (level) {
+			if(level < 7) return level + " (primitive)"
+			if(level%1 ==0) return level;
+			if(level%1 ==.75) return Math.round(level)+ " (Delayed)";
+			if(level%1 ==.25) return Math.round(level)+ " (Advanced)";
+			return level + " (confused)"
+			
+		}
 		var root = {};
+		
+		root.seed = ko.observable(0);
+		root.newSeed = function () {
+			root.seed(Math.random().toString(36).slice(2));
+		}
+		root.regenerate = function () {
+			document.getElementById("regenButton").disabled = true;
+			root.generation.message("Regenerating Sector");
+			root.generation.processing(true);
+			setTimeout(() => root.finishRegenerateSector(),0);
+		}
+		root.finishRegenerateSector = function () {
+			//make sure it gets restarted from the beginning
+			root.names.currentNameMethod = ""
+			if(!root.seed())
+				root.seed(Math.random().toString(36).slice(2));
+			Math.seedrandom(root.seed());
+			
+			root.cosmos.systems([]);
+			for(var i =0;i< root.generation.systemCount();i++)
+			{
+				root.cosmos.systems.push(generateSystem());
+			}
+			
+			root.currentSystem(root.cosmos.systems()[0]);
+			root.currentStar(root.currentSystem().stars()[0]);
+			root.currentPlanet(root.currentSystem().planets()[0]);
+			draw();
+			document.getElementById("regenButton").disabled = false;
+			root.generation.processing(false);
+			root.generation.message("");
+		}
+		root.names = names;
+		root.generation = {};
+		root.generation.nameMethod = ko.observable("Constellation-Grid");
+		root.generation.systemCount = ko.observable(100);
+		root.generation.TL = ko.observable(10);
+		root.generation.colonyAgeMin = ko.observable(300);
+		root.generation.colonyAgeMax = ko.observable(500);
+		root.generation.govGenerator = ko.observable(random.AllianceGovs);
+		root.generation.processing = ko.observable(false);
+		root.generation.message = ko.observable("");
+		root.random = random;
+		root.sorting = {};
+		root.sorting.sortByName = function () {
+			root.cosmos.systems(root.cosmos.systems().sort((a,b) => {
+				return a.name().localeCompare(b.name())
+			}));
+			draw();
+		}
+		root.sorting.sortBySize = function () {
+			root.cosmos.systems(root.cosmos.systems().sort((a,b) => {
+				return b.stars()[0].size().mass - a.stars()[0].size().mass;
+			}));
+			draw();
+		}
+		root.sorting.sortByHabitability = function () {
+			root.cosmos.systems(root.cosmos.systems().sort((a,b) => {
+				return b.habitability() - a.habitability();
+			}));
+			draw();
+		}
+		root.sorting.sortByAffinity = function () {
+			root.cosmos.systems(root.cosmos.systems().sort((a,b) => {
+				return b.affinity() - a.affinity();
+			}));
+			draw();
+		}
+		root.sorting.sortByPopulation = function () {
+			root.cosmos.systems(root.cosmos.systems().sort((a,b) => {
+				return b.population() - a.population();
+			}));
+			draw();
+		}
+		root.sorting.sortByResource = function () {
+			root.cosmos.systems(root.cosmos.systems().sort((a,b) => {
+				return b.resourceValue() - a.resourceValue();
+			}));
+			draw();
+		}
+		
+		root.display = {};
+		root.display.spaceIsBlack = ko.observable(true);
+		
+		root.newSystem = function () {
+			//TODO: only reset seed if its new
+			if(!root.seed() || lastSystemSeed != root.seed()){
+				root.seed(Math.random().toString(36).slice(2));
+				Math.seedrandom(root.seed());
+			}
+			var system = generateSystem();
+			root.currentSystem(system);
+			root.currentStar(root.currentSystem().stars()[0]);
+			root.currentPlanet(root.currentSystem().planets()[0]);
+			draw();
+		}
+		root.addSystem = function () {
+			if(!root.cosmos.systems().includes(root.currentSystem())){
+				root.cosmos.systems.push(root.currentSystem());
+			} else {
+				//TODO: report this is already done somehow
+			}
+		}
+		root.saveSystem = function () {
+			var dryCopy = [root.currentSystem().dryCopy()];
+			root.saveJson(dryCopy);
+		}
+		root.saveJson = function (dryCopy) {
+			var json = JSON.stringify(dryCopy);
+			var blob = new Blob ([json], {type: "text/string"});
+			var saveName = document.getElementById("saveName").value;
+			saveName = saveName?saveName:"DefaultStars";
+			const a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.setAttribute("download", saveName+ ".json");
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+		}
+		root.saveSector = function () {
+			var dryCopy = [];
+			for(var system of root.cosmos.systems()){
+				dryCopy.push(system.dryCopy());
+			}
+			root.saveJson(dryCopy);
+		}
 		function load ()
 		{
 			root.cosmos = {
@@ -44,7 +210,17 @@
 			root.events = {};
 			root.lookup = lookup;
 			
-			for(var i =0;i< 100;i++)
+			var seed = Math.random().toString(36).slice(2)
+			root.seed(seed);
+			//seed = "8amg8nwwzw8"; //double system
+			//seed = "1eiaerxkugq"; //moons
+			//seed = "xyh7y38a27"; //asteroids
+			//seed = "8to99ljgojc"; //Gallelei ... retarded tech techocracy on most populous planet
+			Math.seedrandom(seed);
+			//console.log("using", seed);
+			//var starcount = 100;
+			var starcount = 1;
+			for(var i =0;i< starcount;i++)
 			{
 				root.cosmos.systems.push(generateSystem());
 			}
@@ -56,17 +232,31 @@
 			root.editStar = ko.observable(false);
 			root.editPlanet = ko.observable(false);
 			
-			root.events.planetClick = function (data){root.currentPlanet(data)};
-			root.events.starClick = function (data){root.currentStar(data)};
+			//TODO: undo this
+			root.events.planetClick = function (data){
+				root.currentPlanet(data);
+				draw();
+			};
+			root.events.starClick = function (data){
+				root.currentStar(data);
+				draw();
+			};
 			root.events.systemClick = function (data){
 				root.currentSystem(data);
 				root.currentStar(data.stars()[0]);
 				root.currentPlanet(data.planets()[0]);
+				draw();
 			};
 			
 			root.deletePlanet = function (){
+				console.log(root.currentSystem().planets());
 				root.currentSystem().planets.remove(root.currentPlanet());
+				console.log(root.currentSystem().planets());
+				root.currentSystem().planets().filter(p => p.orbit().center() == root.currentPlanet())
+					.forEach(moon => root.currentSystem().planets.remove(moon));
+				console.log(root.currentSystem().planets());
 				root.currentPlanet(root.currentSystem().planets()[0]);
+				draw();
 			}
 			root.addMoon = function (){
 				var planet = root.currentPlanet();
@@ -76,9 +266,10 @@
 					console.log("THIS IS ALREADY A MOON!")
 					return;
 				}
-				var moon = Planet("terrestrial",1,new Orbit(planet.majorMoons(),0,planet),generateAlternatePlanetTypes());
+				var moon = Planet("terrestrial",1,new Orbit(planet.majorMoons(),0,planet));
 				planet.majorMoons(planet.majorMoons()+1);
 				root.currentSystem().planets.push(moon);
+				draw();
 			}
 			root.addPlanet = function (){
 				var planet = generatePlanet(
@@ -86,194 +277,491 @@
 					root.currentSystem().nextBestOrbit()
 						[root.currentStar().guid],
 					root.currentStar());
-				root.currentSystem().planets.push(planet);
-				root.currentPlanet(planet);
+				if(planet.size() == -1){ //empty orbit
+					root.addPlanet();
+				} else {
+					root.currentSystem().planets.push(planet);
+					root.currentPlanet(planet);
+					draw();
+				}
+			}
+			
+			root.valueChanged = function () {
+				draw();
 			}
 			
 			ko.applyBindings(root,document.getElementById('content'));
+			draw();
+		}
+	
+		// being saved mostly as a backup
+		function save() {
+			var dryCopy = [];
+			for(var system of root.cosmos.systems()){
+				dryCopy.push(system.dryCopy());
+			}
+			var json = JSON.stringify(dryCopy);
+			var blob = new Blob ([json], {type: "text/string"});
+			var saveName = document.getElementById("saveName").value;
+			saveName = saveName?saveName:"DefaultStars";
+			const a = document.createElement("a");
+			a.href = URL.createObjectURL(blob);
+			a.setAttribute("download", saveName+ ".json");
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+		}
+		//TODO: refactor these together!
+		function loadSector(){
+			var fileReader = new FileReader();
+			fileReader.onload = (event) => {
+				console.log("onload", event);
+				var bigStruct = JSON.parse(event.target.result);
+				console.log(bigStruct);
+				var systems = bigStruct.map(systemStruct => {
+					var system = System();
+					system.water(systemStruct);
+					return system;
+				});
+				root.cosmos.systems(systems);
+				root.currentSystem(root.cosmos.systems()[0]);
+				root.currentStar(root.currentSystem().stars()[0]);
+				root.currentPlanet(root.currentSystem().planets()[0]);
+				draw();
+			}
+			fileReader.onerror = (error) => console.log("onload", error);
+			fileReader.readAsText(document.getElementById("up").files[0]);
+		}
+		function loadSystems () {
+			var fileReader = new FileReader();
+			fileReader.onload = (event) => {
+				console.log("onload", event);
+				var bigStruct = JSON.parse(event.target.result);
+				console.log(bigStruct);
+				var systems = bigStruct.map(systemStruct => {
+					var system = System();
+					system.water(systemStruct);
+					return system;
+				});
+				root.cosmos.systems(root.cosmos.systems().concat(systems));
+				root.currentSystem(root.cosmos.systems()[0]);
+				root.currentStar(root.currentSystem().stars()[0]);
+				root.currentPlanet(root.currentSystem().planets()[0]);
+				draw();
+			}
+			fileReader.onerror = (error) => console.log("onload", error);
+			fileReader.readAsText(document.getElementById("up").files[0]);
 		}
 	</script>
 </head>
 <body onload="load()">
 	<div id = "content">
+		<h3> 
+			SYSTEM 
+			<span data-bind="text:currentSystem().name()"></span>
+			<!-- ko if:$root.editStar -->
+				<input  data-bind="value:currentSystem().name"/>
+			<!-- /ko  -->
+		</h3>
+		<div>
+			<span class="key">X coord: </span>
+			<span data-bind="text:currentSystem().location.x().toFixed(1)"></span>
+			<!-- ko if:$root.editStar -->
+				<input  data-bind="value:currentSystem().location.x"/>
+			<!-- /ko  -->
+		</div>
+		<div>
+			<span class="key">Y coord: </span>
+			<span data-bind="text:currentSystem().location.y().toFixed(1)"></span>
+			<!-- ko if:$root.editStar -->
+				<input  data-bind="value:currentSystem().location.y"/>
+			<!-- /ko  -->
+		</div>
 		<div id="textInterface">
 		<div data-bind="with: currentStar" id="star">
 			STAR <br>
-			mass: <span data-bind="text:mass"></span>
+			<span class= "line"><span class="key">name:</span> <span data-bind = "text: name"></span>
 			<!-- ko if:$root.editStar -->
-			<input type="number" min=".1" max="2" step=".05" data-bind="value:mass"/>
-			<input type="range" min=".1" max="2" step=".05" data-bind="value:mass"/>
+			<input  data-bind="value:name"/>
 			<!-- /ko  -->
+			<br/>
+			<span class="key">mass:</span> <span data-bind="text:mass"></span>
+			<!-- ko if:$root.editStar -->
+			<input type="number" min=".1" max="2" step=".05" data-bind="value:mass, event: { change: $root.valueChanged }"/>
+			<!-- /ko  -->
+			Solar Masses<br/>
+			<!-- ko if:$root.editStar -->
+			<span class="key"></span>
+			<input type="range" min=".1" max="2" step=".05" data-bind="value:mass, event: { change: $root.valueChanged }"/>
 			<br>
-			luminosity: <span data-bind="text:luminosity"></span><br>
-			stage: <span data-bind="text:stage"></span><br>
-			type: <span data-bind="text:size().starclass"></span><br>
-			age: <span data-bind="text:age"></span>
-			<!-- ko if:$root.editStar -->
-			<input type="number" min="0" max="13.5" step=".5" data-bind="value:age"/>
-			<input type="range" min="0" max="13.5" step=".5" data-bind="value:age"/>
 			<!-- /ko  -->
-			<br>
-			radius: <span data-bind="text:radius"></span><br>
-			Orbit: <span data-bind="text:orbit().minDistance"></span> to <span data-bind="text:orbit().maxDistance"></span> <br>
-			Limits <span data-bind="text:innerLimit"></span> to <span data-bind="text:outerLimit"></span> <br>
+			<span class="key">luminosity:</span> <span data-bind="text:sigFigs(luminosity(), 3)"></span> of Sun<br>
+			<span class="key">stage:</span> <span data-bind="text:stage"></span><br>
+			<span class="key">type:</span> <span data-bind="text:size().starclass"></span><br>
+			<span class="key">age:</span> <span data-bind="text:sigFigs(Number(age()),3)"></span>
 			<!-- ko if:$root.editStar -->
-				shift planets<input type="number" step=".1" data-bind="value:planetAdjustment"/><br>
+			<input type="number" min="0" max="13.5" step=".5" data-bind="value:age, event: { change: $root.valueChanged }"/>
 			<!-- /ko  -->
-			<input type="checkbox" value="true" data-bind="checked:$root.editStar"> Edit Star<br>
+			Billion Years <br/>
 			<!-- ko if:$root.editStar -->
-				<button data-bind="click:$root.deletePlanet">Delete Planet</button>
-				<button data-bind="click:$root.addPlanet">Add Planet</button>
-				<button data-bind="click:$root.addMoon">Add Moon</button>
+			<span class="key"></span>
+			<input type="range" min="0" max="13.5" step=".5" data-bind="value:age, event: { change: $root.valueChanged }"/>
+			<br/>
+			<!-- /ko  -->
+			<span class="key">radius:</span> <span data-bind="text:sigFigs(radius(), 3)"></span> of Sun<br>
+			<!-- ko if:orbit().maxDistance() > 0 -->
+			<span class="key">Orbit:</span> <span data-bind="text:orbit().minDistance"></span>AU to <span data-bind="text:orbit().maxDistance"></span> AU<br>
+			<!-- /ko  -->
+			<span class="key">Planet Limits </span> <span data-bind="text:sigFigs(innerLimit(), 3)"></span> AU to <span data-bind="text:sigFigs(outerLimit(), 3)"></span> AU <br>
+			<!-- ko if:$root.editStar -->
+				<span class="key">shift planets</span><input type="number" step=".1" data-bind="value:planetAdjustment, event: { change: $root.valueChanged }"/><br>
+			<!-- /ko  -->
+			<input type="checkbox" value="true" data-bind="checked:$root.editStar"> Edit Star and/or System<br>
+			<!-- ko if:$root.editStar -->
+				<button data-bind="click:$root.deletePlanet, event: { change: $root.valueChanged }">Delete Planet</button>
+				<button data-bind="click:$root.addPlanet, event: { change: $root.valueChanged }">Add Planet</button>
+				<br/>
 			<!-- /ko -->
+			<span data-bind="if: root.display.spaceIsBlack()">
+				<image src="MapLegend.svg" style= "width: 350px"></image>
+			</span>
+			<span data-bind="if: !root.display.spaceIsBlack()">
+				<image src="MapLegendWhite.svg" style= "width: 350px"></image>
+			</span>
+
 		</div>
 		<div data-bind="with: currentPlanet" id="planet">
-			PLANET <br>
-			type: <span data-bind="text:terrain"></span><br>
+			PLANET <br/>
+			<span class="key">name: </span><span data-bind = "text: name"></span>
 			<!-- ko if:$root.editPlanet -->
-				<input type="checkbox" value="true" data-bind="checked:alternateTypes.canBeGarden"> Garden
-				<input type="checkbox" value="true" data-bind="checked:alternateTypes.canBeSulfur"> Sulfur<br>
-				<select data-bind="options:$root.lookup.planetTypes, value:type"></select><br>
+			<input  data-bind="value:name"/>
+			<!-- /ko  -->
+			<br/>
+			<span class="key">type: </span> <span data-bind = "text: sizeName"></span> <span data-bind="text:terrain"></span>
+			<!-- ko if:!$root.editPlanet() -->
+				</br>
 			<!-- /ko -->
-			temperature: <span data-bind="text:temperature"></span><br>
+			<!-- ko if:$root.editPlanet -->
+				<select data-bind="options:$root.lookup.planetTypes, value:type, event: { change: $root.valueChanged }"></select><br>
+				<span class="key">size: </span> <input type="number" min="1" step="1" data-bind="value:size, attr: {max: type()=='giant'? 3: 4}, event: { change: $root.valueChanged }"/><br/>
+				<!-- ko if: size() >2 && (terrain() == 'Garden' || terrain() == 'Ocean') --> 
+					<span class="key">Age to Garden</span><input type="number" min=0 max = 6  step = .5 data-bind="value:ageToGarden, event: { change: $root.valueChanged }"> Billion Years<br/>
+				<!-- /ko -->
+				<!-- ko if:isMoon() && size() == 1 -->
+					<input type="checkbox" value="true" data-bind="checked:canBeSulfur, event: { change: $root.valueChanged }"> Can be Sulfur<br/>
+				<!-- /ko -->
+			<!-- /ko -->
+			<span class="key">temperature:</span> <span data-bind="text:temperature"></span> F
+			(<span data-bind="text:temperatureCelcius"></span> C)
+			<br>
 			<!-- ko if:temperature() > -40 && temperature() < 180 -->
-				climate: <span data-bind="text:temperatureRange"></span><br>
+				<span class="key">climate:</span> <span data-bind="text:temperatureRange, event: { change: $root.valueChanged }"></span><br>
 			<!-- /ko -->
 			<!-- ko if:type()=='terrestrial' -->
-				pressure: <span data-bind="text:atmosphere.pressureClass"></span>
-				(<span data-bind="text:atmosphere.pressure"></span>)<br>
-				gravity: <span data-bind="text:gravity"></span><br>
-				blackbody: <span data-bind="text:blackBody"></span><br>
-				atmosphereic mass: <span data-bind="text:atmosphere.mass"></span>
+				<span class="key">pressure:</span> <span data-bind="text:atmosphere.pressureClass"></span>
+				(<span data-bind="text:sigFigs(atmosphere.pressure(),3)"></span> atm)<br>
+				<span class="key">gravity:</span> <span data-bind="text:gravity"></span> G's<br>
 				<!-- ko if:$root.editPlanet -->
-				<input type="number" min="0" max="2.0" step=".1" data-bind="value:atmosphere.naturalMass"/>
+				<span class="key">atmosphereic mass:</span>
+				<input type="number" min="0" max="2.0" step=".1" data-bind="value:atmosphere.naturalMass, event: { change: $root.valueChanged }"/>
+				<br/>
 				<!-- /ko -->
-				<br>
-				toxicity: <span data-bind="text:atmosphere.toxicity"></span><br>
-				tags: <span data-bind="foreach:atmosphere.tags">
+				<span class="key">tags:</span> 
+				<span data-bind="foreach:atmosphere.tags">
 					<span data-bind="text:$data"></span>
 				</span><br>
 				<!-- ko if:terrain() =="Garden" -->
-					Air Quality: <span data-bind="text:atmosphere.marginal"></span><br>
+					<span data-bind="if:atmosphere.marginal"><span class="key"></span>Marginal Atmosphere<br/></span>
+					<span data-bind="if:!atmosphere.marginal()"><span class="key"></span>Not a Marginal Atmosphere<br/></span>
+					<!-- ko if: $root.editPlanet -->
+						<span class="key">Marginal Atmosphere:</span> <input type="checkbox" value="true" data-bind="checked:atmosphere.canBeMarginal, event: { change: $root.valueChanged }">  <br/>
+					<!-- /ko -->
+					<!-- ko if:$root.editPlanet() && atmosphere.marginal() -->
+						<span class="key"></span><select data-bind="options: $root.random.marginalAtmosphereType, optionsText: 'value', value: atmosphere.marginalValueRoll, optionsValue: 'start'",></select>
+						<br/>
+					<!-- /ko -->
 				<!-- /ko -->
-				<!-- ko if:hydrographicCoverage -->
-					Ocean Coverage: <span data-bind="text:hydrographicCoverage"></span><br>
+				<!-- ko if:hasHydrographicCoverage -->
+					<span class="key">Ocean Coverage:</span><span data-bind="text:sigFigs(hydrographicCoverage()*100,2)"></span>%<br>
+					<!-- ko if:$root.editPlanet -->
+						<!-- ko if:usesSingleHydroDice -->
+							<span class="key"></span>
+							<input type="range" min= 1 max= 6 data-bind="value:hydrographicDice1, event: { change: $root.valueChanged }"/>
+							(<span data-bind="text:hydrographicDice1"></span>)
+						<!-- /ko -->
+						<!-- ko if:!usesSingleHydroDice() -->
+							<span class="key"></span>
+							<input type="range" min= 2 max= 12 data-bind="value:hydrographicDice2, event: { change: $root.valueChanged }"/>
+							(<span data-bind="text:hydrographicDice2"></span>)
+						<!-- /ko -->
+						<br/>
+					<!-- /ko -->
 				<!-- /ko -->
-				affinity: <span data-bind="text:affinity"></span><br>
-				resource Value: <span data-bind="text:resourceValue"></span><br>
+				<span class="key">Vulcanism:</span> <span data-bind="text:vulcanism"></span></br>
+				<!-- ko if:$root.editPlanet -->
+					<span class="key"></span>
+					<input type="range" min= 3 max= 18 data-bind="value:vulcanismRoll, event: { change: $root.valueChanged }"/>
+					(<span data-bind="text:vulcanismRoll"></span>)
+					<br/>
+				<!-- /ko -->
+				<span class="key">Tectonic Activity:</span> <span data-bind="text:tectonics"></span><br/>
+				<!-- ko if:$root.editPlanet -->
+					<span class="key"></span>
+					<input type="range" min= 3 max= 18 data-bind="value:tectonicRoll, event: { change: $root.valueChanged }"/>
+					(<span data-bind="text:tectonicRoll"></span>)
+				<!-- /ko -->
+				<span class="key">Habitability: </span> <span data-bind="text:habitability"></span><br/>
 			<!-- /ko -->
-			diameter: <span data-bind="text:diameter"></span>
+			<!-- ko if:type()=='terrestrial'  || type() == 'asteroid' -->
+				<span class="key">resource Value:</span>
+				<span data-bind="text:resourceValue"></span><br/>
+				<!-- ko if:$root.editPlanet -->
+					<span class="key"></span>
+					<input type="range" min=3 max=18 step = 1 data-bind="value: resourceValueRoll"></input>
+					(<span data-bind="text:resourceValueRoll"></span>)
+				<!-- /ko -->
+				<span class="key">affinity:</span> <span data-bind="text:affinity"></span><br>
+				<span class="key">Settlement:</span> <span data-bind="text:settlementType"></span>
+				<!-- ko if:$root.editPlanet -->
+					<select data-bind="value: settlementType, options: $root.lookup.settlementTypes"></select>
+				<!-- /ko -->
+				<br>
+				<!-- ko if: settlementType() != "none" -->
+					<span class="key">World Unity:</span> <span data-bind="text:worldUnity"></span>
+					<!-- ko if:$root.editPlanet -->
+						<select data-bind="value: worldUnity, options: $root.lookup.worldUnity"></select>
+					<!-- /ko -->
+					<br>
+					<span class="key">Government:</span> <span data-bind="text:government"></span></br>
+					<!-- ko if:$root.editPlanet -->
+						<span class="key"></span>
+						<select data-bind="value: government, options: $root.lookup.governmentTypes"></select>
+						<br>
+					<!-- /ko -->
+					<!-- ko if:worldUnity() == "World Gov*" -->
+						<span class="key"></span>
+						<span data-bind="text: specialGov"></span>
+						<select data-bind="value: specialGov, options: $root.lookup.specialGovs"></select>
+					<!-- /ko -->
+					<!-- ko if: government() != "none" -->
+						<span class="key">Control Rating:</span> <span data-bind="text:controlRating"></span></br>
+					<!-- /ko -->
+					<span class="key">Tech Level:</span> <span data-bind="text:formatTechLevel(techLevel())"></span><br>
+					<!-- ko if:$root.editPlanet -->
+						<span class="key"> Use Custom Tech Level:</span><input type="checkbox" data-bind="checked: useCustomTechLevel, event: { change: $root.valueChanged } "></input><br/>
+						<!-- ko if:useCustomTechLevel -->
+							<span class="key"> Custom Tech Level:</span><input type="number" data-bind="value: customTechLevel, event: { change: $root.valueChanged } "></input><br/>
+						<!-- /ko -->
+						<!-- ko if:!useCustomTechLevel() -->
+							<span class="key"> Tech Level Roll:</span><input type="range" min = 3 max = 18 data-bind="value: techLevelRoll, event: { change: $root.valueChanged } "></input><br/>
+							<!-- ko if: techLevel() <= 6 -->
+							<span class="key"> Primitive Tech Level Roll:</span><input type="range" min = 3 max = 18 data-bind="value: primitiveTechLevelRoll, event: { change: $root.valueChanged } "></input>
+							<br/>
+							<!-- /ko -->
+						<!-- /ko -->
+					<!-- /ko -->
+					<span class="key">Population:</span> <span data-bind="text:formatNumberWithMagnitude(population())"></span><br>
+					<!-- ko if:$root.editPlanet -->
+							<!-- ko if: settlementType() == "colony" || settlementType() == "outpost" -->
+								<span class="key"> population roll:</span><input type="range" min = 3 max = 18 data-bind="value: populationRoll, event: { change: $root.valueChanged } "></input><br/>
+							<!-- /ko -->
+							<!-- ko if: settlementType() == "homeworld" -->
+								<span class="key"> homeworld population roll:</span><input type="range" min = 3 max = 18 data-bind="value: homeworldPopulationRoll, event: { change: $root.valueChanged } "></input><br/>
+							<!-- /ko -->
+					<!-- /ko -->
+					<span class="key">Wealth:</span> <span data-bind="text:formatNumberWithMagnitude(averageWealth())"></span><br>
+					<span class="key">Economic Volume:</span> <span data-bind="text:formatNumberWithMagnitude(economicVolume())"></span><br>
+					<!-- ko if:settlementType() == "colony" -->
+						<span class="key">Colony Age:</span> <span data-bind="text:colonyAge"></span>
+						<!-- ko if:$root.editPlanet -->
+							<input type="number" data-bind="value: colonyAge, event: { change: $root.valueChanged } "></input>
+						<!-- /ko -->
+						 years<br>
+					<!-- /ko -->
+				<!-- /ko -->
+				<span class="key">Carrying Capacity:</span> <span data-bind="text:formatNumberWithMagnitude(carryingCapacity())"></span><br>
+			<!-- /ko -->
+			<span class="key">orbital length:</span> 
+			<span data-bind= "text:yearDayLength().toFixed(1)"></span> days<br/>
+			<span class="key"></span>(<span data-bind= "text:yearLength().toFixed(2)"></span> years)<br/>
+			<span class="key">diameter:</span>
+			<span data-bind="text:sigFigs(diameter(),3)"></span> of Earth <br/>
 			<!-- ko if:$root.editPlanet() && type()=='terrestrial' -->
-				<input type="range" min="0" max="1.0" step=".1" data-bind="value:diameterSeed"/>
-			<!-- /ko --><br>
+				<span class="key"></span><input type="range" min="0" max="1.0" step=".1" data-bind="value:diameterSeed, event: { change: $root.valueChanged }"/>
+			<!-- /ko -->
+			<span class="key">density:</span> 
+			<span data-bind="text:density"></span> of Earth<br>
+			<!-- ko if:$root.editPlanet() && type()=='terrestrial' -->
+				<span class="key"></span>
+				<input type="range" min=".3" max=".7" step=".1" data-bind="value:densitySeed, event: { change: $root.valueChanged }"/>
+			<!-- /ko -->
+			<span class="key">mass:</span>
+			<span data-bind="sigFigs(text:mass(),3)"></span>of Earth<br>
 			<!-- ko if:$root.editPlanet() && type()=='giant' -->
-				<input type="range" min="3" max="18" step="1" data-bind="value:gasGiantMassSeed"/><br>
+				<span class="key"></span>
+				<select data-bind="options: $root.random.GasGiantMassSelect[size()-1], optionsText: 'mass', value: gasGiantMassSeed, optionsValue: 'value'",></select> Earth Masses<br/>
 			<!-- /ko -->
-			density: <span data-bind="text:density"></span>
-			<!-- ko if:$root.editPlanet() && type()=='terrestrial' -->
-				<input type="range" min=".3" max=".7" step=".1" data-bind="value:densitySeed"/>
-			<!-- /ko --><br>
-			size: <span data-bind="text:size"></span>
+			<!-- ko if: !isMoon() -->
+				<span class="key">distance from star:</span>
+				<span data-bind="text: sigFigs(orbit().distance(), 3)"></span>
+				<!-- ko if:$root.editPlanet -->
+					<input type="number" data-bind="value:orbit().baseDistance, attr:{step:orbit().baseDistance()/10}, event: { change: $root.valueChanged }"/>
+				<!-- /ko -->
+				AU<br>
+				<span class="key">Orbital eccentricty:</span>
+				<span data-bind="text: orbit().eccentricty"></span>
+					<!-- ko if:$root.editPlanet -->
+						<input type="range" min="0" max="1" step=".05" data-bind="value:orbit().eccentricty, event: { change: $root.valueChanged }"></input>
+						<input type="number" min="0" max="1" step=".05" data-bind="value:orbit().eccentricty, event: { change: $root.valueChanged }"></input>
+					<!-- /ko -->
+				 <br/>
+				<span class="key">Min Distance:</span> <span data-bind="text: sigFigs(orbit().minDistance(),3)"></span> AU <br/>
+				<span class="key">Max Distance:</span> <span data-bind="text: sigFigs(orbit().maxDistance(),3)"></span> AU <br/>
+				<span class="key">minor moons:</span> <span data-bind="text:minorMoons"></span><br>
+				<span class="key">major moons:</span> <span data-bind="text:majorMoons"></span><br>
+			<!-- /ko -->
 			<!-- ko if:$root.editPlanet -->
-			<input type="number" min="1" max="4" step="1" data-bind="value:size"/>
+				<span class="key">blackbody:</span> <span data-bind="text:sigFigs(blackBody(),4)"></span> K<br>
 			<!-- /ko -->
-			<br>
-			orbit: <span data-bind="text:orbit().distance"></span>
+			<span class="key">Day Length:</span> <span data-bind="text:sigFigs(rotation(),3)"></span> Hours</br>
+			<span class="key"></span>
+			(<span data-bind="text:sigFigs(rotationInDays(),3)"></span> Days)
+			<span data-bind="if:tideLocked">(Tide Locked)</span></br>
 			<!-- ko if:$root.editPlanet -->
-				<input type="number" data-bind="value:orbit().baseDistance, attr:{step:orbit().baseDistance()/10}"/>
+				<!-- todo: better input on what control is actually active -->
+				<span class="key">short Rotation Rate:</span>
+				<input type="range" min=3 max=18 step=1 data-bind="value:baseRotationRate"></input>
+				(<span data-bind="text:baseRotationRate"></span>)<br/>
+				<span class="key">Long Rotation Multiplier Roll:</span> <input type="range" min=2 max=12 step=1 data-bind="value:specialRotationTableRoll"></input>
+				(<span data-bind="text:Distribution($root.random.specialRotation).get(specialRotationTableRoll())"></span>)<br/>
+				<span class="key">Long Rotation Roll:</span> <input type="number" min=1 max=6 step=1 data-bind="value:specialRotationRoll"></input>
+				(<span data-bind="text:specialRotationRoll"></span>)<br/>
 			<!-- /ko -->
-			<br>
-			minor moons: <span data-bind="text:minorMoons"></span><br>
-			major moons: <span data-bind="text:majorMoons"></span><br>
-			 
+			<span class="key">Axial Tilt:</span> <span data-bind="text:axialTilt"></span>
+				<!-- ko if:$root.editPlanet -->
+					<input type="number" min= 0 max= 90 data-bind="value:axialTilt, event: { change: $root.valueChanged }"/>
+				<!-- /ko -->
+			%<br/>
+			<!-- ko if: isMoon --> 
+				<span class="key">distance from planet: </span>
+				<span data-bind="text: sigFigs(distanceFromPlanet(),3)"></span> Earth Diameters <br/>
+					<!-- ko if:$root.editPlanet -->
+						<span class="key">Planet Radii Away:</span>
+						<input type="number" min="0" step=".5" data-bind="value:moonDistanceInDiam, event: { change: $root.valueChanged }"></input></br>
+					<!-- /ko -->
+			<!-- /ko -->
+			<span class="key">Tidal Effects:</span> <br/>
+			<span data-bind="foreach:tidalEffects">
+				<span data-bind="if:$index() == 0">
+					<span data-bind="text:$parent.isMoon()?'Lunar': 'Solar:'" class="key"></span>
+				</span>
+				<span data-bind="if:$index() != 0">
+					<span data-bind="text:'Moon '+$index() + ':'" class="key"></span>
+				</span>
+				<span data-bind="text:sigFigs($data,3)"></span> of Earth-Lunar Tide
+				<br/>
+			</span>
+			<!-- ko if:$root.editPlanet -->
+				<span class="key">Total Tidal Effect:</span> <span data-bind="text:sigFigs(totalTidalEffect(),3)"></span><br/>
+			<!-- /ko -->
+			<span class="key">notes:</span> <div data-bind="text:notes"></div>
+			<!-- ko if:$root.editPlanet -->
+				<div><textarea data-bind="value:notes" style =  "width:400px; height: 80px" ></textarea></div>
+			<!-- /ko -->
+			<!-- ko if:$root.editPlanet -->
+				<button type="number" data-bind="click:$root.addMoon, event: { change: $root.valueChanged }"/>add moon</button>
+				<button type="number" data-bind="click:$root.deletePlanet, event: { change: $root.valueChanged }"/>delete Planet</button>
+			<!-- /ko -->
 			<input type="checkbox" value="true" data-bind="checked:$root.editPlanet"> Edit Planet<br>
 
 		</div>
 		</div>
-		<!-- ko Konva.Stage: {width: 800, height:800 } -->
-			<!-- ko Konva.Layer: {} -->
-				<!-- ko foreach:currentSystem().stars() -->
-					<!-- ko Konva.Group: {x:0,y:Number($index()) * 100} -->
-						<!-- ko Konva.Rect: {x:0, y:0, width: 800, height:100, fill:'black', stroke: 'black', strokeWidth: 0 } --> 
-						<!-- /ko -->
-						<!-- TODO: draw asteroids better! -->
-						<!-- ko Konva.Circle: {x:50-drawnRadius(), y:50, radius:drawnRadius, fill:drawnColor, stroke: drawnColor, strokeWidth: 0, click: $root.events.starClick, data:$data} --> 
-						<!-- /ko -->
-						<!-- ko if: $root.currentPlanet().orbit().center() == $parent-->
-							<!-- ko with: $root.currentPlanet() -->
-								<!-- ko Konva.Circle: {x:$parent.displayPosition(orbit().distance()), y:50, radius:50, stroke: 'white', strokeWidth: 5, click: $root.events.planetClick, data:$data } -->
-								<!-- /ko -->
-							<!-- /ko -->
-						<!-- /ko -->
-						<!-- ko foreach:$root.currentSystem().planets -->
-							<!-- ko if: $parent == $data.orbit().center()-->
-								<!-- ko Konva.Circle: {x:$parent.displayPosition(orbit().distance()), y:50, radius:drawnRadius, fill:drawnColor, stroke: drawnColor, strokeWidth: 0, click: $root.events.planetClick, data:$data } -->
-								<!-- /ko -->
-								<!-- moons -->
-								<!-- ko foreach:$root.currentSystem().planets-->
-									<!-- ko if: $parent == $data.orbit().center()-->
-										<!-- ko Konva.Circle: {x:$data.star().displayPosition($parent.orbit().distance())+$data.orbit().distance()*10, y:75, radius:drawnRadius, fill:drawnColor, stroke: drawnColor, strokeWidth: 0, click: $root.events.planetClick, data:$data } -->
-										<!-- /ko -->
-									<!-- /ko -->
-								<!-- /ko -->
-							<!-- /ko -->
-						<!-- /ko -->
-						<!-- ko Konva.Line: {points:[$data.displayPosition($data.snowLine()),0,$data.displayPosition($data.snowLine()),100], stroke: "white", strokeWidth: 1} --> 
-						<!-- /ko -->
-						<!-- ko Konva.Line: {points:[$data.displayPosition($data.hotHabitableZone()),0,$data.displayPosition($data.hotHabitableZone()),100], stroke: "green", strokeWidth: 1} --> 
-						<!-- /ko -->
-						<!-- ko Konva.Line: {points:[$data.displayPosition($data.coldHabitableZone()),0,$data.displayPosition($data.coldHabitableZone()),100], stroke: "green", strokeWidth: 1} --> 
-						<!-- /ko -->
-						<!-- ko Konva.Line: {points:[$data.displayPosition($data.innerLimit()),0,$data.displayPosition($data.innerLimit()),100], stroke: "red", strokeWidth: 1} --> 
-						<!-- /ko -->
-						<!-- ko Konva.Line: {points:[$data.displayPosition($data.outerLimit()),0,$data.displayPosition($data.outerLimit()),100], stroke: "red", strokeWidth: 1} --> 
-						<!-- /ko -->
-						<!-- ko foreach:$root.currentSystem().stars() -->
-							<!-- ko if: $parent != $data && $data.orbit().center() == $parent-->
-								<!-- ko Konva.Line: {points:[$parent.displayPosition($data.orbit().minDistance()),0,$parent.displayPosition($data.orbit().maxDistance()),100], stroke: drawnColor, strokeWidth: 1} --> 
-								<!-- /ko -->
-								<!-- ko Konva.Circle: {x:$parent.displayPosition($data.orbit().distance()), y:50, radius:20, fill: drawnColor, stroke: drawnColor, strokeWidth: 5, click: $root.events.starClick, data:$data } -->
-								<!-- /ko -->
-							<!-- /ko -->
-							<!-- ko if: $parent != $data && $parent.orbit().center() == $data-->
-								<!-- ko Konva.Line: {points:[$parent.displayPosition($parent.orbit().minDistance()),0,$parent.displayPosition($parent.orbit().maxDistance()),100], stroke: drawnColor, strokeWidth: 1} --> 
-								<!-- /ko -->
-								<!-- ko Konva.Circle: {x:$parent.displayPosition($parent.orbit().distance()), y:50, radius:20, fill: drawnColor, stroke: drawnColor, strokeWidth: 5, click: $root.events.starClick, data:$data } -->
-								<!-- /ko -->
-							<!-- /ko -->
-						<!-- /ko -->
-					<!-- /ko -->
-				<!-- /ko -->
-				<!-- ko Konva.Group: {x:0,y:currentSystem().stars().length*100} -->
-					<!-- ko Konva.Rect: {x:0, y:0, width: 500, height:500, fill:'black', stroke: 'black', strokeWidth: 0 } --> 
-					<!-- /ko -->
-					<!-- ko foreach:cosmos.systems -->
-						<!-- ko Konva.Circle: {x:location.x()*5, y:location.y()*5, radius:2, fill:stars()[0].drawnColor, stroke: stars()[0].drawnColor, strokeWidth: 0, click: $root.events.systemClick, data:$data } -->
-						<!-- /ko -->
-						<!-- ko if:isHabitable -->
-							<!-- ko Konva.Circle: {x:location.x()*5+5, y:location.y()*5+5, radius:1, fill:"green", stroke: "green", strokeWidth: 0} -->
-							<!-- /ko -->
-						<!-- /ko -->
-					<!-- /ko -->
-					<!-- ko Konva.Circle: {x:currentSystem().location.x()*5, y:currentSystem().location.y()*5, radius:15, fill:"rgba(0,0,0,0)", stroke: "white", strokeWidth: 1} -->
-					<!-- /ko -->
-				<!-- /ko -->
-				<!-- ko Konva.Group: {x:500,y:currentSystem().stars().length*100} -->
-					<!-- ko Konva.Rect: {x:0, y:0, width: 300, height:300, fill:'#111111', stroke: 'white', strokeWidth: 1 } --> 
-					<!-- /ko -->
-					<!-- ko with:$root.currentPlanet -->
-						<!-- ko Konva.Circle: {x:150, y:150, radius:50, fill:drawnColor, stroke: drawnColor, strokeWidth: 1} -->
-						<!-- /ko -->
-						<!-- ko foreach:$root.currentSystem().planets() -->
-							<!-- ko if:$data.orbit().center() == $parent -->
-								<!-- ko Konva.Circle: {x:$data.orbit().distance()*30+15, y:200, radius:drawnRadius()*5, fill:drawnColor, stroke: drawnColor, strokeWidth: 1,click: $root.events.planetClick, data:$data} -->
-								<!-- /ko -->
-							<!-- /ko -->
-						<!-- /ko -->
-					<!-- /ko -->
-				<!-- /ko -->
-
-			<!-- /ko -->
-		<!-- /ko -->
+		Save As:<input id="saveName" value ="defaultGalaxy"></input>
+		<button data-bind="click:save">Save</button>
+		<button data-bind="click:saveSystem">Save System</button>
+		<input type="file" id="up" />
+		<button data-bind="click:loadSector"> Load Sector</button>
+		<button data-bind="click:loadSystems"> Load Systems</button>
+		<br/>
+		<button data-bind="click: newSeed">New Seed</button>
+		<input id="seed" data-bind="value:seed"></input>
+		<button id="regenButton" data-bind="click: regenerate">Regenerate Sector</button>
+		<button data-bind="click: newSystem">Generate New System</button>
+		<button data-bind="click: addSystem">Add System</button>
+		<div>
+			<span class="key">Number of Systems:</span> <input class="shortInput" type="number" data-bind="value: generation.systemCount" ></input> 
+		</div>
+		<div>
+			<span class="key">TL:</span> <input class="shortInput" type="number" min=0 max=12 data-bind="value: generation.TL"></input>
+		</div>
+		<div>
+			<span class="key">Names:</span> <select data-bind = "options: names.options, value: generation.nameMethod"></select>
+		</div>
+		<div>
+			<span class="key">Colony Age Range:</span> <input class="shortInput" type="number" min=0 data-bind="value: generation.colonyAgeMin"></input>
+			-
+			<input class="shortInput" type="number" min=0 data-bind="value: generation.colonyAgeMax"></input>
+		</div>
+		<div>
+			<span class="key">Sector Governance:</span> 
+			<select data-bind = "options: lookup.govGenerators, optionsText: 'name', optionsValue: 'value', value: generation.govGenerator"></select>
+		</div>
+		<div data-bind="if:root.generation.processing">
+			<h2 data-bind="text:root.generation.message"></h2>
+		</div>
+		<div width = 800>
+			<h3>System View</h3>
+			<div id="systemFrame" data-bind = "click: systemCanvasClick">
+				<canvas width="800px" height = "300px" id = "systemCanvas"></canvas>
+			</div>
+		</div>
+		<div width= 500 style="display: inline-block">
+			<h3>Sector View</h3>
+			<div id="sectorFrame" data-bind = "click: sectorCanvasClick">
+				<canvas width="500px" height = "500px" id = "sectorCanvas"></canvas>
+			</div>
+		</div>
+		<div width=300  style="display: inline-block">
+			<div>
+				<div>space is black: <input type="checkbox" data-bind="checked:display.spaceIsBlack , event: { change: $root.valueChanged }"></input></div>
+			</div>
+			<h3>Planet View</h3>
+			<div id="planetFrame" data-bind = "click: planetCanvasClick" >
+				<canvas width="300px" height = "300px" id = "planetCanvas"></canvas>
+			</div>
+		</div>
+		
+		<div>
+			sort by
+			<button data-bind="click:sorting.sortByName">Name</button>
+			<button data-bind="click:sorting.sortBySize">Size</button>
+			<button data-bind="click:sorting.sortByResource">Resource</button>
+			<button data-bind="click:sorting.sortByHabitability">Habitability</button>
+			<button data-bind="click:sorting.sortByAffinity">Affinity</button>
+			<button data-bind="click:sorting.sortByPopulation">Population</button>
+		</div>
+		<div class="systemList">
+			<div data-bind="foreach:cosmos.systems" class="systemRows">
+				<div class="systemRow" data-bind="click: $root.events.systemClick">
+					<span data-bind="text:name" class="systemRowName"></span>
+					<span data-bind="with: stars()[0]" class="systemRowStar">
+						<span data-bind =  "text:size().starclass"></span>
+						<span style="" data-bind="style: {background:drawnColor, 'min-width':'10px', 'min-height':'10px', display: 'inline-block'}"></span>
+					</span>
+					<span class="systemRowStarCount">
+						<span data-bind="text:stars().length"></span>s
+					</span> 
+					<span class="systemRowPlanetCount">
+						<span data-bind="text:planets().length"></span>p
+					</span>
+					<span class="systemRowAffinity">
+						Af <span data-bind="text:affinity"></span>
+					</span>
+					<span class="systemRowPopulation">
+						<span data-bind="text:formatNumberWithMagnitude(population())"></span> pop
+					</span>
+				</div>
+			</div>
+		</div>
 	</div>
 </body>

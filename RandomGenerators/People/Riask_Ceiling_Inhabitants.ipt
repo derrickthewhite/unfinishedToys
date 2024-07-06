@@ -1,0 +1,15 @@
+; Riask_Ceiling_Inhabitants.ipt
+; created 2/18/2022 8:56:22 AM
+
+Table: Riask_Ceiling_Inhabitants
+20:Mugraggle
+50:Native Human
+10:Foreign Human
+10:Hawk folk
+5:Sparrow folk
+5:Dragon folk
+5:Elf
+5:Goblin
+2:Dwarf
+1:Gnoll (Hynril)  
+18:Generate and Add new

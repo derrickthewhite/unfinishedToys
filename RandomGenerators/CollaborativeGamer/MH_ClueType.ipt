@@ -1,0 +1,10 @@
+; MH_ClueType.ipt
+; created 4/14/2016 11:15:00 AM
+
+Table: MH_ClueType
+You notice signs of a monster
+2: Someone is dead
+A monster attacks a player
+Research yeilds evidence
+Someone else notices an odd behavior 
+Mystical Detection 

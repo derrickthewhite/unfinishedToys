@@ -56,6 +56,7 @@
 				1
 			];
 			config.seed = 4377457;
+			//config.seed = 215356896;
 			
 			var shuffleArray = function (array, random) {
 				array = array.map(a=>a); //shallow copy
@@ -78,7 +79,7 @@
 				}
 				return result;
 			}
-			
+			var hi;
 			var main = function () {
 				var random = new MersenneTwister(config.seed);
 				var colors = generateColors(random);
@@ -87,7 +88,7 @@
 				var deck2 = generateDeck(meta, config.colors.slice(2,4), random);
 				console.log(meta, colors, deck1, deck2);
 				
-				var hi = HumanInterface();
+				hi = HumanInterface();
 				hi.initializeView();
 				
 				var game = Game();

@@ -1,0 +1,76 @@
+; ChangedHumaniod.ipt
+; created 12/18/2015 8:12:44 PM
+
+Table: Humanoid
+Set: skin = [@Odds with SkinTexture,50,skin]
+[@Odds with Ears,80,empty] &
+[@Odds with Build,30,empty] &
+[@SkinColor] &
+{skin} &
+[when][{skin} >> At skin]>0[do][#{1d8} Head][else][#{1d4+4} Head][end] &
+[@Size] Humanoid
+
+Table: Ears
+long pointed ears
+short pointed ears
+pivoting ears
+errect ears
+Oversized ears
+Round ears
+No Ears
+
+Table: Build
+Long Limbed
+Heavy Set
+Squat
+Thin
+Hunched
+
+Table: Size
+3:{''}
+Large
+Small
+
+Table: SkinTexture
+Slimy Skin
+Scales
+Warty Skin
+Fine Fur
+Dirty Fur
+Thick Fur
+Long Fur
+Blubbered Skin
+Tough Hide
+Delicate Skin
+
+Table: SkinColor
+African Black
+Ebony Black
+Grey
+Pasty White
+Ruddy
+Deep Brown
+Pale Brown
+Blotchy
+Redish Brown
+Green
+Blue
+
+Table: Head
+Type: Lookup 
+1-4:Head with [@Hair]
+5:Bald Head
+6:Spiked Head
+7:Frilled Head
+8:Horned Head
+
+Table: Hair
+Tightly Curled Hair
+Strait Hair
+Stiff Hair
+
+Table: Odds
+set: table={$1}
+set: odds={$2}
+set: default = [when not]{$3 = 'empty'}[do]{$3}[else]{''}[end]
+[when]{1d100}<{odds}[do][@{table}][else]{default}[end]

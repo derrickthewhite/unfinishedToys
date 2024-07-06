@@ -1,0 +1,37 @@
+; AncientWorldLocation.ipt
+; created 4/18/2018 11:03:28 AM
+; created for banestorm labelling
+
+Table: AncientWorldLocation
+10: [@medSea]
+5: [@otherWest]
+3: [@farEast]
+10: [@Jungle]
+
+Table: medSea
+3:Italians
+Gallic
+2:Phoenecian
+2:Egyptian
+3:Greeks
+Macedonians
+
+Table: otherWest
+Babylonian
+Persian
+German
+Scythian
+Desert Tribes
+
+Table: farEast
+3:Chineese
+3:Southern Chineesish
+3:Northern Chineesish
+Japan
+
+Table: Jungle
+Amazon
+Mesoamerica
+West Africa
+Central Africa
+Southeast Asia
