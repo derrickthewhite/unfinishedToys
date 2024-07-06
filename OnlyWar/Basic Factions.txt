@@ -1,0 +1,73 @@
+Spacewar Factions:
+
+Teracoa Hive
+	Insectoid Race with intelligent individuals in hive
+	Phase technology
+	Warp technology
+	Good in hand to hand combat
+
+Kinswin Union
+	Humanoid psychics who rely on power
+	Lots of telepathy
+	Good ranged attacks
+	Deflection fields
+
+Bogwalith 
+	A giant slime that can use technology
+	Very phsyically resiliant
+	very good at biological and chemical warefare
+
+LXQ Collective
+	A collective of short legged robots
+	physically tough
+	good ranged attacks
+	On field repairs
+
+Krugits
+	Pysically tough humanoids
+	Lots of them
+	Regeneration via Electricity
+
+Order of Joktor
+	Spaceknights with force shields and force swords
+	Highly directional armor
+	High damage, high defense
+
+
+Units:
+	Teracoa
+		Shooter
+		Slasher
+		Warper
+		Engineer
+	
+	Kinswin
+		Mind Blaster
+		Tech Twister
+		Deflector
+	
+	Bogwalith
+		Shooter
+		Scout
+		Mechanic
+		Blob
+	
+	LXQ
+		Scout
+		Shooter
+		Hacker
+		Mechanic
+		Chopper
+	
+	Krugits
+		Healer
+		Marine
+		Grenadier
+		Techy
+	
+	Joktor
+		Knight
+		civilian
+
+Stat List:
+	

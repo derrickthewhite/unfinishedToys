@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Game</title>
+    <style>
+        .game-container {
+            display: flex;
+            flex-direction: row;
+        }
+        .board-container, .players-container {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid black;
+        }
+        .board-layer {
+            display: flex;
+            flex-direction: column;
+            margin: 10px;
+            padding: 10px;
+        }
+        .row {
+            display: flex;
+        }
+        .card {
+            width: 50px;
+            height: 50px;
+            border: 1px solid black;
+            margin: 5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .hand {
+            display: flex;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="board-container" id="board"></div>
+        <div class="players-container" id="players"></div>
+    </div>
+    <script src="tesseract.js">
+    </script>
+</body>
+</html>

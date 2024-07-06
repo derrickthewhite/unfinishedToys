@@ -1,0 +1,254 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>HotT Army Calculator</title>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+  <script>
+	function unitType(name, type, vsInfantry,vsOther,roadMove,flatMove,roughMove, waterMove, points, noGeneral) {
+		var unit = {
+			name: name,
+			type: type,
+			points: points,
+			vsInfantry: vsInfantry,
+			vsOther: vsOther,
+			roadMove: roadMove,
+			flatMove: flatMove,
+			roughMove: roughMove,
+			waterMove: waterMove,
+			count: ko.observable(0),
+			general: ko.observable(false),
+			noGeneral: noGeneral
+		}
+		return unit;
+	}
+	function main(){
+		console.log("doing stuff in here.")
+		var results = {
+			test: "hello"
+		};
+		
+		results.ruleset = ko.observable("HotT");
+		results.rulesetOptions = [
+			"HotT",
+			"D3H2"
+		]
+		results.sortBy = ko.observable("Name");
+		results.sortOptions = [
+			"Name",
+			"Value",
+			"Type"
+		];
+		results.hideStats = ko.observable(false);
+		
+		results.D3H2Table = ko.observableArray([
+			unitType("Airboat", "Aerial",5,3,"500","500","500","500",3),
+			unitType("Artillery", "Foot", 4,3,"300","200","0","0",3),
+			unitType("Beast","Mounted", 3,4,"400","400","400","100",2),
+			unitType("Behemoth","Mounted",4,5,"400","300","200","100",4),
+			unitType("Blade", "Foot",5,3,"400","200","200","100",2),
+			unitType("Cleric", "Foot",4,4,"400","200","200","100",3),
+			unitType("Dragon", "Aerial",6,6,"1,200","1,200","1,200","1,200",4, true),
+			unitType("Flyer", "Aerial",2,2,"1,200","1,200","1,200","1,200",2),
+			unitType("God", "Aerial",6,6,"1,200","1,200","1,200","1,200",4, true),
+			unitType("Hero","Mounted",5,5,"500","500","200","100",4),
+			unitType("Aerial Hero", "Aerial",5,5,"1,200","1,200","1,200","1,200",6),
+			//unitType("Horde", "Foot",2,2,"400","200","200","100",1),
+			unitType("Knight","Mounted",3,4,"400","300","200","100",2),
+			//unitType("Lurker", "Foot",2,2,"0","0","300","0",1, true),
+			//unitType("Water Lurker", "Foot",2,2,"0","0","0","300",1, true),
+			unitType("Magician","Mounted",4,4,"500","500","200","100",4),
+			unitType("Paladin","Mounted",6,6,"500","500","200","100",4, true),
+			unitType("Rider","Mounted",3,3,"500","500","200","100",2),
+			unitType("Shooter", "Foot",3,4,"400","300","300","100",2),
+			unitType("Sneaker", "Foot",5,3,"400","300","300","100",3, true),
+			unitType("Spear", "Foot",4,4,"400","200","200","100",2),
+			//unitType("Warband", "Foot",3,3,"400","200","200","100",2)
+
+			unitType("War Wagons", "Mounted", 0,0, "0","0","0","0",3),
+			unitType("6Cv", "Mounted", 0,0, "0","0","0","0",3),
+			unitType("6Kn", "Mounted", 0,0, "0","0","0","0",3),
+			unitType("8Spear", "Foot", 0,0, "0","0","0","0",3),
+			unitType("6Blade", "Foot", 0,0, "0","0","0","0",3),
+			unitType("Camelry", "Mounted", 0,0, "0","0","0","0",2),
+			unitType("Command Post", "Foot", 0,0, "0","0","0","0",2),
+			unitType("8Bw", "Foot", 0,0, "0","0","0","0",2),
+			unitType("Pikes", "Foot", 0,0, "0","0","0","0",1.5),
+			unitType("Auxilia", "Foot", 0,0, "0","0","0","0",1.5),
+			unitType("Warband", "Foot", 0,0, "0","0","0","0",1.5),
+			unitType("Bows", "Foot", 0,0, "0","0","0","0",1.5),
+			unitType("Inexhaustible Hordes", "Foot", 0,0, "0","0","0","0",1.5),
+			unitType("Light Horse", "Foot", 0,0, "0","0","0","0",1.5),
+			unitType("Lurker Psiloi", "Foot", 0,0, "0","0","0","0",1.5),
+			unitType("Other Hordes", "Foot", 0,0, "0","0","0","0",1),
+			unitType("Psiloi", "Foot", 0,0, "0","0","0","0",1),
+			unitType("Scythed Chariots", "Foot", 0,0, "0","0","0","0",1),
+		])
+		
+		results.baseTable = ko.observableArray([
+			unitType("Airboat", "Aerial",5,3,"500","500","500","500",3),
+			unitType("Artillery", "Foot", 4,3,"300","200","0","0",3),
+			unitType("Beast","Mounted", 3,4,"400","400","400","100",2),
+			unitType("Behemoth","Mounted",4,5,"400","300","200","100",4),
+			unitType("Blade", "Foot",5,3,"400","200","200","100",2),
+			unitType("Cleric", "Foot",4,4,"400","200","200","100",3),
+			unitType("Dragon", "Aerial",6,6,"1,200","1,200","1,200","1,200",4, true),
+			unitType("Flyer", "Aerial",2,2,"1,200","1,200","1,200","1,200",2),
+			unitType("God", "Aerial",6,6,"1,200","1,200","1,200","1,200",4, true),
+			unitType("Hero","Mounted",5,5,"500","500","200","100",4),
+			unitType("Aerial Hero", "Aerial",5,5,"1,200","1,200","1,200","1,200",6),
+			unitType("Horde", "Foot",2,2,"400","200","200","100",1),
+			unitType("Knight","Mounted",3,4,"400","300","200","100",2),
+			unitType("Lurker", "Foot",2,2,"0","0","300","0",1, true),
+			unitType("Water Lurker", "Foot",2,2,"0","0","0","300",1, true),
+			unitType("Magician","Mounted",4,4,"500","500","200","100",4),
+			unitType("Paladin","Mounted",6,6,"500","500","200","100",4, true),
+			unitType("Rider","Mounted",3,3,"500","500","200","100",2),
+			unitType("Shooter", "Foot",3,4,"400","300","300","100",2),
+			unitType("Sneaker", "Foot",5,3,"400","300","300","100",3, true),
+			unitType("Spear", "Foot",4,4,"400","200","200","100",2),
+			unitType("Warband", "Foot",3,3,"400","200","200","100",2)
+		]);
+		results.table = ko.computed(() => {
+			var table = results.ruleset() == "HotT"? results.baseTable(): results.D3H2Table()
+			return table.map(u =>u).sort((a,b) => {
+				if(results.sortBy() == "Name") {
+					return a.name.localeCompare(b.name);
+				}
+				else if (results.sortBy() == "Value") {
+					return a.points - b.points;
+				}
+				else {
+					if(a.type == b.type) return a.points - b.points
+					var aValue = a.type == "Foot"? 1 : a.type == "Mounted"? 2 : 3;
+					var bValue = b.type == "Foot"? 1 : b.type == "Mounted"? 2 : 3;
+					return aValue - bValue;
+				}
+			});
+		});
+		//TODO: can these be pure?
+		results.pointTotal = ko.computed(() => {
+			return results.table().reduce((sofar, type) => {
+				return sofar + type.points * type.count();
+			}, 0);
+		});
+		results.bigModelPointTotal = ko.computed(() => {
+			return results.table().reduce((sofar, type) => {
+				return sofar + (type.points >2? type.points : 0) * type.count();
+			}, 0);
+		});
+		
+		results.problems = ko.pureComputed(() => {
+			var result = [];
+			if(results.pointTotal() > 24) {
+				result.push("You have spent more than 24 points on units. You must reduce your army value by "+ (results.pointTotal() - 24) + " points");
+			}
+			if(results.bigModelPointTotal() > 12) {
+				result.push("You have spent more than 12 points on units costing over 2 points each. You must reduce the value of your 'Large' units by "+ (results.bigModelPointTotal() - 12) + " points");
+			}
+			if(results.table().filter(unit => unit.general()).length > 1) {
+				result.push("you may only select one general!");
+			}
+			if(results.table().filter(unit => unit.general()).length < 1) {
+				result.push("you should select a general!");
+			}
+			return result;
+		});
+		results.warnings = ko.pureComputed(() => {
+			var result = [];
+			if(results.pointTotal() < 24) result.push("You should probably buy more units. You have " +(24 - results.pointTotal()) + " points left");
+			return result;
+		});
+		results.pointsColor = ko.pureComputed(() => {
+			var total = results.pointTotal();
+			if(total <=12 || total > 24) return "#ff0000";
+			if(total <=20) return "rgb(200,"+200*(total -12)/8+",0)";
+			return "rgb("+200*(24 -total)/4+",200,0)";
+		});
+		results.approval = ko.pureComputed(() => {
+			return results.pointTotal() ==24 
+			&& results.bigModelPointTotal() <=12 
+			&& results.table().filter(unit => unit.general()).length == 1
+		})
+		results.summary = ko.pureComputed(() => {
+			return results.table().filter(type => type.count() >0);
+		});
+		ko.applyBindings(results,document.getElementById('display'));
+
+	}
+  </script>
+</head>
+<body onload="main()">
+	<div id="display">
+		Sort By: <select data-bind="options:sortOptions, value:sortBy"></select>
+		Hide Stats: <input type="checkbox" data-bind = "checked: hideStats"></input>
+		Ruleset: <select data-bind="options:rulesetOptions, value:ruleset"></select>
+		<table >
+			<style>
+				td{
+					margin: 10px;
+				}
+			</style>
+			<tbody >
+			<tr>
+				<th>Name</th>
+				<!-- ko if: !$root.hideStats() && $root.ruleset() == "HotT" -->
+				<th>Type</th>
+				<th>Combat</th>
+				<th>Move</th>
+				<!-- /ko -->
+				<th>Points</th>
+				<th>Count</th>
+				<th>General's Element</th>
+			</tr>
+			<!-- ko foreach:table -->
+			<tr>
+				<td data-bind="text:name" style="font-weight:bold"></td>
+				<!-- ko if: !$root.hideStats() && $root.ruleset() == "HotT" -->
+				<td data-bind="text:type" ></td>
+				<td>
+					+<span data-bind="text:vsInfantry"></span>/+<span data-bind="text:vsOther"></span>
+				</td>
+				<td style="padding-right:20px">
+					<span data-bind="text:roadMove"></span>/<span data-bind="text:flatMove"></span>/<span data-bind="text:roughMove"></span>
+				</td>
+				<!-- /ko -->
+				<td data-bind="text:points"></td>
+				<td>
+					<input type="number" min="0" step="1" data-bind="value:count" style="width:50px"></input>
+				</td>
+				<td data-bind="if:!noGeneral">
+					<input type="checkbox" data-bind="checked:general"></input>
+				</td>
+			</tr>
+			<!-- /ko -->
+			</tbody>
+		</table>
+		<table style="font-size:14pt">
+		<tr><td>Points:</td><td data-bind="style: { border: 'solid '+ pointsColor()}"><span data-bind="text:pointTotal"></span>/24</td></tr>
+		<tr><td>Big Model Points:</td><td><span data-bind="text:bigModelPointTotal"></span>/12</td></tr>
+		</table>
+		
+		<div data-bind="foreach:problems" style="color:red">
+			<div data-bind="text:$data"></div>
+		</div>
+		<div data-bind="foreach:warnings" style="color:#aaaa00">
+			<div data-bind="text:$data"></div>
+		</div>
+		<div data-bind="if: approval" style="color: green">
+			This is a valid 24 point army!
+		</div>
+		<div style="font-size: 14pt">
+			Summary:
+			<div data-bind="foreach:summary">
+				<div>
+					x<span data-bind="text:count"></span>
+					<span data-bind="text:name"></span>
+					<span data-bind="if:general">General</span>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>3D Maze</title>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+  <script>
+  		function makeCell (z,x,y) {
+			var cell = {};
+			cell.x =x;
+			cell.y = y;
+			cell.z = z;
+			
+			cell.connections = [];
+			cell.isNeighbor = function (n) {
+				return Math.abs(n.x - cell.x) + Math.abs(n.y-cell.y) + Math.abs(n.z-cell.z) == 0;
+			}
+			
+			return cell;
+		}
+		
+		function makeMazeGrid(d, w, h) {
+			var grid = new Array(d).fill(0).map(level => new Array(w).fill(0).map(row => new Array(h).fill(0)));
+			for(var z = 0; z < d; z++)
+			for(var x = 0; x < w; x++)
+			for(var y = 0; y < h; y++) {
+				grid [z][x][y] = makeCell(z, x,y);
+			}
+			
+			grid.getCell = function (z, x, y) {
+					if(grid[z] && grid[z][x] && grid[z][x][y])
+						return grid[z][x][y];
+			}
+			
+			grid.getNeighbors = function (cell) {
+				var results = [];
+				results.push(grid.getCell(cell.z-1, cell.x, cell.y))
+				results.push(grid.getCell(cell.z+1, cell.x, cell.y))
+				results.push(grid.getCell(cell.z, cell.x-1, cell.y))
+				results.push(grid.getCell(cell.z, cell.x+1, cell.y))
+				results.push(grid.getCell(cell.z, cell.x, cell.y-1))
+				results.push(grid.getCell(cell.z, cell.x, cell.y+1))
+				results = results.filter(a => a);
+				return results;
+			}
+			return grid;
+		}
+		
+		function makeMaze(grid) {
+			var connected = [grid [0][0][0]];
+			var options = grid.getNeighbors(connected[0]);
+			connected[0].connected = true;
+			options.forEach(o => o.option= true);
+			
+			while(options.length > 0){
+				var nextIndex = Math.floor(Math.random()* options.length);
+				var next = options.splice(nextIndex,1)[0];
+				next.connected = true;
+				connected.push(next);
+				
+				var possibleConnections = grid.getNeighbors(next).filter(n => n.connected);
+				var connection = possibleConnections[Math.floor(Math.random()* possibleConnections.length)];
+				connection.connections.push(next);
+				next.connections.push(connection);
+				
+				//console.log("connecting ", next.z, next.x, next.y, "to", connection.z, connection.x, connection.y)
+				
+				var nextNeighbors = grid.getNeighbors(next).filter(n => n.connected != true && n.option != true);
+				nextNeighbors.forEach (n  =>  {
+					n.option = true;
+					options.push(n);
+				})
+			}
+			return grid;
+		}
+		
+		function drawMaze (maze) {
+			var canvas = document.getElementById("canvas");
+			
+			if(canvas.getContext) 
+			{
+				var ctx = canvas.getContext("2d");
+				ctx.fillStyle = "#ffffff";
+				ctx.strokeStyle = "#888888";
+				ctx.fillRect(0,0,1000,1000);
+				ctx.strokeRect(0,0,1000,1000);
+
+				/*
+				ctx.fillStyle = "#red";
+				ctx.beginPath();
+				ctx.arc(5,5,5,0,Math.Pi*2)
+				ctx.fill();
+				*/
+				
+				var levelHeight = (maze[0][0].length+1) * 20;
+				
+				for(var level = 0; level < maze.length; level ++ ){
+					for(var column = 0; column < maze[level].length; column++) {
+						for(var row = 0; row < maze[level][column].length; row++){
+							//ctx.strokeRect(column *20+20, levelHeight*level + row*20 + 20, 20, 20);
+							
+							var cell = maze[level][column][row];
+							
+							if(!cell.connections.includes(maze.getCell(cell.z,cell.x-1, cell.y))){
+									ctx.beginPath();
+									ctx.moveTo(column *20+20, levelHeight*level + row*20 + 20);
+									ctx.lineTo(column *20+20, levelHeight*level + row*20 + 40);
+									ctx.stroke();
+							}
+							if(!cell.connections.includes(maze.getCell(cell.z,cell.x+1, cell.y))){
+									ctx.beginPath();
+									ctx.moveTo(column *20+40, levelHeight*level + row*20 + 20);
+									ctx.lineTo(column *20+40, levelHeight*level + row*20 + 40);
+									ctx.stroke();
+							}
+							if(!cell.connections.includes(maze.getCell(cell.z,cell.x, cell.y-1))){
+									ctx.beginPath();
+									ctx.moveTo(column *20+20, levelHeight*level + row*20 + 20);
+									ctx.lineTo(column *20+40, levelHeight*level + row*20 + 20);
+									ctx.stroke();
+							}
+							if(!cell.connections.includes(maze.getCell(cell.z,cell.x, cell.y+1))){
+									ctx.beginPath();
+									ctx.moveTo(column *20+20, levelHeight*level + row*20 + 40);
+									ctx.lineTo(column *20+40, levelHeight*level + row*20 + 40);
+									ctx.stroke();
+							}
+							if(cell.connections.includes(maze.getCell(cell.z-1,cell.x, cell.y))){
+									ctx.fillStyle = "#000";
+									ctx.fillRect(cell.x*20 +27, cell.z*levelHeight + cell.y*20 +27,6,6)
+							}
+							if(cell.connections.includes(maze.getCell(cell.z+1,cell.x, cell.y))){
+									ctx.fillStyle = "#000";
+									ctx.fillRect(cell.x*20 +27, cell.z*levelHeight + cell.y*20 +27,6,6)
+							}
+							/*
+							for(var n of cell.connections) {
+								if(cell.z == n.z){
+									ctx.beginPath();
+									ctx.moveTo(cell.x*20 +30, cell.z*levelHeight + cell.y*20 +30);
+									ctx.lineTo(n.x*20 +30, n.z*levelHeight + n.y*20 +30);
+									ctx.stroke();
+								} else {
+									var zDir = cell.z > n.z? -5: 5;
+
+									ctx.beginPath();
+									ctx.arc(cell.x*20 +30, cell.z*levelHeight + cell.y*20 +30,5,0,Math.Pi*2)
+									ctx.stroke();
+
+									ctx.fillStyle = "#000";
+									ctx.fillRect(cell.x*20 +27, cell.z*levelHeight + cell.y*20 +27,6,6)
+								}
+							}
+							*/
+
+						}
+					}
+				}
+			}
+
+		}
+
+	function main(){
+		var maze = makeMaze(makeMazeGrid(2,15,15));
+		drawMaze(maze)
+	}
+  </script>
+</head>
+	<body onload = "main()">
+		<div id="display">
+			<canvas id = "canvas" width = 1000 height = 1000></canvas>
+		</div>
+	</body>
+</html>

@@ -1,0 +1,165 @@
+<html>
+	<head>
+			<style>
+			.board-layer {
+				display: flex;
+				flex-direction: column;
+				margin: 10px;
+				border: 1px solid black;
+				padding: 10px;
+			}
+			.row {
+				display: flex;
+			}
+			.card {
+				width: 50px;
+				height: 50px;
+				border: 1px solid black;
+				margin: 5px;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+			}
+			.hand {
+				display: flex;
+			}
+			.hand .card {
+				margin: 10px;
+			}
+		</style>
+		<script>
+		
+			function createDeck() {
+				const cards = [];
+
+				const numbers = [1, 2, 3, 4];
+				const colors = ['red', 'green', 'blue', 'black'];
+				const shapes = ['circle', 'square', 'triangle', 'bar'];
+
+				for (let number of numbers) {
+					for (let color of colors) {
+						for (let shape of shapes) {
+							cards.push({ number, color, shape });
+						}
+					}
+				}
+				return cards;
+			}
+			
+			function shuffleArray(array) {
+				for (let i = array.length - 1; i > 0; i--) {
+					const j = Math.floor(Math.random() * (i + 1));
+					[array[i], array[j]] = [array[j], array[i]];
+				}
+				return array;
+			}
+			
+			function create3DArray(cards) {
+				const card3DArray = [];
+
+				let index = 0;
+				for (let i = 0; i < 4; i++) {
+					const layer = [];
+					for (let j = 0; j < 4; j++) {
+						const row = [];
+						for (let k = 0; k < 4; k++) {
+							row.push(null);
+							index++;
+						}
+						layer.push(row);
+					}
+					card3DArray.push(layer);
+				}
+				return card3DArray;
+			}
+			
+			function initializeGame() {
+				const cards = createDeck();
+				const shuffledCards = shuffleArray(cards);
+
+				const player1 = {
+					hand: shuffledCards.slice(0, 4),
+					score: 0,
+				};
+
+				const player2 = {
+					hand: shuffledCards.slice(4, 8),
+					score: 0,
+				};
+
+				const gameState = {
+					player1: player1,
+					player2: player2,
+					currentPlayer: 'player1',
+					deck: shuffledCards,
+					board: create3DArray()
+				};
+
+				return gameState;
+			}
+			
+			function main(){
+				const gameState = initializeGame();
+				displayGame(gameState);
+			}
+			
+			function displayGame(gameState) {
+				const gameDiv = document.getElementById('game');
+				gameDiv.innerHTML = '';
+
+				// Display board
+				const boardDiv = document.createElement('div');
+				boardDiv.innerHTML = '<h2>Board</h2>';
+				gameState.board.forEach((layer, layerIndex) => {
+					const layerDiv = document.createElement('div');
+					layerDiv.classList.add('board-layer');
+					layerDiv.innerHTML = `<h3>Layer ${layerIndex + 1}</h3>`;
+					layer.forEach(row => {
+						const rowDiv = document.createElement('div');
+						rowDiv.classList.add('row');
+						row.forEach(cell => {
+							const cellDiv = document.createElement('div');
+							cellDiv.classList.add('card');
+							cellDiv.textContent = cell ? `${cell.number}${cell.color[0]}${cell.shape[0]}` : '';
+							rowDiv.appendChild(cellDiv);
+						});
+						layerDiv.appendChild(rowDiv);
+					});
+					boardDiv.appendChild(layerDiv);
+				});
+				gameDiv.appendChild(boardDiv);
+
+				// Display players' hands and scores
+				['player1', 'player2'].forEach(playerKey => {
+					const player = gameState[playerKey];
+					const playerDiv = document.createElement('div');
+					playerDiv.innerHTML = `<h2>${playerKey.charAt(0).toUpperCase() + playerKey.slice(1)}</h2>
+										   <p>Score: ${player.score}</p>`;
+					const handDiv = document.createElement('div');
+					handDiv.classList.add('hand');
+					player.hand.forEach(card => {
+						const cardDiv = document.createElement('div');
+						cardDiv.classList.add('card');
+						cardDiv.textContent = `${card.number}${card.color[0]}${card.shape[0]}`;
+						handDiv.appendChild(cardDiv);
+					});
+					playerDiv.appendChild(handDiv);
+					gameDiv.appendChild(playerDiv);
+				});
+
+				// Display remaining cards in deck
+				const deckDiv = document.createElement('div');
+				deckDiv.innerHTML = `<h2>Deck</h2><p>Remaining cards: ${gameState.deck.length}</p>`;
+				gameDiv.appendChild(deckDiv);
+
+				// Display current player
+				const currentPlayerDiv = document.createElement('div');
+				currentPlayerDiv.innerHTML = `<h2>Current Turn: ${gameState.currentPlayer}</h2>`;
+				gameDiv.appendChild(currentPlayerDiv);
+        }
+		</script>
+	</head>
+	<body onload="main()">
+		<div id="game"></div>
+	</body>
+<html>

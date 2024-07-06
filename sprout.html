@@ -1,0 +1,326 @@
+<html>
+	<head>
+		<script type="text/javascript" src= "../tools/seededGenerator.js"></script>
+		<script>
+			var config = {
+				width: 10,
+				height: 10,
+				scale: 50,
+				seedPop: 10,
+				actionCost: 5,
+				organicPerDeath: .2,
+				energyPerOrganic: 10,
+				organicPerFeeding: .25
+			}
+			var world ;
+			var nextPlantId = 1000;
+			function draw (){
+				var canvas = document.getElementById("display");
+				
+				if(canvas.getContext) 
+				{
+					var ctx = canvas.getContext("2d");
+					ctx.fillStyle = "#ffffff";
+					ctx.strokeStyle = "#888888";
+					ctx.fillRect(0,0,config.width*config.scale, config.height*config.scale);
+					ctx.strokeRect(0,0,config.width*config.scale, config.height*config.scale);
+					ctx.fillStyle = "#ff4400";
+					ctx.strokeStyle = "#aa3300"
+					/*
+					ctx.strokeRect(100,100,100,100);
+					ctx.fillRect(100,100,100,100);
+					*/
+					
+					ctx.beginPath();
+					ctx.arc(100,100,20,0,Math.Pi*2);
+					ctx.fill();
+					ctx.stroke();
+				}
+				
+				for(var x = 0; x < config.width; x++)
+					for(var y = 0; y < config.height; y++) {
+						var cell = world.cells[x][y].occupant;
+						var organic = world.cells[x][y].organicMatter;
+						var level = 255- Math.round(organic*100);
+						ctx.fillStyle = 'rgb('+level+','+level+',' + level +')';
+						ctx.fillRect(x*config.scale, y*config.scale, config.scale, config.scale);
+						if(cell) {
+							if(cell.type == "sprout") {
+								if(cell.growing) ctx.fillStyle = "#22aa22";
+								else ctx.fillStyle = "#444444";
+							}
+							if(cell.type == "leaf") {
+								ctx.fillStyle = "#008800";
+							}
+							if(cell.type == "root") {
+								ctx.fillStyle = "#aa4400";
+							}
+							if(cell.type == "seed") {
+								ctx.fillStyle = "#aaaa00";
+							}
+							ctx.beginPath();
+							ctx.arc((x+.5)*config.scale, (y+.5)*config.scale,config.scale/2, 0, Math.PI*2);
+							ctx.fill();
+							
+							ctx.fillStyle = "#00ff00";
+							if(cell.type == "sprout") {
+								ctx.fillText(cell.state,x*config.scale+config.scale/2,y*config.scale+config.scale/2);
+							}
+							else {
+								ctx.fillText(cell.type,x*config.scale+config.scale/2,y*config.scale+config.scale/2);
+							}
+							ctx.fillText(cell.energy,x*config.scale+config.scale/2,y*config.scale+config.scale/2 +10 );
+							ctx.fillText(cell.plantId,x*config.scale+config.scale/2,y*config.scale+config.scale/2 +20 );
+
+						}
+					}
+			}
+			function createCell(type, energy, position, plantId, connection) {
+				var cell =  {
+					type: type,
+					energy: energy,
+					position: position,
+					plantId: plantId,
+					connection: connection
+				}
+				return cell;
+			}
+			
+			function createDNA() {
+				var dna = Array(16).fill().map(a => Array(8).fill(0).map(a=> Math.floor(Math.random()*16)));
+				return dna;
+				
+				/* 
+				dna slot 0 -- move (only when free)
+				0 - plant
+				1 - move left
+				2 - move ahead
+				3 - move right
+				4 - move backwards
+				5 - absorb organic
+				6 - absorb light
+				7 - eat left
+				8 - eat ahead
+				9 - eat right
+				10 - eat back
+				default - do nothing
+				dna slot 1-3 -- grow (only when growing)
+				0 - sprout
+				1 - root
+				2 - leaf
+				3 - seed
+				4 - storage
+				dna slot 4 -- next state
+				dna slot 5-7 -- energy spent on growth
+				*/
+			}
+			
+			function createSprout(position, dna, energy, state, growing, direction, plantId){
+				var sprout = {
+					position:position,
+					dna: dna,
+					energy: energy,
+					state: state,
+					growing: growing,
+					direction: direction,
+					type: "sprout",
+					plantId: plantId? plantId: nextPlantId++
+				};
+				return sprout;
+			}
+			function createGround() {
+				return {
+					organicMatter: 0,
+					occupant: undefined
+				};
+			}
+			function directionToCoord(position, direction) {
+			// 0,1,2,3
+				return {
+					x : (position.x + (direction%2))%config.width,
+					y : (position.y + (direction==0?1:direction==2?-1:0))%config.height
+				}
+			}
+			function moveSprout(sprout, direction, eat){
+				var newPos = directionToCoord(sprout.position, sprout.direction+direction-2)
+				var occupant = world.cell(newPos.x, newPos.y).occupant;
+				if(!occupant || eat) {
+					world.cell(newPos.x, newPos.y).occupant = sprout;
+					world.cell(sprout.position.x,sprout.position.y).occupant=undefined;
+					sprout.position = newPos;
+				}
+				return occupant;
+			}
+			function countNeighbors(position) {
+				var count = 0;
+				for(var x = -1; x <= 1; x++)
+				for(var y = -1; y <= 1; y++) {
+					if(!world.cell(x,y).occupant) count++;
+				}
+				return count;
+			}
+			
+			function getCellType(code) {
+				switch(code) {
+					case 0: return "sprout";
+					case 1: return "root";
+					case 2: return "leaf";
+					case 3: return "seed";
+					default: return "";
+				}
+			}
+			function growHere(instruction, position , energy, test, sprout) {
+				var type = getCellType(instruction);
+				if(type!=="" && !world.cell(position.x, position.y).occupant) {
+					//TODO: energy maybe isn't linear?
+					//TOOD: connection to sprout that grows it.
+					if(!test && type != "sprout") {
+						var cell = createCell(type, energy, position, sprout.plantId, sprout.position);
+						world.cell(position.x, position.y).occupant = cell;
+					}
+					if(!test && type == "sprout") {
+						//TODO: sort out direction
+						var sprout = createSprout({x:position.x,y:position.y}, sprout.dna, energy, sprout.dna[sprout.state][4], true, sprout.direction, sprout.plantId);
+						world.cell(position.x, position.y).occupant = sprout;
+					}
+					return energy+5;
+				}
+				return 0;
+			}
+			function walkPlant(cell){
+				cell.checked = true;
+				var result = [cell];
+				for(var i = 0; i< 4; i++) {
+					var toCheck = directionToCoord(cell.position, i);
+					var occupant = world.cell(toCheck.x, toCheck.y).occupant;
+					//TODO: check pointer... right now web magic is happening
+					if(occupant && !occupant.checked && occupant.plantId == cell.plantId) {
+						result = result.concat(walkPlant(occupant));
+					}
+				}
+				return result;
+			}
+			function stepPlant(cell) {
+				var cells = walkPlant(cell);
+				var sprouts = cells.filter(cell => cell.type == "sprout");
+				var energy = cells.reduce((sofar,cell) => sofar+stepCell(cell), 0);
+				sprouts.forEach(sprout => sprout.energy += energy/sprouts.length);
+			}
+			function stepCell(cell){
+				var energy = 0;
+				if(cell.type =="leaf") {
+					var light = countNeighbors(cell.position) +1;
+					energy += light * world.light;
+				}
+				if(cell.type != "sprout" && cell.type!="seed") {
+					cell.energy -=1;
+					if (cell.energy <= 0) {
+						cellDeath(cell);
+					}
+				}
+				return energy;
+			}
+			function cellDeath (cell) {
+				var ground = world.cell(cell.position.x, cell.position.y);
+				ground.organicMatter+= config.organicPerDeath;
+				ground.occupant = undefined
+			}
+			function stepSprout(sprout){
+				var instruction = sprout.dna[sprout.state];
+				if(!sprout.growing) {
+					switch (instruction[0]) {
+						case 0: 
+							sprout.growing = true; 
+							sprout.energy -=config.actionCost;
+							break;
+						case 1: 
+						case 2: 
+						case 3: 
+						case 4: 
+							moveSprout(sprout, instruction[0], false); 
+							sprout.energy -=config.actionCost;
+							break;
+						case 5:
+							// will be roots, do nothing for now
+							// should 
+							break;
+						case 6:
+							var light = countNeighbors(sprout.position) +1;
+							sprout.energy += light * world.light;
+							sprout.energy -= config.actionCost;
+						case 7:
+						case 8:
+						case 9:
+						case 10:
+							moveSprout(sprout, instruction[0]-6, true); 
+							sprout.energy -=config.actionCost*2;
+							break;
+						default:
+							break;
+					}
+				} else {
+					var energyNeeded = 
+						growHere(instruction[1], directionToCoord(sprout.position, sprout.direction -1), instruction[5], true)
+						+growHere(instruction[2], directionToCoord(sprout.position,sprout.direction), instruction[6], true)
+						+growHere(instruction[3], directionToCoord(sprout.position,sprout.direction +1), instruction[7], true);
+					if(energyNeeded < sprout.energy) {
+						growHere(instruction[1], directionToCoord(sprout.position,sprout.direction -1), instruction[5], false, sprout);
+						growHere(instruction[2], directionToCoord(sprout.position,sprout.direction), instruction[6], false, sprout);
+						growHere(instruction[3], directionToCoord(sprout.position,sprout.direction +1), instruction[7], false, sprout);
+					}
+					//TODO: do we need this?
+					sprout.energy -= config.actionCost;
+				}
+				if (sprout.energy < 0) {
+					cellDeath(sprout);
+					world.sprouts.splice(world.sprouts.indexOf(sprout),1);
+				}
+				sprout.state = instruction[4];
+			}
+			function tick () {
+				world.eachCell((x,y,ground, occupant) => {if(occupant) occupant.checked = false});
+				world.eachCell((x,y,ground, occupant) => {if(occupant && !occupant.checked) stepPlant(occupant)});
+				for(var sprout of world.sprouts) stepSprout(sprout);
+				draw();
+				setTimeout(tick, 1500);
+			}
+			function main () {
+				Math.seedrandom("josh");
+				world = {
+					cells: Array(config.width).fill().map(a=> Array(config.height).fill().map(() => createGround())),
+					light: 1,
+					sprouts: []
+				};
+				world.cell = function(x,y) {
+					return world.cells[(x+config.width)%config.width][(y+config.height)%config.height];
+				}
+				world.eachCell = function (callback) {
+					for(var x = 0; x < config.width; x++)
+						for(var y = 0; y < config.height; y++) {
+							callback(x,y, world.cell(x,y),world.cell(x,y).occupant);
+						}
+				}
+				for(var i = 0; i< config.seedPop; i++) {
+					var x = Math.floor(Math.random()*config.width);
+					var y = Math.floor(Math.random()*config.height);
+					var direction = Math.floor(Math.random()*4);
+					
+					if(!world.cells[x][y].occupant) {
+						var sprout = createSprout({x:x,y:y}, createDNA(), 25, 0, false, direction);
+						world.cell(x,y).occupant = sprout;
+						world.sprouts.push(sprout);
+					}
+				}
+				draw();
+				setTimeout(tick, 1500);
+			}
+		</script>
+	</head>
+	<body onload="main()">
+		<h4>Hello</h4>
+		<div id = "canvasFrame">
+			<canvas id="display" width="500" height = "500">
+			</canvas>
+		</div>
+	</body>
+</html>

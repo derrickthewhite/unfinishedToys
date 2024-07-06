@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<script type="text/javascript" src= "../../tools/seededGenerator.js"></script>
+	<script type="text/javascript" src= "populate.js"></script>
+	<script type="text/javascript" src= "draw.js"></script>
+    <title>Maze Generator</title>
+	<style>
+		.cell{
+			height: 50px;
+			width: 50px;
+			max-height: 50px;
+			max-width: 50px;
+			display:inline-block;
+			margin-bottom: -5px;
+			position: relative;
+		}
+		.maze{
+			display:inline-block;
+			margin-left: -4px;
+		}
+		.character{
+			height: 40px;
+			width: 40px;
+			position: absolute;
+		}
+		.object{
+			height: 40px;
+			width: 40px;
+			position: absolute;
+		}
+		.Vertdoor{
+			height: 40px;
+			width: 40px;
+			position: absolute;
+			right: -20px;
+		}
+		.Horzdoor{
+			height: 40px;
+			width: 40px;
+			position: absolute;
+			bottom: -20px;
+		}
+		span {
+			margin: 0;
+			padding: 0;
+			left: 0;
+		}
+		.score{
+			font-size: 100px;
+		}
+		#gameOver{
+			position:absolute;
+			width: 50%;
+			left: 25%;
+			top:25%;
+			font-size: 25px;
+			border: solid black 1px;
+			background:white;
+			text-align:center;
+		}
+		#descriptionOverlay{
+			position: absolute;
+			width:100%;
+			height: 100%;
+			background-color: rgba(0,0,0,.5);
+			top: 0px;
+			left: 0px;
+			margin: 0;
+			padding: 0;
+		}
+		#description{
+			position: absolute;
+			width:30%;
+			height: 30%;
+			left: 35%;
+			top: 35%;
+			background: white;
+		}
+	</style>
+	<script>
+		function genMaze(x,y) {
+			var n=x*y-1;
+			if (n<0) {alert("illegal maze dimensions");return;}
+			var horiz=[]; for (var j= 0; j<x+1; j++) horiz[j]= [];
+			var verti=[]; for (var j= 0; j<y+1; j++) verti[j]= [];
+			var here= [Math.floor(Math.random()*x), Math.floor(Math.random()*y)];
+			var path= [here];
+			var unvisited= [];
+			for (var j= 0; j<x+2; j++) {
+				unvisited[j]= [];
+				for (var k= 0; k<y+1; k++)
+					unvisited[j].push(j>0 && j<x+1 && k>0 && (j != here[0]+1 || k != here[1]+1));
+			}
+			while (0<n) {
+				var potential= [[here[0]+1, here[1]], [here[0],here[1]+1],
+					[here[0]-1, here[1]], [here[0],here[1]-1]];
+				var neighbors= [];
+				for (var j= 0; j < 4; j++)
+					if (unvisited[potential[j][0]+1][potential[j][1]+1])
+						neighbors.push(potential[j]);
+				if (neighbors.length) {
+					n= n-1;
+					next= neighbors[Math.floor(Math.random()*neighbors.length)];
+					unvisited[next[0]+1][next[1]+1]= false;
+					if (next[0] == here[0])
+						horiz[next[0]][(next[1]+here[1]-1)/2]= true;
+					else 
+						verti[(next[0]+here[0]-1)/2][next[1]]= true;
+					path.push(here= next);
+				} else 
+					here= path.pop();
+			}
+			return ({x: x, y: y, horiz: horiz, verti: verti});
+		}
+
+		function display(m) {
+			var text= [];
+			for (var j= 0; j<m.x*2+1; j++) {
+				var line= [];
+				if (0 == j%2)
+					for (var k=0; k<m.y*4+1; k++)
+						if (0 == k%4) 
+							line[k]= '+';
+						else
+							if (j>0 && m.verti[j/2-1][Math.floor(k/4)])
+								line[k]= ' ';
+							else
+								line[k]= '-';
+				else
+					for (var k=0; k<m.y*4+1; k++)
+						if (0 == k%4)
+							if (k>0 && m.horiz[(j-1)/2][k/4-1])
+								line[k]= ' ';
+							else
+								line[k]= '|';
+						else
+							line[k]= ' ';
+				if (0 == j) line[1]= line[2]= line[3]= ' ';
+				if (m.x*2-1 == j) line[4*m.y]= ' ';
+				text.push(line.join('')+'\r\n');
+			}
+			console.log(text.join(''));
+			
+			return text.join('');
+		}
+
+		function protagonistDeath() {
+			console.log("protagonist Death!");
+			protagonist.hearts = 0;
+			protagonist.icon = "assets/Skull.svg";
+			protagonist.loyalty = "protagonist";
+		}
+		function runCollision(character,collision) {
+			if(collision.loyalty != "object" && collision.loyalty!= character.loyalty){
+				if(collision.name == "Fire"){
+					if(character.resources && character.resources.filter(r => r.name == "Bucket").length > 0){
+						var bucket = character.resources.filter(r => r.name == "Bucket")[0];
+						bucket.name = "Empty Bucket";
+						bucket.icon = "assets/EmptyBucket.svg"
+						collision.loyalty= "object";
+						collision.hearts =0;
+						collision.name = "Ashheap";
+						collision.icon = "assets/Ashheap.svg"
+						return;
+					}
+				}
+			
+				var characterDamage = Math.max(0,character.hearts + getArmor(character) - getArmor(collision));
+				var collisionDamage = Math.max(0,collision.hearts + getArmor(collision) - getArmor(character));
+				//TODO: swords and shields should not protect from fire
+				if(character.loyalty!= "hazard")character.hearts -= collisionDamage;
+				if(collision.loyalty!= "hazard")collision.hearts -= characterDamage;
+				
+				if(character.hearts <= 0) {
+					characters = characters.filter(c => c!=character);
+					objects = objects.filter(o => o!=character);
+					character.loyalty= "object";
+					character.icon = "assets/Skull.svg";
+					objects.push(character);
+				}
+				if(collision.hearts <= 0) {
+					characters = characters.filter(c => c!=collision);
+					objects = objects.filter(o => o!=collision);
+					collision.loyalty= "object";
+					collision.icon = "assets/Skull.svg";
+					objects.push(collision);
+				}
+				if(protagonist.hearts <= 0) {
+					protagonistDeath();
+				}
+			}
+		}
+		function move(character,dir) {
+			var y = character.y
+			var x = character.x;
+			var newLocation = wallMove(x, y,dir);
+			if(!newLocation){
+				newLocation= doors.map(door=> doorMove(x,y,dir,door)).filter(m => m)[0];
+				if(!newLocation) return false;
+				if(!(newLocation.door.open == true) &&
+					//!(character.doors.includes(newLocation.door))&&
+					!(character.resources && character.resources.filter(r=>r.name == "Key").length && newLocation.door.name == "locked Door" ) &&
+					!(character.resources && character.resources.filter(r => r.name == "Pick").length > 0 && newLocation.door.name == "weak wall")){
+						return false;
+					}
+			}
+			newLocation.collisions= [];
+			for(var collision of characters) {
+				if(newLocation.x == collision.x && newLocation.y == collision.y){
+					newLocation.collisions.push(collision);
+				}
+			}
+			for(var collision of objects) {
+				if(newLocation.x == collision.x && newLocation.y == collision.y){
+					newLocation.collisions.push(collision);
+				}
+			}
+			return newLocation;
+		}
+		function wallMove(x,y,direction) {
+			//keep in case the composite function is wrong
+			tX = Math.floor(x/9);
+			tY = Math.floor(y/9);
+			let maze = mazes[tX][tY];
+			x = x - tX*9;
+			y=y -tY*9;
+			switch(direction) {
+				case "Up": return (maze.verti[y-1] && maze.verti[y-1][x])? {x:x +tX*9, y:y-1+tY*9}: false;
+				case "Down": return (maze.verti[y][x])? {x:x +tX*9, y:y+1+tY*9}: false;
+				case "Left": return (maze.horiz[y][x-1])? {x:x-1 +tX*9, y:y+tY*9}: false;
+				case "Right": return (maze.horiz[y][x])? {x:x+1+tX*9, y:y+tY*9}: false;
+			}
+			throw new Error("direction was wrong!");
+			//getWallValue(getWall(x,y,direction));
+		}
+		function doorMove(x,y,dir, door) {
+				if(door.orient == "verti") {
+					if(x == door.x && y == door.y && dir == "Down") return {x:x, y: y+1, door: door};
+					if(x == door.x && y == door.y+1 && dir == "Up") return {x:x, y: y-1, door: door};
+				}
+				if(door.orient == "horiz") {
+					if(x == door.x && y == door.y && dir == "Right") return {x:x+1, y: y, door: door};
+					if(x == door.x+1 && y == door.y && dir == "Left") return {x:x-1, y: y, door: door};
+				}
+				return false;
+		}
+		function getWall(x,y,direction) {
+			switch(direction) {
+				case "Up": return {x:x, y: y-1, orient: "verti"};
+				case "Down": return {x:x, y: y, orient: "verti"};
+				case "Left": return {x:x-1, y: y, orient: "horiz"};
+				case "Right": return {x:x, y: y, orient: "horiz"};
+			}
+			throw new Error("direction was wrong!");
+		}
+		function getWallValue (x,y,orient){
+			if(x.x !== undefined) return getWallValue(x.x, x.y, x.orient);
+			tX = Math.floor(x/9);
+			tY = Math.floor(y/9);
+			if(mazes[tX] == undefined) return undefined;
+			let maze = mazes[tX][tY];
+			x = x - tX*9;
+			y=y -tY*9;
+			if(maze === undefined) return undefined; // spot is outside of maze zone
+			if(maze[orient] == undefined) throw new Error ("orient does not exist", orient);
+			if(maze[orient][y] === undefined) return undefined;
+			return maze[orient][y][x]
+
+		}
+		function rotateMaze(maze) {
+			var newMaze = {
+				x: maze.x,
+				y: maze.y,
+				horiz: [],
+				verti: []
+			}
+			for(var i = 0;i< newMaze.y+1;i++) newMaze.horiz.push([]);
+			for(var i = 0;i< newMaze.y+1;i++) newMaze.verti.push([]);
+			
+			for(var longSide = 0;longSide< newMaze.x; longSide++){
+					for(var shortSide = 0; shortSide < newMaze.x-1; shortSide++){
+						newMaze.horiz[newMaze.x - longSide -1][shortSide] = maze.verti [shortSide] [longSide]
+						newMaze.verti[newMaze.x - shortSide -2][longSide] = maze.horiz [longSide] [shortSide]
+					}
+				}
+			return newMaze;
+		}
+		function rotateFloater(floater,mazeX, mazeY) {
+			if(Math.floor(floater.x/9) == mazeX && Math.floor(floater.y/9) == mazeY){
+				let x = floater.x - mazeX*9;
+				let y = floater.y - mazeY*9;
+				
+				floater.x = y + mazeX*9;
+				floater.y = (9 -1 - x) + mazeY*9;
+			}
+		}
+		function rotateDoor(door, mazeX, mazeY) {
+			if(Math.floor(door.x/9) == mazeX && Math.floor(door.y/9) == mazeY){
+				let x = door.x - mazeX*9;
+				let y = door.y - mazeY*9;
+				
+				if(door.orient == "verti"){
+					if(y == 9-1) return;
+					door.x = y + mazeX*9;
+					door.y = (9 -1 - x) + mazeY*9;
+					door.orient = "horiz"
+				}
+				else {
+					if(x == 9-1) return;
+					door.x = y + mazeX*9;
+					door.y = (9 -2 - x) + mazeY*9;
+					door.orient =  "verti";
+				}
+			}
+		}
+		function randomUnobstructedLocation () {
+			var coords = {
+				x: Math.floor(Math.random()*18),
+				y: Math.floor(Math.random()*18)
+			};
+			while(characters.concat(objects).filter(obstruction => obstruction.x== coords.x && obstruction.y==coords.y).length){
+				coords.x = Math.floor(Math.random()*18);
+				coords.y = Math.floor(Math.random()*18);
+			}
+			return coords;
+		}
+		function NPCTurn (){
+			for(var character of characters) {
+				if(character.name != "protagonist"){
+					var moves = ["Up","Down","Left","Right"]
+						.map(dir=> move(character, dir))
+						.filter(m => m);
+					moves = moves.filter(m => m.collisions.filter(c=> c.loyalty == "hazard").length == 0);
+					if(moves.length!=1){
+						moves = moves.filter(m => m.x!= character.lastX || m.y != character.lastY);
+					}
+					var moveToMake = moves[Math.floor(Math.random()*moves.length)];
+					if(moveToMake == undefined) continue; // usually because they're trapped in a path
+					character.lastX = character.x;
+					character.lastY = character.y;
+					character.x = moveToMake.x;
+					character.y = moveToMake.y;
+
+					for(collision of moveToMake.collisions) {
+						runCollision(character, collision);
+					}
+				}
+			}
+			draw();
+		}
+		/*
+		//I don't think we use this anymore
+		function protagonistArmor() {
+			return protagonist.resources.filter(r => r.name == "Sword").length? 1:0;
+		}
+		*/
+		function getArmor(character) {
+			if(!(character.resources)) return 0;
+			return (character.resources.filter(r => r.name == "Sword").length? 1:0)
+			+(character.resources.filter(r => r.name == "Shield").length? 1:0);
+		}
+		function setUp(){
+			mazes = [
+				[genMaze(9,9), genMaze(9,9)],
+				[genMaze(9,9), genMaze(9,9)],
+			];
+			objects = [];
+			doors = [];
+			characters = [];
+			protagonist.hearts = protagonist.maxHearts;
+			protagonist.resources = [];
+			populateMaze();
+			protagonist.icon = "assets/protagonist.svg"
+			draw();
+		}
+		function showDescription(description){
+			document.getElementById("descriptionOverlay").style.display = "";
+			document.getElementById("description").innerHTML = description;
+		}
+		function hideDescription(){
+			document.getElementById("descriptionOverlay").style.display = "none";
+		}
+		let mazes = [];
+		let characters = [];
+		let doors = [];
+		let objects = [];
+		let protagonist;
+		function main() {
+			//Math.seedrandom("dragon");
+			mazes = [
+				[genMaze(9,9), genMaze(9,9)],
+				[genMaze(9,9), genMaze(9,9)],
+			];
+			
+			populateMaze();
+			
+			document.addEventListener("keydown", (event) => {
+				var character = characters[0];
+				if(["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(event.code)){
+					var dir = event.code.replace("Arrow","");
+					var newLocation = move(character,dir);
+					if(newLocation){
+						var x = protagonist.x
+						var y = protagonist.y
+						characters[0].x = newLocation.x;
+						characters[0].y = newLocation.y;
+						if(newLocation.door && newLocation.door.name == "weak wall"){
+							doors.filter(door=> doorMove(x,y,dir,door) && door.name == "weak wall").forEach(door => {
+								door.name = "broken wall";
+								door.icon = "assets/BrokenWall.svg";
+								door.open = true;
+								
+								var x = door.x;
+								var y = door.y;
+								tX = Math.floor(x/9);
+								tY = Math.floor(y/9);
+								if(mazes[tX] == undefined) return undefined;
+								let maze = mazes[tX][tY];
+								x = x - tX*9;
+								y=y -tY*9;
+								maze[door.orient][y][x] = true;
+							})
+						}
+						if(newLocation.collisions.length) {
+							for(collision of newLocation.collisions) {
+								runCollision(protagonist,collision);
+							}
+						}
+						draw();
+						//TODO: diable click during NPC move?
+						// OR just run it early
+						NPCTurn();
+					}
+				}
+				if(event.code == "Space"){
+					for(var object of objects) {
+						if(object.x == character.x && object.y == character.y) {
+							if(object.name == "Lever") {
+								//rotate code
+								mazes[object.maze.x][object.maze.y]= rotateMaze(mazes[object.maze.x][object.maze.y]);
+								var maze = mazes[object.maze.x][object.maze.y];
+								for(let rchar of characters)rotateFloater(rchar, object.maze.x, object.maze.y)
+								for(let robj of objects)rotateFloater(robj, object.maze.x, object.maze.y)
+								for(let rdoor of doors)rotateDoor(rdoor, object.maze.x, object.maze.y)
+								
+								NPCTurn();
+								draw();
+							}
+							if(object.name == "Chest"){
+								//protagonist.resources= protagonist.resources.concat(object.contents);
+								//object.contents = [];
+								protagonist.score++;
+								object.icon = "assets/OpenChest.svg";
+								
+								NPCTurn();
+								draw();
+							}
+							if(object.name == "Well"){
+								protagonist.resources.filter(r => r.name == "Empty Bucket")
+									.forEach(r =>  {
+										r.name = "Bucket";
+										r.icon = "assets/Bucket.svg"
+									})
+								NPCTurn();
+								draw();
+							}
+							if(object.resource == true){
+								objects = objects.filter(o => o!== object);
+								protagonist.resources.push(object);
+								NPCTurn();
+								draw();
+							}
+							if(object.name == "Potion") {
+								protagonist.hearts = Math.max(protagonist.maxHearts, protagonist.hearts+1);
+								objects = objects.filter(o => o!== object);
+								NPCTurn();
+								draw();
+							}
+							if(object.name == "Stairs") {
+								setUp();
+							}
+						}
+					}
+				}
+			})
+			//document.getElementById("textMaze").innerHTML= display(maze);
+			
+			draw();
+		}
+    </script>
+</head>
+<body onload="main()">
+    <!--pre id="textMaze">
+	</pre-->
+	<div id="ULMaze" class="maze"> 
+	</div>
+	<div id="URMaze" class="maze"> 
+	</div>
+	<br>
+	<div id="LLMaze" class="maze"> 
+	</div>
+	<div id="LRMaze" class="maze"> 
+	</div>
+	<div id="inventory"></div>
+	<div id="gameOver" style="display:none">
+		<img src= "assets/Skull.svg"><img>
+		<div >You are Dead</div>
+		<div >Your Score is : <span id ="score">0</span></div>
+		<button onclick="setUp()">Restart</button>
+	</div>
+	<div id="descriptionOverlay" style="display:none" onclick="hideDescription()">
+		<div id="description"></div>
+	</div>
+
+</body>
+</html>

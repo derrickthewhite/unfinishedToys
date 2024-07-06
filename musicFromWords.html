@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Music</title>
+    <style>
+        #noteDisplay {
+            margin-top: 20px;
+            font-size: 20px;
+            font-family: monospace;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.25/Tone.min.js"></script>
+</head>
+<body>
+    <h1>Text to Music Converter</h1>
+    <textarea id="textInput" rows="10" cols="50" placeholder="Enter text here..."></textarea><br>
+    <select id="playMode">
+        <option value="single">Single Note</option>
+        <option value="double">Double Notes</option>
+    </select>
+    <select id="instrument">
+        <option value="sine">Sine</option>
+        <option value="square">Square</option>
+        <option value="triangle">Triangle</option>
+        <option value="sawtooth">Sawtooth</option>
+        <option value="piano">Piano</option>
+        <option value="synth">Synth</option>
+    </select>
+    <button onclick="playSong()">Play Song</button>
+
+    <div id="noteDisplay"></div>
+
+    <script>
+        const noteFrequencies = {
+            'a': 'A4',
+            'b': 'B4',
+            'c': 'C4',
+            'd': 'D4',
+            'e': 'E4',
+            'f': 'F4',
+            'g': 'G4',
+            'h': 'A4',
+            'i': 'B4',
+            'j': 'C4',
+            'k': 'D4',
+            'l': 'E4',
+            'm': 'F4',
+            'n': 'G4',
+            'o': 'A4',
+            'p': 'B4',
+            'q': 'C4',
+            'r': 'D4',
+            's': 'E4',
+            't': 'F4',
+            'u': 'G4',
+            'v': 'A4',
+            'w': 'B4',
+            'x': 'C4',
+            'y': 'D4',
+            'z': 'E4'
+        };
+
+        function playSong() {
+            const textInput = document.getElementById('textInput').value;
+            const playMode = document.getElementById('playMode').value;
+            const instrumentType = document.getElementById('instrument').value;
+            const noteDisplay = document.getElementById('noteDisplay');
+            noteDisplay.innerHTML = ''; // Clear previous notes display
+            let currentTime = Tone.now();
+
+            let instrument;
+            switch (instrumentType) {
+                case 'piano':
+                    instrument = new Tone.Sampler({ 
+                        urls: { 
+                            A4: "A4.mp3",
+                            B4: "B4.mp3",
+                            // add other note samples
+                        },
+                        baseUrl: "path/to/piano/samples/"
+                    }).toDestination();
+                    break;
+                case 'synth':
+                    instrument = new Tone.Synth().toDestination();
+                    break;
+                default:
+                    instrument = new Tone.Oscillator().toDestination();
+                    instrument.type = instrumentType;
+                    break;
+            }
+
+            if (playMode === 'double') {
+                for (let i = 0; i < textInput.length; i += 2) {
+                    const char1 = textInput[i];
+                    const char2 = textInput[i + 1];
+                    const duration1 = char1 === char1.toUpperCase() ? 0.5 : 0.25;
+                    const duration2 = char2 === char2.toUpperCase() ? 0.5 : 0.25;
+                    if (noteFrequencies[char1.toLowerCase()] && noteFrequencies[char2?.toLowerCase()]) {
+                        displayNotes(noteFrequencies[char1.toLowerCase()], noteFrequencies[char2.toLowerCase()]);
+                        playNotePair(instrument, noteFrequencies[char1.toLowerCase()], noteFrequencies[char2.toLowerCase()], currentTime, Math.max(duration1, duration2));
+                        currentTime += Math.max(duration1, duration2);
+                    } else if (noteFrequencies[char1.toLowerCase()]) {
+                        displayNotes(noteFrequencies[char1.toLowerCase()], null);
+                        playSingleNote(instrument, noteFrequencies[char1.toLowerCase()], currentTime, duration1);
+                        currentTime += duration1;
+                    }
+                }
+            } else {
+                for (let i = 0; i < textInput.length; i++) {
+                    const char = textInput[i];
+                    const duration = char === char.toUpperCase() ? 0.5 : 0.25;
+                    if (noteFrequencies[char.toLowerCase()]) {
+                        displayNotes(noteFrequencies[char.toLowerCase()], null);
+                        playSingleNote(instrument, noteFrequencies[char.toLowerCase()], currentTime, duration);
+                        currentTime += duration;
+                    }
+                }
+            }
+        }
+
+        function playNotePair(instrument, note1, note2, startTime, duration) {
+            if (instrument instanceof Tone.Sampler) {
+                instrument.triggerAttackRelease(note1, duration, startTime);
+                instrument.triggerAttackRelease(note2, duration, startTime);
+            } else {
+                instrument.frequency.setValueAtTime(Tone.Frequency(note1), startTime);
+                instrument.start(startTime);
+                instrument.stop(startTime + duration);
+
+                instrument.frequency.setValueAtTime(Tone.Frequency(note2), startTime);
+                instrument.start(startTime);
+                instrument.stop(startTime + duration);
+            }
+        }
+
+        function playSingleNote(instrument, note, startTime, duration) {
+            if (instrument instanceof Tone.Sampler) {
+                instrument.triggerAttackRelease(note, duration, startTime);
+            } else {
+                instrument.frequency.setValueAtTime(Tone.Frequency(note), startTime);
+                instrument.start(startTime);
+                instrument.stop(startTime + duration);
+            }
+        }
+
+        function displayNotes(note1, note2) {
+            const noteDisplay = document.getElementById('noteDisplay');
+            if (note2) {
+                noteDisplay.innerHTML += `${note1}-${note2} `;
+            } else {
+                noteDisplay.innerHTML += `${note1} `;
+            }
+        }
+    </script>
+</body>
+</html>

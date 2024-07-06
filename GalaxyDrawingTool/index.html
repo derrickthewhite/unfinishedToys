@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaxy Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+        }
+        canvas {
+            border: 1px solid black;
+            background-color: black; /* Set canvas background to black */
+        }
+        .controls {
+            margin-top: 20px;
+            display: inline-block;
+            text-align: left;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .controls h3 {
+            margin-top: 0;
+        }
+        .control-group {
+            margin-bottom: 10px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .control-group input[type="range"], 
+        .control-group input[type="number"] {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="galaxyCanvas" width="3000" height="3000"></canvas>
+        
+        <script>
+			const galaxyLayerCount =11;
+			const fuzziness = [undefined, 200, 150, 100, 75, 750, 300, 150, 75, 0, 0, 75]
+			const starColor = [undefined,"#ffffff","#aaaaff","#ffffff","#ffffff","#ffffff","#aaaaff","#aaaaff","#ffcc00", "#ffee00", "#ffffff","#aa8800"];
+			const starDensity = [undefined,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.25, 0, 0,0];
+			const armRotations = [undefined,1.1,1.05,1,1,1,1,1,.95, 0, 0,.9];
+			const bulgeRadius = [undefined,200,150,100,75,300,250,230,220, 180, 150,200];
+			const theta = [undefined,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005, .0005, .0005, .0005];
+			const bulgeDensity = [undefined, 0,0,0,.025,0,0,0,0, .025, 0, 0];
+			const nebulaDensity = [undefined, .5,.5,.5,.5,.5,.5,.5,.5, .5, .5, .05];
+			const nebulaBulgeDensity = [undefined, .05,.05,.05,.025,.05,.05,.05,.08, .01, .01, .001];
+			const nebulaSize = [undefined, 5,5,5,5,5,5,5,5, 5, 5, 15];
+            // Function to create galaxy control section
+            function createGalaxyControl(prefix) {
+                const container = document.createElement('div');
+                container.classList.add('controls');
+
+                const h3 = document.createElement('h3');
+                h3.textContent = `Galaxy ${prefix} Controls`;
+                container.appendChild(h3);
+
+                const controlGroups = [
+                    { label: 'Number of Arms:', id: `armCount${prefix}`, type: 'number', value: '4', min: '1', max: '10' },
+                    { label: 'Arm Sharpness:', id: `armSharpness${prefix}`, type: 'number', value: '0.25', step: '0.01' },
+                    { label: 'Arm Rotations:', id: `armRotations${prefix}`, type: 'number', value: `${armRotations[prefix]}`, step: '0.01' },
+                    { label: 'Star Density:', id: `starDensity${prefix}`, type: 'number', value: `${starDensity[prefix]}`, step: '0.01' },
+                    { label: 'Galaxy Color:', id: `galaxyColor${prefix}`, type: 'color', value: `${starColor[prefix]}` },
+                    { label: 'Seed:', id: `seedInput${prefix}`, type: 'number', value: `${prefix}` },
+                    { label: 'Arm Radius Coefficient:', id: `armRadiusCoefficient${prefix}`, type: 'number', value: '0.2', step: '0.01' },
+                    { label: 'Star Fuzziness:', id: `starFuzziness${prefix}`, type: 'number', value: `${fuzziness[prefix]}` },
+                    { label: 'Bulge Radius:', id: `bulgeRadius${prefix}`, type: 'number', value: `${bulgeRadius[prefix]}` },
+                    { label: 'Bulge Density:', id: `bulgeDensity${prefix}`, type: 'number', value: `${bulgeDensity[prefix]}`, step: '0.01' },
+                    { label: 'Theta Step:', id: `thetaStep${prefix}`, type: 'number', value: `${theta[prefix]}`, step: '0.001' },
+                    { label: 'Nebula Density:', id: `nebulaDensity${prefix}`, type: 'number', value: `${nebulaDensity[prefix]}`, step: '0.01' },
+                    { label: 'bulge Nebula Density:', id: `bulgeNebulaDensity${prefix}`, type: 'number', value: `${nebulaBulgeDensity[prefix]}`, step: '0.01' },
+                    { label: 'Nebula Color:', id: `nebulaColor${prefix}`, type: 'color', value: `${starColor[prefix]}` },
+                    { label: 'Nebula Size:', id: `nebulaSize${prefix}`, type: 'number', value: `${nebulaSize[prefix]}` },
+                ];
+
+                controlGroups.forEach(group => {
+                    const div = document.createElement('div');
+                    div.classList.add('control-group');
+
+                    const label = document.createElement('label');
+                    label.setAttribute('for', group.id);
+                    label.textContent = group.label;
+                    div.appendChild(label);
+
+                    const input = document.createElement('input');
+                    input.setAttribute('type', group.type);
+                    input.setAttribute('id', group.id);
+                    input.setAttribute('value', group.value);
+                    if (group.min) input.setAttribute('min', group.min);
+                    if (group.max) input.setAttribute('max', group.max);
+                    if (group.step) input.setAttribute('step', group.step);
+                    div.appendChild(input);
+
+                    container.appendChild(div);
+                });
+
+                return container;
+            }
+
+            // Create galaxy controls
+            const container = document.querySelector('.container');
+
+            // Create controls for each galaxy (adjust the number of galaxies as needed)
+            for (let i = 1; i <= galaxyLayerCount; i++) {
+                const galaxyControl = createGalaxyControl(i);
+                container.appendChild(galaxyControl);
+            }
+			
+			 // Function to download canvas as image
+            function downloadCanvasAsJpg() {
+                const canvas = document.getElementById('galaxyCanvas');
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/jpeg');
+                link.download = 'galaxy.jpg';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        </script>
+
+        <button onclick="generateGalaxy()">Generate Galaxies</button>
+		<div class="button-container">
+            <button onclick="downloadCanvasAsJpg()">Download Galaxy Image</button>
+        </div>
+    </div>
+
+    <script src="galaxy.js"></script>
+</body>
+</html>

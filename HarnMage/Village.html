@@ -1,0 +1,251 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Village</title>
+  <script type="text/javascript" src="names.js"></script>
+  <script type="text/javascript" src="generate.js"></script>
+  <script type="text/javascript" src="familyTree.js"></script>
+  	<script type="text/javascript" src= "../../tools/seededGenerator.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+  <script>
+	function getAcres(socialClass) {
+		switch(socialClass) {
+			case "Craftsman": return RollTheDice(1,6)*5;
+			case "Farmer": return RollTheDice(2,6)*5;
+			case "Villein": return RollTheDice(1,20)+20;
+			case "Half-Villein": return RollTheDice(1,10)+10;
+			case "Cottar": return RollTheDice(1,6)-1;
+		}
+		throw error(socialClass+" not recognized as a social class");
+	}
+	function getYeomanAcres(yeomanClass) {
+		switch(yeomanClass) {
+			case "Light Foot": return RollTheDice(1,10)+10;
+			case "Medium Foot": return RollTheDice(1,10)+20;
+			case "Longbow": return RollTheDice(1,10)+40;
+			case "Light Horse": return RollTheDice(1,10)+60;
+		}
+		throw error(yeomanClass+" not recognized as a yeoman class");
+	}
+	function getYeomanPoints(yeomanClass) {
+		switch(yeomanClass) {
+			case "Light Foot": return 1;
+			case "Medium Foot": return 1.5;
+			case "Longbow": return 3;
+			case "Light Horse": return 3;
+		}
+		throw error(yeomanClass+" not recognized as a yeoman class");
+	}
+	function getHouseHoldSizeModifier(socialClass) {
+		switch(socialClass) {
+			case "Craftsman": return 0;
+			case "Farmer": return 0;
+			case "Yeoman": return 0;
+			case "Villein": return 1;
+			case "Half-Villein": return 0;
+			case "Cottar": return -1;
+		}
+		throw error(socialClass+" not recognized as a social class");
+	}
+	function isFree(socialClass) {
+		switch(socialClass) {
+			case "Craftsman": return true;
+			case "Farmer": return true;
+			case "Yeoman": return true;
+			case "Villein": return false;
+			case "Half-Villein": return false;
+			case "Cottar": return false;
+		}
+		throw error(socialClass+" not recognized as a social class");
+
+	}
+	function socialOrder(socialClass){
+		switch(socialClass) {
+			case "Craftsman": return 0;
+			case "Yeoman": return 1;
+			case "Farmer": return 2;
+			case "Villein": return 3;
+			case "Half-Villein": return 4;
+			case "Cottar": return 5;
+		}
+		throw error(socialClass+" not recognized as a social class");
+	}
+	
+	function craftsmanFee(craft) {
+		switch(craft){
+			case "Miller": return  240;
+			case "Metalsmith": return  144;
+			case "Woodcrafter": return  120;
+			case "Salter": return  120;
+			case "Hideworker": return  144;
+			case "Timberwright": return  216;
+			case "Charcoaler": return  180;
+			case "Shipwright": return  144;
+			case "Innkeeper": return  216;
+		}
+	}
+	function unfilledCrafts(craftsmen) {
+		var craftList = ["Miller","Metalsmith","Woodcrafter","Salter","Hideworker","Timberwright","Charcoaler","Shipwright","Innkeeper"];
+		return craftList.filter( craft => !craftsmen.map(c=>c.craftsman).includes(craft));
+	}
+	function generateHouseHold () {
+		var household = {};
+		household.socialClass = handleSpread(config.tenantClass);
+		household.acres = getAcres(household.socialClass);
+		household.freeAcres = 0;
+		household.serfAcres = 0;
+		if(isFree(household.socialClass)) household.freeAcres = household.acres;
+		else household.serfAcres = household.acres;
+		if(household.serfAcres>20 && household.serfAcres%5 == 0) household.freeAcres= RollTheDice(1,6)*5;
+		household.size = RollTheDice(1,6)
+		if(household.size == 6) household.size += RollTheDice(1,6)-1;
+		household.size+= getHouseHoldSizeModifier(household.socialClass);
+		calculateDues(household);
+
+		if(household.socialClass == "Craftsman"){
+			var craftsman = handleSpread(config.craftsman);
+			 household.craftsman = craftsman.title;
+			 household.fees += craftsman.fee;
+		}		
+		household.title = household.craftsman? household.craftsman: household.socialClass;
+
+		return household;
+	}
+	function calculateDues (household) {
+		household.rent = isFree(household.socialClass)? 60: 0;
+		household.rent += household.freeAcres * 6;		
+		household.labor = household.serfAcres*4;
+		household.fees = 6 + household.freeAcres*1 + household.serfAcres*1;
+	}
+	
+	function makeYeoman (household) {
+		household.yeoman = handleSpread(config.yeoman);
+		household.serfAcres =0;
+		household.freeAcres = getYeomanAcres(household.yeoman);
+
+		household.rent = 60;
+		household.fees = 6 + household.freeAcres*1;
+		household.title = household.yeoman;
+		
+		household.socialClass = "Yeoman";
+		
+		return household;
+	}
+  
+	function main(){
+		var seed = Math.random().toString(36).slice(2)
+		var seed = "g4pjzxtuprv";
+		//var seed = "kr90sn8ua8m"
+		//var seed = "magecoin"
+		Math.seedrandom(seed);
+		console.log("using", seed);
+		
+		var results = {};
+		results.TotalAcres = 3000;
+		results.WoodedAcres = results.TotalAcres * (RollTheDice(1,10)+15)/100;
+		results.ClearedAcres = results.TotalAcres - results.WoodedAcres;
+		results.LandQuality = (75 + (RollTheDice(3,6))*25/10)/100;
+		results.householdCount = results.ClearedAcres/40*results.LandQuality;
+		
+		results.yeomanOwed = Math.round(results.TotalAcres/600)
+		
+		var households = [];
+		for(var i = 0; i< results.householdCount; i++)
+			households.push(generateHouseHold());
+		
+		var yeomanPoints = 0;
+		while(yeomanPoints < results.yeomanOwed) {
+			var farmerToTransform = households.find(f=>f.socialClass="Farmer");
+			makeYeoman(farmerToTransform);
+			yeomanPoints+= getYeomanPoints(farmerToTransform.yeoman);
+			console.log("yeoman",farmerToTransform);
+		}
+
+		var craftsmen = households.filter(h => h.socialClass =="Craftsman");
+		var duplicateCraftsmen = craftsmen.filter((household, index) =>  craftsmen.map(c=>c.craftsman).indexOf(household.craftsman)!= index);
+		var openings = unfilledCrafts(craftsmen);
+		for(var i = 0; i< duplicateCraftsmen.length; i++) {
+			duplicateCraftsmen[i].fees -= craftsmanFee(duplicateCraftsmen[i].craftsman);
+			duplicateCraftsmen[i].craftsman = openings[i];
+			duplicateCraftsmen[i].title = openings[i];
+			duplicateCraftsmen[i].fees += craftsmanFee(duplicateCraftsmen[i].craftsman);
+		}
+		console.log(results);
+		households.sort((a,b) => {
+			var aSocial = socialOrder(a.socialClass);
+			var bSocial = socialOrder(b.socialClass);
+			if(aSocial == bSocial) 
+				if(a.socialClass != "Craftsman") return b.acres - a.acres;
+				else return a.title.localeCompare(b.title);
+			else return aSocial - bSocial;
+		});
+		
+		results.households= households
+		
+		results.serfAcres = ko.pureComputed(() => {return results.households.map(h => h.serfAcres).reduce((a,b)=>a+b);});
+		results.freeAcres = ko.pureComputed(() => {return results.households.map(h => h.freeAcres).reduce((a,b)=>a+b);});
+		results.population = ko.pureComputed(() => {return results.households.map(h => h.size).reduce((a,b)=>a+b);});
+		results.fees = ko.pureComputed(() => {return results.households.map(h => h.fees).reduce((a,b)=>a+b);});
+		results.rent = ko.pureComputed(() => {return results.households.map(h => h.rent).reduce((a,b)=>a+b);});
+		results.labor = ko.pureComputed(() => {return results.households.map(h => h.labor).reduce((a,b)=>a+b);});
+		
+		results.TenantAcres = ko.pureComputed(() => {return results.serfAcres() + results.freeAcres()});
+		results.DemesneAcres = ko.pureComputed(() => {return results.ClearedAcres - results.TenantAcres()});
+		
+		results.LaborPool = ko.pureComputed(() => {return results.householdCount*500});
+		
+		console.log("households", results.households.length)
+		
+		ko.applyBindings(results,document.getElementById('display'));
+	}
+  </script>
+</head>
+	<body onload="main()">
+		<div id="display">
+				<table>
+					<tr><th>Land Quality:</th><td data-bind = "text:LandQuality" ></td></tr>
+					<tr><th>Total Acres:</th><td data-bind = "text:TotalAcres" ></td></tr>
+					<tr><th>Wooded Acres:</th><td data-bind = "text:WoodedAcres" ></td></tr>
+					<tr><th>Cleared Acres:</th><td data-bind = "text:ClearedAcres" ></td></tr>
+					<tr><th>Tenant Acres:</th><td data-bind = "text:TenantAcres" ></td></tr>
+					<tr><th>Desmense Acres:</th><td data-bind = "text:DemesneAcres" ></td></tr>
+				</table>
+				<table >
+					<tbody data-bind="">
+						<tr>
+							<th>title</th>
+							<th>hd size</th>
+							<th>Serf Acres</th>
+							<th>Free Acres</th>
+							<th>Labor</th>
+							<th>Rent</th>
+							<th>Fees</th>
+						</tr>
+						<!-- ko foreach:households --> 
+						<tr>
+							<td data-bind="text:title"></td>
+							<td data-bind="text:size"></td>
+							<td data-bind="text:serfAcres"></td>
+							<td data-bind="text:freeAcres"></td>
+							<td data-bind="text:labor"></td>
+							<td data-bind="text:rent"></td>
+							<td data-bind="text:fees"></td>
+						</tr>
+						<!-- /ko -->
+						<tr>
+							<th >totals</th>
+							<td data-bind="text:population"></td>
+							<td data-bind="text:serfAcres"></td>
+							<td data-bind="text:freeAcres"></td>
+							<td data-bind="text:labor"></td>
+							<td data-bind="text:rent"></td>
+							<td data-bind="text:fees"></td>
+						</tr>
+
+					</tbody>
+				</table>
+		</div>
+	</body>
+</html>

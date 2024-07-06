@@ -1,0 +1,224 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Title</title>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+  <script>
+	var colors = ["red","green", "yellow", "blue", "purple"];
+	var spinner = colors.concat(["nothing", "restart", "steal", "pick1", "pick2"])
+	var nextPlayerID = 0;
+	function cautiousAI() {
+		return {
+			//most common color
+			pickColor: function (player, game) {
+				var toPickFrom = colors.filter(c=>!player.colors().includes(c));
+				if(toPickFrom.length == 0) return colors[0];
+				var colorRanks = toPickFrom.map(c => ({ color: c, count: game.players.filter(p => p.colors().includes(c)).length}));
+				var maxCount = colorRanks.sort((a,b) => b.count - a.count)[0].count;
+				toPickFrom = colorRanks.filter( cr => cr.count == maxCount).map(cr => cr.color)
+				return toPickFrom[Math.floor(Math.random()*toPickFrom.length)];
+			},
+			//TODO: pick most common color
+			stealColor: function (player, game) {
+				var neededColors = colors.filter(c => !player[c]);
+				var targets = game.players.filter(p => p!=player)
+				.sort((a,b) => a.colors().length - b.colors.length);
+				var options = [];
+				for(var target of targets) {
+					for(color of colors){
+						if(!player[color] && target[color]){
+							options.push({
+								color: color,
+								target: target
+							});
+						}
+					}
+					if(options.length != 0)
+						return options[Math.floor(Math.random()*options.length)];
+				}
+				return undefined;
+			}
+		}
+	}
+	function naiveAI() {
+		return {
+			//random color
+			pickColor: function (player, game) {
+				var toPickFrom = colors.filter(c=>!player.colors().includes(c));
+				if(toPickFrom.length == 0) return colors[0];
+				return toPickFrom[Math.floor(Math.random()*toPickFrom.length)];
+			},
+			stealColor: function (player, game) {
+				var neededColors = colors.filter(c => !player[c]);
+				var targets = game.players.filter(p => p!=player)
+				.sort((a,b) => a.colors().length - b.colors.length);
+				var options = [];
+				for(var target of targets) {
+					for(color of colors){
+						if(!player[color] && target[color]){
+							options.push({
+								color: color,
+								target: target
+							});
+						}
+					}
+					if(options.length != 0)
+						return options[Math.floor(Math.random()*options.length)];
+				}
+				return undefined;
+			}
+		}
+	}
+	function randomAI() {
+		return {
+			pickColor: function (player, game) {
+				var toPickFrom = colors.filter(c=>!player.colors().includes(c));
+				if(toPickFrom.length == 0) return colors[0];
+				return toPickFrom[Math.floor(Math.random()*toPickFrom.length)];
+			},
+			stealColor: function (player, game) {
+				var neededColors = colors.filter(c => !player[c]);
+				var targets = game.players.filter(p => p!=player)
+				.sort((a,b) => a.colors().length - b.colors.length);
+				var options = [];
+				for(var target of targets) {
+					for(color of colors){
+						if(!player[color] && target[color]){
+							options.push({
+								color: color,
+								target: target
+							});
+						}
+					}
+				}
+				if(options.length == 0) return undefined;
+				return options[Math.floor(Math.random()*options.length)];
+			}
+		}
+	}
+	function simpleAI() {
+		return {
+			pickColor: function (player, game) {
+				for(color of colors){
+					if(!player[color]) return color;
+				}
+				return colors[0];
+			},
+			stealColor: function (player, game) {
+				var neededColors = colors.filter(c => !player[c]);
+				var targets = game.players.filter(p => p!=player)
+				.sort((a,b) => a.colors().length - b.colors.length);
+				for(var target of targets) {
+					for(color of colors){
+						if(!player[color] && target[color]){
+							return {
+								color: color,
+								target: target
+							};
+						}
+					}
+				}
+				return undefined;
+			}
+		}
+	}
+	function createPlayer(ai) {
+		var player ={
+			ID: nextPlayerID++,
+			AI: ai
+		};
+		colors.forEach(c => player[c] = 0);
+		player.colors = function () {
+			return colors.filter(c => player[c]);
+		}
+		return player;
+	}
+	function createGame(ais) {
+		var game = {
+			turn: 0
+		};
+		game.players = [];
+		for(var i =0; i<ais.length; i++) 
+			game.players.push(createPlayer(ais[i]));
+		return game;
+	}
+	function runTurn (game) {
+		var player = game.players[game.turn % game.players.length];
+		var spin = spinner[Math.floor(Math.random()*spinner.length)];
+		if(colors.includes(spin)) player[spin] =1;
+		if(spin == "restart") colors.forEach(c => player[c] = 0);
+		if(spin == "pick1") player[player.AI.pickColor(player, game)]=1;
+		if(spin == "pick2") {
+			player[player.AI.pickColor(player, game)]=1;
+			player[player.AI.pickColor(player, game)]=1;
+		}
+		if(spin == "steal") {
+			var steal = player.AI.stealColor(player, game);
+			if(steal) {
+				player[steal.color] = 1;
+				steal.target[steal.color] =0;
+			}
+		}
+		game.turn++;
+		return player.colors().length == colors.length;
+	}
+	function runGame(ais) {
+		var game = createGame(ais);
+		while (!runTurn(game)){
+			//maybe draw? report? all the good stuff is in the condition
+		};
+		game.turn--;
+		return game;
+	}
+	function analyzeAIs(ais, name) {
+		var games = [];
+		var winners = [0,0,0,0];
+		var gameLengths = [];
+		for(var i = 0; i< 100000; i++){
+			var game = runGame(ais);
+			//console.log("the winner is", (game.turn) % game.players.length, "after ", game.turn, " turns");
+			games.push(game);
+			winners[(game.turn) % game.players.length]++;
+			if(!gameLengths[game.turn])gameLengths[game.turn]=0;
+			gameLengths[game.turn]++;
+		}
+		console.log(name,"winners", winners);
+		//console.log(name,"game lengths", gameLengths);
+
+	}
+	function main(){
+		/*
+		analyzeAIs([simpleAI(), simpleAI(), simpleAI()], "sss");
+		analyzeAIs([randomAI(), simpleAI(), simpleAI()], "rss");
+		analyzeAIs([simpleAI(), randomAI(), simpleAI()], "srs");
+		analyzeAIs([simpleAI(), simpleAI(), randomAI()], "ssr");
+		analyzeAIs([simpleAI(), randomAI(), randomAI()], "srr");
+		analyzeAIs([randomAI(), simpleAI(), randomAI()], "rsr");
+		analyzeAIs([randomAI(), randomAI(), simpleAI()], "rrs");
+		analyzeAIs([randomAI(), randomAI(), randomAI()], "rrr");
+		*/
+		/*
+		analyzeAIs([randomAI(), randomAI(), randomAI()], "rrr");
+		analyzeAIs([randomAI(), randomAI(), naiveAI()], "rrn");
+		analyzeAIs([simpleAI(), simpleAI(), simpleAI()], "sss");
+		analyzeAIs([simpleAI(), simpleAI(), naiveAI()], "ssn");
+		analyzeAIs([naiveAI(), naiveAI(), naiveAI()], "nnn");
+		*/
+		
+		analyzeAIs([randomAI(), randomAI(), randomAI()], "rrr");
+		analyzeAIs([randomAI(), randomAI(), cautiousAI()], "rrc");
+		analyzeAIs([simpleAI(), simpleAI(), simpleAI()], "sss");
+		analyzeAIs([simpleAI(), simpleAI(), cautiousAI()], "ssc");
+		analyzeAIs([cautiousAI(), cautiousAI(), cautiousAI()], "ccc");
+
+	}
+  </script>
+</head>
+	<body onload="main()">
+		<div id="display">
+		</div>
+		<canvas></canvas>
+	</body>
+</html>

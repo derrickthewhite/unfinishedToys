@@ -1,0 +1,137 @@
+<html>
+	<head>
+		<style>
+			.polity{
+				border: solid black 1px;
+			}
+			.habitat{
+				border: solid black 1px;
+				display: inline-block;
+				min-width: 50px;
+				min-height: 30px;
+				margin: 3px;
+			}
+			.pop {
+				display: inline-block;
+				min-width: 20px;
+				min-height: 20px;
+				border: solid black 1px;
+				margin: 3px;
+				padding: 2px;
+			}
+		</style>
+		<script type="text/javascript" src= "../../tools/seededGenerator.js"></script>
+		<script>
+			let polities= [];
+			let deck = [
+				{
+					growth: 1,
+					convert: 1,
+					immigrate: 1,
+					transfer: 1,
+					schism:0
+				}
+			];
+			let baseDeck = [
+				{ growth: 1},
+				{ convert:1},
+				{ immigrate:1},
+				{ transfer:1},
+				{ growth: 1},
+				{ convert:1},
+				{ immigrate:1},
+				{ transfer:1},
+				{ schism: 1}
+			]
+			function main() {
+				Math.seedrandom("derrick");
+				for(var i =0;i<4; i++)
+					polities.push(createPolity());
+				generateTurnGrowth();
+			}
+			function createPolity() {
+				var polity={};
+				
+				polity.deck = JSON.parse(JSON.stringify(baseDeck));
+				var basePop = createPop(6);
+				polity.habitats = [
+					createHabitat([basePop]),
+					createHabitat([createPop(3,basePop.color)]),
+					createHabitat([createPop(3,basePop.color)]),
+					createHabitat(),
+				];
+				polity.changes = [];
+				return polity;
+			}
+			function createHabitat(pops) {
+				var habitat = {};
+				habitat.pops=pops?pops:[];
+				return habitat;
+			}
+			function createPop(count, color) {
+				var pop = {
+					color: color? color: getRandomColor(),
+					count: count
+				};
+				return pop;
+			}
+			function getRandomColor() {
+			  var letters = '0123456789ABCDEF';
+			  var color = '#';
+			  for (var i = 0; i < 6; i++) {
+				color += letters[Math.floor(Math.random() * letters.length)];
+			  }
+			  return color;
+			}			
+			function draw() {
+				var pDivs = polities.map(polity => {
+					var pDiv = document.createElement("div");
+					pDiv.className = "polity";
+					var habitats = polity.habitats.map(h => {
+							var hDiv = document.createElement("div")
+							hDiv.className = "habitat";
+							var popDivs = h.pops.map( p => {
+								var popDiv = document.createElement("div");
+								popDiv.innerHTML = ""+p.count;
+								popDiv.style.backgroundColor= p.color;
+								popDiv.className = "pop"
+								return popDiv;
+							});
+							hDiv.replaceChildren(...popDivs);
+							if(popDivs.length == 0) {
+								hDiv.innerHTML = "<div class='pop'>0<div>"
+							}
+							return hDiv;
+						})
+					var changeDivs = Object.keys(polity.changes).map(key => {
+						var changeDiv= document.createElement("div");
+						changeDiv.className= "change";
+						changeDiv.innerHTML = key +" "+polity.changes[key];
+						return changeDiv;
+					});
+					pDiv.replaceChildren(...habitats.concat(changeDivs));
+					return pDiv;
+				});
+				document.getElementById("display").replaceChildren(...pDivs);
+			}
+			
+			function generateTurnGrowth() {
+				console.log("take a turn!");
+				var card = deck[Math.floor(Math.random()*deck.length)];
+				polities.forEach(p => {
+					p.changes = JSON.parse(JSON.stringify(card))
+					var polityCard = p.deck[Math.floor(Math.random()*p.deck.length)];
+					Object.keys(polityCard).forEach(key => p.changes[key] += polityCard[key] );
+				});
+				draw();
+			}
+		</script>
+	</head>
+	<body onload="main()">
+		<div>
+		</div>
+		<div id = "display">
+			
+		</div>
+	</body>
+</html>

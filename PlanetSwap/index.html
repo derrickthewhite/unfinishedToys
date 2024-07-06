@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Space Colonization Simulation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Space Colonization Simulation</h1>
+        <div id="empire-summary"></div>
+    </header>
+    <main>
+        <aside>
+            <h2>Colonies</h2>
+            <ul id="colony-list"></ul>
+            <h2>Uncolonized Planets</h2>
+            <ul id="uncolonized-planet-list"></ul>
+            <h2>Work List</h2>
+            <ul id="work-list"></ul>
+        </aside>
+        <section id="main-area">
+            <div id="planet-details"></div>
+            <div id="economy-management">
+                <h2>Economy Management</h2>
+                <div>
+                    <label for="explore-worlds">Worlds to Explore:</label>
+                    <input type="number" id="explore-worlds" value="0">
+                </div>
+                <div>
+                    <button id="take-turn">Take Turn</button>
+                </div>
+                <div id="economy-status"></div>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <button id="save-game">Save Game</button>
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>
