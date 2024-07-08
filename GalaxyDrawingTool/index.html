@@ -51,15 +51,18 @@
         
         <script>
 			const galaxyLayerCount =11;
-			const fuzziness = [undefined, 200, 150, 100, 75, 750, 300, 150, 75, 0, 0, 75]
+			const fuzziness = [undefined, 150, 200, 250, 75, 750, 250, 200, 150, 0, 0, 100]
 			const starColor = [undefined,"#ffffff","#aaaaff","#ffffff","#ffffff","#ffffff","#aaaaff","#aaaaff","#ffcc00", "#ffee00", "#ffffff","#aa8800"];
+			//const starColor = [undefined,"#ffff88","#aaaaff","#0000ff","#aaaaff","#ff8888","#88ff88","#8888ff","#ffcc00", "#ffee00", "#ffffff","#aa8800"];
 			const starDensity = [undefined,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.25, 0, 0,0];
-			const armRotations = [undefined,1.1,1.05,1,1,1,1,1,.95, 0, 0,.9];
+			//const armRotations = [undefined,1.1,1.05,1,1,1,1,1,.95, 0, 0,.9];
+			//const armRotations = [undefined,.75,.70,.7,.7,.75,.7,.7,.65, 0, 0,.6];
+			const armRotations = [undefined,.55,.50,.5,.5,.55,.5,.5,.45, 0, 0,.4];
 			const bulgeRadius = [undefined,200,150,100,75,300,250,230,220, 180, 150,200];
-			const theta = [undefined,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005, .0005, .0005, .0005];
+			const theta = [undefined,0.0005,0.0005,0.0005,0.0005,0.001,0.0005,0.0005,0.0003, .0002, .0005, .0005];
 			const bulgeDensity = [undefined, 0,0,0,.025,0,0,0,0, .025, 0, 0];
-			const nebulaDensity = [undefined, .5,.5,.5,.5,.5,.5,.5,.5, .5, .5, .05];
-			const nebulaBulgeDensity = [undefined, .05,.05,.05,.025,.05,.05,.05,.08, .01, .01, .001];
+			const nebulaDensity = [undefined, .5,.5,.5,.5,.5,.05,.2,.5, .5, .5, .05];
+			const nebulaBulgeDensity = [undefined, .05,.05,.05,.025,.01,.05,.05,.08, .01, .01, .001];
 			const nebulaSize = [undefined, 5,5,5,5,5,5,5,5, 5, 5, 15];
             // Function to create galaxy control section
             function createGalaxyControl(prefix) {
@@ -77,7 +80,7 @@
                     { label: 'Star Density:', id: `starDensity${prefix}`, type: 'number', value: `${starDensity[prefix]}`, step: '0.01' },
                     { label: 'Galaxy Color:', id: `galaxyColor${prefix}`, type: 'color', value: `${starColor[prefix]}` },
                     { label: 'Seed:', id: `seedInput${prefix}`, type: 'number', value: `${prefix}` },
-                    { label: 'Arm Radius Coefficient:', id: `armRadiusCoefficient${prefix}`, type: 'number', value: '0.2', step: '0.01' },
+                    { label: 'Arm Radius Coefficient:', id: `armRadiusCoefficient${prefix}`, type: 'number', value: '0.6', step: '0.01' },
                     { label: 'Star Fuzziness:', id: `starFuzziness${prefix}`, type: 'number', value: `${fuzziness[prefix]}` },
                     { label: 'Bulge Radius:', id: `bulgeRadius${prefix}`, type: 'number', value: `${bulgeRadius[prefix]}` },
                     { label: 'Bulge Density:', id: `bulgeDensity${prefix}`, type: 'number', value: `${bulgeDensity[prefix]}`, step: '0.01' },

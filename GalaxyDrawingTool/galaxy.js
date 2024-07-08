@@ -1,6 +1,13 @@
 const canvas = document.getElementById('galaxyCanvas');
 const ctx = canvas.getContext('2d');
 
+const drawStarArms = true;
+const drawStarBulge = true;
+
+const armOffset = 500;
+const bendPoint = .25;
+const regressPoint = .35;
+
 let seed = 1;
 
 function seededRandom() {
@@ -36,8 +43,14 @@ function drawSpiralCurve(ctx, width, shadowBlur, centerX, centerY, armAngle, arm
     ctx.beginPath();
 
 	let strokeCounter = 0;
-    for (let theta = 0; theta < Math.PI * 2 * 1.1; theta += thetaStep) {
-        const armRadius = armRadiusCoefficient * radius * Math.exp(armSharpness * theta) -100;
+	
+	const armRotation = .55;
+    for (let theta = 0; theta < Math.PI * 2 * armRotation; theta += thetaStep) {
+		//const truncatedTheta = Math.min(theta, Math.PI *2 * .5);
+		const truncatedTheta = 
+			theta > Math.PI*2 * regressPoint? (Math.PI*2*bendPoint + (Math.PI*2*regressPoint - Math.PI*2*bendPoint)/2 + (theta - Math.PI*2 * regressPoint)/4) :
+			theta > Math.PI*2 * bendPoint? (Math.PI*2 *bendPoint + theta)/2 : theta;
+        const armRadius = armRadiusCoefficient * radius * Math.exp(armSharpness * truncatedTheta) -armOffset;
         const x = centerX + (armRadius) * Math.cos(theta + armAngle);
         const y = centerY + (armRadius) * Math.sin(theta + armAngle);
 
@@ -48,8 +61,8 @@ function drawSpiralCurve(ctx, width, shadowBlur, centerX, centerY, armAngle, arm
         }
 		if(strokeCounter++ %500 ==0){
 			ctx.stroke();
-			const adjustment = (Math.PI *3 - theta)/(Math.PI*3)
-			const baseValue = 1
+			const adjustment = (Math.PI *2 * armRotation - theta)/(Math.PI*2 * armRotation)
+			const baseValue = 180
 			ctx.lineWidth = width * adjustment;
 			ctx.strokeStyle = `rgb(${baseValue*adjustment},${baseValue*adjustment},${baseValue*adjustment})`;
 			ctx.beginPath();
@@ -69,12 +82,16 @@ function drawSpiralArm(centerX, centerY, radius, armAngle, armSharpness, armRota
 	
     // Draw spiral arms
     for (let theta = 0; theta <= Math.PI * 2 * armRotations; theta += thetaStep) {
-        const armRadius = radius * Math.exp(armSharpness * theta) * armRadiusCoefficient -100;
+		//const truncatedTheta = Math.min(theta, Math.PI *2 * .5);
+		const truncatedTheta = 
+			theta > Math.PI*2 * regressPoint? (Math.PI*2*bendPoint + (Math.PI*2*regressPoint - Math.PI*2*bendPoint)/2 + (theta - Math.PI*2 * regressPoint)/4) :
+			theta > Math.PI*2 * bendPoint? (Math.PI*2 *bendPoint + theta)/2 : theta;
+        const armRadius = armRadiusCoefficient * radius * Math.exp(armSharpness * truncatedTheta) -armOffset;
 
         // Scatter factor decreases as theta increases
         const scatterFactor = Math.PI/8> theta? 
 		theta/(Math.PI/8):
-		(Math.PI * 2.5 * armRotations - theta) / (Math.PI * 2.5 * armRotations);
+		(Math.PI * 2 * armRotations - theta) / (Math.PI * 2 * armRotations);
         const fuzzX = seededRandom() * starFuzziness * scatterFactor - starFuzziness * scatterFactor / 2;
         const fuzzY = seededRandom() * starFuzziness * scatterFactor - starFuzziness * scatterFactor / 2;
 		
@@ -194,17 +211,22 @@ function generateGalaxyBackground(){
     ctx.fillStyle = 'white';
 	
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 125, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, 160, 0, Math.PI * 2);
     ctx.fill();
 
 
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 125, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, 160, 0, Math.PI * 2);
+    ctx.fill();
+	
+	ctx.fillStyle = "black";
+	ctx.beginPath();
+    ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
     ctx.fill();
 	
     ctx.restore();
 
-	const glows = [[30,50],[30,100], [30,200]];
+	const glows = [[70,50],[70,100], [70,200]];
 	for(let pass = 0; pass< glows.length; pass++)
 		for (let i = 0; i < armCount; i++) {
 			const armAngle = (i / armCount) * Math.PI * 2;
@@ -218,15 +240,25 @@ function generateGalaxy() {
 	
 	generateGalaxyBackground();
 	
-	for(var i = 1;i <= galaxyLayerCount; i++){
+	for(var i = 1;i <= galaxyLayerCount && drawStarArms; i++){
 		generateArms(''+i);
+		if(drawStarBulge) generateBulge(''+i);
 		console.log("generated layer " +i)
 	}
 	
-	for(var i = 1;i <= galaxyLayerCount; i++){
-		generateBulge(''+i);
+	for(var i = 1;i <= galaxyLayerCount && drawStarBulge; i++){
+		//generateBulge(''+i);
 		console.log("generated layer " +i)
 	}
+	/*
+	const centerX = canvas.width / 2 ;
+    const centerY = canvas.height / 2;
+
+	ctx.fillStyle = "black";
+	ctx.beginPath();
+    ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+    ctx.fill();
+	*/
 }
 
 generateGalaxy();
