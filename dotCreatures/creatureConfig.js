@@ -40,7 +40,7 @@ var creatureConfig = [
 		name:"grazer",
 		color:"#aaaa00",
 		upkeep: 20,
-		move: {type:'flat', flatMove:2},
+		move: {type:'flat', flatMove:3},
 		startingStorage:20,
 		reproductionPoint:300,
 		reproductionCost:100,

@@ -100,6 +100,9 @@
 			root.currentCreatureType(creature);
 			root.edit(true);
 		};
+		root.deleteCreature = function (creature){
+			root.creatureTypes.remove(creature);
+		};
 		root.newCreatureType = function (){
 			var newType = CreatureType({name:"New Creature"});
 			root.creatureTypes.push(newType);
@@ -109,16 +112,16 @@
 		};
 		var startingConfig ={
 			creatureCounts:{
-				"plant": 1200,
+				"plant": 4000,
 				//"cactus": 400,
 				//"flower": 800,
-				//"grazer":50,
-				"lazy grazer":100,
+				"grazer":200,
+				//"lazy grazer":100,
 				"carnivore":10
 			},
 			dimensions:{
-				x:30,
-				y:30
+				x:80,
+				y:60
 			},
 			seed:"derrick",
 			scale:10,
@@ -129,8 +132,8 @@
 		var emptyConfig = {
 			creatureCounts:{},
 			dimensions:{
-				x:100,
-				y:40
+				x:80,
+				y:60
 			},
 			seed:"derrick",
 			scale:10,
@@ -425,6 +428,7 @@
 				</span><br>
 				Display Priority: <span data-bind="text:displayOrder"></span><br>
 			<button data-bind= "click:$root.editCreature">Edit</button>
+			<button data-bind= "click:$root.deleteCreature">Delete</button>
 			</div>
 		</div>
 		<div>
