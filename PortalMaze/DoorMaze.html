@@ -1,0 +1,432 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fantasy Portal Game</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js" integrity="sha512-+Ru50BzEpZjlFzVnjSmJfYFPFfY2hS0Kjlu/IvqaJoux7maF5lJrRVUJWJ2LevPls7rd242GLbWEt+zAo4OVVQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="location"></div>
+  <div id="doors"></div>
+  <div id="visited-list"></div>
+  <div id="inventory"></div>
+  <div id="party"></div>
+  <div id="room-items"></div>
+  <div id="moves"></div>
+  <button id="show-blocking-options" onclick="displayUnblockOptions()">Unblocking Options</button>
+  <button id="show-follow-options" onclick="displayFollowOptions()">Follow Options</button>
+  <div id="victory-message"></div>
+	<div style="position: absolute; top: 10px; right: 10px; z-index: 1000;">
+	  <button onclick="downloadMaze()">💾 Save</button>
+	  <input type="file" id="uploadMaze" style="display:none" onchange="uploadMaze(event)" />
+	  <button onclick="document.getElementById('uploadMaze').click()">📂 Load</button>
+	  <button onclick="reset(startingPosition)">Reset</button>
+	</div>
+
+  <canvas id="map-canvas" width="800" height="600" style="border:1px solid black; margin-top: 20px;"></canvas>
+  <div id="hover-info" style="font-size: 12px; margin-top: 5px;"></div>
+  <button id ="arrangeNodesButton">shake</button>
+  <button id ="showEntireMaze">show Map</button>
+  <button id ="AnalyzeMaze">Analyze Level</button>
+  <div id="game-modal" class="modal hidden">
+	<div class="modal-content">
+	  <div class="modal-icon" id="modal-icon"></div>
+	  <div class="modal-text">
+		<div class="modal-text" id="modal-text-top"></div>
+		<div class="modal-text bottom" id="modal-text-bottom"></div>
+	  </div>
+	  <img class="modal-image" id="modal-image" />
+	  <button id="modal-close-button">OK</button>
+	</div>
+  </div> 
+  
+  	<script src="game-logic.js" ></script>
+	<script src = "nodeMap.js" ></script>
+<script src="loadAndSave.js"></script>
+  <script>
+	let visited = new Set();
+	let seen = new Set();
+	let inventory = [];
+	let followingCreatures = [];
+	let moveCount = 0;
+	let currentLocation = null;
+	let messages = [];
+  
+	//original numbers
+	/*
+    const numLocations = 20;
+    const connectionsPerLocation = 3;
+	const percentBlockedPortals = .2;
+	*/
+
+	//fails a lot but good ones are good
+	const numLocations = 20;
+    const connectionsPerLocation = 2;
+	const percentBlockedPortals = .4;
+
+
+	const itemsPerLocation = 0
+    const totalConnections = numLocations * connectionsPerLocation;
+	const totalBlocks = Math.floor(totalConnections*percentBlockedPortals);
+	const totalLooseItems = numLocations*itemsPerLocation;
+	let randCalls = 1;
+	
+	let seed = [...Array(10)].map(() => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random()*62)]).join('');
+	//seed = "4judnmi5fQ"; // tiger hard?
+	Math.seedrandom(seed);
+	console.log(seed);
+
+    const namePool = [
+      "Pond", "Tiger", "Fire", "Stone", "Ash", "Leaf", "Storm", "Echo", "Fang", "River",
+      "Flame", "Wolf", "Cave", "Mist", "Shadow", "Thorn", "Ice", "Drift", "Claw", "Root",
+      "Moon", "Blaze", "Dust", "Hollow", "Ridge", "Glade", "Frost", "Vale", "Spire", "Ember",
+      "Groove", "Boulder", "Howl", "Branch", "Cloud", "Snare", "Peak", "Cinder", "Glow", "Whisper",
+      "Burrow", "Tide", "Stalk", "Crag", "Fog", "Wisp", "Dusk", "Glint", "Haze", "Nest"
+    ];
+
+    const emojiMap = {
+      Pond: "🐸", Tiger: "🐯", Fire: "🔥", Flame: "💥", Stone: "⛰️", Ash: "🖤", Leaf: "🍃",
+      Storm: "🌩️", Echo: "🌌", Fang: "🐺", River: "🏞️", Wolf: "🐺", Cave: "🕳️",
+      Mist: "🌫️", Shadow: "🌑", Thorn: "🌵", Ice: "🧊", Drift: "🌬️", Claw: "🐾", Root: "🌱",
+      Moon: "🌕", Blaze: "⚡", Dust: "🌫️", Hollow: "🌀", Ridge: "⛰️", Glade: "🌳",
+      Frost: "❄️", Vale: "🌄", Spire: "🗼", Ember: "🔥", Groove: "🎶", Boulder: "🧱",
+      Howl: "🌕", Branch: "🌿", Cloud: "☁️", Snare: "🪢", Peak: "🏔️", Cinder: "🌋",
+      Glow: "✨", Whisper: "🤫", Burrow: "🕳️", Tide: "🌊", Stalk: "🌾", Crag: "🗻",
+      Fog: "🌁", Wisp: "💨", Dusk: "🌆", Glint: "🔆", Haze: "😶‍🌫️", Nest: "🐣",
+	  "Hole": "🕳️",
+	  "Fire": "🔥",
+	  "Pond": "🐸",            // Alt: 🌊
+	  "Dog": "🐶",
+	  "Crow": "🐦",         // Alt: 🐦
+	  "Ghost": "👻",
+	  "Fog of Darkness": "🌫️",
+	  "Tangled Roots": "🌿",
+	  "Thorn Patch": "🌵",
+	  "Dragon": "🐉",
+	  "Hairy Ogre": "👹",
+	  "High Cliff": "🗻",
+	  "Mysterious Chest": "🧰", // Alt: 🧳, 🧿
+	  "Enchanted Mirror": "💠",
+	  "Glowing Runes": "🧿",
+	  "Waterfall": "🏞️",
+	  "Wizard": "🧙",
+	  "Hero": "🛡️",
+	  "Scholar": "👨‍🎓",       // Alt: 📚
+	  "Princess": "👸",
+	  "Beast": "🐗",           // Alt: 🐗
+	  "Carpenter": "👨🛠",       // Alt: 🧰
+	  "Fairy": "🧚",
+	  "Castaway": "👨🏝️",
+	  "Key": "🔑",
+	  "Bucket": "⚱️",
+	  "Rope": "🧵",       // Alt: 🪢 or 🪤 (knot/trap if more rustic)
+	  "Meat Scraps": "🍖",
+	  "Axe": "🪓",
+	  "Sword": "🗡️",
+	  "Ancient Tome": "📖",  // Alt: 📚
+	  "staff": "🔮",         // Magical look; alt: 🪄
+	  "Lantern": "🏮",       // Alt: 🕯️
+	  "Diamond Necklace": "💎",
+	  "Berries": "🍓",       // Alt: 🍓
+	  "Whistle": "🎺",       // Alt: 🎺
+	  "Gold": "💰",          // Alt: 💰 or 💵
+	  "Tools": "🛠️"          // Alt: 
+    };
+
+    const objectItems = ["Key", "Bucket", "Rope", "Meat Scraps", "Axe", "Sword", "Ancient Tome", "staff", "Lantern", "Diamond Necklace",
+		"Berries","Whistle", "Gold", "Tools"
+	];
+	
+const handsRequired = {
+  "Key": 0,
+  "Bucket": 2,
+  "Rope": 0,
+  "Meat Scraps": 1,
+  "Axe": 1,
+  "Sword": 1,
+  "Ancient Tome": 1,
+  "staff": 1,
+  "Lantern": 1,
+  "Diamond Necklace": 0,
+  "Berries": 1,
+  "Whistle": 0,
+  "Gold": 0,
+  "Tools": 2
+};
+	const featureAndCreatureItems = [
+	  "Hole", "Fire", "Pond", "Dog", "Crow", "Ghost",
+	  "Fog of Darkness", "Tangled Roots", "Thorn Patch", "Dragon", "Hairy Ogre",
+	  "High Cliff", "Mysterious Chest", "Enchanted Mirror", "Glowing Runes", "Waterfall",
+	  "Wizard", "Hero", "Scholar", "Princess", "Beast", "Carpenter", "Fairy", "Castaway"
+	];
+	
+	const followOptions = {
+	  "Dog": ["Meat Scraps", "Whistle", "Rope"],
+	  "Fairy": ["Lantern", "Diamond Necklace", "Berries", "Key", "Ancient Tome"],
+	  "Ghost": ["Key", "Axe", "Sword", "Ancient Tome", "Lantern", "staff"],
+	  "Crow": ["Berries", "Meat Scraps", "Diamond Necklace"],
+	  "Wizard": ["Ancient Tome", "staff", "Gold"],
+	  "Hero": ["Sword", "Gold"],
+	  "Princess": ["Diamond Necklace", "Ancient Tome", "Lantern"],
+	  "Scholar": ["Gold", "Key", "Ancient Tome"],
+	  "Carpenter": ["Axe", "Rope", "Bucket", "Tools"],
+	  "Castaway": [...objectItems] // follows anything
+	};
+	
+	const followHands = {
+	  "Dog": 0,
+	  "Fairy": 0,
+	  "Ghost": 0,
+	  "Crow": 0,
+	  "Wizard": 1,
+	  "Hero": 2,
+	  "Princess": 1,
+	  "Scholar": 1,
+	  "Carpenter": 2,
+	  "Castaway": 2 // follows anything
+	};
+	let creatureFollowTarget = {};
+	let creaturesThatFollow = Object.keys(followOptions);
+	
+	const unblockingOptions = {
+		"Hole": ["Rope"],
+		"Fire": ["Bucket"],
+		"Pond": ["Wizard", "Fairy", "Scholar", "Castaway"],
+		"Tangled Roots": ["Axe"],
+		"Thorn Patch": ["Dog", "Crow"],
+		"Fog of Darkness": ["Dog", "Fairy"],
+		"Dragon": ["Hero", "Wizard", "Princess"],
+		"Hairy Ogre": ["Hero", "Dog", "Carpenter"],
+		"High Cliff": ["Rope", "Castaway"],
+		"Mysterious Chest": ["Key"],
+		"Glowing Runes": ["Wizard", "Ancient Tome", "Scholar", "Fairy"],
+		"Enchanted Mirror": ["Fairy", "Wizard", "Scholar", "Ancient Tome", "Crow"],
+		"Waterfall": ["Crow", "Dog", "Carpenter"],
+		"Ghost": ["Fairy", "Scholar"]
+		//TODO: finish
+	};
+
+	const blockingMessages = {
+		"Hole": "You find a portal, but its at the bottom of a deep hole. How to get down safely?",
+		"Fire": "The portal is surrounded by a raging fire. How to make it through?",
+		"Pond": "You think you can see a shining portal at the bottom of the pond. ",
+		"Tangled Roots": "Behind a thick tangle of roots shines the light of a portal. Maybe you could cut your way througn?",
+		"Thorn Patch": "A tangled maze of brambles obscures the portal. Its in the right place, but you'll need to find a way through.",
+		"Fog of Darkness": "There's a portal in their somewhere. You just know it. But A magical darkness surrounds it, so you'll need som sense other than sight",
+		"Dragon": "A Scaley Dragon guards the portal. You don't even need to ask to know you won't be allowed through",
+		"Hairy Ogre": "A large ugly Ogre covered in hair has camped out near the portal",
+		"High Cliff": "The portal is at the top of a high Cliff. How can you possibly get up there?",
+		"Mysterious Chest": "The Portal is locked away. You'll need the key",
+		"Glowing Runes": "A circle of magical runes surrounds to portal, creating a barrier keeping you out. You'll need magic of your own",
+		"Enchanted Mirror": "Its a portal, but its not open yet. Must be some sort of magic",
+		"Waterfall": "Their might be a portal behind that waterfall. But you'll need a way to find it and cross the water",
+		"Ghost": "A forboding ghost hangs out near the portal. You'll need help to cross it"
+		//TODO: finish
+	};
+
+	const followerMessages = {
+		"Dog": "\"Woof Woof!\" ... the dog seems freindly enough ",
+		"Fairy": "A dainty fairy approaches you and circles around you a few times in a judging manner",
+		"Crow": "A strangly Friendly crow follows you from a few paces away... did you just hear him say 'hello'?",
+		"Wizard": "The Old Man waves you off when you approach: 'I'm busy trying to solve this maze.' To you it just looks like he's sitting there.",
+		"Hero": "The Warrior is busily making a campsite. As he works, he's happy to tell you about all his mighty exploits",
+		"Princess": "The Princess seems to have a way with the small forest animals. How do they know she won't hurt them?",
+		"Scholar": "The man is happy to talk 'This portal nexus was created by confluence of magic and artistry, but they never expected the intricacy we got.'",
+		"Carpenter": "The man is working hard shaping what used to be a log into something useful.",
+		"Castaway": "A big hairy man, with his skin bronzed from time in the sun and his wild hair long and unkept."
+	}
+	
+	const fearOptions = {
+	  "Dog": ["Ghost"],
+	  "Fairy": ["Dog", "Crow"],
+	  "Ghost": ["Fairy", "Scholar"],
+	  "Crow": ["Dog", "Carpenter"],
+	  "Wizard": ["Dog"],
+	  "Hero": ["Scholar", "Princess"],
+	  "Princess": [],
+	  "Scholar": [],
+	  "Carpenter": ["Ghost","Fairy"],
+	  "Castaway": ["Ghost", "Crow"], // follows anything
+	  "Dragon": ["Hero"]
+	}
+	const blockingItems = Object.keys(unblockingOptions);
+
+    const allItems = [...objectItems, ...featureAndCreatureItems];
+
+    const shuffledNames = namePool.sort(() => random() - 0.5);
+    let locationNames = shuffledNames.slice(0, numLocations);
+
+    let maze = {};
+    let roomItems = {};
+    let blockedPortals = {}; // {fromRoom: {toRoom: blockingThing}}
+	let portalUnblockers = {}; // {blocker-room: unblocker}
+	const usedItems = [];
+	
+    locationNames.forEach(name => {
+      maze[name] = [];
+      roomItems[name] = [];
+    });
+
+    // Ensure basic path exists
+    for (let i = 0; i < locationNames.length - 1; i++) {
+      maze[locationNames[i]].push(locationNames[i + 1]);
+    }
+	maze[locationNames[locationNames.length - 1]].push(locationNames[0])
+
+    let addedConnections = locationNames.length - 1;
+    while (addedConnections < totalConnections) {
+      const from = locationNames[Math.floor(random() * numLocations)];
+      const to = locationNames[Math.floor(random() * numLocations)];
+
+      if (from !== to && !maze[from].includes(to)) {
+        maze[from].push(to);
+        addedConnections++;
+      }
+    }
+
+    for (const room in maze) {
+      maze[room].sort();
+    }
+
+	let blockedPortalCount = 0; 
+	while(blockedPortalCount < totalBlocks) {
+		const from = locationNames[Math.floor(random() * locationNames.length)];
+		const destinations = maze[from].filter(location => !blockedPortals[from] || !blockedPortals[from][location]);
+        if (destinations.length > 1) {
+		  const to = destinations[Math.floor(random() * destinations.length)]
+          const blocker = blockingItems[Math.floor(random() * blockingItems.length)];
+          if (!blockedPortals[from]) blockedPortals[from] = {};
+          blockedPortals[from][to] = blocker;
+		  roomItems[from].push(blocker);
+		  
+		  const unblockOptions = unblockingOptions[blocker]
+		  const unblocker = unblockOptions[Math.floor(random() * unblockOptions.length)]
+		  if(!usedItems.includes(unblocker)){
+			placeItemRandomly(unblocker, from); //TODO: make sure its not in the place that was blocked
+			usedItems.push(unblocker);
+		  }
+		  portalUnblockers[blocker+"-"+from] = unblocker;
+		  
+		  console.log (from, blocker,unblocker)
+		  
+		  blockedPortalCount++;
+        }
+	}
+	
+	let looseItems = 0;
+	while(totalLooseItems > looseItems){
+		const item = allItems[Math.floor(random() * allItems.length)];
+		placeItemRandomly(item);
+		looseItems++;
+	}
+	
+	let welcomeMessages = [
+		{text: "Welcome to Portal Maze"},
+		{text: "In this game you go through a bunch of portals, trying to visit all the locations."},
+		{text: "Some portals you can travel through freely. Some are blocked by obstacles"},
+		{text: "But they are always one way: don't count on being able to go back."},
+		{text: "This can be tricky to follow, so You have a map to track it with. Take care of it, you're going to need it!"},
+		{text: "you can click and drag the connections."},
+		{text: "Some blocked portals can be overcome with items. Pick up the items but watch how many hands you have. Or drop them so you can carry something else"},
+		{text: "Some blocked portals can be overcome with characters. Characters follow certain items, and some even help you carry things"},
+		{text: "Unfortunately, right now I can't prove that evey puzzle is solveable"},
+	];
+	
+	welcomeMessages.forEach(m => messages.push(m));
+
+
+	
+	function placeItemRandomly(item, notHere, blocking) {
+		const legalLocations  =locationNames.filter( name => name !== notHere)
+		const name = legalLocations[Math.floor(random() * legalLocations.length)];
+		roomItems[name].push(item);
+		
+		if (creaturesThatFollow.includes(item)) {
+		  const options = followOptions[item];
+		  const chosenItem = options[Math.floor(random() * options.length)];
+		  creatureFollowTarget[item] = chosenItem;
+		  console.log(name, chosenItem);
+			if(!usedItems.includes(chosenItem)){
+			  placeItemRandomly(chosenItem, name);
+			  usedItems.push(chosenItem);
+			}
+		}
+	}
+	
+    function analyzeDistances(start) {
+      const distances = {};
+      const queue = [[start, 0]];
+      const sofar = new Set();
+      while (queue.length > 0) {
+        const [node, dist] = queue.shift();
+        if (sofar.has(node)) continue;
+        sofar.add(node);
+        distances[node] = dist;
+        for (const neighbor of maze[node]) {
+          if (!sofar.has(neighbor)) {
+            queue.push([neighbor, dist + 1]);
+          }
+        }
+      }
+      return distances;
+    }
+	function analyzeEntrances(){
+		var entrances = {};
+		
+		Object.keys(maze)
+	}
+
+
+
+
+	// allow control of random for testing
+	function random () {
+		return Math.random();
+		
+		//sin method
+		//randCalls +=1.1
+		//return .5+Math.sin(randCalls)/2;
+	}
+
+	let distances = analyzeDistances(locationNames[0]);
+	let blockedEntrances = Object.keys(blockedPortals).map(to => blockedPortals[to]).map(portals => Object.keys(portals)).flat().reduce((counts, element) => {counts[element] = (counts[element] || 0) + 1; return counts;},{});
+	let entrances = Object.keys(maze).map(to => maze[to]).flat().reduce((counts, element) => {counts[element] = (counts[element] || 0) + 1; return counts;},{});
+	
+	let analysis = Object.keys(distances).map(key => ({
+		room: key, 
+		distance: distances[key], 
+		entrances: entrances[key], 
+		blockedEntrances: (blockedEntrances[key]?blockedEntrances[key]: 0), 
+		unblockedEntrances: entrances[key] - (blockedEntrances[key]? blockedEntrances[key]: 0),
+		exits: maze[key].length, 
+		blockedExits: Object.keys(blockedPortals[key]?blockedPortals[key]: []).length,
+		unblockedExits: maze[key].length - Object.keys(blockedPortals[key]?blockedPortals[key]: []).length
+	}))
+
+	analysis.sort((a,b) => Math.sqrt(a.unblockedEntrances) + Math.sqrt(a.unblockedExits) - Math.sqrt(b.unblockedEntrances)- Math.sqrt(b.unblockedExits));
+
+	currentLocation = analysis.pop().room;
+    showLocation(currentLocation, true);
+	
+	
+	  let startingPosition = {
+		maze,
+		locationNames,
+		roomItems,
+		blockedPortals,
+		portalUnblockers,
+		creatureFollowTarget,
+		currentLocation,
+		inventory,
+		visited: Array.from(visited),
+		seen: Array.from(seen),
+		moveCount
+	  };
+	  startingPosition = JSON.parse(JSON.stringify(startingPosition));
+
+	
+  initMap();
+  </script>
+</body>
+</html>
