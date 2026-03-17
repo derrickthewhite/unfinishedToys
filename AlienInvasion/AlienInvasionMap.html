@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>South America Game Board</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; background: #eef; }
+  </style>
+  <script src="provinces.js" type="text/javascript"></script>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let dragging = false;
+let dragStart = {x: 0, y: 0};
+
+// --- Draw Function ---
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+  ctx.clearRect(-offsetX/scale, -offsetY/scale, canvas.width/scale, canvas.height/scale);
+
+  for (let p of provinces) {
+    ctx.beginPath();
+    ctx.moveTo(p.points[0][0], p.points[0][1]);
+    for (let i = 1; i < p.points.length; i++) {
+      ctx.lineTo(p.points[i][0], p.points[i][1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "#ccc";
+    ctx.fill();
+    ctx.strokeStyle = "#444";
+    ctx.stroke();
+  }
+}
+
+// --- Hit Test ---
+function getClickedProvince(x, y) {
+  const tx = (x - offsetX) / scale;
+  const ty = (y - offsetY) / scale;
+
+  for (let p of provinces) {
+    ctx.beginPath();
+    ctx.moveTo(p.points[0][0], p.points[0][1]);
+    for (let i = 1; i < p.points.length; i++) {
+      ctx.lineTo(p.points[i][0], p.points[i][1]);
+    }
+    ctx.closePath();
+    if (ctx.isPointInPath(tx, ty)) {
+      return p;
+    }
+  }
+  return null;
+}
+
+// --- Events ---
+canvas.addEventListener("mousedown", e => {
+  dragging = true;
+  dragStart.x = e.clientX;
+  dragStart.y = e.clientY;
+});
+
+canvas.addEventListener("mouseup", e => {
+  dragging = false;
+
+  const province = getClickedProvince(e.clientX, e.clientY);
+  if (province) {
+    alert("Clicked: " + province.name);
+  }
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (dragging) {
+    offsetX += e.clientX - dragStart.x;
+    offsetY += e.clientY - dragStart.y;
+    dragStart.x = e.clientX;
+    dragStart.y = e.clientY;
+    draw();
+  }
+});
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
+  const mx = e.clientX;
+  const my = e.clientY;
+  const wx = (mx - offsetX) / scale;
+  const wy = (my - offsetY) / scale;
+
+  scale *= zoom;
+  offsetX = mx - wx * scale;
+  offsetY = my - wy * scale;
+  draw();
+});
+
+window.addEventListener("resize", () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  draw();
+});
+
+draw();
+</script>
+</body>
+</html>

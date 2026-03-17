@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>South America Game Board</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; background: #eef; }
+  </style>
+  <script src="provinces.js" type="text/javascript"></script>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let dragging = false;
+let dragStart = {x: 0, y: 0};
+
+// Dummy population graph for demonstration
+const popGraph = {
+  nodes: {
+  // behaviors
+    vegan: { label: "Vegan", value: 0.35, x: 300, y: 200 },
+    militant: { label: "Militant", value: 0.2, x: 500, y: 250 },
+    alien_support: { label: "Alien Support", value: 0.5, x: 400, y: 400 },
+    dray_loyalist: { label: "Dray Loyalist", value: 0.3, x: 600, y: 150 }
+  },
+  edges: [
+    { from: "vegan", to: "alien_support", weight: 0.7 },
+    { from: "militant", to: "alien_support", weight: -0.6 },
+    { from: "militant", to: "dray_loyalist", weight: 0.8 },
+    { from: "vegan", to: "dray_loyalist", weight: -0.2 }
+  ]
+};
+
+// --- Draw Function ---
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+  ctx.clearRect(-offsetX / scale, -offsetY / scale, canvas.width / scale, canvas.height / scale);
+
+  for (let p of provinces) {
+    ctx.beginPath();
+    ctx.moveTo(p.points[0][0], p.points[0][1]);
+    for (let i = 1; i < p.points.length; i++) {
+      ctx.lineTo(p.points[i][0], p.points[i][1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "#ccc";
+    ctx.fill();
+    ctx.strokeStyle = "#444";
+    ctx.stroke();
+  }
+
+  drawPopGraph();
+}
+
+function drawPopGraph() {
+  const nodes = popGraph.nodes;
+  const edges = popGraph.edges;
+
+  // Draw edges
+  for (const edge of edges) {
+    const from = nodes[edge.from];
+    const to = nodes[edge.to];
+    const color = edge.weight > 0 ? "green" : "red";
+    const thickness = Math.abs(edge.weight) * 5;
+
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
+    ctx.stroke();
+  }
+
+  // Draw nodes
+  for (const key in nodes) {
+    const node = nodes[key];
+    const radius = 20 + node.value * 40;
+
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = "#88c";
+    ctx.fill();
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(node.label, node.x, node.y);
+  }
+}
+
+// --- Hit Test ---
+function getClickedProvince(x, y) {
+  const tx = (x - offsetX) / scale;
+  const ty = (y - offsetY) / scale;
+
+  for (let p of provinces) {
+    ctx.beginPath();
+    ctx.moveTo(p.points[0][0], p.points[0][1]);
+    for (let i = 1; i < p.points.length; i++) {
+      ctx.lineTo(p.points[i][0], p.points[i][1]);
+    }
+    ctx.closePath();
+    if (ctx.isPointInPath(tx, ty)) {
+      return p;
+    }
+  }
+  return null;
+}
+
+// --- Events ---
+canvas.addEventListener("mousedown", e => {
+  dragging = true;
+  dragStart.x = e.clientX;
+  dragStart.y = e.clientY;
+});
+
+canvas.addEventListener("mouseup", e => {
+  dragging = false;
+
+  const province = getClickedProvince(e.clientX, e.clientY);
+  if (province) {
+    alert("Clicked: " + province.name);
+  }
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (dragging) {
+    offsetX += e.clientX - dragStart.x;
+    offsetY += e.clientY - dragStart.y;
+    dragStart.x = e.clientX;
+    dragStart.y = e.clientY;
+    draw();
+  }
+});
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
+  const mx = e.clientX;
+  const my = e.clientY;
+  const wx = (mx - offsetX) / scale;
+  const wy = (my - offsetY) / scale;
+
+  scale *= zoom;
+  offsetX = mx - wx * scale;
+  offsetY = my - wy * scale;
+  draw();
+});
+
+window.addEventListener("resize", () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  draw();
+});
+
+draw();
+</script>
+</body>
+</html>
