@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Toggle SVG Layers</title>
+  <style>
+      body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+      #svgContainer {
+      width: 100%;
+      height: calc(100vh - 40px); /* Adjust 40px if controls height changes */
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+<div>
+  <button onclick="toggleLayer('layer2')">Toggle Background</button>
+  <button onclick="toggleLayer('layer3')">Toggle Galactic Borders</button>
+  <button onclick="toggleLayer('layer4')">Toggle Constellation Names</button>
+  <button onclick="toggleLayer('layer5')">Toggle Galactic Labels</button>
+  <button onclick="toggleLayer('layer6')">Toggle Regions</button>
+  <button onclick="toggleLayer('layer8')">Toggle Stars</button>
+  <button onclick="toggleLayer('layer9')">Toggle Star Names</button>
+  <button onclick="toggleLayer('layer10')">Toggle Constellations</button>
+  <button onclick="toggleLayer('layer12')">Toggle Factions</button>
+  <button onclick="toggleLayer('layer13')">Toggle Faction names</button>
+  <button onclick="zoom('in')">Zoom In</button>
+  <button onclick="zoom('out')">Zoom Out</button>
+</div>
+
+<div id="svgContainer">
+	<object id="svgObject" type="image/svg+xml" data="galaxyMap.svg" ></object>
+</div>
+
+<script>
+  let viewBox = { x: 60, y: 0, width: 500, height: 500 };
+  const zoomFactor = 1.1;
+  const panFactor = 20;
+    let isPanning = false;
+  let startPoint = { x: 800, y: 800 };
+  let currentPoint = { x: 800, y: 800 };
+  
+  function toggleLayer(layerId) {
+    const svgDoc = document.getElementById("svgObject").contentDocument;
+    const layer = svgDoc.getElementById(layerId);
+    if (layer.style.display === "none") {
+      layer.style.display = "block";
+    } else {
+      layer.style.display = "none";
+    }
+  }
+  
+  function zoom(direction) {
+    if (direction === 'in') {
+      viewBox.width /= zoomFactor;
+      viewBox.height /= zoomFactor;
+    } else if (direction === 'out') {
+      viewBox.width *= zoomFactor;
+      viewBox.height *= zoomFactor;
+    }
+    updateViewBox();
+  }
+
+  function updateViewBox() {
+    const svgElement = document.getElementById("svgObject").contentDocument.documentElement;
+    svgElement.setAttribute("viewBox", `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
+    svgElement.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  }
+
+  document.getElementById("svgObject").addEventListener("load", () => {
+    const svgElement = document.getElementById("svgObject").contentDocument.documentElement;
+    
+    svgElement.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const zoomDirection = e.deltaY < 0 ? 'in' : 'out';
+      zoom(zoomDirection);
+    });
+
+    svgElement.addEventListener("mousedown", (e) => {
+      isPanning = true;
+      startPoint = { x: e.clientX, y: e.clientY };
+    });
+
+    svgElement.addEventListener("mousemove", (e) => {
+      if (isPanning) {
+        currentPoint = { x: e.clientX, y: e.clientY };
+        const dx = (startPoint.x - currentPoint.x) * (viewBox.width / svgElement.clientWidth);
+        const dy = (startPoint.y - currentPoint.y) * (viewBox.height / svgElement.clientHeight);
+        viewBox.x += dx;
+        viewBox.y += dy;
+        startPoint = { x: currentPoint.x, y: currentPoint.y };
+        updateViewBox();
+      }
+    });
+
+    svgElement.addEventListener("mouseup", () => {
+      isPanning = false;
+    });
+
+    svgElement.addEventListener("mouseleave", () => {
+      isPanning = false;
+    });
+
+    updateViewBox();
+  });
+</script>
+
+</body>
+</html>
