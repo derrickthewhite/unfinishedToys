@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hex Grid Strategy Game</title>
+    <link rel = "stylesheet" href="style.css">
+    </link>
+</head>
+<body>
+	<div id = "topLeftMenu">
+		<button id="edit" class= "topLeftMenuItem">Edit</button>
+		<button id="editObstacles" class= "topLeftMenuItem" style="display:none">Edit Obstacles</button>
+		<button id="editUnits" class= "topLeftMenuItem" style="display:none">Edit Units</button>
+		<button id="noEdit" class= "topLeftMenuItem" style="display:none">Stop Editing</button>
+		<button id="takeTurn" class = "topLeftMenuItem">Take Turn</button>
+	</div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="toast"></div>
+    <div id="unitDisplay" style="display: none">
+        <div style="display:inline-block">
+            <h2 id="unitName"></h2>
+            <div id="unitStats"></div>
+        </div>
+        <div id="unitImage"></div>
+    </div>
+	<div id="actionBar">
+		<span id="activeUnitImage"></span>
+		<select id="maneuverDropdown" class="actionDropdown">
+		</select>
+		<select id="submaneuverDropdown" class="actionDropdown">
+		</select>
+		<select id="extraEffortDropdown" class="actionDropdown">
+		</select>
+		<select id="weaponDropdown" class="actionDropdown">
+		</select>
+		<select id="targetDropdown" class="actionDropdown">
+		</select>
+	</div>
+    <div id="attackDisplay"></div>
+    <div id="defenseDisplay"></div>
+    <div id="terrainAddDisplay"></div>
+    <div id="unitAddDisplay"></div>
+    <script src="editor.js"></script>
+    <script src="unitsAndTerrain.js"></script>
+    <script src="clickAgent.js"></script>
+    <script src="domElements.js"></script>
+    <script src="hexgame.js"></script>
+</body>
+</html>
