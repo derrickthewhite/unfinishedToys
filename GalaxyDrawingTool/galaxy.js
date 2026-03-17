@@ -4,7 +4,7 @@ const ctx = canvas.getContext('2d');
 const drawStarArms = true;
 const drawStarBulge = true;
 
-const armOffset = 500;
+const armOffset = 520 + bulgeAdjust;
 const bendPoint = .25;
 const regressPoint = .35;
 
@@ -113,13 +113,14 @@ function drawSpiralArm(centerX, centerY, radius, armAngle, armSharpness, armRota
 }
 
 function drawBulge(centerX, centerY, starFuzziness, bulgeRadius, bulgeDensity, galaxyColor, nebulaDensity, nebulaColor, nebulaSize) {
+	const flatFactor = .9;
     // Draw central bulge
     const bulgeRadiusSquared = bulgeRadius * bulgeRadius;
     for (let x = -bulgeRadius; x <= bulgeRadius; x++) {
         for (let y = -bulgeRadius; y <= bulgeRadius; y++) {
-            if (x * x + y * y <= bulgeRadiusSquared) {
+            if (x * x + y * y * flatFactor <= bulgeRadiusSquared) {
                 const fuzzX = seededRandom() * starFuzziness - starFuzziness / 2;
-                const fuzzY = seededRandom() * starFuzziness - starFuzziness / 2;
+                const fuzzY = (seededRandom() * starFuzziness - starFuzziness / 2) / flatFactor;
                 const bx = centerX + x + fuzzX;
                 const by = centerY + y + fuzzY;
 
@@ -211,12 +212,12 @@ function generateGalaxyBackground(){
     ctx.fillStyle = 'white';
 	
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 160, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, 160 - bulgeAdjust, 0, Math.PI * 2);
     ctx.fill();
 
 
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 160, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, 160-bulgeAdjust, 0, Math.PI * 2);
     ctx.fill();
 	
 	ctx.fillStyle = "black";
@@ -227,7 +228,7 @@ function generateGalaxyBackground(){
     ctx.restore();
 
 	const glows = [[70,50],[70,100], [70,200]];
-	for(let pass = 0; pass< glows.length; pass++)
+	for(let pass = 0; pass< glows.length && drawStarArms; pass++)
 		for (let i = 0; i < armCount; i++) {
 			const armAngle = (i / armCount) * Math.PI * 2;
 			drawSpiralCurve(ctx, glows[pass][0], glows[pass][1], centerX, centerY, armAngle, armSharpness, radius, armRadiusCoefficient, thetaStep)
@@ -240,16 +241,12 @@ function generateGalaxy() {
 	
 	generateGalaxyBackground();
 	
-	for(var i = 1;i <= galaxyLayerCount && drawStarArms; i++){
-		generateArms(''+i);
+	for(var i = 1;i <= galaxyLayerCount; i++){
+		if(drawStarArms) generateArms(''+i);
 		if(drawStarBulge) generateBulge(''+i);
 		console.log("generated layer " +i)
 	}
-	
-	for(var i = 1;i <= galaxyLayerCount && drawStarBulge; i++){
-		//generateBulge(''+i);
-		console.log("generated layer " +i)
-	}
+
 	/*
 	const centerX = canvas.width / 2 ;
     const centerY = canvas.height / 2;
