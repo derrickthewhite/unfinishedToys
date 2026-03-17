@@ -1,5 +1,6 @@
 let selectedCardIndex = null;
 let swapCardIndex = null;
+let AIpause = 1000;
 
 function handleCardClick(cardIndex) {
     if (selectedCardIndex === null) {
@@ -26,6 +27,12 @@ function handleBoardClick(layerIndex, rowIndex, colIndex) {
 	const card = gameState[currentPlayer].hand[selectedCardIndex];
 
 	if (gameState.board[layerIndex][rowIndex][colIndex] === null) {
+		
+		const move = {
+			card: card,
+			spot: [layerIndex, rowIndex, colIndex],
+			player: currentPlayer
+		};
 		gameState.board[layerIndex][rowIndex][colIndex] = card;
 		gameState[currentPlayer].hand.splice(selectedCardIndex, 1);
 		gameState.lastMove = [layerIndex, rowIndex, colIndex];
@@ -35,6 +42,7 @@ function handleBoardClick(layerIndex, rowIndex, colIndex) {
 			gameState[currentPlayer].hand.push(topCard);
 		}
 		const completions = checkCompletion(layerIndex, rowIndex, colIndex);
+		move.completions = completions;
 		if (completions.length > 0) {
 			completions.forEach(completion => {
 				const score = calculateScore(completion.cards);
@@ -42,16 +50,17 @@ function handleBoardClick(layerIndex, rowIndex, colIndex) {
 			});
 		}
 		
+		gameState.moves.push(move);
+		
 		gameState.currentPlayer = gameState.currentPlayer === 'player1' ? 'player2' : 'player1';
 		selectedCardIndex = null;
 		displayGame(gameState);
 		
 		if(gameState.aiActive){
-			setTimeout(aiMakeMove, 1000);
+			setTimeout(aiMakeMove, AIpause);
 		}
 	}
 }
-
 
 function createSVGShape(shape, color) {
     switch (shape) {
@@ -68,7 +77,76 @@ function createSVGShape(shape, color) {
     }
 }
 
+function getMoveScoresHTML(completions) {
+	if(!completions) return '';
+    let scores = completions.map(completion => {
+        let score = calculateScore(completion.cards);
+        let cardsHTML = completion.cards.map(card => 
+            `<div class="card inline">${createSVGShape(card.shape, card.color)}<span>${card.number}</span></div>`
+        ).join('');
+        return `<div class="score-block">
+                    <div class="cards">${cardsHTML}
+                    <h2 class="score inline">(${score})</h2>
+				</div>
+                </div>`;
+    }).join('');
+    return `<div class="scores"><h2>Scores:</h2>${scores}</div>`;
+}
+
+function displayEndGamePanel() {
+    const overlay = document.createElement('div');
+    overlay.id = 'overlay';
+
+    const panel = document.createElement('div');
+    panel.id = 'end-game-panel';
+
+    const player1Score = gameState.player1.score;
+    const aiScore = gameState.player2.score;
+
+    let winnerText = 'It\'s a tie!';
+    if (player1Score > aiScore) {
+        winnerText = 'Player 1 wins!';
+    } else if (aiScore > player1Score) {
+        winnerText = 'Player 2 wins!';
+    }
+
+    const winnerMessage = document.createElement('h2');
+    winnerMessage.innerText = winnerText;
+
+    const player1ScoreMessage = document.createElement('p');
+    player1ScoreMessage.innerText = `Player 1 Score: ${player1Score}`;
+
+    const aiScoreMessage = document.createElement('p');
+    aiScoreMessage.innerText = `Player 2 Score: ${aiScore}`;
+	
+	const newGameButton = document.createElement('button');
+	newGameButton.innerHTML = `New Game`;
+	newGameButton.onclick = () => {
+		document.body.removeChild(document.getElementById("overlay"));
+		document.body.removeChild(document.getElementById("end-game-panel"));
+
+		newGame();
+	}
+
+    panel.appendChild(winnerMessage);
+    panel.appendChild(player1ScoreMessage);
+    panel.appendChild(aiScoreMessage);
+    panel.appendChild(newGameButton);
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(panel);
+}
+
+function checkGameEnd() {
+    if (gameState.deck.length === 0 && gameState.player1.hand.length === 0 && gameState.player2.hand.length === 0) {
+        displayEndGamePanel();
+		return true;
+    }
+	return false;
+}
+
 function displayGame(gameState) {
+	if(checkGameEnd())return true;
 	const boardDiv = document.getElementById('board');
 	const playersDiv = document.getElementById('players');
 	boardDiv.innerHTML = '';
@@ -121,16 +199,20 @@ function displayGame(gameState) {
 					cellDiv.innerHTML = createSVGShape(cell.shape, cell.color) + `<span>${cell.number}</span>`;
 				}
 				//TODO: double check this when moving!
-				if(i == gameState.lastMove[0] && j == gameState.lastMove[1] && k ==gameState.lastMove[2] && !gameState.twisted){
+				let layerIndex =i, rowIndex = j, colIndex = k;
+				if(gameState.twisted) layerIndex =j, rowIndex = i, colIndex = k;
+				if(layerIndex == gameState.lastMove[0] && rowIndex == gameState.lastMove[1] && colIndex ==gameState.lastMove[2]){
 					cellDiv.style.backgroundColor = "#ffaa88";
 				}
-				if(j == gameState.lastMove[0] && i == gameState.lastMove[1] && k ==gameState.lastMove[2] && gameState.twisted){
-					cellDiv.style.backgroundColor = "#ffaa88";
+				if(gameState.showScores && selectedCardIndex != null && gameState.board[layerIndex][rowIndex][colIndex] == null){
+					card = gameState[gameState.currentPlayer].hand[selectedCardIndex];
+					gameState.board[layerIndex][rowIndex][colIndex] = card;
+					const completions = checkCompletion(layerIndex,rowIndex,colIndex);
+					const score = completions.reduce((acc, comp) => acc + calculateScore(comp.cards), 0);
+					gameState.board[layerIndex][rowIndex][colIndex] = null;
+					cellDiv.innerHTML = score;
 				}
-				if(!gameState.twisted)
-					cellDiv.onclick = () => handleBoardClick(i, j, k);
-				else 
-					cellDiv.onclick = () => handleBoardClick(j, i, k);
+				cellDiv.onclick = () => handleBoardClick(layerIndex, rowIndex, colIndex);
 				rowDiv.appendChild(cellDiv);
 			}
 			layerDiv.appendChild(rowDiv);
@@ -169,6 +251,10 @@ function displayGame(gameState) {
 	deckDiv.innerHTML = `<h2>Cards Left: ${gameState.deck.length}</h2>`;
 	playersDiv.appendChild(deckDiv);
 	
+	const lastScoreDiv = document.createElement('div');
+	lastScoreDiv.innerHTML = getMoveScoresHTML(gameState.moves.slice(-1)[0]?.completions);
+	playersDiv.appendChild(lastScoreDiv);
+	
 	const AIDiv = document.createElement('div');
 	AIDiv.innerHTML = `<span>AI player?</span>`;
 	const AIcheckBox = document.createElement('input');
@@ -178,7 +264,7 @@ function displayGame(gameState) {
 		gameState.aiActive = !gameState.aiActive; 
 		displayGame(gameState);
 		if(gameState.currentPlayer == "player2" && gameState.aiActive){
-			setTimeout(aiMakeMove, 1000);
+			setTimeout(aiMakeMove, AIpause);
 		}
 	}
 	AIDiv.appendChild(AIcheckBox);
@@ -193,11 +279,42 @@ function displayGame(gameState) {
 		gameState.aiOnly = !gameState.aiOnly; 
 		displayGame(gameState);
 		if(gameState.aiOnly){
-			setTimeout(aiMakeMove, 1000);
+			setTimeout(aiMakeMove, AIpause);
 		}
 	}
 	twoAIDiv.appendChild(twoAIcheckBox);
 	playersDiv.appendChild(twoAIDiv);
+	
+	playersDiv.appendChild(createAILevelSelector());
+	
+	const showScoreDiv = document.createElement('div');
+	showScoreDiv.innerHTML = `<span>Show Scores?</span>`;
+	const showScoreCheckbox = document.createElement('input');
+	showScoreCheckbox.type = "checkbox";
+	showScoreCheckbox.checked = gameState.showScores;
+	showScoreCheckbox.onclick = () => {
+		gameState.showScores = !gameState.showScores; 
+		displayGame(gameState);
+	}
+	showScoreDiv.appendChild(showScoreCheckbox);
+	playersDiv.appendChild(showScoreDiv);
+	
+	const newGameButton = document.createElement('button');
+	newGameButton.innerHTML = `New Game`;
+	newGameButton.onclick = newGame;
+	playersDiv.appendChild(newGameButton);
+	
+	const handSizeDiv = document.createElement('div');
+	handSizeDiv.innerHTML = `<span>Hand Size:</span>`
+	const handSizeInput = document.createElement('input');
+	handSizeInput.type= "number";
+	handSizeInput.value = gameState.handsize;
+	handSizeInput.id = "handsize";
+	handSizeInput.min = 1;
+	handSizeInput.max = 32;
+	handSizeDiv.appendChild(handSizeInput);
+	playersDiv.appendChild(handSizeDiv);
+	
 	
 	const gameplayDescriptionDiv = document.createElement('div');
 	gameplayDescriptionDiv.innerHTML = `
@@ -224,6 +341,46 @@ function displayGame(gameState) {
 	`;
 	playersDiv.appendChild(gameplayDescriptionDiv);
 
+}
+function setAILevel(level) {
+    gameState.aiLevel = level;
+}
+function createAILevelSelector() {
+    const aiLevelDiv = document.createElement('div');
+    aiLevelDiv.id = 'ai-level-selector';
+
+    const label = document.createElement('label');
+    label.htmlFor = 'aiLevel';
+    label.innerText = 'Choose AI Level: ';
+    aiLevelDiv.appendChild(label);
+
+    const select = document.createElement('select');
+    select.id = 'aiLevel';
+    select.onchange = function () {
+        setAILevel(this.value);
+    };
+
+    const easyOption = document.createElement('option');
+    easyOption.value = 'easy';
+    easyOption.innerText = 'Easy';
+    select.appendChild(easyOption);
+
+    const mediumOption = document.createElement('option');
+    mediumOption.value = 'medium';
+    mediumOption.innerText = 'Medium';
+    mediumOption.selected = true;
+    select.appendChild(mediumOption);
+
+    const hardOption = document.createElement('option');
+    hardOption.value = 'hard';
+    hardOption.innerText = 'Hard';
+    select.appendChild(hardOption);
+	
+	select.value = gameState.aiLevel;
+
+    aiLevelDiv.appendChild(select);
+
+    return aiLevelDiv;
 }
 
 function setsUpThree(layerIndex, rowIndex, colIndex) {
@@ -323,37 +480,34 @@ function calculateScore(cards) {
 // Shuffle and create game state functions
 function initializeGame(cards) {
 	const shuffledCards = shuffleArray(cards);
-	const handsize = 8;
+	gameState.handsize = document.getElementById("handsize")?document.getElementById("handsize") .value: 8;
+	
+	if(gameState.handsize < 1) gameState.handsize = 1;
+	if(gameState.handsize > 32) gameState.handsize = 32;
 
 	const player1 = {
-		hand: shuffledCards.slice(0, handsize),
+		hand: shuffledCards.slice(0, gameState.handsize),
 		score: 0,
 		id: "player1"
 	};
 
 	const player2 = {
-		hand: shuffledCards.slice(handsize, handsize*2),
+		hand: shuffledCards.slice(gameState.handsize, gameState.handsize*2),
 		score: 0,
 		id: "player2"
 	};
 
-	const remainingDeck = shuffledCards.slice(handsize*2);
+	const remainingDeck = shuffledCards.slice(gameState.handsize*2);
 
 	const board = create3DArray();
 
-	const gameState = {
-		player1: player1,
-		player2: player2,
-		currentPlayer: 'player1',
-		board: board,
-		deck: remainingDeck,
-		lastMove: [0,0,0],
-		aiActive: true,
-		aiOnly: false,
-		twist: false
-	};
-
-	return gameState;
+	gameState.player1 = player1;
+	gameState.player2 = player2;
+	gameState.currentPlayer= 'player1',
+	gameState.board= board,
+	gameState.deck= remainingDeck,
+	gameState.lastMove= [0,0,0],
+	gameState.moves= [];
 }
 
 function shuffleArray(array) {
@@ -397,7 +551,10 @@ function aiMakeMove() {
 					if (gameState.board[layerIndex][rowIndex][colIndex] === null) {
 						gameState.board[layerIndex][rowIndex][colIndex] = card;
 						const completions = checkCompletion(layerIndex, rowIndex, colIndex);
-						const score = completions.reduce((acc, comp) => acc + calculateScore(comp.cards), 0)+(setsUpThree(layerIndex,rowIndex,colIndex)%2==1? -1:-0.5);
+						const tripples = setsUpThree(layerIndex,rowIndex,colIndex);
+						let score = completions.reduce((acc, comp) => acc + calculateScore(comp.cards), 0);
+						if(gameState.aiLevel == "hard") score+=(tripples ===0? 0: tripples == 2? -.5: -1);
+						if(gameState.aiLevel == "medium") score+=(tripples %2 ==0? 0: -1);
 						gameState.board[layerIndex][rowIndex][colIndex] = null;
 
 						if (score > bestScore) {
@@ -416,9 +573,16 @@ function aiMakeMove() {
 	if (bestMoves.length > 0) {
 		const bestMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
 		const { cardIndex, layerIndex, rowIndex, colIndex } = bestMove;
+		const move = {
+			card: aiPlayer.hand[cardIndex],
+			spot: [layerIndex, rowIndex, colIndex],
+			player: gameState.currentPlayer
+		}
+		
 		gameState.board[layerIndex][rowIndex][colIndex] = aiPlayer.hand[cardIndex];
 		gameState.lastMove = [layerIndex, rowIndex, colIndex];
 		aiPlayer.hand.splice(cardIndex, 1);
+		
 
 		if (gameState.deck.length > 0) {
 			const topCard = gameState.deck.pop();
@@ -432,12 +596,14 @@ function aiMakeMove() {
 				aiPlayer.score += score;
 			});
 		}
+		move.completions = completions;
+		gameState.moves.push(move);
 
 		gameState.currentPlayer = ['player1', 'player2'].filter(p => p!= gameState.currentPlayer)[0];
 		displayGame(gameState);
 		
 		if(gameState.aiOnly){
-			setTimeout(aiMakeMove, 1000);
+			setTimeout(aiMakeMove, AIpause);
 		}
 	}
 }
@@ -449,14 +615,35 @@ const numbers = [1, 2, 3, 4];
 const colors = ['red', 'green', 'blue', 'black'];
 const shapes = ['circle', 'square', 'triangle', 'bar'];
 
-for (let number of numbers) {
-	for (let color of colors) {
-		for (let shape of shapes) {
-			cards.push({ number, color, shape });
+const gameState = {
+	player1: undefined,
+	player2: undefined,
+	currentPlayer: '',
+	board: undefined,
+	deck: undefined,
+	lastMove: [0,0,0],
+	moves: [],
+	aiActive: true,
+	aiOnly: false,
+	twist: false,
+	showScores: false,
+	aiLevel: "easy"
+};
+
+function newGame () {
+	cards.splice(0,cards.length)
+	for (let number of numbers) {
+		for (let color of colors) {
+			for (let shape of shapes) {
+				cards.push({ number, color, shape });
+			}
 		}
 	}
+
+	// Initialize game and display it
+	initializeGame(cards);
+	
+	displayGame(gameState);
 }
 
-// Initialize game and display it
-const gameState = initializeGame(cards);
-displayGame(gameState);
+newGame();
