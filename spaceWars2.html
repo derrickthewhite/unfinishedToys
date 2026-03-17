@@ -1,0 +1,1035 @@
+<html>
+	<head>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+		<style>
+			#combatDiv {
+			  position: fixed; /* stays centered regardless of scroll */
+			  top: 50%;
+			  left: 50%;
+			  transform: translate(-50%, -50%);
+
+			  background: rgba(100, 100, 100, 0.85);
+			  color: white;
+			  padding: 20px 30px;
+			  border-radius: 12px;
+			  box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+			  text-align: center;
+			  z-index: 1000; /* above canvas & menus */
+			  display: none; /* hidden until needed */
+			}
+			.combatColumn {
+				min-width: 200px;
+			}
+		</style>
+		<script>
+			function randInt (n){
+				return Math.floor(Math.random()*n);
+			}
+			
+			function generateDirectionalPoints(width, height, numDirections) {
+			  const centerX = width / 2;
+			  const centerY = height / 2;
+			  const radius = Math.min(width, height) / 2;
+
+			  let points = [];
+
+			  for (let i = 0; i < numDirections; i++) {
+				// angle slice
+				let angleStart = (i*2 * 2 * Math.PI) / (numDirections*2);
+				let angleEnd = ((i*2 + 1) * 2 * Math.PI) / (numDirections*2);
+
+				// pick a random angle inside this slice
+				let angle = angleStart + Math.random() * (angleEnd - angleStart);
+
+				// pick a random distance
+				let r = Math.random() * radius*2/3 + radius/3;
+
+				// convert polar -> cartesian
+				let x = Math.round(centerX + r * Math.cos(angle));
+				let y = Math.round(centerY + r * Math.sin(angle));
+
+				// clamp to rectangle bounds
+				x = Math.max(0, Math.min(width - 1, x));
+				y = Math.max(0, Math.min(height - 1, y));
+
+				points.push({ x, y });
+			  }
+
+			  return points;
+			}
+			
+			class ColorGenerator {
+				  constructor(minDistance = 40) {
+					this.minDistance = minDistance; // minimum distance between colors
+					this.colors = []; // store generated colors as {r,g,b}
+				  }
+
+				  // Convert RGB to hex
+				  rgbToHex(r, g, b) {
+					return (
+					  "#" +
+					  [r, g, b]
+						.map(x => {
+						  const hex = x.toString(16);
+						  return hex.length === 1 ? "0" + hex : hex;
+						})
+						.join("")
+					);
+				  }
+
+				  // Distance between two RGB colors
+				  colorDistance(c1, c2) {
+					return Math.sqrt(
+					  Math.pow(c1.r - c2.r, 2) +
+					  Math.pow(c1.g - c2.g, 2) +
+					  Math.pow(c1.b - c2.b, 2)
+					);
+				  }
+
+				  // Generate a random distinct color
+				  generate() {
+					let attempt = 0;
+					let targetDistance = 250;
+					while (attempt < 1000) { // safety loop
+					  attempt++;
+					  const r = Math.floor(Math.random() * 256);
+					  const g = Math.floor(Math.random() * 256);
+					  const b = Math.floor(Math.random() * 256);
+					  const newColor = { r, g, b };
+
+					  let tooClose = this.colors.some(c => this.colorDistance(c, newColor) < Math.max(this.minDistance, targetDistance));
+					  if (!tooClose && r+g+b > 300) {
+						this.colors.push(newColor);
+						return this.rgbToHex(r, g, b);
+					  }
+					  targetDistance -=1;
+					}
+					console.warn("Couldn’t find distinct color, lowering threshold might help");
+					return "#000000"; // fallback
+				  }
+			}
+			
+			let nextId = 1000;
+			function Planet(data) {
+				let planet = {
+					x:data? data.x: 0,
+					y:data? data.y: 0,
+					owner: data? data.owner: "",
+					production: data? data.production: 0,
+					attack: data? data.attack: 0,
+					defense: data? data.defense: 0,
+					culture: data? data.culture: "",
+					ships: data? data.ships: 0,
+					name: data? data.name: "",
+					id: data? data.id: nextId++
+				}
+				return planet;
+			}
+			
+			function Fleet(source, destination, ships, owner){
+				let fleet = {
+					source: source,
+					destination: destination,
+					ships: ships, 
+					owner: owner,
+					x: source.x,
+					y: source.y
+				}
+				return fleet;
+			}
+			function SpaceMap (planetCount, factionCount, width, height) {
+				let map = {
+					width: width,
+					height: height,
+					planets: [],
+					fleets: [],
+					factions: []
+				};
+				
+				for(let i = 0;i < planetCount - factionCount; i++){
+					let p = new Planet ({
+						x: randInt(map.width),
+						y: randInt(map.height),
+						owner: undefined,
+						attack: randInt(5) + randInt(5),
+						defense: randInt(5) + randInt(5),
+						production: randInt(5) + randInt(5),
+						ships: 30 + randInt(25) + randInt(25),
+						name: ("ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789")[i],
+						id: nextId++
+						
+					});
+					map.planets.push(p)
+				};
+				
+				let locations = generateDirectionalPoints(map.width, map.height, factionCount);
+				let colorGen = new  ColorGenerator();
+				for(let i= 0;i <factionCount; i++) {
+					let f = new Faction("faction"+i);
+					f.map = map;
+					f.color = colorGen.generate();
+					map.factions.push(f);
+				
+					let p = new Planet({
+						x: locations[i].x,
+						y: locations[i].y,
+						owner: f,
+						attack: 5,
+						defense: 5,
+						production: 7,
+						ships: 70, 
+						name: "Capital"+i,
+						id: nextId++
+					})
+					map.planets.push(p);
+				}
+				
+				return map;
+			}
+			
+			function Faction (name) {
+				let faction = {
+					name: name,
+					shipSpeed: 5,
+					shipAttack: 1,
+					shipDefense: 1,
+					planetProduction: 1,
+					color: "#ff00ff",
+					map: undefined
+				}
+				
+				faction.getPlanets = function (){
+					return faction.map.planets.filter(p => p.owner == faction)
+				}
+				faction.getFleets = function (){
+					return faction.map.fleets.filter(f => f.source.owner == faction)
+				}
+				
+				return faction;
+			}
+			
+			let currentMap;
+			function startGame () {
+				let width = Number(document.querySelector("#inputWidth").value)
+				let height = Number(document.querySelector("#inputHeight").value)
+				let factions = Number(document.querySelector("#inputFactions").value)
+				let planets = Number(document.querySelector("#inputPlanets").value)
+				let playerFactionName = document.querySelector("#inputFactionName").value;
+				document.querySelector("#createGameScreen").style.display = "none";
+				
+				Math.seedrandom("test")
+				
+				currentMap = new SpaceMap(planets, factions, width, height);
+				currentFaction = currentMap.factions[0];
+				currentFaction.name = playerFactionName;
+				
+				setMode("main");
+				setupCanvas();
+				document.querySelector("#shipsToSend").onchange = function () {
+					document.querySelector("#sendShips").innerHTML= document.querySelector("#shipsToSend").value;
+					document.querySelector("#sendFleetButton").disabled = !Number(document.querySelector("#shipsToSend").value) > 0;
+				}
+				render();
+			}
+			
+			function cancelSendFleet() {
+				destinationPlanet = undefined;
+				currentPlanet = undefined;
+				setMode("main");
+			}
+			
+			function sendFleet() {
+				if(mode != "fleet-select"){
+					return;
+				}
+				let ships = Number(document.querySelector("#shipsToSend").value);
+				let fleet = new Fleet(currentPlanet, destinationPlanet,ships,currentPlanet.owner);
+				currentPlanet.ships = currentPlanet.ships - ships;
+				currentMap.fleets.push(fleet);
+				
+				destinationPlanet= undefined;
+				currentPlanet = undefined;
+				setMode("main");
+			}
+			let turnCount = 0; 
+			function endTurn() {
+				setMode("moving");
+				console.log("turn "+turnCount++);
+				for(faction of currentMap.factions){
+					if(faction === currentFaction && !aiMode) continue;
+					//TODO: evaluate risk and how big a fleet you can send
+					//TODO: sometimes pick a slightly worse option
+					let aiMoves = AIAnalysis(faction);
+					let aiPlanets = faction.getPlanets();
+					for(let pIndex = 0; pIndex < aiPlanets.length; pIndex++){
+						let planetMoves = aiMoves[pIndex];
+						let planet = aiPlanets[pIndex];
+						let bestTarget = planetMoves[0];
+						let potentialTargets = planetMoves.filter(pm => pm.shipsAt20*1.1 >= bestTarget.shipsAt20 );
+						let target = potentialTargets[randInt(potentialTargets.length)];
+						if(target.shipsAt20 > planet.ships){
+							let shipsToSend = planet.ships - target.neededShips
+							let fleet = new Fleet(planet, target.planet, shipsToSend, planet.owner);
+							planet.ships -= shipsToSend;
+							currentMap.fleets.push(fleet);
+						}
+					}
+				}
+
+				
+				for(var planet of currentMap.planets) {
+					if(planet.owner) {
+						planet.ships += Math.round(planet.production * planet.owner.planetProduction);
+					}
+				}
+				setUpFleetMovement();
+				
+				if(aiMode)setTimeout(combatOK, 2500);
+			}
+			
+			function combatOK() {
+				if(combatsToRun.length){
+					displayNextCombat();
+					if(aiMode)setTimeout(combatOK, 500);
+				}
+				else{
+					setMode("main");
+					if(aiMode)setTimeout(endTurn, 1000);
+				}
+			}
+			
+			function AIAnalysis(faction) {
+				return faction.getPlanets().map(planet => {
+					let neededShips = Math.ceil(AIThreatAnalysis(planet));
+					console.log("planet", planet.name, neededShips);
+					return currentMap.planets
+					.filter( p=> p.owner!= planet.owner)
+					.map(p => { 
+						let time = Math.ceil(distance(planet,p)/planet.owner.shipSpeed);
+						let expectedShips = p.owner? p.ships + p.production*time : p.ships;
+						let combatOutcome = predictCombatOutcome(planet.ships - neededShips, planet.attack, expectedShips, p.defense, 100); 
+						combatOutcome.name = p.name;
+						combatOutcome.planet = p;
+						combatOutcome.time = time;
+						combatOutcome.shipsAt40 = Number(combatOutcome.avgARemaining) + p.production*(40 - combatOutcome.time)*combatOutcome.aWinRate; 
+						combatOutcome.shipsAt20 = Number(combatOutcome.avgARemaining) + p.production*(20 - combatOutcome.time)*combatOutcome.aWinRate; 
+						combatOutcome.shipsAt10 = Number(combatOutcome.avgARemaining) + p.production*(10 - combatOutcome.time)*combatOutcome.aWinRate; 
+						combatOutcome.shipsAt5 = Number(combatOutcome.avgARemaining) + p.production*(5 - combatOutcome.time)*combatOutcome.aWinRate; 
+						combatOutcome.neededShips = neededShips;
+						return combatOutcome
+					})
+					.sort((a,b) => b.shipsAt20 - a.shipsAt20);
+				});
+			}
+			
+			function AIThreatAnalysis(planet) {
+				//todo: account for planets that can reach you before an attack
+				//todo: reinforce planets that can be saved
+				let fleetThreat = currentMap.fleets
+					.filter( f => f.owner != planet.owner)
+					.map(f => {
+						let time = 
+							Math.ceil (distance (f, f.destination)/f.owner.shipSpeed)+
+							Math.ceil(distance(planet,f.destination)/f.owner.shipSpeed);
+						let minimumShips = f.ships - planet.production*time;
+						return minimumShips
+					})
+					.reduce((sofar, a) => Math.max(a,sofar), 0)
+			
+					return currentMap.planets
+					.filter( p=> p.owner!= planet.owner && p.owner)
+					.map(p => { 
+						let time = Math.ceil(distance(planet,p)/p.owner.shipSpeed);
+						let minimumShips = p.ships  - planet.production*time;
+						return minimumShips
+						
+					})
+					.reduce((sofar, a) => Math.max(a,sofar),fleetThreat);
+			}
+			
+			function setMode(newMode) {
+				// mode = setup, main, fleet-select, tech, moving, display-combat
+				mode = newMode;
+				if(mode == "main") {
+					document.querySelector("#mainMenu").style.display = "block";
+				} else {
+					document.querySelector("#mainMenu").style.display = "none";
+				}
+				if(mode == "fleet-select"){
+					document.querySelector("#fleetMenu").style.display="block";
+					document.querySelector("#sendShips").innerHTML = "0";
+					document.querySelector("#totalShips").innerHTML = currentPlanet.ships;
+					document.querySelector("#shipsToSend").max = currentPlanet.ships;
+					document.querySelector("#shipsToSend").value = 0;
+					document.querySelector("#sendFleetButton").disabled = true;
+					actionButtons = [];
+				} else {
+					document.querySelector("#fleetMenu").style.display = "none";
+				}
+				if(mode == "display-combat") {
+					document.querySelector("#combatDiv").style.display = "block";
+				}
+				else {
+					document.querySelector("#combatDiv").style.display = "none";
+				}
+			}
+			
+			let config = {
+			  scale: 10,
+			  zoom: 1,
+			  offsetX: 0,
+			  offsetY: 0
+			  }
+			let aiMode = false;
+			let isDragging = false;
+			let dragStart = { x: 0, y: 0 };
+			let mousePos = null;
+			let currentPlanet = null;
+			let hoveredPlanet = null;
+			let currentFaction = null;
+			let destinationPlanet = null;
+			let actionButtons = [];
+			let combatsToRun = [];
+			let mode = "setup"; // setup, main, fleet-select, tech, moving, display-combat
+			function draw(map) {
+				let canvas = document.querySelector("#canvas")
+				
+				canvas.width = map.width * config.scale; 
+				canvas.height = map.height * config.scale; 
+				
+				let ctx = canvas.getContext('2d');
+				ctx.fillStyle = "black";
+				ctx.fillRect(0,0,map.width*config.scale, map.height*config.scale);
+				  // apply pan + zoom
+				  ctx.save();
+				  ctx.translate(config.offsetX, config.offsetY);
+				  ctx.scale(config.zoom, config.zoom);
+				
+				for(let p of map.planets) {
+					const x = p.x * config.scale + config.scale / 2;
+					const y = p.y * config.scale + config.scale / 2;
+
+					// draw planet
+					ctx.fillStyle = "yellow";
+					ctx.strokeStyle = "blue";
+					if(p.owner) ctx.strokeStyle = p.owner.color;
+					ctx.lineWidth = 2;
+					ctx.beginPath();
+					ctx.arc(x, y, 10, 0, Math.PI * 2);
+					ctx.fill();
+					ctx.stroke();
+				}
+				for(let p of map.planets) {
+					const x = p.x * config.scale + config.scale / 2;
+					const y = p.y * config.scale + config.scale / 2;
+
+					  // highlight hovered planet
+				  if (hoveredPlanet === p || currentPlanet === p) {
+					ctx.strokeStyle = "red";
+					ctx.lineWidth = 3;
+					ctx.beginPath();
+					ctx.arc(x, y, 14, 0, Math.PI * 2);
+					ctx.stroke();
+
+					// --- draw stats box ---
+					const stats = [
+					  `Name: ${p.name}`,
+					  `Coords: (${p.x}, ${p.y})`,
+					  `Production: ${p.production || "?"}`,
+					  `Attack: ${p.attack || "?"}`,
+					  `Defense: ${p.defense || "?"}`,
+					  `Ships: ${p.ships || "?"}`,
+					];
+
+					ctx.fillStyle = "rgba(0,0,0,0.7)";
+					ctx.strokeStyle = "white";
+					ctx.lineWidth = 1;
+
+					// measure box
+					const padding = 6;
+					const lineHeight = 14;
+					const textWidth = Math.max(...stats.map(s => ctx.measureText(s).width));
+					const boxWidth = textWidth + padding * 2;
+					const boxHeight = stats.length * lineHeight + padding * 2;
+
+					const boxX = x + 20; // offset to the right
+					const boxY = y - boxHeight / 2;
+
+					// draw background box
+					ctx.beginPath();
+					ctx.rect(boxX, boxY, boxWidth, boxHeight);
+					ctx.fill();
+					ctx.stroke();
+
+					// draw text
+					ctx.fillStyle = "white";
+					stats.forEach((line, i) => {
+					  ctx.fillText(line, boxX + padding, boxY + padding + (i + 1) * lineHeight - 4);
+					});
+				  } else {
+
+					// draw name
+					ctx.fillStyle = "white";
+					ctx.fillText(p.name, x + 12, y);
+					ctx.fillText(p.ships, x + 12, y+12);
+				  }
+				  
+				}
+				
+				drawFleets(ctx, map.fleets);
+				
+				if(destinationPlanet) {
+					const x = destinationPlanet.x * config.scale + config.scale / 2;
+					const y = destinationPlanet.y * config.scale + config.scale / 2;
+
+					ctx.strokeStyle = "blue";
+					ctx.lineWidth = 3;
+					ctx.beginPath();
+					ctx.arc(x, y, 14, 0, Math.PI * 2);
+					ctx.stroke();
+				}
+				
+				if(hoveredPlanet && mode == "fleet-select" && !destinationPlanet) {
+					let ships = Number(document.querySelector("#shipsToSend").value)
+					let odds = predictCombatOutcome(ships, currentPlanet.attack, hoveredPlanet.ships, hoveredPlanet.defense, 100);
+					let timeTaken = Math.ceil(distance(currentPlanet, hoveredPlanet)/currentPlanet.owner.shipSpeed);
+					ctx.fillText((odds.aWinRate*100)+"%",hoveredPlanet.x*config.scale -20, hoveredPlanet.y*config.scale-20);
+					ctx.fillText(timeTaken+" turn" +(timeTaken ==1? "": "s"),hoveredPlanet.x*config.scale -20, hoveredPlanet.y*config.scale);
+				}
+				
+				if(destinationPlanet && currentPlanet && mode == "fleet-select") {
+					drawArrow(ctx, currentPlanet, destinationPlanet);
+				}
+				
+				if(!destinationPlanet && mode === "fleet-select" && mousePos){
+					drawArrow(ctx, currentPlanet, mousePos);
+				}
+				
+				if(currentPlanet && currentPlanet.owner === currentFaction && mode == "main") {
+					const x = currentPlanet.x * config.scale + config.scale / 2;
+					const y = currentPlanet.y * config.scale + config.scale / 2;
+
+					// --- ACTION BUTTON ---
+					const btnW = 100, btnH = 20;
+					const btnX = x-100;
+					const btnY = y;
+
+					// button background
+					ctx.fillStyle = "darkgreen";
+					ctx.fillRect(btnX, btnY, btnW, btnH);
+					ctx.strokeStyle = "white";
+					ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+					// text
+					ctx.fillStyle = "white";
+					ctx.fillText("Launch Fleet", btnX + 10, btnY + 14);
+
+					// record button hitbox
+					actionButtons.push({
+					  planet: currentPlanet,
+					  action: "launchFleet",
+					  x: btnX,
+					  y: btnY,
+					  w: btnW,
+					  h: btnH
+					});
+				}
+				
+				ctx.restore();
+			}
+			
+			function drawFleets(ctx, fleets, scale) {
+			  for (let fleet of fleets) {
+				const { x, y, source, destination } = fleet;
+
+				// World to screen
+				const fx = x * config.scale + config.scale / 2;
+				const fy = y * config.scale + config.scale / 2;
+
+				const dx = destination.x * config.scale + config.scale / 2;
+				const dy = destination.y * config.scale + config.scale / 2;
+
+				// Direction vector
+				const angle = Math.atan2(dy - fy, dx - fx);
+
+				// Triangle size
+				const length = 20; // tip to base
+				const width = 10;  // base width
+
+				// Tip of triangle (towards destination)
+				const tipX = fx + Math.cos(angle) * length;
+				const tipY = fy + Math.sin(angle) * length;
+
+				// Base corners
+				const leftX = fx + Math.cos(angle + Math.PI / 2) * width;
+				const leftY = fy + Math.sin(angle + Math.PI / 2) * width;
+
+				const rightX = fx + Math.cos(angle - Math.PI / 2) * width;
+				const rightY = fy + Math.sin(angle - Math.PI / 2) * width;
+
+				// Draw fleet triangle
+				ctx.fillStyle = fleet.owner.color || "cyan";
+				ctx.strokeStyle = "white";
+				ctx.lineWidth = 2;
+
+				ctx.beginPath();
+				ctx.moveTo(tipX, tipY);
+				ctx.lineTo(leftX, leftY);
+				ctx.lineTo(rightX, rightY);
+				ctx.closePath();
+
+				ctx.fill();
+				ctx.stroke();
+				
+				ctx.fillStyle = "white"
+				ctx.fillText(fleet.ships+ "" , tipX-20, tipY);
+				
+				drawArrow(ctx, source, destination,1);
+			  }
+			}
+
+			function drawArrow(ctx, from, to, weight) {
+					const dx = to.x * config.scale + config.scale / 2;
+					const dy = to.y * config.scale + config.scale / 2;
+					
+					const cx = from.x * config.scale + config.scale / 2;
+					const cy = from.y * config.scale + config.scale / 2;
+					
+					ctx.strokeStyle = "white";
+					ctx.lineWidth = weight? weight: 3;
+					ctx.beginPath();
+					ctx.moveTo(cx, cy);
+					ctx.lineTo(dx, dy);
+					ctx.stroke();
+					
+					 // draw arrowhead at destination
+					  const headLength = 12; // length of arrowhead lines
+					  const angle = Math.atan2(dy - cy, dx - cx);
+
+					  ctx.beginPath();
+					  ctx.moveTo(dx, dy);
+					  ctx.lineTo(
+						dx - headLength * Math.cos(angle - Math.PI / 6),
+						dy - headLength * Math.sin(angle - Math.PI / 6)
+					  );
+					  ctx.moveTo(dx, dy);
+					  ctx.lineTo(
+						dx - headLength * Math.cos(angle + Math.PI / 6),
+						dy - headLength * Math.sin(angle + Math.PI / 6)
+					  );
+					  ctx.stroke()
+			}
+			
+			let animationStart;
+			let animationDuration = 2000;
+			function moveFleets(now) {
+				const t = Math.min((now - animationStart) / animationDuration, 1);
+				for(let fleet of currentMap.fleets){
+					for (let fleet of currentMap.fleets) {
+					  fleet.x = fleet.startX + (fleet.targetX - fleet.startX) * t;
+					  fleet.y = fleet.startY + (fleet.targetY - fleet.startY) * t;
+					}
+				}
+				
+				if(t == 1){
+					setUpCombats();
+					setMode("display-combat");
+				}
+			}
+			function distance(a,b) {
+				const dx = a.x - b.x;
+				const dy = a.y - b.y;
+				const dist = Math.sqrt(dx * dx + dy * dy);
+				return dist;
+			}
+			
+			function setUpFleetMovement() {
+				animationStart = performance.now();
+
+				// Store start and end positions for each fleet
+				for (let fleet of currentMap.fleets) {
+					const { x, y, destination, owner } = fleet;
+
+					// Distance to destination
+					const dx = destination.x - x;
+					const dy = destination.y - y;
+					const dist = distance(fleet,destination);
+					
+
+					// How far fleet can move in this animation
+					const speed = owner.shipSpeed;
+					const maxDist = speed;
+
+					// If destination is within reach this turn, snap to it
+					if (dist <= maxDist) {
+					  fleet.targetX = destination.x;
+					  fleet.targetY = destination.y;
+					} else {
+					  const ratio = maxDist / dist;
+					  fleet.targetX = x + dx * ratio;
+					  fleet.targetY = y + dy * ratio;
+					}
+
+					fleet.startX = x;
+					fleet.startY = y;
+				  }
+			}
+			
+			function setUpCombats() {
+				let fleetsToRemove = [];
+				for(let fleet of currentMap.fleets) {
+					if(fleet.x === fleet.destination.x && fleet.y === fleet.destination.y){
+						
+						if(fleet.owner !== fleet.destination.owner)
+							combatsToRun.push(fleet);
+						else {
+							fleet.destination.ships += fleet.ships;
+							fleetsToRemove.push(fleet);
+						}
+					}
+				}
+				currentMap.fleets = currentMap.fleets.filter(f => !fleetsToRemove.includes(f))
+				
+				displayNextCombat();
+			}
+			
+			function displayNextCombat() {
+				fleet = combatsToRun.pop();
+				currentMap.fleets = currentMap.fleets.filter(f => f!= fleet);
+				if(fleet){
+					let combatResult = runCombat(fleet.ships, fleet.source.attack, fleet.destination.ships, fleet.destination.defense);
+				
+					document.querySelector("#combatResultsDiv").style.display= "block";
+					document.querySelector("#FinishedCombat").style.display= "none";
+					showCombatResult(combatResult, fleet);
+					
+					if(combatResult.endingDefenseShips > 0) fleet.destination.ships = combatResult.endingDefenseShips;
+					if(combatResult.endingAttackShips > 0) {
+						fleet.destination.ships = combatResult.endingAttackShips;
+						fleet.destination.owner = fleet.owner
+					}
+				}
+				else {
+					document.querySelector("#combatResultsDiv").style.display= "none";
+					document.querySelector("#FinishedCombat").style.display= "block";
+				}
+				document.querySelector("#combatOKButton").focus();
+			}
+			
+			function showCombatResult(result, fleet) {
+				document.getElementById("attackerStart").textContent = result.startingAttackShips;
+				document.getElementById("defenderStart").textContent = result.startingDefenseShips;
+				document.getElementById("attackerEnd").textContent = result.endingAttackShips;
+				document.getElementById("defenderEnd").textContent = result.endingDefenseShips;
+				document.getElementById("attackPower").textContent = fleet.source.attack;
+				document.getElementById("defensePower").textContent = fleet.destination.defense;
+				document.getElementById("attackerFaction").textContent = fleet.owner.name
+				document.getElementById("defenderFaction").textContent = fleet.destination.owner?.name || "Neutral";
+
+				let outcome;
+				if (result.endingAttackShips > 0 && result.endingDefenseShips <= 0) {
+					outcome = fleet.owner.name+ " Wins!";
+				} else if (result.endingDefenseShips > 0 && result.endingAttackShips <= 0) {
+					outcome = (fleet.destination.owner?.name || "Neutral") +" Wins!";
+				} else {
+					outcome = "Both Destroyed!";
+				}
+
+				  document.getElementById("combatResult").textContent = outcome;
+
+				  // Show the div
+				  document.getElementById("combatDiv").style.display = "block";
+			}
+
+			
+			function runCombat (aShips, aStrength, dShips, dStrength) {
+				let result = {
+					attack: aStrength,
+					defense: dStrength,
+					startingAttackShips: aShips,
+					startingDefenseShips: dShips
+				}
+				
+				const aTarget = 5 + Math.max(0, aStrength - dStrength);
+				const dTarget = 5 + Math.max(0, dStrength - aStrength);
+				roundCount = 0;
+				while(aShips > 0 && dShips > 0) {
+					let aHits = 0, dHits = 0;
+					for(let i =0; i<dShips; i++) if(randInt(100)<= dTarget) dHits++;
+					for(let i =0; i<aShips; i++) if(randInt(100)<= aTarget) aHits++;
+					dShips = Math.max(0, dShips-aHits);
+					aShips = Math.max(0, aShips-dHits);
+				}
+				result.endingAttackShips = aShips;
+				result.endingDefenseShips = dShips;
+				result.summary = aShips? "A"+aShips: "D"+dShips;
+				return result;
+			}
+			let combatPredictionCache = new Map();
+			function predictCombatOutcome(aShips, aStrength, dShips, dStrength, trials = 10000) {
+			    const key = `${aShips},${aStrength},${dShips},${dStrength},${trials}`;
+				if (combatPredictionCache.has(key)) {
+					return combatPredictionCache.get(key);
+				}
+				let outcomes = {
+					attackerWins: 0,
+					defenderWins: 0,
+					remainingAttackShips: 0,
+					remainingDefenseShips: 0
+				};
+
+				for (let i = 0; i < trials; i++) {
+					let result = runCombat(aShips, aStrength, dShips, dStrength);
+
+					if (result.endingAttackShips > 0) {
+						outcomes.attackerWins++;
+						outcomes.remainingAttackShips += result.endingAttackShips;
+					} else {
+						outcomes.defenderWins++;
+						outcomes.remainingDefenseShips += result.endingDefenseShips;
+					}
+				}
+
+				// Calculate averages
+				let attackerWinRate = outcomes.attackerWins / trials;
+				let defenderWinRate = outcomes.defenderWins / trials;
+
+				let avgAttackRemaining = outcomes.attackerWins > 0 
+					? (outcomes.remainingAttackShips / outcomes.attackerWins).toFixed(2) 
+					: 0;
+
+				let avgDefenseRemaining = outcomes.defenderWins > 0 
+					? (outcomes.remainingDefenseShips / outcomes.defenderWins).toFixed(2) 
+					: 0;
+				
+				const result = {
+					aWinRate: attackerWinRate,
+					dWinRate: defenderWinRate,
+					avgARemaining: avgAttackRemaining,
+					avgDRemaining: avgDefenseRemaining
+				}
+				
+				combatPredictionCache.set(key, result);
+					
+				return result;
+			}
+			
+			function screenToWorld(x, y) {
+			  return {
+				x: (x - config.offsetX) / config.zoom,
+				y: (y - config.offsetY) / config.zoom
+			  };
+			}
+			
+			function clientToCanvas(canvas, clientX, clientY) {
+			  const rect = canvas.getBoundingClientRect();
+			  // Map CSS pixels -> canvas pixel coordinates
+			  const x = (clientX - rect.left) * (canvas.width  / rect.width);
+			  const y = (clientY - rect.top)  * (canvas.height / rect.height);
+			  return { x, y };
+			}
+			
+			function canvasToWorld(x, y) {
+			  // invert your pan+zoom
+			  return {
+				x: (x - config.offsetX) / config.zoom,
+				y: (y - config.offsetY) / config.zoom
+			  };
+			}
+
+			function setupCanvas(map) {
+			  let canvas = document.querySelector("#canvas");
+
+			  // mouse drag (pan)
+			  canvas.addEventListener("mousedown", e => {
+				isDragging = true;
+				dragStart.x = e.clientX - config.offsetX;
+				dragStart.y = e.clientY - config.offsetY;
+			  });
+
+			  canvas.addEventListener("mousemove", e => {
+				if (isDragging) {
+				  config.offsetX = e.clientX - dragStart.x;
+				  config.offsetY = e.clientY - dragStart.y;
+				}
+			  });
+
+			  canvas.addEventListener("mouseup", () => {
+				isDragging = false;
+			  });
+
+			  // zoom
+			  canvas.addEventListener("wheel", e => {
+				e.preventDefault();
+				const zoomAmount = -e.deltaY * 0.001;
+				const mouse = screenToWorld(e.clientX, e.clientY);
+
+				config.zoom *= 1 + zoomAmount;
+				config.zoom = Math.max(0.2, Math.min(5, config.zoom));
+
+				// adjust offset so zoom centers on mouse
+				config.offsetX -= (mouse.x * config.zoom - mouse.x * (config.zoom / (1 + zoomAmount)));
+				config.offsetY -= (mouse.y * config.zoom - mouse.y * (config.zoom / (1 + zoomAmount)));
+
+			  });
+
+			  // click planet detection
+				canvas.addEventListener("click", (e) => {
+				  // 1) client -> canvas pixels
+				  const cpos = clientToCanvas(canvas, e.clientX, e.clientY);
+				  // 2) canvas -> world
+				  const pos = canvasToWorld(cpos.x, cpos.y);
+				  
+				  // check action buttons first
+				  for (let btn of actionButtons) {
+					if (
+					  pos.x >= btn.x && pos.x <= btn.x + btn.w &&
+					  pos.y >= btn.y && pos.y <= btn.y + btn.h
+					) {
+						setMode("fleet-select")
+						return;
+					}
+				  }
+				  
+					// otherwise: check planet click
+				  const pickRadius = 10;           // same as your draw radius in WORLD units
+				  const r2 = pickRadius * pickRadius;
+
+				  
+				  if(mode == "main") currentPlanet = undefined;
+				  if(mode === "fleet-select") destinationPlanet = undefined;
+				  for (let p of currentMap.planets) {
+					const x = p.x * config.scale + config.scale / 2;
+					const y = p.y * config.scale + config.scale / 2;
+
+					const dx = pos.x - x;
+					const dy = pos.y - y;
+					if (dx * dx + dy * dy <= r2) {
+						if(mode == "main")
+							currentPlanet = p;
+						if(mode == "fleet-select")
+							destinationPlanet = p;
+					  break;
+					}
+				  }
+				});
+				
+				canvas.addEventListener("mousemove", (e) => {
+				  // 1) client -> canvas pixels
+				  const cpos = clientToCanvas(canvas, e.clientX, e.clientY);
+				  // 2) canvas -> world
+				  const pos = canvasToWorld(cpos.x, cpos.y);
+				  mousePos = {x:pos.x/config.scale, y: pos.y/config.scale};
+
+				  const pickRadius = 10;   // same as your draw radius in WORLD units
+				  const r2 = pickRadius * pickRadius;
+				  
+				  // check action buttons first
+				  for (let btn of actionButtons) {
+					if (
+					  pos.x >= btn.x && pos.x <= btn.x + btn.w &&
+					  pos.y >= btn.y && pos.y <= btn.y + btn.h
+					) {
+						canvas.style.cursor = "pointer";
+						return;
+					}
+				  }
+
+				  hoveredPlanet = null;
+				  for (let p of currentMap.planets) {
+					const x = p.x * config.scale + config.scale / 2;
+					const y = p.y * config.scale + config.scale / 2;
+
+					const dx = pos.x - x;
+					const dy = pos.y - y;
+					if (dx * dx + dy * dy <= r2) {
+					  hoveredPlanet = p;
+					  break;
+					}
+				  }
+
+				  // optional: change cursor style
+				  canvas.style.cursor = hoveredPlanet ? "pointer" : "default";
+
+				});
+
+			  // touch support (basic pan)
+			  canvas.addEventListener("touchstart", e => {
+				if (e.touches.length === 1) {
+				  isDragging = true;
+				  dragStart.x = e.touches[0].clientX - config.offsetX;
+				  dragStart.y = e.touches[0].clientY - config.offsetY;
+				}
+			  });
+
+			  canvas.addEventListener("touchmove", e => {
+				if (e.touches.length === 1 && isDragging) {
+				  config.offsetX = e.touches[0].clientX - dragStart.x;
+				  config.offsetY = e.touches[0].clientY - dragStart.y;
+				}
+			  });
+
+			  canvas.addEventListener("touchend", () => {
+				isDragging = false;
+			  });
+			}
+			
+			function render(now) {
+				if(mode == "moving") {
+					moveFleets(now);
+				}
+				draw(currentMap);
+				requestAnimationFrame(render);
+			}
+			
+
+		</script>
+	</head>
+	<body>
+		<div id = "createGameScreen">
+			<h2>Welcome to Space War!</h2>
+			<div>please select your options for the game!</div>
+			<div>Width: <input id="inputWidth" value= "120" type = "number"></input></div>
+			<div>Height: <input id="inputHeight"  value = "80" type = "number"></input></div>
+			<div>Factions: <input id="inputFactions"  value = "2" type = "number"></input></div>
+			<div>Planets: <input id="inputPlanets"  value = "20" type = "number"></input></div>
+			<div>Faction Name: <input id="inputFactionName"  value = "Player" type = "text"></input></div>
+			<button onclick="startGame()">start game</game>
+		</div>
+		<canvas height = "800" width = "1200" id = "canvas"></canvas>
+		<div id = "fleetMenu" style="display:none">
+			<span>ships to send:</span>
+			<input id="shipsToSend" type="range" value="0" max="10" min="0"></input>
+			<span id="sendShips"></span>/
+			<span id="totalShips"></span>
+			<button id= "sendFleetButton" onclick="sendFleet()">send fleet</button>
+			<button onclick="cancelSendFleet()">cancel</button>
+		</div>
+		<div id="mainMenu" style="display:none">
+			<button onclick="endTurn()">End Turn</button>
+		</div>
+		<div id = "combatDiv">
+			<div id="combatResultsDiv">
+				<h3>Combat Results</h3>
+				<div style="display:flex; justify-content:space-around; margin-bottom:12px;">
+				<div class="combatColumn">
+					<strong>Attacker(<span id= "attackPower"></span>)</strong><br>
+					<span id="attackerFaction"></span><br>
+					Start: <span id="attackerStart"></span><br>
+					End: <span id="attackerEnd"></span>
+				</div>
+				<div class="combatColumn">
+					<strong>Defender(<span id= "defensePower"></span>)</strong><br>
+					<span id="defenderFaction"></span><br>
+					Start: <span id="defenderStart"></span><br>
+					End: <span id="defenderEnd"></span>
+				</div>
+				</div>
+				<div id="combatResult" style="margin-top:10px; font-size:1.2em;"></div>
+			</div>
+			<div id = "FinishedCombat">The fights are over!</div>
+			<button id="combatOKButton" onclick="combatOK()">Ok</button>
+		</div>
+	<body>
+	
+</html>

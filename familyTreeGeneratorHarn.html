@@ -1,5 +1,4 @@
-<!doctype html>
-<html class="no-js" lang="">
+<html>
 
 <head>
   <title>Harn Family Tree Generator</title>
@@ -10,6 +9,10 @@
 		tables.currentAge = [25,49,72,94,115,136,156,176,196,216,236,255,274,293,312,331,349,367,385,403,421,438,455,472,489,506,522,538,554,570,585,600,615,630,644,658,672,686,699,712,725,738,751,763,775,787,799,810,821,832,842,852,862,872,881,890,899,907,915,923,931,938,945,951,957,963,968,973,977,981,984,987,989,991,993,994,995,996,997,998,999];
 		tables.ageAtBirth = [undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined, 7,21,43,72,108,151,198,247,300,356,412,466,516,564,610,653,693,731,766,799,829,856,880,901,919,935,949,961,971,978,984,989,993,996,998,999];
 		tables.ageAtInfertility = [undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,9,18,27,36,45,54,63,72,81,90,99,108,117,126,135,144,153,162,171,180,189,198,207,216,230,254,283,319,360,405,464,528,594,659,727,796,857,907,944,972,];
+		
+		let nextId = 1;
+		let people = [];		
+		
 		function d6() {
 			return Math.floor(Math.random()*6)+1;
 		}
@@ -36,33 +39,248 @@
 			if(rolls[0] == 1) return d6();
 			return rolls[0];
 		}
-		function person(birthYear){
-			var person = {};
-			person.birthYear = birthYear;
-			person.ageAtDeath = ageFromTable(tables.ageAtDeath);
-			person.ageAtInfertility = ageFromTable(tables.ageAtInfertility);
-			person.sex = Math.random() < .5 ? "F":"M";
-			return person;
+
+		function person(birthYear, motherId = null, fatherId = null) {
+			var p = {};
+			p.id = nextId++;
+			p.birthYear = birthYear;
+			p.ageAtDeath = ageFromTable(tables.ageAtDeath);
+			p.ageAtInfertility = ageFromTable(tables.ageAtInfertility);
+			p.sex = Math.random() < .5 ? "F":"M";
+			p.motherId = motherId;
+			p.fatherId = fatherId;
+			p.children = [];
+
+			people.push(p);
+			return p;
 		}
+
 		
 		function generateChildren(woman) {
 			var ageAtChild = [explode6(2)+14];
+			
 			while(ageAtChild[0] < woman.ageAtInfertility && ageAtChild[0] < woman.ageAtDeath){
 				ageAtChild.unshift(ageAtChild[0]+childGap());
 			}
-			return ageAtChild.map(age => person(woman.birthYear+age))
+			
+			//remove the one that goes over
+			ageAtChild.shift();
+
+			return ageAtChild.map(age => {
+				let child = person(woman.birthYear+age, woman.id, null);
+				woman.children.push(child.id);
+				return child;
+			});
 		}
+		
+		function displayFamily() {
+			let year = parseInt(document.getElementById("yearSlider").value);
+			document.getElementById("yearLabel").innerText = year;
+
+			computeLayout();
+			drawTree(year);
+		}
+
+		
+		function drawTree(year) {
+			const canvas = document.getElementById("treeCanvas");
+			const ctx = canvas.getContext("2d");
+			
+			let showDead = document.getElementById("showDead").checked;
+			let showUnborn = document.getElementById("showUnborn").checked;
+
+
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+			// --- Draw connection lines first ---
+			people.forEach(p => {
+				p.children.forEach(childId => {
+					if(!showDead && !isAlive(p,year) && p.birthYear> year) return;
+					if(!showUnborn && !isAlive(p,year) && p.birthYear< year) return;
+					let child = people.find(x => x.id === childId);
+					if (!child) return;
+
+					ctx.beginPath();
+					ctx.moveTo(p.x, p.y);
+					ctx.lineTo(child.x, child.y);
+					ctx.strokeStyle = "#666";
+					ctx.lineWidth = 1.5;
+					ctx.stroke();
+				});
+			});
+
+			// --- Draw nodes ---
+			people.forEach(p => {
+				if(!showDead && !isAlive(p,year) && p.birthYear> year) return;
+				if(!showUnborn && !isAlive(p,year) && p.birthYear< year) return;
+
+				const radius = 30;
+
+				ctx.beginPath();
+				ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+
+				// Alive / dead coloring
+				if (isAlive(p, year)) {
+					ctx.fillStyle = p.sex === "F" ? "#ffb6c1" : "#87cefa";
+				} else {
+					ctx.fillStyle = p.birthYear> year?"#ddd":"#aaa";
+				}
+
+				ctx.fill();
+				ctx.strokeStyle = "#222";
+				ctx.lineWidth = 2;
+				ctx.stroke();
+
+				// --- Text ---
+				ctx.fillStyle = "black";
+				ctx.textAlign = "center";
+
+				// ID
+				ctx.font = "bold 13px Arial";
+				ctx.fillText("ID " + p.id, p.x, p.y - 6);
+
+				// Year range
+				ctx.font = "12px Arial";
+				let deathYear = p.birthYear + p.ageAtDeath;
+				ctx.fillText(
+					p.birthYear + " – " + deathYear,
+					p.x,
+					p.y + 12
+				);
+				
+				//Current Age or Age at Death 
+				ctx.fillText(Math.min(p.ageAtDeath, Math.max(year - p.birthYear,0)), 
+					p.x,
+					p.y+20
+				)
+			});
+		}
+
+		function isAlive(person, year) {
+			return year >= person.birthYear &&
+				   year <= person.birthYear + person.ageAtDeath;
+		}
+
+		function getGeneration(person) {
+			let depth = 0;
+			let current = person;
+
+			while (current.motherId) {
+				current = people.find(p => p.id === current.motherId);
+				depth++;
+				if (!current) break;
+			}
+
+			return depth;
+		}
+		
+		/*
+			year = parseInt(document.getElementById("yearSlider").value);
+			showDead = document.getElementById("showDead").checked;
+			showUnborn = document.getElementById("showUnborn").checked;
+
+		*/
+		function computeLayout(year, showDead = true, showUnborn = true) {
+			year = parseInt(document.getElementById("yearSlider").value);
+			showDead = document.getElementById("showDead").checked;
+			showUnborn = document.getElementById("showUnborn").checked;
+
+
+			const verticalSpacing = 140;     // space between generations
+			const wrapSpacing = 90;          // space between wrapped rows
+			const horizontalSpacing = 160;
+			const maxPerRow = 6;
+
+			// --- Step 1: Build visible list ---
+			let visiblePeople = people.filter(p => {
+				let deathYear = p.birthYear + p.ageAtDeath;
+				let unborn = year < p.birthYear;
+				let dead = year > deathYear;
+
+				if (!showUnborn && unborn) return false;
+				if (!showDead && dead) return false;
+
+				return true;
+			});
+
+			// --- Step 2: Group visible by generation ---
+			let generations = {};
+
+			visiblePeople.forEach(p => {
+				let gen = getGeneration(p);
+				if (!generations[gen]) generations[gen] = [];
+				generations[gen].push(p);
+			});
+
+			// Sort generation keys numerically
+			let sortedGens = Object.keys(generations)
+				.map(Number)
+				.sort((a, b) => a - b);
+
+			// --- Step 3: Lay out generations cumulatively ---
+			let currentY = 120;
+
+			sortedGens.forEach(gen => {
+
+				let row = generations[gen];
+
+				row.forEach((p, index) => {
+
+					let wrapRow = Math.floor(index / maxPerRow);
+					let positionInWrap = index % maxPerRow;
+
+					p.x = 120 + positionInWrap * horizontalSpacing;
+					p.y = currentY + wrapRow * wrapSpacing;
+				});
+
+				// Increase Y based on how many wrap rows this generation used
+				let wrapCount = Math.ceil(row.length / maxPerRow);
+				currentY += verticalSpacing + (wrapCount - 1) * wrapSpacing;
+			});
+		}
+
+
+
 		function main() {
-			var grandmother = person(500);
-			grandmother.ageAtDeath = Math.max(ageFromTable(tables.ageAtDeath),ageFromTable(tables.ageAtDeath),ageFromTable(tables.ageAtDeath),ageFromTable(tables.ageAtDeath));
+			people = [];
+			nextId = 1;
+
+			var grandmother = person(450);
 			grandmother.sex = "F";
-			var children = generateChildren(grandmother);
-			children.forEach(c => console.log(c));
+
+			let children = generateChildren(grandmother);
+
+			children.forEach(child => {
+				if (child.sex === "F") {
+					generateChildren(child);
+				}
+			});
+			
+			people.sort((a,b)=> a.birthYear - b.birthYear);
+
+			displayFamily();
 		}
+
 	</script>
 </head>
 
 <body onload="main()">
+    <div>
+        Year:
+        <input type="number" id="yearSlider" min="400" max="1200" value="500" oninput="displayFamily()">
+        <span id="yearLabel">500</span>
+    </div>
+	<div>
+		Show Unborn: 
+		<input type= "checkbox" id="showUnborn" checked="false" oninput="displayFamily()"></input>
+	</div>
+	<div>
+		Show Dead: 
+		<input type= "checkbox" id="showDead" checked="true" oninput="displayFamily()"></input>
+	</div>
+
+    <canvas id="treeCanvas" width="1400" height="800"></canvas>
 </body>
+
 
 </html>

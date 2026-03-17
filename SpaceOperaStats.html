@@ -1,0 +1,188 @@
+<html>
+	<head>
+		<style>
+			.header{
+				width: 100px;
+				display: inline-block;
+			}
+		</style>
+		<script>
+			let craft = {
+				gnat: {
+					attackSkill: 14,
+					maximumHits: 2,
+					damage: 4,
+					
+					toHit: -2,
+					dodge: 5,
+					DR: 1,
+					FF: 15,
+					HP: 15,
+					HT: 12,
+				},
+				skyDragon: {
+					toHit: -6,
+					dodge: 4,
+					DR: 16,
+					FF: 40,
+					HP: 23,
+					HT: 12,
+					
+					attackSkill: 14,
+					maximumHits: 4,
+					damage: 5
+				},
+				oni: {
+					toHit: -2,
+					dodge: 4,
+					DR: 8,
+					FF: 40,
+					HP: 23,
+					HT: 12,
+					
+					maximumHits: 2,
+					damage: 4
+				},
+				flash:{
+					toHit: -3,
+					dodge: 4,
+					DR: 7,
+					FF: 80,
+					HP: 23,
+					HT: 12,
+					
+					maximumHits: 3,
+					damage: 4
+				},
+				huuktra:{
+					toHit: -7,
+					dodge: 4,
+					DR: 10,
+					FF: 60,
+					HP: 35,
+					HT: 12,
+					
+					maximumHits: 6,
+					damage: 5
+				},
+				huuktra:{
+					toHit: -7,
+					dodge: 4,
+					DR: 10,
+					FF: 60,
+					HP: 35,
+					HT: 12,
+					
+					maximumHits: 6,
+					damage: 5
+				},			}
+
+			function roll(dice) {
+				let result = dice;
+				for(let i =0; i< dice; i++ ){
+					result += Math.floor(Math.random() * 6)
+				}
+				return result;
+			}
+
+			function runAttack(attacker, defender){
+				let attackSkill = Number(document.getElementById("attackSkill").value);
+				
+				let proximity = document.getElementById("proximity").checked
+				if(proximity) attackSkill+=4;
+				let hits = Math.max(Math.min(attackSkill + defender.toHit - roll(3), attacker.maximumHits),0);
+				let dodgeSkill = Math.floor(Number(document.getElementById("defenseSkill").value)/2) + defender.dodge;
+				let dodges = Math.max(dodgeSkill-roll(3),0);
+				let damages = Math.max(0, hits-dodges);
+				var ffSoFar = defender.FF;
+				let totalDamage = 0;
+				for(let hit = 0; hit < damages; hit++) {
+					let damage = roll(6)*attacker.damage;
+					if(proximity) damage = damage/3;
+					if(damage >= ffSoFar) {
+						damage -= ffSoFar;
+						ffSoFar=0;
+					} else {
+						ffSoFar-=damage
+						damage = 0;
+					}
+					damage = Math.max(damage - defender.DR, 0)
+					totalDamage += damage;
+				}
+				let multiples = totalDamage/defender.HP;
+				console.log(damages, totalDamage);
+				return multiples;
+			}
+
+
+			function generateStats () {
+				results = [];
+				let attacker = document.getElementById("attacker").value;
+				attacker = craft[attacker];
+				let defender = document.getElementById("defender").value;
+				defender = craft[defender];
+
+				for(let i =0;i<10000; i++) {
+					let result = runAttack(attacker, defender)
+					
+					if(result === 0) result =0;
+					else if (result < .5) result = .1
+					else if (result < 1) result = .5
+					else result = Math.floor(result)
+					result = Math.min(5, result);
+
+					if(!results[result])results[result] = 0;
+					results[result]++;
+					
+				}
+				document.getElementById("results").innerHTML = statsReportHtml(results);
+			}
+			
+			function statsReportHtml(results) {
+				let html = "";
+				firstValues = [0, .1, .5]
+				for(let i=0; i<firstValues.length; i++){
+					results[firstValues[i]] = results[firstValues[i]]? results[firstValues[i]]: 0;
+					html+="<div><span class='header'>"+firstValues[i]+"</span><span>"+results[firstValues[i]]+"</span></div>";
+				}
+				for(let i=1; i<results.length; i++){
+					results[i] = results[i]? results[i]: 0;
+					html+="<div><span class='header'>"+i+"</span><span>"+results[i]+"</span></div>";
+				}
+				return html
+			}
+		</script>
+	</head>
+	<body>
+		<div id="results">
+			
+		</div>
+		Attackers:
+		<select value="gnat" id = "attacker">
+			<option value = "gnat">Gnat</option>
+			<option value = "skyDragon">Sky Dragon</option>
+			<option value = "oni">Oni</option>
+			<option value = "flash">flash</option>
+			<option value = "huuktra">huuktra</option>
+			<option value = "intruder">intruder</option>
+		<select>
+		Defenders:
+		<select value="gnat" id = "defender">
+			<option value = "gnat">Gnat</option>
+			<option value = "skyDragon">Sky Dragon</option>
+			<option value = "oni">Oni</option>
+			<option value = "flash">flash</option>
+			<option value = "huuktra">huuktra</option>
+			<option value = "intruder">intruder</option>
+		<select>
+		<br>
+		Attack Skill:
+		<input type="number" value = "14" id="attackSkill"></input>
+		Defender Pilot Skill<input type="number" value = "18" id="defenseSkill"></input>
+		proximity: <input type="checkbox" id="proximity"></input>
+		<button onclick = "generateStats()" >generate Stats</button>
+		<script>
+			generateStats();
+		</script>
+	</body>
+</html>

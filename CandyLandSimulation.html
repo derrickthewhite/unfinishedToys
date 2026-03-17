@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Candy Land Multiplayer Simulation</title>
+</head>
+<body>
+  <h1>Candy Land Simulator</h1>
+  <label>Number of Players:
+    <input type="number" id="numPlayers" value="4" min="2" max="8">
+  </label>
+  <button onclick="runSimulations()">Run Simulations</button>
+  <p id="results"></p>
+
+  <script>
+    const colors = ['red', 'purple', 'yellow', 'blue', 'orange', 'green'];
+    const boardLength = 134;
+
+    // Candy shortcut map
+    const candyCards = {
+      'plumpy': 8,       // near the beginning
+      'mr_mint': 18,
+      'jolly': 44,
+      'princess_lolly': 69,
+      'queen_frostine': 95,
+      'king_kandy': 133  // final tile
+    };
+    const candyCardNames = Object.keys(candyCards);
+
+    // Make a deck with color cards and candy cards
+    function createDeck() {
+      const deck = [];
+
+      for (let color of colors) {
+        for (let i = 0; i < 6; i++) deck.push({ type: 'color', color, move: 1 });
+        for (let i = 0; i < 4; i++) deck.push({ type: 'color', color, move: 2 });
+      }
+
+      for (let name of candyCardNames) {
+        deck.push({ type: 'candy', name });
+      }
+
+      return shuffle(deck);
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // Build board with colored tiles and candy locations
+    function buildBoard() {
+      const board = [];
+      for (let i = 0; i < boardLength; i++) {
+        board.push({ color: colors[i % colors.length], candy: null });
+      }
+
+      for (let name in candyCards) {
+        const index = candyCards[name];
+        board[index].candy = name;
+      }
+
+      return board;
+    }
+
+    function moveToNextColor(position, board, color, count) {
+      let steps = count;
+      while (position < board.length - 1) {
+        position++;
+        if (board[position].color === color) {
+          steps--;
+          if (steps === 0) break;
+        }
+      }
+      return position;
+    }
+
+    function simulateGame(numPlayers, board) {
+      const positions = new Array(numPlayers).fill(0);
+      let deck = createDeck();
+      let deckIndex = 0;
+      let turns = 0;
+
+      while (true) {
+        for (let p = 0; p < numPlayers; p++) {
+          if (positions[p] >= board.length - 1) continue;
+
+          if (deckIndex >= deck.length) {
+            deck = createDeck();
+            deckIndex = 0;
+          }
+
+          const card = deck[deckIndex++];
+
+          if (card.type === 'color') {
+            positions[p] = moveToNextColor(positions[p], board, card.color, card.move);
+          } else if (card.type === 'candy') {
+            positions[p] = candyCards[card.name];
+          }
+
+          turns++;
+
+          if (positions[p] >= board.length - 1) {
+            return { winner: p, turns };
+          }
+        }
+      }
+    }
+
+    function runSimulations() {
+      const numPlayers = parseInt(document.getElementById("numPlayers").value);
+      const gamesToSimulate = 100000;
+      const board = buildBoard();
+
+      const turnTotals = [];
+      const winCounts = new Array(numPlayers).fill(0);
+
+      for (let i = 0; i < gamesToSimulate; i++) {
+        const result = simulateGame(numPlayers, board);
+        turnTotals.push(result.turns);
+        winCounts[result.winner]++;
+      }
+
+      const avgTurns = (turnTotals.reduce((a, b) => a + b, 0) / gamesToSimulate).toFixed(2);
+      const maxTurns = Math.max(...turnTotals);
+      const minTurns = Math.min(...turnTotals);
+
+      let winSummary = '';
+      for (let i = 0; i < numPlayers; i++) {
+        const pct = ((winCounts[i] / gamesToSimulate) * 100).toFixed(2);
+        winSummary += `Player ${i + 1}: ${winCounts[i]} wins (${pct}%)<br>`;
+      }
+
+      document.getElementById("results").innerHTML = `
+        Simulated ${gamesToSimulate} games with ${numPlayers} players.<br>
+        Average turns per game: ${avgTurns}<br>
+        Min turns: ${minTurns}, Max turns: ${maxTurns}<br>
+        <br><strong>Win Distribution:</strong><br>${winSummary}
+      `;
+    }
+  </script>
+</body>
+</html>

@@ -11,7 +11,6 @@
             font-family: monospace;
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.25/Tone.min.js"></script>
 </head>
 <body>
     <h1>Text to Music Converter</h1>
@@ -20,20 +19,41 @@
         <option value="single">Single Note</option>
         <option value="double">Double Notes</option>
     </select>
-    <select id="instrument">
-        <option value="sine">Sine</option>
-        <option value="square">Square</option>
-        <option value="triangle">Triangle</option>
-        <option value="sawtooth">Sawtooth</option>
-        <option value="piano">Piano</option>
-        <option value="synth">Synth</option>
-    </select>
     <button onclick="playSong()">Play Song</button>
 
     <div id="noteDisplay"></div>
 
     <script>
         const noteFrequencies = {
+            'a': 440.00, // A4
+            'b': 493.88, // B4
+            'c': 261.63, // C4
+            'd': 293.66, // D4
+            'e': 329.63, // E4
+            'f': 349.23, // F4
+            'g': 392.00, // G4
+            'h': 440.00, // A4
+            'i': 493.88, // B4
+            'j': 261.63, // C4
+            'k': 293.66, // D4
+            'l': 329.63, // E4
+            'm': 349.23, // F4
+            'n': 392.00, // G4
+            'o': 440.00, // A4
+            'p': 493.88, // B4
+            'q': 261.63, // C4
+            'r': 293.66, // D4
+            's': 329.63, // E4
+            't': 349.23, // F4
+            'u': 392.00, // G4
+            'v': 440.00, // A4
+            'w': 493.88, // B4
+            'x': 261.63, // C4
+            'y': 293.66, // D4
+            'z': 329.63  // E4
+        };
+
+        const noteNames = {
             'a': 'A4',
             'b': 'B4',
             'c': 'C4',
@@ -63,94 +83,80 @@
         };
 
         function playSong() {
-            const textInput = document.getElementById('textInput').value;
+            const textInput = document.getElementById('textInput').value.toLowerCase();
             const playMode = document.getElementById('playMode').value;
-            const instrumentType = document.getElementById('instrument').value;
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const noteDisplay = document.getElementById('noteDisplay');
             noteDisplay.innerHTML = ''; // Clear previous notes display
-            let currentTime = Tone.now();
-
-            let instrument;
-            switch (instrumentType) {
-                case 'piano':
-                    instrument = new Tone.Sampler({ 
-                        urls: { 
-                            A4: "A4.mp3",
-                            B4: "B4.mp3",
-                            // add other note samples
-                        },
-                        baseUrl: "path/to/piano/samples/"
-                    }).toDestination();
-                    break;
-                case 'synth':
-                    instrument = new Tone.Synth().toDestination();
-                    break;
-                default:
-                    instrument = new Tone.Oscillator().toDestination();
-                    instrument.type = instrumentType;
-                    break;
-            }
+            let currentTime = audioCtx.currentTime;
 
             if (playMode === 'double') {
                 for (let i = 0; i < textInput.length; i += 2) {
                     const char1 = textInput[i];
                     const char2 = textInput[i + 1];
-                    const duration1 = char1 === char1.toUpperCase() ? 0.5 : 0.25;
-                    const duration2 = char2 === char2.toUpperCase() ? 0.5 : 0.25;
-                    if (noteFrequencies[char1.toLowerCase()] && noteFrequencies[char2?.toLowerCase()]) {
-                        displayNotes(noteFrequencies[char1.toLowerCase()], noteFrequencies[char2.toLowerCase()]);
-                        playNotePair(instrument, noteFrequencies[char1.toLowerCase()], noteFrequencies[char2.toLowerCase()], currentTime, Math.max(duration1, duration2));
-                        currentTime += Math.max(duration1, duration2);
-                    } else if (noteFrequencies[char1.toLowerCase()]) {
-                        displayNotes(noteFrequencies[char1.toLowerCase()], null);
-                        playSingleNote(instrument, noteFrequencies[char1.toLowerCase()], currentTime, duration1);
-                        currentTime += duration1;
+                    if (noteFrequencies[char1] && noteFrequencies[char2]) {
+                        displayNotes(char1, char2);
+                        playNotePair(audioCtx, noteFrequencies[char1], noteFrequencies[char2], currentTime);
+                        currentTime += 0.5; // Play next note pair after 0.5 seconds
+                    } else if (noteFrequencies[char1]) {
+                        displayNotes(char1, null);
+                        playNotePair(audioCtx, noteFrequencies[char1], 0, currentTime);
+                        currentTime += 0.5; // Play next note after 0.5 seconds
                     }
                 }
             } else {
                 for (let i = 0; i < textInput.length; i++) {
                     const char = textInput[i];
-                    const duration = char === char.toUpperCase() ? 0.5 : 0.25;
-                    if (noteFrequencies[char.toLowerCase()]) {
-                        displayNotes(noteFrequencies[char.toLowerCase()], null);
-                        playSingleNote(instrument, noteFrequencies[char.toLowerCase()], currentTime, duration);
-                        currentTime += duration;
+                    if (noteFrequencies[char]) {
+                        displayNotes(char, null);
+                        playSingleNote(audioCtx, noteFrequencies[char], currentTime);
+                        currentTime += 0.5; // Play next note after 0.5 seconds
                     }
                 }
             }
         }
 
-        function playNotePair(instrument, note1, note2, startTime, duration) {
-            if (instrument instanceof Tone.Sampler) {
-                instrument.triggerAttackRelease(note1, duration, startTime);
-                instrument.triggerAttackRelease(note2, duration, startTime);
-            } else {
-                instrument.frequency.setValueAtTime(Tone.Frequency(note1), startTime);
-                instrument.start(startTime);
-                instrument.stop(startTime + duration);
+        function playNotePair(audioCtx, frequency1, frequency2, startTime) {
+            // First note
+            const oscillator1 = audioCtx.createOscillator();
+            const gainNode1 = audioCtx.createGain();
+            oscillator1.connect(gainNode1);
+            gainNode1.connect(audioCtx.destination);
+            oscillator1.type = 'sine';
+            oscillator1.frequency.setValueAtTime(frequency1, audioCtx.currentTime);
+            oscillator1.start(startTime);
+            oscillator1.stop(startTime + 0.5);
 
-                instrument.frequency.setValueAtTime(Tone.Frequency(note2), startTime);
-                instrument.start(startTime);
-                instrument.stop(startTime + duration);
+            // Second note if frequency2 is not zero
+            if (frequency2 !== 0) {
+                const oscillator2 = audioCtx.createOscillator();
+                const gainNode2 = audioCtx.createGain();
+                oscillator2.connect(gainNode2);
+                gainNode2.connect(audioCtx.destination);
+                oscillator2.type = 'sine';
+                oscillator2.frequency.setValueAtTime(frequency2, audioCtx.currentTime);
+                oscillator2.start(startTime);
+                oscillator2.stop(startTime + 0.5);
             }
         }
 
-        function playSingleNote(instrument, note, startTime, duration) {
-            if (instrument instanceof Tone.Sampler) {
-                instrument.triggerAttackRelease(note, duration, startTime);
-            } else {
-                instrument.frequency.setValueAtTime(Tone.Frequency(note), startTime);
-                instrument.start(startTime);
-                instrument.stop(startTime + duration);
-            }
+        function playSingleNote(audioCtx, frequency, startTime) {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+            oscillator.start(startTime);
+            oscillator.stop(startTime + 0.5);
         }
 
-        function displayNotes(note1, note2) {
+        function displayNotes(char1, char2) {
             const noteDisplay = document.getElementById('noteDisplay');
-            if (note2) {
-                noteDisplay.innerHTML += `${note1}-${note2} `;
+            if (char2) {
+                noteDisplay.innerHTML += `${noteNames[char1]}-${noteNames[char2]} `;
             } else {
-                noteDisplay.innerHTML += `${note1} `;
+                noteDisplay.innerHTML += `${noteNames[char1]} `;
             }
         }
     </script>

@@ -1,0 +1,502 @@
+<html>
+<head>
+	<title>Cat Herder</title>
+	<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+	<script src = "../Tools/knockout-3.4.0.js" ></script>
+	<script>
+		var config = {
+			side: 200,
+			distanceScale: 5,
+			magnitudeScale: 10,
+			miliseconds: 50,
+			adjustment:.25,
+			spawnRate: .1,
+			scoresPerHitBonus: 50 
+		};
+		//miliseconds*spawnrate = 5 is hardish
+		
+		
+		var escort = {
+			position:{x:0,y:10},
+			velocity:{x:0,y:0},
+			m:2,
+			maxSpeed:8,
+			color:'#00ff00'
+		}
+		
+		var ward = {
+			position:{x:0,y:-10},
+			velocity:{x:0,y:0},
+			m:2,
+			maxSpeed:1,
+			color:'#0000ff'
+		}
+		
+		var creatures = [];
+		var collected = [];
+		var drivenOff = [];
+		var score = 0;
+		var hits = 5;
+		
+		function angleToBoxSides (angle,boxLength){
+			var x = (Math.abs(Math.tan(angle)) < 1? Math.tan(angle) *boxLength/2  : boxLength/2*(Math.sin(angle)>0?-1:1));
+			var y = (Math.abs(Math.tan(angle)) > 1? (boxLength/2) / Math.tan(angle) : boxLength/2 * (Math.cos(angle)>0?-1:1));
+			return {x:x,y:y};
+		}
+		
+		var creatureTypes=[
+			{
+				name:'Hunter',
+				color:'#ff8800',
+				m:.5,
+				maxSpeed:3,
+				stubbornness:1,
+				fear:1,
+				desire:1,
+				vision:20,
+				score:0,
+				damage:1
+			},
+			{
+				name:'Hungry',
+				color:'#880000',
+				m:1.2,
+				maxSpeed:2,
+				stubbornness:2,
+				fear:2,
+				desire:2,
+				vision:20,
+				score:0,
+				damage:1
+			},
+			{
+				name:'Pleasant',
+				color:'#00ff00',
+				m:.8,
+				maxSpeed:2,
+				stubbornness:.75,
+				fear:2,
+				desire:1,
+				vision:20,
+				score:10,
+				damage:0
+			},
+			{
+				name:'Predator',
+				color:'#ff8800',
+				m:1.5,
+				maxSpeed:1.5,
+				stubbornness:2,
+				fear:.5,
+				desire:.5,
+				vision:20,
+				score:0,
+				damage:2
+			},
+			{
+				name:'Lazy',
+				color:'#ffaa00',
+				m:1.25,
+				maxSpeed:.5,
+				stubbornness:2,
+				fear:.5,
+				desire:.5,
+				vision:30,
+				score:0,
+				damage:2
+			},
+			{
+				name:'Valued',
+				color:'#00aaff',
+				m:.75,
+				maxSpeed:1,
+				stubbornness:2,
+				fear:1.5,
+				desire:.25,
+				vision:20,
+				score:30,
+				damage:0
+			},
+			{
+				name:'Ferocious',
+				color:'#ff0000',
+				m:1,
+				maxSpeed:7,
+				stubbornness:2,
+				fear:2,
+				desire:3,
+				vision:200,
+				score:0,
+				damage:1
+			}
+		]
+		
+		for(var type of creatureTypes){
+			collected.push({type:type.name,count:ko.observable(0)})
+			drivenOff.push({type:type.name,count:ko.observable(0)})
+		}
+		
+		function generateCreature(){
+			var angle = Math.random()*2*Math.PI;
+			var direction = angle;
+			var velAngle = angle + Math.random()/2*Math.PI - Math.PI/4
+			
+			var type = creatureTypes[Math.floor(Math.random()*creatureTypes.length)]
+			var velocity = {x:Math.sin(velAngle * type.maxSpeed/2),y:Math.cos(velAngle * type.maxSpeed/2)};
+			
+			return {
+				position: angleToBoxSides(angle,config.side),
+				velocity: velocity,
+				angle: angle*180/Math.PI,
+				radians: angle,
+				tan: Math.tan(angle),
+				direction: direction*180/Math.PI,
+				dirTan: Math.tan(direction),
+				name:type.name,
+				m:type.m,
+				color:type.color,
+				maxSpeed:type.maxSpeed,
+				stubbornness:type.stubbornness,
+				fear:type.fear,
+				desire:type.desire,
+				vision:type.vision,
+				score:type.score,
+				damage:type.damage
+			}
+		}
+		
+		// Initialize audio context
+		const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+		// Function to create an 8-bit style sound
+		function createOscillator(type, frequency, duration, volume = 0.1) {
+			const oscillator = audioContext.createOscillator();
+			const gainNode = audioContext.createGain();
+
+			oscillator.type = type; // 'square', 'sawtooth', 'triangle', 'sine'
+			oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+			gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+
+			oscillator.connect(gainNode);
+			gainNode.connect(audioContext.destination);
+
+			oscillator.start();
+			oscillator.stop(audioContext.currentTime + duration);
+		}
+
+		// Play the background track
+		function playBackgroundMusic() {
+			// A simple looping 8-bit background track
+			const interval = 0.5; // seconds between notes
+			const notes = [440, 494, 523, 440, 349, 392, 440]; // A sequence of frequencies
+			let index = 0;
+
+			function playNextNote() {
+				createOscillator('square', notes[index], 0.4, 0.05);
+				index = (index + 1) % notes.length; // Loop through the notes
+				setTimeout(playNextNote, interval * 1000);
+			}
+
+			playNextNote();
+		}
+
+		// Sound effect hooks
+		function playGoodSound() {
+			createOscillator('triangle', 659, 0.2); // E5
+			setTimeout(() => createOscillator('triangle', 880, 0.2), 200); // A5
+		}
+
+		function playBadSound() {
+			createOscillator('sawtooth', 110, 0.3); // A2
+			setTimeout(() => createOscillator('sawtooth', 87, 0.3), 300); // F2
+		}
+
+		function playHitSound() {
+			createOscillator('square', 392, 0.1); // G4
+		}
+
+		function playDeathSound() {
+			createOscillator('sine', 220, 0.5, 0.2); // A3
+			setTimeout(() => createOscillator('sine', 110, 0.7, 0.2), 500); // A2
+		}
+
+		// Example event hooks for sound effects
+		document.addEventListener('keydown', (e) => {
+			switch (e.key) {
+				case '1':
+					playGoodSound();
+					break;
+				case '2':
+					playBadSound();
+					break;
+				case '3':
+					playHitSound();
+					break;
+				case '4':
+					playDeathSound();
+					break;
+			}
+		});
+
+		
+		var canvas;
+		var frame;
+		var ctx;
+		var mouseCoord = {x:0,y:0}
+		var canvasCoord
+		function initCanvas(){
+			canvas = document.getElementById('display');
+			frame = document.getElementById('canvasFrame');
+			ctx = canvas.getContext('2d');
+			canvasCoord = canvas.getBoundingClientRect();
+			
+			canvas.addEventListener('mousemove',e=>{
+				mouseCoord.x = e.clientX - canvasCoord.left;
+				mouseCoord.y = e.clientY - canvasCoord.top;
+				
+				console.log("mouse move");
+				
+				mouseCoord.x = mouseCoord.x/config.distanceScale - config.side/2
+				mouseCoord.y = mouseCoord.y/config.distanceScale - config.side/2
+			})
+			
+			canvas.addEventListener('touchmove',e=>{
+				var touch =e.touches[e.touches.length-1];
+				
+				mouseCoord.x = touch.clientX - canvasCoord.left;
+				mouseCoord.y = touch.clientY - canvasCoord.top;
+				
+				console.log(touch.clientX, touch.clientY, touch);
+				
+				mouseCoord.x = mouseCoord.x/config.distanceScale - config.side/2
+				mouseCoord.y = mouseCoord.y/config.distanceScale - config.side/2
+			})
+			document.addEventListener("keyup", (event) => {
+				if(event.code == "Space") {
+					if(halt) resume();
+					else stop();
+				}
+			});
+		}
+		
+		function draw(spots){
+			config.displayDimensions = config.distanceScale * config.side;
+			frame.width = config.displayDimensions;
+			frame.height = config.displayDimensions;
+			canvas.width = config.displayDimensions;
+			canvas.height = config.displayDimensions;
+
+
+			if(canvas.getContext){
+				ctx.fillStyle="#aaaaaa";
+				ctx.fillRect(0,0,config.displayDimensions,config.displayDimensions);
+				
+				ctx.beginPath();
+				ctx.stroke();
+				
+				for(var spot of spots){
+				
+					ctx.fillStyle = spot.color;
+					ctx.beginPath();
+					ctx.arc(
+						config.displayDimensions/2 +spot.position.x*config.distanceScale,
+						config.displayDimensions/2 +spot.position.y*config.distanceScale,
+						spot.m*config.magnitudeScale,
+						0,
+						Math.PI*2
+					);
+					ctx.fill();
+					ctx.beginPath();
+					ctx.moveTo(config.displayDimensions/2 +spot.position.x*config.distanceScale,config.displayDimensions/2 +spot.position.y*config.distanceScale);
+					ctx.lineTo(config.displayDimensions/2 +(spot.position.x - spot.velocity.x*3)*config.distanceScale,config.displayDimensions/2 +(spot.position.y -spot.velocity.y*3)*config.distanceScale);
+					ctx.stroke();
+				}
+				
+				ctx.fillStyle = ward.color;
+				ctx.beginPath();
+				ctx.arc(
+					config.displayDimensions/2 +ward.position.x*config.distanceScale,
+					config.displayDimensions/2 +ward.position.y*config.distanceScale,
+					5*config.distanceScale,
+					0,
+					Math.PI*2
+				);
+				ctx.stroke();
+				//console.log(spots.sort((a,b)=>b.m-a.m));
+				
+				ctx.font = "30px Arial"
+				ctx.fillStyle = "blue"
+				ctx.fillText(""+score,10,30)
+				ctx.fillStyle = "red"
+				ctx.fillText(""+hits,config.side*config.distanceScale-200,30)
+			}
+		}
+		
+		function normalizedDirection (vector,magnitude){
+			if(vector.x == 0 && vector.y ==0) return vector;
+			var baseMag = Math.sqrt(vector.x*vector.x+vector.y*vector.y)
+			return {
+				x:vector.x/baseMag*magnitude,
+				y:vector.y/baseMag*magnitude
+			}
+		}
+		function capVelocity(vector,maxVel){
+			var baseMag = Math.sqrt(vector.x*vector.x+vector.y*vector.y)
+			if(baseMag>maxVel)
+			return {
+				x:vector.x/baseMag*maxVel,
+				y:vector.y/baseMag*maxVel
+			}
+			else
+			return vector
+		}
+		function distance(a,b){
+			x = a.x-b.x;
+			y = a.y-b.y
+			return Math.sqrt(x*x+y*y)
+		}
+		function influence(){
+			var escortDirection = {x:mouseCoord.x -escort.position.x,y:mouseCoord.y-escort.position.y}
+			escort.velocity = capVelocity(escortDirection,escort.maxSpeed);
+			
+			var wardDirection = {x:escort.position.x -ward.position.x,y:escort.position.y-ward.position.y}
+			ward.velocity = normalizedDirection(wardDirection,ward.maxSpeed);
+			console.log("velocity", ward.velocity, mouseCoord);
+			
+			for(var creature of creatures){
+				var escortDistance = distance(escort.position,creature.position);
+				if(escortDistance < creature.vision){
+					var shooDirection = {x:creature.position.x -escort.position.x,y:creature.position.y-escort.position.y}
+					var shooMag = Math.min(50/(escortDistance*escortDistance),3)
+					var push = normalizedDirection(shooDirection,shooMag)
+					creature.velocity.x += push.x*creature.fear;
+					creature.velocity.y += push.y*creature.fear;
+				}
+				var wardDistance = distance(ward.position,creature.position);
+				if(wardDistance < creature.vision){
+					var callDirection = {x:ward.position.x -creature.position.x,y:ward.position.y-creature.position.y}
+					var callMag = Math.min(60/(wardDistance*wardDistance),3)
+					var pull = normalizedDirection(callDirection,callMag)
+					creature.velocity.x += pull.x*creature.desire;
+					creature.velocity.y += pull.y*creature.desire;
+				}
+				creature.velocity = capVelocity(creature.velocity,creature.maxSpeed)
+			}
+		}
+		
+		function capture(){
+			var creaturesToRemove = [];
+			for(var creature of creatures){
+				if(distance(ward.position,creature.position) < 5){
+					creaturesToRemove.push(creature);
+					var tracker = collected.filter(t=>t.type == creature.name)[0]
+					tracker.count(tracker.count()+1)
+					var hitsEarned = Math.floor((score+creature.score)/config.scoresPerHitBonus)
+					var hitsSoFar= Math.floor((score)/config.scoresPerHitBonus)
+					if(hitsEarned > hitsSoFar)
+						hits+=hitsEarned-hitsSoFar;
+					if(creature.score > 0) playGoodSound();
+					if(creature.damage > 0) playBadSound();
+					score+=creature.score;
+					hits -=creature.damage;
+				}
+				if(distance(creature.position,{x:0,y:0})>config.side*2){
+					creaturesToRemove.push(creature);
+					var tracker = drivenOff.filter(t=>t.type == creature.name)[0]
+					tracker.count(tracker.count()+1)
+				}
+			}
+			if(hits <= 0 ) halt = true;
+			else creatures = creatures.filter(c=>creaturesToRemove.indexOf(c)==-1)
+		}
+		
+		function move(spots){
+			for(var spot of spots){
+				spot.position.x +=spot.velocity.x*config.adjustment;
+				spot.position.y +=spot.velocity.y*config.adjustment;
+			}
+		}
+		var count = 0; 
+		function cycle(){
+			capture();
+			if(Math.random()<config.spawnRate)
+				creatures.push(generateCreature());
+		
+			influence();
+			move(creatures.concat(ward).concat(escort));
+			draw(creatures.concat(ward).concat(escort));
+			if(count++ %100 == 0){
+				console.log(ward);
+			}
+			
+			if(!halt)
+				setTimeout(function (){cycle();},config.miliseconds);
+		}
+		
+		var halt = false;
+		function stop (){
+			halt= true;
+		}
+		function resume(){
+			if(halt){
+				halt = false;
+				setTimeout(function (){cycle();},config.miliseconds);
+			}
+		}
+		function main(){
+				
+			//var seed = 7099;
+			//var seed = 3208;
+			seed = Math.floor(Math.random()*10000);
+			Math.seedrandom(seed);
+			console.log(seed);
+			
+			initCanvas()
+			
+			
+			for(var i = 0;i<3;i++) 
+				creatures.push(generateCreature());
+			
+			draw(creatures);
+			
+			setTimeout(()=>{cycle()},500);
+			
+			var root = {};
+			
+			root.collected = collected;
+			root.drivenOff = drivenOff;
+			
+			
+			// Start the background music
+			playBackgroundMusic();
+			
+			ko.applyBindings(root,document.getElementById('report'));
+
+		}
+
+	</script>
+</head>
+<body onload="main()">
+	<div id="canvasFrame">
+	<canvas id="display" ></canvas>
+	</div>
+	<button onclick="stop()">Halt</button>
+	<button onclick="resume()">Resume</button>
+	<div id = "report">
+		<h2>collected</h2>
+		<div data-bind="foreach:collected">
+			<div>
+				<span data-bind = "text:type"></span>
+				<span data-bind = "text:count"></span>
+			</div>
+		</div>
+		<h2>Driven Off </h2>
+		<div data-bind="foreach:drivenOff">
+			<div>
+				<span data-bind = "text:type"></span>
+				<span data-bind = "text:count"></span>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

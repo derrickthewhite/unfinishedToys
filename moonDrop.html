@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Moon Base Prototype</title>
+  <style>
+    canvas { border: 1px solid black; }
+	button { cursor: pointer; }
+    #stats { margin-top: 10px; font-family: monospace; }
+
+	.remote {
+	  display: flex;
+	  flex-direction: column;
+	  gap: 20px;
+	  width: 200px;;
+	}
+
+	.dpad {
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	}
+
+	.dpad #up {
+	  margin-bottom: 10px;
+	}
+
+	.middle-row {
+	  display: flex;
+	  gap: 10px;
+	}
+
+	.control, .action {
+	  width: 60px;
+	  height: 60px;
+	  border-radius: 12px;
+	  background: #333;
+	  color: #fff;
+	  font-size: 1.4rem;
+	  border: none;
+	  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+	  transition: background 0.2s;
+	}
+
+	.control:active, .action:active {
+	  background: #555;
+	}
+
+	.actions {
+	  display: flex;
+	  gap: 15px;
+	}
+
+	.action {
+	  width: 100px;
+	  height: 60px;
+	  font-size: 1rem;
+	}
+  </style>
+</head>
+<body>
+  <canvas id="game" width="550" height="550"></canvas>
+  <div id="previewStats"></div>
+  <div id="currentStats"></div>
+  
+    <div class="remote">
+    <div class="dpad">
+      <button class="control" id="up">▲</button>
+      <div class="middle-row">
+        <button class="control" id="left">◀</button>
+        <button class="control" id="down">▼</button>
+        <button class="control" id="right">▶</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="action" id="rotate">⟳ Rotate</button>
+      <button class="action" id="place">✔ Place</button>
+      <button class="action" id="option">Options</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const GRID_SIZE = 11;
+    const CELL_SIZE = 50;
+
+    // Board: 7x7 empty
+    let board = Array.from({length: GRID_SIZE}, () => Array(GRID_SIZE).fill("."));
+
+    // Weighted bag: corridor "+" is twice as likely
+    const tileBag = ["Q","+","+","D","H","R","L","P"];
+
+    function randomChoice(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    // Generate a random connected tetromino shape
+    function generateRandomShape() {
+      let cells = [[0,0]];
+      while (cells.length < 4) {
+        let [x,y] = randomChoice(cells);
+        let dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        let [dx,dy] = randomChoice(dirs);
+        let newCell = [x+dx,y+dy];
+        // avoid duplicates
+        if (!cells.some(([cx,cy]) => cx===newCell[0] && cy===newCell[1])) {
+          cells.push(newCell);
+        }
+      }
+      return cells;
+    }
+
+    // Generate a random piece with independent tile types
+    function generateRandomPiece() {
+      let shape = generateRandomShape();
+      // each cell has its own type
+      let tiles = shape.map(([dx,dy]) => ({
+        dx, dy,
+        type: randomChoice(tileBag)
+      }));
+      return {tiles, x: 3, y: 3};
+    }
+
+	let pieceOptions = [generateRandomPiece(), generateRandomPiece(),generateRandomPiece()];
+    let currentPiece = pieceOptions[0];
+
+    function rotate(piece) {
+      piece.tiles = piece.tiles.map(({dx,dy,type}) => ({
+        dx: -dy,
+        dy: dx,
+        type
+      }));
+    }
+
+    function move(dx, dy) {
+      currentPiece.x = Math.max(0, Math.min(GRID_SIZE-1, currentPiece.x + dx));
+      currentPiece.y = Math.max(0, Math.min(GRID_SIZE-1, currentPiece.y + dy));
+    }
+
+    function placePiece() {
+      for (let {dx,dy,type} of currentPiece.tiles) {
+        let x = currentPiece.x + dx;
+        let y = currentPiece.y + dy;
+        if (x>=0 && x<GRID_SIZE && y>=0 && y<GRID_SIZE) {
+          board[y][x] = type;
+        }
+      }
+	 pieceOptions = [generateRandomPiece(), generateRandomPiece(),generateRandomPiece()];
+     currentPiece = pieceOptions[0];
+    }
+	
+	function swapOptions() {
+		let index = (pieceOptions.indexOf(currentPiece)+1)%3;
+		currentPiece = pieceOptions[index];
+	}
+
+    function calcStats(tempBoard) {
+      let stats = {food: 0, oxygen: 0, temp: 0};
+	  let oxygenMakers = 0;
+	  let totalbuilds = 0;
+	  let power = 0;
+	  let lifeSupport = 0;
+	  let maintained = getMaintainedTiles(tempBoard);
+      for (let rowIndex in tempBoard) {
+        for (let cellIndex in tempBoard[rowIndex]) {
+			let cell = tempBoard[rowIndex][cellIndex];
+		  if(cell !== ".") totalbuilds +=1;
+		  if(maintained[rowIndex][cellIndex]) {
+			  if(cell === "H" || cell === "L") oxygenMakers+=1;
+			  if(cell === "P") power ++;
+			  if(cell === "L") lifeSupport++;
+			  if(cell === "Q") stats.food --;
+			  if(cell === "H" || cell === "D") stats.food++;
+		  }
+        }
+      }
+	  stats.temp = (power? 20: -20) + power*5 - countCorridorExposedSides(tempBoard)*2;
+	  if(Math.abs(stats.temp-20) < lifeSupport*3) stats.temp = 20;
+	  else stats.temp = stats.temp > 20? stats.temp - lifeSupport*3: stats.temp + lifeSupport*3;
+	  stats.oxygen = oxygenMakers/totalbuilds*100;
+      return stats;
+    }
+	
+    function getPreviewBoard() {
+      let tempBoard = board.map(r => r.slice());
+      for (let {dx,dy,type} of currentPiece.tiles) {
+        let x = currentPiece.x + dx;
+        let y = currentPiece.y + dy;
+        if (x>=0 && x<GRID_SIZE && y>=0 && y<GRID_SIZE) {
+          tempBoard[y][x] = type;
+        }
+      }
+      return tempBoard;
+    }
+	
+	function countCorridorExposedSides(map) {
+		  const rows = map.length;
+		  const cols = map[0].length;
+		  let count = 0;
+
+		  const dirs = [
+			[0, -1], // up
+			[0, 1],  // down
+			[-1, 0], // left
+			[1, 0]   // right
+		  ];
+
+		  for (let y = 0; y < rows; y++) {
+			for (let x = 0; x < cols; x++) {
+			  if (map[y][x] === '+') {
+				for (let [dx, dy] of dirs) {
+				  let nx = x + dx;
+				  let ny = y + dy;
+
+				  // check bounds
+				  if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) {
+					if (map[ny][nx] === '.') {
+					  count++;
+					}
+				  }
+				}
+			  }
+			}
+		  }
+
+		  return count;
+	}
+
+	
+	function getMaintainedTiles(board) {
+	  const rows = board.length;
+	  const cols = board[0].length;
+
+	  // Boolean map for maintained state
+	  const maintained = Array.from({length: rows}, () => Array(cols).fill(false));
+
+	  // Find all Q positions (quarters)
+	  let queue = [];
+	  for (let y=0; y<rows; y++) {
+		for (let x=0; x<cols; x++) {
+		  if (board[y][x] === "Q") {
+			maintained[y][x] = true;
+			queue.push([x,y]);
+		  }
+		}
+	  }
+
+	  // BFS to spread maintenance
+	  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+	  while (queue.length > 0) {
+		let [x,y] = queue.shift();
+		let type = board[y][x];
+
+		// Corridor extends to all adjacent tiles
+		if (type === "+" || type === "Q" || type === "D") {
+		  for (let [dx,dy] of dirs) {
+			let nx = x+dx, ny = y+dy;
+			if (nx>=0 && nx<cols && ny>=0 && ny<rows) {
+			  if (!maintained[ny][nx]) {
+				maintained[ny][nx] = true;
+				queue.push([nx,ny]);
+			  }
+			}
+		  }
+		}
+
+		// Dock extends to other docks (anywhere on the map)
+		if (type === "D") {
+		  for (let yy=0; yy<rows; yy++) {
+			for (let xx=0; xx<cols; xx++) {
+			  if (board[yy][xx] === "D" && !maintained[yy][xx]) {
+				maintained[yy][xx] = true;
+				queue.push([xx,yy]);
+			  }
+			}
+		  }
+		}
+	  }
+	  return maintained;
+	}
+
+
+    function draw() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+	  const maintained = getMaintainedTiles(getPreviewBoard());
+	  
+      // Draw grid
+      for (let y=0;y<GRID_SIZE;y++) {
+        for (let x=0;x<GRID_SIZE;x++) {
+		  let val = board[y][x];
+          ctx.strokeRect(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          if (val !== ".") {
+			if(maintained[y][x])
+				ctx.fillStyle = "lightblue";
+			else
+				ctx.fillStyle = "darkblue";
+            ctx.fillRect(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          if(maintained[y][x]) ctx.fillStyle = "black";
+			else ctx.fillStyle = "white";
+            ctx.fillText(val, x*CELL_SIZE+20, y*CELL_SIZE+30);
+          }
+        }
+      }
+      // Draw ghost piece
+      ctx.fillStyle = "rgba(0,255,0)";
+      for (let {dx,dy,type} of currentPiece.tiles) {
+        let x = currentPiece.x + dx;
+        let y = currentPiece.y + dy;
+        if (x>=0 && x<GRID_SIZE && y>=0 && y<GRID_SIZE) {
+			if(maintained[y][x]) ctx.fillStyle = "rgba(0,255,0)";
+			else ctx.fillStyle = "rgba(0,127,0)"
+          ctx.fillRect(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          ctx.strokeRect(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          if(maintained[y][x]) ctx.fillStyle = "black";
+			else ctx.fillStyle = "white";
+          ctx.fillText(type, x*CELL_SIZE+20, y*CELL_SIZE+30);
+        }
+      }
+      // Stats
+      let previewStats = calcStats(getPreviewBoard());
+      let currentStats = calcStats(board);
+      document.getElementById("previewStats").innerText = `Food: ${previewStats.food} | Oxygen: ${previewStats.oxygen} | Temp: ${previewStats.temp}`;
+      document.getElementById("currentStats").innerText = `Food: ${currentStats.food} | Oxygen: ${currentStats.oxygen} | Temp: ${currentStats.temp}`;
+    }
+
+    // Controls
+    window.addEventListener("keydown", e => {
+      if (e.key === "ArrowUp") move(0,-1);
+      if (e.key === "ArrowDown") move(0,1);
+      if (e.key === "ArrowLeft") move(-1,0);
+      if (e.key === "ArrowRight") move(1,0);
+      if (e.key === "r") rotate(currentPiece);
+      if (e.key === " ") placePiece();
+      draw();
+    });
+	
+	document.getElementById("up").addEventListener("click", () => {move(0,-1); draw();});
+	document.getElementById("down").addEventListener("click", () => {move(0,1); draw();});
+	document.getElementById("left").addEventListener("click", () => {move(-1,0), draw();});
+	document.getElementById("right").addEventListener("click", () => {move(1,0), draw();});
+	document.getElementById("rotate").addEventListener("click", () => {rotate(currentPiece), draw();});
+	document.getElementById("place").addEventListener("click", () => {placePiece(), draw();});
+	document.getElementById("option").addEventListener("click", () => {swapOptions(), draw();});
+
+    draw();
+  </script>
+</body>
+</html>

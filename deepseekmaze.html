@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Maze Game</title>
+    <style>
+        canvas {
+            border: 1px solid #ccc;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #2c3e50;
+        }
+        #gameMap {
+            width: 500px;
+            height: 500px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Maze Game</h1>
+    <canvas id="gameMap"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameMap');
+        let window = document.body;
+
+        // Maze data structure
+        const maze = {
+            locations: {
+                "A": { doors: ["B"], names: ["C", "D"] },
+                "B": { doors: [], names: [] }
+            },
+            startLocation: "A",
+            endLocation: "E"
+        };
+
+        let currentLocation = maze.startLocation;
+        let score = 0;
+        let gameLoop;
+
+        function updateMap() {
+            const ctx = canvas.getContext('2d');
+            for (let i = 0; i < maze(locations.count); i++) {
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(i * canvas.width/4, i * canvas.height/4,
+                             canvas.width - i * canvas.width/4,
+                             canvas.height - i * canvas.height/4);
+            }
+        }
+
+        function drawMap() {
+            updateMap();
+            setTimeout(() => {
+                removeAllDoors();
+            }, 100);
+        }
+
+        // Remove doors after game
+        function removeAllDoors() {
+            const doors = maze(locations.find(d => d.name === currentLocation)).doors;
+
+            if (doors.length > 0) {
+                doors.forEach-door(function(door, index) {
+                    for (let loc of door.locations) {
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.fillRect(
+                            ((index * canvas.width/4) +
+                               door.startLocation.x) - 1,
+                            ((index * canvas.height/4) +
+                               door.startLocation.y) - 1,
+                            1, 1
+                        );
+                    }
+                });
+            }
+        }
+
+        function addDoorsForClicks() {
+            const mapWidth = maze(locations.count);
+
+            // Get current location doors
+            const currentDoors = maze(locations.find(d => d.name === currentLocation)).doors;
+            if (currentDoors.length > 0) {
+                for (let door of currentDoors) {
+                    addDoorToLocation(currentLocation, door);
+                }
+            }
+        }
+
+        function addDoorFromCurrentLocation(currentLocation, newLocation) {
+            const mapWidth = maze(locations.count);
+            const ctx = canvas.getContext('2d');
+
+            // Remove any existing doors that go to other locations
+            if (currentLocation !== newLocation &&
+                currentLocation !== maze(locations.find(d => d.name === newLocation)).startLocation) {
+                removeDoors(currentLocation, newLocation);
+            }
+
+            // Add the door from current location to new location
+            const doors = maze(newLocation).doors;
+            if (!doors.includes(currentLocation)) {
+                doors.push(currentLocation);
+            }
+        }
+
+        function addDoorToLocation(location, newLocation) {
+            addDoorsForClicks();
+            removeDoors(location, newLocation);
+
+            for (let door of location(doors)) {
+                const ctx2 = canvas.getContext('2d');
+                ctx2.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Remove any existing doors that go to other locations
+                if (newLocation !== door.name &&
+                    newLocation !== maze(location).startLocation) {
+                    removeDoors(newLocation, door.name);
+                }
+
+                addDoorFromCurrentLocation(location, newLocation);
+            }
+        }
+
+        function removeDoors(sourceLocation, destinationLocation) {
+            const sourceDoors = maze(destinationLocation).doors;
+            for (let door of sourceDoors) {
+                if (door === sourceLocation) {
+                    return;
+                }
+            }
+
+            // Remove any existing doors that go to other locations
+            for (let currentDestination of sourceDoors) {
+                if (currentDestination !== destinationLocation) {
+                    removeDoors(currentDestination, door.name);
+                }
+            }
+        }
+
+        function updateScore() {
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#3498db';
+            ctx.fillRect(
+                maze(locations.find(m => m.name === 'E')).x - 100,
+                        maze(locations.find(m => m.name === 'E')).y - 100,
+                        50, 50);
+        }
+
+        function handleClick() {
+            const currentLocation = maze.find(loc => loc.name === (currentLocation || '-'));
+
+            if (currentLocation) {
+                addDoorsForClicks();
+                setTimeout(() => removeDoors(currentLocation, currentLocation), 10);
+                setTimeout(() => addDoors(currentLocation, currentLocation), 25);
+                setTimeout(() => addDoors(currentLocation, 'end'), 35);
+
+                let score = 0;
+
+                function updateScore() {
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#4CAF50';
+                    ctx.fillRect(
+                        maze(locations.find(m => m.name === 'E')).x - 100,
+                                maze(locations.find(m => m.name === 'E')).y - 100,
+                                50, 50);
+                }
+
+                function draw() {
+                    addDoorsForClicks();
+                    setTimeout(() => removeDoors(currentLocation, currentLocation), 10);
+                    setTimeout(() => addDoors(currentLocation, currentLocation), 25);
+                    setTimeout(() => addDoors(currentLocation, 'end'), 35);
+
+                    if (currentLocation === maze(locations.find(m => m.name === 'E')) &&
+                        window.addEventListener('click', handleClick)) {
+                        // Update score
+                        updateScore();
+                    }
+                }
+
+                requestAnimationFrame(draw);
+            } else {
+                setTimeout(() => addDoors(currentLocation, currentLocation), 50);
+                setTimeout(() => removeDoors(currentLocation, currentLocation), 150);
+                setTimeout(() => addDoors(currentLocation, 'end'), 200);
+
+                handleClick();
+            }
+        }
+
+        // Start the game
+        gameLoop = requestAnimationFrame(updateScore && updateMap);
+        window.addEventListener('click', handleClick);
+
+        let lastMove = null;
+
+        startGame();
+    </script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Map Editor</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; background: #eef; }
+    #ui { position: absolute; top: 10px; left: 10px; background: white; padding: 10px; border-radius: 8px; }
+    input, button { margin: 4px; }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="ui">
+  <label>Province Name: <input id="provinceName" type="text"></label><br>
+  <button onclick="startNewProvince()">New Province</button>
+  <button onclick="saveProvinces()">Save</button>
+  <button onclick="clearProvinces()">Clear</button>
+  <pre id="output"></pre>
+</div>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+//let provinces = [];
+let currentProvince = null;
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let p of provinces) {
+    ctx.beginPath();
+    ctx.moveTo(p.points[0][0], p.points[0][1]);
+    for (let i = 1; i < p.points.length; i++) {
+      ctx.lineTo(p.points[i][0], p.points[i][1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "#ccf";
+    ctx.fill();
+    ctx.strokeStyle = "#333";
+    ctx.stroke();
+
+    const cx = p.points.reduce((a, b) => a + b[0], 0) / p.points.length;
+    const cy = p.points.reduce((a, b) => a + b[1], 0) / p.points.length;
+    ctx.fillStyle = "#000";
+    ctx.fillText(p.name, cx - p.name.length * 2.5, cy);
+  }
+
+  if (currentProvince && currentProvince.points.length) {
+    ctx.beginPath();
+    ctx.moveTo(currentProvince.points[0][0], currentProvince.points[0][1]);
+    for (let i = 1; i < currentProvince.points.length; i++) {
+      ctx.lineTo(currentProvince.points[i][0], currentProvince.points[i][1]);
+    }
+    ctx.strokeStyle = "#f00";
+    ctx.stroke();
+  }
+}
+
+canvas.addEventListener("click", e => {
+  const x = e.clientX;
+  const y = e.clientY;
+  if (currentProvince) {
+    currentProvince.points.push([x, y]);
+    draw();
+  }
+});
+
+function startNewProvince() {
+  const name = document.getElementById("provinceName").value;
+  if (name && currentProvince && currentProvince.points.length) {
+    provinces.push(currentProvince);
+  }
+  currentProvince = { name, points: [] };
+  draw();
+}
+
+function saveProvinces() {
+  if (currentProvince && currentProvince.points.length) {
+    provinces.push(currentProvince);
+    currentProvince = null;
+  }
+  const output = document.getElementById("output");
+  output.textContent = JSON.stringify(provinces, null, 2);
+}
+
+function clearProvinces() {
+  provinces = [];
+  currentProvince = null;
+  document.getElementById("output").textContent = "";
+  draw();
+}
+
+draw();
+</script>
+</body>
+</html>

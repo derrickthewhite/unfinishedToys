@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>South America Game Board</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; background: #eef; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let provinces = [];  // Holds all clickable provinces
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let dragging = false;
+let dragStart = {x: 0, y: 0};
+
+// --- Stylized provinces --- (abstract, simplified polygons)
+provinces.push({ name: "Brazil North", points: [[200, 100], [300, 80], [350, 150], [250, 180]] });
+provinces.push({ name: "Brazil Northeast", points: [[300, 80], [380, 120], [360, 180], [350, 150]] });
+provinces.push({ name: "Brazil Southeast", points: [[360, 180], [380, 250], [320, 270], [300, 200]] });
+provinces.push({ name: "Brazil South", points: [[320, 270], [300, 350], [250, 330], [270, 250]] });
+provinces.push({ name: "Brazil Central", points: [[250, 180], [300, 200], [270, 250], [200, 220]] });
+
+provinces.push({ name: "Argentina North", points: [[200, 220], [270, 250], [250, 330], [180, 300]] });
+provinces.push({ name: "Argentina Central", points: [[180, 300], [250, 330], [240, 400], [160, 360]] });
+provinces.push({ name: "Argentina South", points: [[160, 360], [240, 400], [220, 470], [140, 420]] });
+provinces.push({ name: "Argentina Patagonia", points: [[140, 420], [220, 470], [200, 550], [120, 520]] });
+
+provinces.push({ name: "Chile North", points: [[120, 200], [140, 220], [130, 300], [100, 280]] });
+provinces.push({ name: "Chile South", points: [[100, 280], [130, 300], [120, 520], [80, 500]] });
+
+provinces.push({ name: "Peru", points: [[160, 160], [200, 180], [180, 220], [140, 200]] });
+provinces.push({ name: "Colombia", points: [[140, 120], [200, 100], [160, 160], [120, 140]] });
+provinces.push({ name: "Venezuela", points: [[200, 80], [250, 60], [280, 90], [200, 100]] });
+provinces.push({ name: "Ecuador", points: [[120, 140], [140, 160], [130, 180], [110, 160]] });
+provinces.push({ name: "Bolivia", points: [[200, 180], [250, 180], [200, 220], [180, 220]] });
+provinces.push({ name: "Paraguay", points: [[200, 220], [180, 220], [160, 260], [180, 260]] });
+provinces.push({ name: "Uruguay", points: [[250, 330], [300, 350], [270, 370], [240, 350]] });
+provinces.push({ name: "Guyana", points: [[250, 60], [270, 40], [300, 80], [280, 90]] });
+provinces.push({ name: "Suriname", points: [[270, 40], [300, 20], [320, 60], [300, 80]] });
+provinces.push({ name: "French Guiana", points: [[320, 60], [340, 30], [360, 80], [340, 100]] });
+
+// --- Draw Function ---
+function draw() {
+  ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+  ctx.clearRect(-offsetX/scale, -offsetY/scale, canvas.width/scale, canvas.height/scale);
+
+  for (let p of provinces) {
+    ctx.beginPath();
+    ctx.moveTo(p.points[0][0], p.points[0][1]);
+    for (let i = 1; i < p.points.length; i++) {
+      ctx.lineTo(p.points[i][0], p.points[i][1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = "#ccc";
+    ctx.fill();
+    ctx.strokeStyle = "#444";
+    ctx.stroke();
+  }
+}
+
+// --- Hit Test ---
+function getClickedProvince(x, y) {
+  const tx = (x - offsetX) / scale;
+  const ty = (y - offsetY) / scale;
+
+  for (let p of provinces) {
+    ctx.beginPath();
+    ctx.moveTo(p.points[0][0], p.points[0][1]);
+    for (let i = 1; i < p.points.length; i++) {
+      ctx.lineTo(p.points[i][0], p.points[i][1]);
+    }
+    ctx.closePath();
+    if (ctx.isPointInPath(tx, ty)) {
+      return p;
+    }
+  }
+  return null;
+}
+
+// --- Events ---
+canvas.addEventListener("mousedown", e => {
+  dragging = true;
+  dragStart.x = e.clientX;
+  dragStart.y = e.clientY;
+});
+
+canvas.addEventListener("mouseup", e => {
+  dragging = false;
+
+  const province = getClickedProvince(e.clientX, e.clientY);
+  if (province) {
+    alert("Clicked: " + province.name);
+  }
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (dragging) {
+    offsetX += e.clientX - dragStart.x;
+    offsetY += e.clientY - dragStart.y;
+    dragStart.x = e.clientX;
+    dragStart.y = e.clientY;
+    draw();
+  }
+});
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  const zoom = e.deltaY < 0 ? 1.1 : 0.9;
+  const mx = e.clientX;
+  const my = e.clientY;
+  const wx = (mx - offsetX) / scale;
+  const wy = (my - offsetY) / scale;
+
+  scale *= zoom;
+  offsetX = mx - wx * scale;
+  offsetY = my - wy * scale;
+  draw();
+});
+
+window.addEventListener("resize", () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  draw();
+});
+
+draw();
+</script>
+</body>
+</html>

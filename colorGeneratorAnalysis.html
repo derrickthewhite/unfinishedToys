@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Color Generator Display</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+    }
+    #colors {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+      gap: 5px;
+      margin-top: 1rem;
+    }
+    .color-box {
+      width: 60px;
+      height: 60px;
+      border: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 0.6rem;
+      text-shadow: 0 0 3px #000;
+    }
+  </style>
+</head>
+<body>
+  <h1>Generated Colors</h1>
+  <button id="runBtn">Generate Colors</button>
+  <div id="colors"></div>
+
+  <script>
+    class ColorGenerator {
+      constructor(minDistance = 50) {
+        this.minDistance = minDistance;
+        this.colors = [];
+      }
+      rgbToHex(r, g, b) {
+        return (
+          "#" +
+          [r, g, b]
+            .map(x => {
+              const hex = x.toString(16);
+              return hex.length === 1 ? "0" + hex : hex;
+            })
+            .join("")
+        );
+      }
+      colorDistance(c1, c2) {
+        return Math.sqrt(
+          Math.pow(c1.r - c2.r, 2) +
+          Math.pow(c1.g - c2.g, 2) +
+          Math.pow(c1.b - c2.b, 2)
+        );
+      }
+      generate() {
+        let attempt = 0;
+		let targetDistance = 250;
+        while (attempt < 1000) {
+          attempt++;
+          const r = Math.floor(Math.random() * 256);
+          const g = Math.floor(Math.random() * 256);
+          const b = Math.floor(Math.random() * 256);
+          const newColor = { r, g, b };
+          let tooClose = this.colors.some(c => this.colorDistance(c, newColor) < Math.max(this.minDistance, targetDistance));
+		  let tooDark = r+g+b <300;
+          if (!tooClose && !tooDark) {
+            this.colors.push(newColor);
+            return this.rgbToHex(r, g, b);
+          }
+		  targetDistance-=1;
+        }
+        return null; // no more unique colors found
+      }
+    }
+
+    document.getElementById("runBtn").addEventListener("click", () => {
+      const gen = new ColorGenerator(80);
+      const colorsContainer = document.getElementById("colors");
+      colorsContainer.innerHTML = "";
+
+      let next;
+      while ((next = gen.generate()) !== null) {
+        const box = document.createElement("div");
+        box.className = "color-box";
+        box.style.backgroundColor = next;
+        box.textContent = next;
+        colorsContainer.appendChild(box);
+      }
+    });
+  </script>
+</body>
+</html>

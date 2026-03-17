@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WarFog</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            margin: 20px auto;
+        }
+        td {
+            width: 60px;
+            height: 60px;
+            text-align: center;
+            vertical-align: middle;
+            border: 1px solid black;
+            cursor: pointer;
+        }
+        .hidden {
+            background-color: grey;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">WarFog</h1>
+    <table id="gameBoard">
+        <!-- Generate 5x5 grid -->
+    </table>
+
+    <script>
+        const gridSize = 5;
+        const player1Cards = {
+            "Champion": 1,
+            "Veteran": 2,
+            "Warrior": 3,
+            "Spy": 1,
+            "Base": 1,
+            "Trap": 1
+        };
+
+        const player2Cards = {
+            "Champion": 1,
+            "Veteran": 2,
+            "Warrior": 3,
+            "Spy": 1,
+            "Base": 1,
+            "Trap": 1
+        };
+
+        let currentPlayer = 1;
+        let selectedCard = null;
+        let board = Array(gridSize).fill().map(() => Array(gridSize).fill(null));
+
+        function createBoard() {
+            const table = document.getElementById("gameBoard");
+            for (let i = 0; i < gridSize; i++) {
+                const row = document.createElement("tr");
+                for (let j = 0; j < gridSize; j++) {
+                    const cell = document.createElement("td");
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.classList.add("hidden");
+                    cell.addEventListener("click", onCellClick);
+                    row.appendChild(cell);
+                }
+                table.appendChild(row);
+            }
+        }
+
+        function onCellClick(event) {
+            const cell = event.target;
+            const row = parseInt(cell.dataset.row);
+            const col = parseInt(cell.dataset.col);
+
+            if (!selectedCard && board[row][col] && board[row][col].player === currentPlayer) {
+                selectedCard = { row, col };
+                cell.classList.remove("hidden");
+                return;
+            }
+
+            if (selectedCard) {
+                const targetCell = board[row][col];
+                if (targetCell && targetCell.player !== currentPlayer) {
+                    resolveAttack(selectedCard, { row, col });
+                } else if (!targetCell) {
+                    moveCard(selectedCard, { row, col });
+                }
+                selectedCard = null;
+                switchPlayer();
+            }
+        }
+
+        function switchPlayer() {
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+        }
+
+        function moveCard(from, to) {
+            board[to.row][to.col] = board[from.row][from.col];
+            board[from.row][from.col] = null;
+            updateBoard();
+        }
+
+        function resolveAttack(from, to) {
+            const attacker = board[from.row][from.col];
+            const defender = board[to.row][to.col];
+
+            if (defender.type === "Trap") {
+                board[to.row][to.col] = null;
+            } else if (attacker.type === defender.type) {
+                board[from.row][from.col] = null;
+                board[to.row][to.col] = null;
+            } else if (attacker.type === "Spy" && defender.type === "Champion") {
+                board[to.row][to.col] = attacker;
+                board[from.row][from.col] = null;
+            } else if (attacker.type === "Champion" && defender.type === "Spy") {
+                board[from.row][from.col] = null;
+            } else if (attacker.type === "Veteran" && defender.type === "Warrior") {
+                board[to.row][to.col] = attacker;
+                board[from.row][from.col] = null;
+            } else {
+                board[from.row][from.col] = null;
+            }
+
+            updateBoard();
+        }
+
+        function updateBoard() {
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    const cell = document.querySelector(`td[data-row="${i}"][data-col="${j}"]`);
+                    cell.classList.add("hidden");
+                    if (board[i][j]) {
+                        cell.innerText = board[i][j].type[0];
+                    } else {
+                        cell.innerText = "";
+                    }
+                }
+            }
+        }
+
+        function initializeGame() {
+            createBoard();
+            // Setup player cards on the board (omitted for brevity)
+            // Example: board[0][0] = { player: 1, type: "Champion" };
+            updateBoard();
+        }
+
+        initializeGame();
+    </script>
+</body>
+</html>

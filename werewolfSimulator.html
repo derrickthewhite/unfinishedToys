@@ -1,0 +1,441 @@
+<html>
+	<head>
+		<title>Werewolf Simulator</title>
+		    <style>
+        .color-box {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .color-square {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border: 1px solid #000;
+        }
+		input{
+			width: 50px;
+		}
+    </style>
+
+		<script>
+				let pause = false;
+				let config = {
+					scale: 10
+				}
+			let nextId = 1000;
+			function random(){
+				return Math.random();
+			}
+			function makeVillager(x, y, color, food, tolerance, warriorRate) {
+				var v = {
+					x:x,
+					y:y,
+					color: color,
+					food: food,
+					role: "farmer",
+					tolerance: tolerance,
+					warriorRate: warriorRate,
+					id: nextId++
+				};
+				
+				return v;
+			}
+			function makeWarrior(x,y,color,food, tolerance, warriorRate) {
+				var v = {
+					x:x,
+					y:y,
+					color: color,
+					food: food,
+					role: "warrior",
+					tolerance: tolerance,
+					warriorRate: warriorRate,
+					id: nextId++
+				};
+				return v;
+			}
+			function makePredator(x,y,color, food, tolerance) {
+				var p = {
+					x:x,
+					y:y,
+					color: color,
+					food: food,
+					role: "predator",
+					tolerance: tolerance,
+					warriorRate: 0,
+					id: nextId++
+				}
+				return p;
+			}
+			function getRandomHexColor() {
+				// Generate a random number between 0 and 0xFFFFFF (16,777,215)
+				const randomColor = Math.floor(random() * 16777215);
+
+				// Convert the number to a hexadecimal string and pad with leading zeros if necessary
+				const hexColor = "#" + randomColor.toString(16).padStart(6, '0');
+
+				return hexColor;
+			}
+			function makeWorld() {
+				const height = Number(document.getElementById("height").value);
+				const width = Number(document.getElementById("width").value);
+				const scale = Number(document.getElementById("scale").value);
+				const starting = Number(document.getElementById("starting").value);
+				config.scale = scale;
+				var w = {
+					units: [],
+					height: height,
+					width: width,
+					nextUnit: 0,
+					map: [],
+					terrain: [],
+					history: [],
+					historyLogRate: 100,
+					ticksPerDraw:2,
+					time: 0
+				}
+				
+				for(var x = 0;x<w.width;x++){
+					w.map[x] = [];
+					w.terrain[x] = [];
+					for(var y=0;y<w.height;y++) {
+						w.map[x][y] = [];
+						w.terrain[x][y] = "wheat"
+					}
+				}
+				
+				w.addUnit = function(unit, x, y, order) {
+					//TODO: slice add?
+					w.units.push(unit);
+					w.map[x][y].push(unit);
+				}
+				w.moveUnit = function(unit, x,y) {
+					w.map[unit.x][unit.y] = w.map[unit.x][unit.y].filter(u => u!= unit);
+					w.map[x][y].push(unit);
+					unit.x = x;
+					unit.y = y;
+				}
+				w.removeUnit = function(unit, index){
+					w.map[unit.x][unit.y] = w.map[unit.x][unit.y].filter(u => u!= unit);
+					w.units.splice(index, 1)
+				}
+				/*
+				w.units.push(makeVillager(10,10,"#ee8822",20, .5));
+				w.units.push(makeVillager(20,20,"#888822",20, .6));
+				w.units.push(makeVillager(10,20,"#22ee88",20, .7));
+				w.units.push(makeVillager(20,10,"#2288ee",20, .4));
+				*/
+				/*
+				w.units.push(makeVillager(30,0,"#888822",20, .5));//
+				w.units.push(makeVillager(20,0,"#ee8822",20, .6));
+				w.units.push(makeVillager(10,0,"#2288ee",20, .7));
+				w.units.push(makeVillager(40,0,"#22ee88",20, .4));
+				*/
+				
+				let predatorRatio = .05;
+				for(var i = 0;i<starting;i++) {
+					//TODO: play with starting tolerance
+					let unit = Math.random() > predatorRatio ?
+						makeVillager(Math.floor(random()*w.width),Math.floor(random()*w.height),getRandomHexColor(),20, Math.floor(Math.random()*100)+Math.floor(Math.random()*100), random()):
+						makePredator(Math.floor(random()*w.width),Math.floor(random()*w.height),getRandomHexColor(),20, Math.floor(Math.random()*100)+Math.floor(Math.random()*100))
+					w.addUnit(unit, unit.x, unit.y, w.nextUnit++);
+				}
+				w.nextUnit= 0;
+
+				canvas.addEventListener("click", (event) => {
+					gridx = Math.floor(event.offsetX/scale);
+					gridy = Math.floor(event.offsetY/scale);
+					console.log(gridx, gridy);
+					console.log(w.units.filter(u => u.x == gridx && u.y == gridy).map( u => u.color))
+				});
+				
+				return w;
+			};
+			
+			// Function to convert a hexadecimal color to its RGB components
+			function hexToRgb(hex) {
+				// Remove the hash at the start if it's there
+				hex = hex.replace(/^#/, '');
+
+				// Parse the red, green, and blue components
+				let r = parseInt(hex.substring(0, 2), 16);
+				let g = parseInt(hex.substring(2, 4), 16);
+				let b = parseInt(hex.substring(4, 6), 16);
+
+				return { r, g, b };
+			}
+
+			// Function to calculate the taxicab (Manhattan) distance between two colors
+			function taxicabDistance(color1, color2) {
+				let rgb1 = hexToRgb(color1);
+				let rgb2 = hexToRgb(color2);
+
+				// Calculate the sum of absolute differences between the RGB components
+				let distance = Math.abs(rgb1.r - rgb2.r) + 
+							   Math.abs(rgb1.g - rgb2.g) + 
+							   Math.abs(rgb1.b - rgb2.b);
+
+				return distance;
+			}
+			
+			function rgbToHex(r, g, b) {
+				return "#" + 
+					r.toString(16).padStart(2, '0') + 
+					g.toString(16).padStart(2, '0') + 
+					b.toString(16).padStart(2, '0');
+			}
+			
+			// Function to count the frequency of each color
+			function countColors(items) {
+				const colorCounts = {
+					examples: []
+				};
+
+				items.forEach(item => {
+					const color = item.color;
+					if (colorCounts[color]) {
+						colorCounts[color]++;
+					} else {
+						colorCounts[color] = 1;
+						colorCounts.examples[color] = item;
+					}
+				});
+
+				return colorCounts;
+			}
+
+			// Function to sort colors by frequency
+			function sortColorsByFrequency(colorCounts) {
+				let result =  Object.entries(colorCounts).sort((a, b) => b[1] - a[1]);
+				result.examples = colorCounts.examples;
+				return result;
+			}
+
+			// Function to display the sorted colors in the HTML
+			function displayColors(sortedColors) {
+				const show = document.getElementById("showTotals").checked;
+				const colorList = document.getElementById('colorList');
+				colorList.innerHTML= "";
+				if(show)
+				{		
+					sortedColors.forEach(([color, count]) => {
+						if(color === "examples") return;
+						const colorBox = document.createElement('div');
+						colorBox.className = 'color-box';
+						colorBox.innerHTML = 
+							"<div class='color-square' style='background-color: " + color + ";'></div>" +
+							"<span>" + color + "</span> - <span>" + count + " items,   ----- warriorRate: "+ (sortedColors.examples[color].warriorRate).toFixed(2)+" ---- tolerance:"+sortedColors.examples[color].tolerance+ (sortedColors.examples[color].role == "predator"? "--p":"")+"</span>";
+						colorList.appendChild(colorBox);
+					});
+				}
+			}
+			
+			function displayMatrix(matrix) {
+				const colorMatrix = document.getElementById('colorMatrix');
+				colorMatrix.innerHTML = "";
+				for(a of matrix){
+					
+						const colorBox = document.createElement('div');
+						colorBox.className = 'color-box';
+					for( c of a) {
+						colorBox.innerHTML += 
+							"<div class='color-square' style='background-color: " + c + ";'></div>" +
+							"<span>" + c + "</span>";
+						colorMatrix.appendChild(colorBox);
+					}
+				}
+			}
+
+			// Main function to process and display the colors
+			function processAndDisplayColors(items) {
+				const colorCounts = countColors(items);
+				const sortedColors = sortColorsByFrequency(colorCounts);
+				displayColors(sortedColors);
+				
+
+				const showMatrix = document.getElementById("showMatrix").checked;
+				if(showMatrix && sortedColors.length <=100){
+					let colors = Object.keys(colorCounts).filter( c=> c!="examples");
+					colors = colors.sort((a,b) => colorCounts[b] - colorCounts[a])
+					const matrix = colors.map((color) => {
+						return (colors.filter(c => taxicabDistance(c, color)<colorCounts.examples[color].tolerance).sort((a,b)=> a==color?-1: b==color? 1: 0));
+					});
+					displayMatrix(matrix);
+				}
+			}
+			
+			function moveRandomly(unit) {
+				let moveX = Math.floor(random()*2);
+				let direction = 1 - 2 * Math.floor(random()*2);
+				
+				let x = unit.x;
+				let y = unit.y;
+				if(moveX) x = unit.x+direction;
+				else y = unit.y + direction;
+				x = (x+w.width)%w.width;
+				y =(y+w.height)%w.height;
+				w.moveUnit(unit, x,y);
+			}
+			
+			function shiftColorRandomly(color) {
+				let rgb = hexToRgb(color);
+				let hue = Math.floor(random()*3);
+				let direction = 1-2*Math.floor(random()*2);
+				let colorArray = [rgb.r,rgb.g,rgb.b];
+				colorArray[hue] = Math.min(255, Math.max(0,colorArray[hue]+49*direction));
+				return rgbToHex(...colorArray)
+			}
+			
+			function step() {
+				let unit = w.units[w.nextUnit];
+				
+				if(unit.role =="farmer"){
+					//if (w.units.filter(u => u.x == unit.x && u.y == unit.y && u.role == "farmer").length <=1) {
+					if (w.map[unit.x][unit.y].filter(u => u.role == "farmer").length <=1) {
+						unit.food +=4;
+					} else {
+						moveRandomly(unit)
+					}			
+				}
+	
+				if(unit.role == "warrior") {
+					moveRandomly(unit);
+					//let neighbors = w.units.filter(u => u.x == unit.x && u.y == unit.y);
+					let neighbors = w.map[unit.x][unit.y];
+					for(n of neighbors) {
+						if(taxicabDistance(unit.color,n.color) > unit.tolerance) {
+							n.food-=10;
+						}
+						else {
+							unit.food+=2;
+							n.food-=2;
+						}
+					}
+				}
+				
+				if(unit.role == "predator"){
+					moveRandomly(unit);
+					let prey = w.map[unit.x][unit.y].filter(n => taxicabDistance(unit.color, n.color) > unit.tolerance);
+					if(prey.length > 0){
+						//TODO: sort by food? or not
+						let efficiency = 3;
+						target = prey[Math.floor(Math.random() * prey.length)];
+						let toEat = Math.min(Math.floor(target.food/efficiency), 16);
+						target.food -= toEat*efficiency+6;
+						unit.food += toEat;
+					}
+				}
+				
+				unit.food -= 2;
+				if(unit.food < 0) {
+					w.removeUnit(unit, w.nextUnit);
+					//w.units.splice(w.nextUnit, 1);
+				}
+				if(unit.food > 50){
+					//if(random()> unit.warriorRate)w.units.splice(w.nextUnit, 0, makeVillager(unit.x, unit.y, random() < 0? shiftColorRandomly(unit.color):unit.color, 20, unit.tolerance, unit.warriorRate));
+					//else w.units.splice(w.nextUnit, 0, makeWarrior(unit.x, unit.y, unit.color, 20, unit.tolerance, unit.warriorRate));
+					// w.units.splice(w.nextUnit, 0, created);
+					
+					let created;
+					if(unit.role == "predator") created = makePredator(unit.x, unit.y, unit.color, 20, unit.tolerance);
+					else if(random()> unit.warriorRate) created = makeVillager(unit.x, unit.y, random() < 0? shiftColorRandomly(unit.color):unit.color, 20, unit.tolerance, unit.warriorRate);
+					else created = makeWarrior(unit.x, unit.y, unit.color, 20, unit.tolerance, unit.warriorRate);
+					w.addUnit(created, created.x, created.y, w.nextUnit);
+					
+					unit.food -= 25;
+				}
+				w.nextUnit = (w.nextUnit+1) % w.units.length;
+			}
+			function round() {
+				let initialFirst = w.nextUnit;
+				do{
+					step();
+				}while(initialFirst!= w.nextUnit);
+			}
+			
+			function draw() {
+				let canvas = document.getElementById("canvas");
+				let ctx = canvas.getContext("2d");
+					
+				ctx.fillStyle = "#aaccaa";
+				ctx.strokeStyle = "#000000";
+				ctx.fillRect(0,0,w.width*config.scale,w.height*config.scale);
+				ctx.strokeRect(0,0,w.width*config.scale,w.height*config.scale);
+				
+				for(let u of w.units) {
+					
+					ctx.beginPath();
+					ctx.fillStyle = u.color;
+					if(u.role != "predator")
+						ctx.arc(u.x*config.scale+config.scale/2, u.y*config.scale+config.scale/2, config.scale/2*.8, 0, Math.PI * 2);
+					else 
+						ctx.fillRect((u.x+.15)*config.scale, (u.y+.15)*config.scale, config.scale*.7, config.scale*.7);
+					ctx.fill();
+					if(u.role == "warrior") ctx.stroke();
+					ctx.closePath();
+
+				}	
+			}
+			function tick() {
+				round();
+				
+				if(w.time%w.historyLogRate == 0){
+					w.history.push(
+						countColors(w.units)
+					)
+				}
+				if(w.time%w.ticksPerDraw){
+					draw();
+					processAndDisplayColors(w.units);
+				}
+				w.time++;
+				
+				if(!pause)setTimeout(tick, 100); 
+			}
+			
+			function newGame() {
+				w = makeWorld();
+				document.getElementById("canvas").height = w.height*config.scale
+				document.getElementById("canvas").width = w.width*config.scale
+				draw();
+				tick();
+			}
+			function pauseNow() {
+				pause = true;
+			}
+			function start() {
+				pause = false;
+				tick();
+			}
+			function historyReport() {
+				let report = Object.keys(w.history[0]).sort().filter(k=> k!= "examples").map(key => ({ key: key, history: w.history.map( tick => tick[key]? tick[key]: 0)})).map(i => i.key + i.history.join(",")).join("|")
+				console.log("history",report);
+			}
+		</script>
+	</head>
+	<body>
+	<button onClick= "newGame()">new game</button>
+	<button onClick= "pauseNow()">pause</button>
+	<button onClick = "start()">restart</button>
+	<button onClick = "historyReport()">history report</button>
+	<br>
+	show color totals: <input type="checkbox" id = "showTotals"></input>
+	show color matrix: <input type="checkbox" id = "showMatrix"></input>
+	Height: <input type="number" id = "height" value = 10></input>
+	Width: <input type="number" id = "width" value = 10></input><br>
+	Scale: <input type="number" id = "scale" value = 25></input>
+	Starting Units: <input type="number" id = "starting" value = 100></input><br>
+    <canvas id="canvas" width="400" height="400"></canvas>
+			
+		</canvas>
+		    <div id="colorList"></div>
+		    <div id="colorMatrix"></div>
+		<script>
+			let w = makeWorld();
+			document.getElementById("canvas").height = w.height*config.scale
+			document.getElementById("canvas").width = w.width*config.scale
+			draw();
+			tick();
+		</script>
+	</body>
+</html>
