@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konva Drag and Drop</title>
+    <script src="https://cdn.jsdelivr.net/npm/konva@8.3.5/konva.min.js"></script>
+    <script defer src="resources.js"></script>
+    <script defer src="stage.js"></script>
+    <script defer src="script.js"></script>
+    <script defer src="resourceBoxes.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #container {
+            width: 100vw;
+            height: 100vh;
+            background-color: #d3d3d3;
+            border: 3px solid black;
+            box-sizing: border-box;
+        }
+        #context-menu {
+            position: absolute;
+            display: none;
+            background: white;
+            border: 1px solid black;
+            padding: 5px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="context-menu"><li id="mode-toggle">toggle mode</li></div>
+</body>
+</html>
