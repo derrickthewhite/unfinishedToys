@@ -1,0 +1,215 @@
+// Recursive function to subdivide edges and add orthogonal displacement (fractality)
+function subdivide(points, roughness, depth) {
+	if (depth <= 0) return points;
+
+	const newPoints = [];
+	for (let i = 0; i < points.length - 1; i++) {
+		let p1 = points[i];
+		let p2 = points[i + 1];
+
+		// Midpoint
+		let midX = (p1.x + p2.x) / 2;
+		let midY = (p1.y + p2.y) / 2;
+
+		// Calculate the direction of the line segment (p1 -> p2)
+		let directionX = p2.x - p1.x;
+		let directionY = p2.y - p1.y;
+
+		// Normalize the direction vector
+		let length = Math.sqrt(directionX * directionX + directionY * directionY);
+		let unitDirectionX = directionX / length;
+		let unitDirectionY = directionY / length;
+
+		// Find the perpendicular (orthogonal) direction to the line segment
+		let perpendicularX = -unitDirectionY;
+		let perpendicularY = unitDirectionX;
+
+		// Displace the midpoint along the perpendicular direction
+		let displacement = (Math.random() - 0.5) * roughness;
+		midX += perpendicularX * displacement;
+		midY += perpendicularY * displacement;
+
+		// Add the first point and the displaced midpoint
+		newPoints.push(p1);
+		newPoints.push({ x: midX, y: midY });
+	}
+	newPoints.push(points[points.length - 1]); // Add the last point
+
+	// Recursively subdivide further
+	return subdivide(newPoints, roughness * 0.7, depth - 1); // Decrease roughness and depth
+}
+
+// Generate initial points with more randomness (chaotic angles and radius)
+function generateBaseLoop(radius, centerX, centerY) {
+	const numPoints = Math.floor(Math.random() * 6) + 3; // Random number of points between 3 and 8
+	const angleStep = (Math.PI * 2) / numPoints;
+
+	const points = [];
+	const globalRotation = (Math.random() * Math.PI * 2) - Math.PI; // Random rotation
+
+	for (let i = 0; i < numPoints; i++) {
+		let angle = i * angleStep + (Math.random() - 0.5) * angleStep;  // Random offset
+		angle += globalRotation;
+
+		let r = radius + Math.random() * radius - (radius / 2); // Chaotic radius
+		let x = centerX + Math.cos(angle) * r;
+		let y = centerY + Math.sin(angle) * r;
+		points.push({ x, y });
+	}
+	points.push(points[0]); // Close the loop
+	return points;
+}
+
+// Convert points array to an SVG path string
+function pointsToSVGPath(points) {
+	let pathData = `M ${points[0].x},${points[0].y}`;
+	for (let i = 1; i < points.length; i++) {
+		pathData += ` L ${points[i].x},${points[i].y}`;
+	}
+	pathData += " Z"; // Close the loop
+	return pathData;
+}
+
+// Add evenly spaced points along the split line
+function addBoundaryPoints(p1, p2, numPoints = 10) {
+	const boundaryPoints = [];
+	for (let i = 0; i <= numPoints; i++) {
+		const t = i / numPoints;
+		const x = p1.x + t * (p2.x - p1.x);
+		const y = p1.y + t * (p2.y - p1.y);
+		boundaryPoints.push({ x, y });
+	}
+	return boundaryPoints;
+}
+
+function distance(p1,p2) {
+	return Math.sqrt((p1.x-p2.x)*(p1.x-p2.x) + (p1.y-p2.y)*(p1.y-p2.y))
+}
+
+// Split one province at a time, returning two new provinces
+function splitProvince(province) {
+	let splitIndex1 = Math.floor(Math.random() * province.length);
+	let splitIndex2 = (splitIndex1+Math.floor(province.length/2)) %province.length;
+	//TODO: walk them around and measure
+	
+	/*
+	let minIndex = 0;
+	let minDistance = -Math.Infinity;
+	for(var i =-5; i<= 5; i++){
+		let newIndex = (splitIndex1+i + province.length)%province.length;
+		let dist = distance(province[newIndex],province[splitIndex2]);
+		if(dist < minDistance){
+			minIndex = newIndex;
+			minDistance = distance
+		}
+	}
+	splitIndex1 = minIndex;
+	*/
+
+	const p1 = province[splitIndex1];
+	const p2 = province[splitIndex2];
+
+	// Add boundary points between p1 and p2
+	const boundaryPoints = addBoundaryPoints(p1, p2, Math.floor(province.length/2));
+
+	const province1 = [];
+	const province2 = [];
+
+	let onProvince1 = true;
+	for (let i = 0; i < province.length; i++) {
+		const point = province[i];
+
+		if (point === p1 || point === p2) {
+			if(onProvince1)province1.push(...(point === p1? boundaryPoints: boundaryPoints.toReversed()));
+			else province2.push(...(point === p1? boundaryPoints: boundaryPoints.toReversed()));
+			onProvince1 = !onProvince1; // Switch province when hitting boundary
+		}
+		else {
+			if (onProvince1) {
+				province1.push(point);
+			} else {
+				province2.push(point);
+			}
+		}
+
+	}
+
+	return [province1, province2];
+}
+
+// Generate multiple provinces by progressively splitting
+function generateProvinces(points, numProvinces) {
+	let provinces = [points];
+
+	while (provinces.length < numProvinces) {
+		const provinceIndex = Math.floor(Math.random() * provinces.length);
+		const provinceToSplit = provinces.splice(provinceIndex, 1)[0];
+		const [province1, province2] = splitProvince(provinceToSplit);
+
+		provinces.push(province1, province2);
+	}
+
+	return provinces;
+}
+
+// Main function to draw the fractal squiggly loop with provinces
+function drawFractalProvinces() {
+	//const svg = document.getElementById('svgCanvas');
+	const radius = 150;
+	const centerX = 250;
+	const centerY = 250;
+	const roughness = 50;
+	const depth = 5;
+
+	// Generate initial continent shape
+	let points = generateBaseLoop(radius, centerX, centerY);
+	points = subdivide(points, roughness, depth);
+	
+	//TODO: undo
+	
+	/*
+	points = [
+		{x:10,y:10},
+		{x:10,y:20},
+		{x:10,y:30},
+		{x:10,y:40},
+		{x:10,y:50},
+		{x:10,y:60},
+		{x:20,y:60},
+		{x:30,y:60},
+		{x:40,y:60},
+		{x:50,y:60},
+		{x:60,y:60},
+		{x:60,y:50},
+		{x:60,y:40},
+		{x:60,y:30},
+		{x:60,y:20},
+		{x:60,y:10},
+		{x:50,y:10},
+		{x:40,y:10},
+		{x:30,y:10},
+		{x:20,y:10}
+	];
+	*/
+
+	// Split the continent into provinces (e.g., 4 provinces)
+	//const provinces = generateProvinces(points, 4);
+	const provinces = generateProvinces(points, 1);
+	//provinces.unshift(points);
+	// Render each province as a separate SVG path
+	const result =  provinces.map((province, index) => {
+		const pathData = pointsToSVGPath(province);
+
+		const pathElement = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		pathElement.setAttribute("d", pathData);
+		//pathElement.setAttribute("fill", `hsl(${Math.random() * 360}, 70%, 70%)`);
+		pathElement.setAttribute("fill", `hsl(${index*90}, 70%, 70%)`);
+		pathElement.setAttribute("stroke", "darkblue");
+		pathElement.setAttribute("stroke-width", "2");
+
+		//svg.appendChild(pathElement);
+		return pathElement;
+	});
+	result.push(provinces);
+	return result;
+}

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Triangle Map</title>
+  <style>
+    canvas { border: 1px solid black; display: block; }
+    body { margin: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+<div id="controls" style="
+  position: absolute;
+  top: 10px; left: 10px;
+  background: white;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-family: sans-serif;
+  z-index: 10;
+">
+  <label for="fill-mode">Fill by:</label>
+  <select id="fill-mode" selected="humidity">
+    <option value="none">None</option>
+    <option value="temperature">Temperature</option>
+    <option value="humidity">Humidity</option>
+    <option value="roughness">Roughness</option>
+  </select>
+</div>
+
+<canvas id="canvas"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6"></script>
+<script src="continentShape.js"></script>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let width = canvas.width = window.innerWidth;
+let height = canvas.height = window.innerHeight;
+
+// Settings
+const spacing = 50;
+const jitter = 30;
+const cols = 60;
+const rows = 60;
+
+// Generate random jittered grid points
+function generatePoints() {
+  const points = [];
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      let px = x * spacing + (y%2==0?0:spacing/2) + (Math.random() - 0.5) * jitter;
+      let py = y * spacing + (Math.random() - 0.5) * jitter;
+      if(Math.random() > .5) points.push([px, py]);
+    }
+  }
+  return points;
+}
+
+// Initial camera state
+let camera = {
+  x: 0,
+  y: 0,
+  zoom: .25
+};
+
+// Transform screen to world coords
+function screenToWorld(x, y) {
+  return [
+    (x - width / 2) / camera.zoom + camera.x,
+    (y - height / 2) / camera.zoom + camera.y
+  ];
+}
+
+// Transform world to screen coords
+function worldToScreen(x, y) {
+  return [
+    (x - camera.x) * camera.zoom + width / 2,
+    (y - camera.y) * camera.zoom + height / 2
+  ];
+}
+
+function getViewportBounds() {
+  const topLeft = screenToWorld(0, 0);
+  const bottomRight = screenToWorld(window.innerWidth, window.innerHeight);
+
+  return {
+    minX: topLeft[0],
+    minY: topLeft[1],
+    maxX: bottomRight[0],
+    maxY: bottomRight[1]
+  };
+}
+
+
+function getOldViewportBounds() {
+  const topLeft = screenToWorld(0, 0);
+  const bottomRight = screenToWorld(width, height);
+  return {
+    minX: topLeft[0],
+    minY: topLeft[1],
+    maxX: bottomRight[0],
+    maxY: bottomRight[1]
+  };
+}
+
+
+function triangleIntersectsViewport(triangle, viewport) {
+  const verts = triangle.points.map(i => points[i]);
+  let xs = verts.map(v => v[0]);
+  let ys = verts.map(v => v[1]);
+  let minX = Math.min(...xs), maxX = Math.max(...xs);
+  let minY = Math.min(...ys), maxY = Math.max(...ys);
+
+  return !(maxX < viewport.minX || minX > viewport.maxX ||
+           maxY < viewport.minY || minY > viewport.maxY);
+}
+
+function computeMapCenter(points) {
+  let sumX = 0, sumY = 0;
+  for (const [x, y] of points) {
+    sumX += x;
+    sumY += y;
+  }
+  return [sumX / points.length, sumY / points.length];
+}
+
+// Random helpers
+function randomCulture() {
+  return `M${Math.floor(Math.random() * 3)}_S${Math.floor(Math.random() * 3)}_C${Math.floor(Math.random() * 3)}`;
+}
+function randFloat() {
+  return Math.random().toFixed(2);
+}
+
+
+function setOutsideHumidity(continentPaths) {
+  for (const tri of triangleMap) {
+    const verts = tri.points.map(i => points[i]);
+    const centroid = [
+      (verts[0][0] + verts[1][0] + verts[2][0]) / 3,
+      (verts[0][1] + verts[1][1] + verts[2][1]) / 3
+    ];
+
+	const isLand = continentPaths.map(path => ctx.isPointInPath(path, centroid[0], centroid[1])).reduce((a,b) => a||b, false);
+    if (!isLand) {
+    //if (!ctx.isPointInPath(continentPath, centroid[0], centroid[1])) {
+      tri.humidity = 1.0;
+    }
+	else tri.humidity = tri.humidity> .9? .7: tri.humidity;
+  }
+}
+
+let points = generatePoints();
+let delaunay = d3.Delaunay.from(points);
+let trianglesRaw = delaunay.triangles;
+let halfedges = delaunay.halfedges;
+let triangleMap = []; // Array of full triangle objects
+
+// Build triangle objects
+for (let i = 0; i < trianglesRaw.length; i += 3) {
+  triangleMap.push({
+    id: i / 3,
+    points: [trianglesRaw[i], trianglesRaw[i + 1], trianglesRaw[i + 2]],
+    neighbors: [], // to be filled later
+    culture: randomCulture(),
+    temperature: parseFloat(randFloat()),
+    humidity: parseFloat(randFloat()),
+    roughness: parseFloat(randFloat())
+  });
+}
+
+const [centerX, centerY] = computeMapCenter(points);
+
+camera = {
+  x: centerX,
+  y: centerY,
+  zoom: .25
+};
+
+const GRID_SIZE = 100; // pixels per cell
+let gridIndex = new Map(); // key: "x,y", value: list of triangle IDs
+
+
+let fillMode = "humidity";
+
+function getCellKey(x, y) {
+  return `${Math.floor(x / GRID_SIZE)},${Math.floor(y / GRID_SIZE)}`;
+}
+
+function valueToColor(value, mode) {
+  value = Math.max(0, Math.min(1, value)); // clamp
+
+  switch (mode) {
+    case "temperature": {
+      // Blue (cold) to white (mid) to red (hot)
+      if (value < 0.5) {
+        const t = value / 0.5;
+        return lerpColor([0, 0, 255], [255, 255, 255], t);
+      } else {
+        const t = (value - 0.5) / 0.5;
+        return lerpColor([255, 255, 255], [255, 0, 0], t);
+      }
+    }
+
+    case "humidity": {
+      // Tan (dry) → Green (normal) → Blue (wet)
+      if (value < 0.5) {
+        const t = value / 0.5;
+        return lerpColor([210, 180, 140], [0, 200, 0], t); // tan to green
+      } else {
+        const t = (value - 0.5) / 0.5;
+        return lerpColor([0, 200, 0], [0, 100, 255], t); // green to blue
+      }
+    }
+
+    case "roughness": {
+      // Light gray → dark gray → black
+      return lerpColor([200, 200, 200], [0, 0, 0], value);
+    }
+
+    default:
+      return "rgb(128,128,128)";
+  }
+}
+
+function lerpColor(colorA, colorB, t) {
+  const r = Math.round(colorA[0] + (colorB[0] - colorA[0]) * t);
+  const g = Math.round(colorA[1] + (colorB[1] - colorA[1]) * t);
+  const b = Math.round(colorA[2] + (colorB[2] - colorA[2]) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function addToGrid(triangle) {
+  // Find bounding box of triangle
+  let allX = triangle.points.map(i => points[i][0]);
+  let allY = triangle.points.map(i => points[i][1]);
+  let minX = Math.min(...allX), maxX = Math.max(...allX);
+  let minY = Math.min(...allY), maxY = Math.max(...allY);
+
+  let startX = Math.floor(minX / GRID_SIZE);
+  let endX = Math.floor(maxX / GRID_SIZE);
+  let startY = Math.floor(minY / GRID_SIZE);
+  let endY = Math.floor(maxY / GRID_SIZE);
+
+  for (let gx = startX; gx <= endX; gx++) {
+    for (let gy = startY; gy <= endY; gy++) {
+      const key = `${gx},${gy}`;
+      if (!gridIndex.has(key)) gridIndex.set(key, []);
+      gridIndex.get(key).push(triangle.id);
+    }
+  }
+}
+
+function getRandomPlacementOffset(big, small) {
+  const [bigMinX, bigMaxX, bigMinY, bigMaxY] = big;
+  const [smallMinX, smallMaxX, smallMinY, smallMaxY] = small;
+
+  const smallWidth = smallMaxX - smallMinX;
+  const smallHeight = smallMaxY - smallMinY;
+
+  const xMin = bigMinX;
+  const xMax = bigMaxX - smallWidth;
+
+  const yMin = bigMinY;
+  const yMax = bigMaxY - smallHeight;
+
+  const newMinX = xMin + Math.random() * (xMax - xMin);
+  const newMinY = yMin + Math.random() * (yMax - yMin);
+
+  const dx = newMinX - smallMinX;
+  const dy = newMinY - smallMinY;
+
+  return { dx, dy };
+}
+
+
+// Populate the grid
+for (const triangle of triangleMap) {
+  addToGrid(triangle);
+}
+
+// Build neighbor map
+// Create a map from edge to triangle
+let edgeToTriangle = new Map();
+for (let i = 0; i < trianglesRaw.length; i += 3) {
+  const triID = i / 3;
+  for (let j = 0; j < 3; j++) {
+    let a = trianglesRaw[i + j];
+    let b = trianglesRaw[i + (j + 1) % 3];
+    edgeToTriangle.set(`${a},${b}`, triID);
+  }
+}
+
+// Use halfedges to find neighbors
+for (let i = 0; i < halfedges.length; i++) {
+  const twin = halfedges[i];
+  if (twin < 0) continue;
+
+  let triA = Math.floor(i / 3);
+  let triB = Math.floor(twin / 3);
+
+  if (!triangleMap[triA].neighbors.includes(triB)) triangleMap[triA].neighbors.push(triB);
+  if (!triangleMap[triB].neighbors.includes(triA)) triangleMap[triB].neighbors.push(triA);
+}
+
+const numContinents = 20;
+const continents = [];
+for(var c = 0; c< numContinents; c++ ){
+	//const continentScale = Math.floor(Math.random()*7+1);
+	const continentScale = 2;
+	const continent = drawFractalProvinces();
+	const svgPath = continent[0];
+	const d = svgPath.getAttribute("d");
+	const basePath = new Path2D(d);
+
+	const continentBoundaries = [
+			continent[1][0].reduce((sofar,b) => Math.min(sofar,b.x), 10000)*continentScale,
+			continent[1][0].reduce((sofar,b) => Math.max(sofar,b.x), -10000)*continentScale,
+			continent[1][0].reduce((sofar,b) => Math.min(sofar,b.y), 10000)*continentScale,
+			continent[1][0].reduce((sofar,b) => Math.max(sofar,b.y), -10000)*continentScale,
+		]
+
+	const mapBoundaries = [
+			points.reduce((sofar,b) => Math.min(sofar,b[0]), 10000),
+			points.reduce((sofar,b) => Math.max(sofar,b[0]), -10000),
+			points.reduce((sofar,b) => Math.min(sofar,b[1]), 10000),
+			points.reduce((sofar,b) => Math.max(sofar,b[1]), -10000),
+	];
+	
+	const {dx,dy} = getRandomPlacementOffset(mapBoundaries, continentBoundaries);
+
+	const transform = new DOMMatrix().translate(dx, dy).scale(continentScale)
+	const continentPath = new Path2D();
+	continentPath.addPath(basePath, transform);
+
+	continents.push(continentPath);
+}
+	setOutsideHumidity(continents);
+
+// Barycentric method for point-in-triangle test
+function pointInTriangle(p, a, b, c) {
+  const [px, py] = p;
+  const [ax, ay] = a;
+  const [bx, by] = b;
+  const [cx, cy] = c;
+
+  const v0x = cx - ax, v0y = cy - ay;
+  const v1x = bx - ax, v1y = by - ay;
+  const v2x = px - ax, v2y = py - ay;
+
+  const dot00 = v0x * v0x + v0y * v0y;
+  const dot01 = v0x * v1x + v0y * v1y;
+  const dot02 = v0x * v2x + v0y * v2y;
+  const dot11 = v1x * v1x + v1y * v1y;
+  const dot12 = v1x * v2x + v1y * v2y;
+
+  const denom = dot00 * dot11 - dot01 * dot01;
+  if (denom === 0) return false;
+
+  const u = (dot11 * dot02 - dot01 * dot12) / denom;
+  const v = (dot00 * dot12 - dot01 * dot02) / denom;
+
+  return u >= 0 && v >= 0 && (u + v) <= 1;
+}
+
+function draw() {
+	let triangles = trianglesRaw;
+  ctx.clearRect(0, 0, width, height);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#444";
+  ctx.beginPath();
+  
+  for (const triangle of triangleMap) {
+    if (!triangleIntersectsViewport(triangle, getViewportBounds())) {
+		continue;
+	}
+
+/*
+    const [a, b, c] = triangle.points.map(i => worldToScreen(...points[i]));
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(b[0], b[1]);
+    ctx.lineTo(c[0], c[1]);
+    ctx.closePath();
+	*/
+	
+	  const verts = triangle.points.map(i => worldToScreen(...points[i]));
+
+  if (fillMode !== "none") {
+    // Determine fill color based on attribute
+    const value = triangle[fillMode]; // e.g., temperature
+	const color = valueToColor(value, fillMode);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(...verts[0]);
+    ctx.lineTo(...verts[1]);
+    ctx.lineTo(...verts[2]);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Draw outline
+  ctx.beginPath();
+  ctx.moveTo(...verts[0]);
+  ctx.lineTo(...verts[1]);
+  ctx.lineTo(...verts[2]);
+  ctx.closePath();
+  ctx.stroke();
+  }
+
+  ctx.stroke();
+  
+  ctx.save();
+  const worldTransform = new DOMMatrix()
+	.translate(width/2, height/2)
+	.scale(camera.zoom)
+	.translate(-camera.x, -camera.y)
+	//.inverse();
+	
+	for(let continentPath of continents){
+		const currentContinent = new Path2D();
+		currentContinent.addPath(continentPath, worldTransform);
+
+		ctx.strokeStyle = "red";
+		ctx.lineWidth = 5;
+		ctx.stroke(currentContinent); // or finalPath
+	}
+	ctx.restore();
+}
+
+draw();
+
+// Pan and zoom
+let isDragging = false;
+let dragStart = [0, 0];
+canvas.addEventListener("mousedown", e => {
+  isDragging = true;
+  dragStart = [e.clientX, e.clientY];
+});
+canvas.addEventListener("mouseup", () => isDragging = false);
+canvas.addEventListener("mousemove", e => {
+  if (!isDragging) return;
+  let dx = (e.clientX - dragStart[0]) / camera.zoom;
+  let dy = (e.clientY - dragStart[1]) / camera.zoom;
+  camera.x -= dx;
+  camera.y -= dy;
+  dragStart = [e.clientX, e.clientY];
+  draw();
+});
+/*
+canvas.addEventListener("wheel", e => {
+  let zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+  camera.zoom *= zoomFactor;
+  draw();
+});
+*/
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+
+  const mouseX = e.clientX;
+  const mouseY = e.clientY;
+
+  // Get world position under the mouse BEFORE zoom
+  const [wxBefore, wyBefore] = screenToWorld(mouseX, mouseY);
+
+  // Apply zoom change
+  const zoomFactor = 1.1;
+  const scale = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
+
+  camera.zoom *= scale;
+
+  // Get world position under the mouse AFTER zoom
+  const [wxAfter, wyAfter] = screenToWorld(mouseX, mouseY);
+
+  // Move camera so that mouse stays over the same world point
+  camera.x += wxBefore - wxAfter;
+  camera.y += wyBefore - wyAfter;
+
+  draw(); // re-render
+}, { passive: false });
+
+canvas.addEventListener("click", e => {
+  const [wx, wy] = screenToWorld(e.clientX, e.clientY);
+
+  const cellKey = getCellKey(wx, wy);
+  const candidates = gridIndex.get(cellKey) || [];
+
+  let clickedTriangle = null;
+  for (const id of candidates) {
+    const tri = triangleMap[id];
+    const [a, b, c] = tri.points.map(i => points[i]);
+    if (pointInTriangle([wx, wy], a, b, c)) {
+      clickedTriangle = tri;
+      break;
+    }
+  }
+
+  draw(); // Clear/redraw
+  console.log(candidates);
+
+  if (clickedTriangle) {
+    // Highlight
+    ctx.fillStyle = "rgba(255,0,0,0.3)";
+    ctx.beginPath();
+    clickedTriangle.points.forEach((id, i) => {
+      const [x, y] = worldToScreen(...points[id]);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fill();
+
+    console.log("Clicked Triangle:", clickedTriangle);
+  }
+});
+
+window.addEventListener("resize", () => {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+  draw();
+});
+
+
+document.getElementById("fill-mode").addEventListener("change", e => {
+  fillMode = e.target.value;
+  draw(); // re-render
+});
+
+</script>
+</body>
+</html>
