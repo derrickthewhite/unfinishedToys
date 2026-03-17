@@ -51,7 +51,7 @@
 		.score{
 			font-size: 100px;
 		}
-		#gameOver{
+		.modal{
 			position:absolute;
 			width: 50%;
 			left: 25%;
@@ -152,9 +152,162 @@
 			protagonist.hearts = 0;
 			protagonist.icon = "assets/Skull.svg";
 			protagonist.loyalty = "protagonist";
+			protagonist.ignores = [];
+			protagonist.ignores = [];
+			mode = "pause";
+		}
+		
+		function getHighestValuesByType(arr) {
+			// Create an empty object to track the highest value for each type
+			const highestByType = {};
+
+			// Iterate over each object in the array
+			arr.forEach(item => {
+				const { type, value } = item;
+
+				// If the type is not in the object, or if the current value is higher, update it
+				if (!highestByType[type] || value > highestByType[type].value) {
+					highestByType[type] = item;
+				}
+			});
+
+			// Convert the highestByType object back into an array
+			return Object.values(highestByType);
+		}
+		function calculateCharacterCombat(attacker, defender) {
+			var atkWeapons = (attacker.resources? attacker.resources.filter(weapon => weapon.weaponDamage && !weapon.weaponType.includes("armor")).map(weapon => ({
+				value : weapon.weaponDamage,
+				type: weapon.weaponType? weapon.weaponType: "physical"
+			})): []).concat([{
+				type: "none",
+				value: 0
+			}]);
+			atkWeapons = getHighestValuesByType(atkWeapons);
+			
+			var defWeapons = (defender.resources? defender.resources.filter(weapon => weapon.weaponDamage && !weapon.weaponType.includes("armor")).map(weapon => ({
+				value : weapon.weaponDamage,
+				type: weapon.weaponType? weapon.weaponType: "physical"
+			})): []).concat([{
+				type: "none",
+				value: 0
+			}]);
+			defWeapons = getHighestValuesByType(atkWeapons);
+			
+			var atkArmors = (attacker.resources? attacker.resources.filter(weapon => weapon.weaponDamage && weapon.weaponType.includes("armor"))
+			.map(a => ({
+				type: a.weaponType.split("-")[0],
+				value: a.weaponDamage
+			})):[]).concat([{
+				type: "none",
+				value: 0
+			}]);
+			atkArmors = getHighestValuesByType(defArmors);
+			
+			var defArmors = (defender.resources? defender.resources.filter(weapon => weapon.weaponDamage && weapon.weaponType.includes("armor"))
+			.map(a => ({
+				type: a.weaponType.split("-")[0],
+				value: a.weaponDamage
+			})):[]).concat([{
+				type: "none",
+				value: 0
+			}]);
+			defArmors = getHighestValuesByType(defArmors);
+
+			atkWeapons.map(atkWeapon => {
+				var attackerDamageType = attacker.damageType? attacker.damageType : "physical";
+				if(weapon.type == "none") weapon.type = attackerDamageType;
+
+			
+				var defArmor = defArmors.find(armor=> attackerDamageType == armor.type);
+				defArmor = defArmor? defArmor.value: 0;
+
+			});
+		}
+		function getBaseDamage(attacker, defender) {
+			var atkWeapons = (attacker.resources? attacker.resources.filter(weapon => weapon.weaponDamage && !weapon.weaponType.includes("armor")).map(weapon => ({
+				value : weapon.weaponDamage,
+				type: weapon.weaponType? weapon.weaponType: "physical"
+			})): []).concat([{
+				type: "none",
+				value: 0
+			}]);
+			atkWeapons = getHighestValuesByType(atkWeapons);
+			
+			var defArmors = (defender.resources? defender.resources.filter(weapon => weapon.weaponDamage && weapon.weaponType.includes("armor"))
+			.map(a => ({
+				type: a.weaponType.split("-")[0],
+				value: a.weaponDamage
+			})):[]).concat([{
+				type: "none",
+				value: 0
+			}]);
+			defArmors = getHighestValuesByType(defArmors);
+			
+			//TODO: filter ignores
+			
+			var attacks =  atkWeapons.map(weapon => {
+				var hearts = attacker.hearts;
+				var attackerDamageType = attacker.damageType? attacker.damageType : "physical";
+				if(weapon.type == "none") weapon.type = attackerDamageType;
+				if(defender.ignores && defender.ignores.includes(attackerDamageType)) {
+					hearts = 0;
+				}
+				var mainArmor = defArmors.find(armor=> attackerDamageType == armor.type);
+				var mainArmorValue = mainArmor? mainArmor.value: 0;
+				
+				if(hearts > mainArmorValue){
+					hearts = hearts-mainArmorValue;
+					mainArmorValue = 0;
+				}
+				else {
+					hearts = 0;
+					mainArmorValue = mainArmorValue-hearts;
+				}
+				hearts += weapon.value;
+				if(weapon.type == weapon.type){
+					if(hearts> mainArmorValue) {
+						hearts = hearts - mainArmorValue;
+						mainArmorValue = 0;
+					} else {
+						hearts = 0;
+					}
+				} else {
+					var weaponArmor = defArmors.find(armor => armor.type == weapon.type);
+					var weaponArmorValue = weaponArmor? weaponArmor.value: 0;
+					if(hearts> weaponArmorValue) {
+						weaponArmorValue = 0;
+						hearts = hearts - weaponArmorValue;
+					} else {
+						hearts = 0;
+					}
+				}
+				weapon.damage = hearts;
+				return weapon;
+			})
+			
+			attacks = attacks.sort((a,b) => {
+				return b.damage - a.damage;
+			});
+			return attacks [0]
+		}
+		function getDamage(attacker,defender){
+			var result = attacker.hearts;
+			if(!defender.ignores || !defender.ignores.includes("phsyical")){
+				result += getArmor(attacker);
+			}
+			result -= getArmor(defender)
+			return Math.max(0,result);
+		}
+
+		function hasDamageType (unit, damageType) {
+			return (unit.damageTypes && unit.damageTypes.includes (damageType))
+			|| (unit.resources && unit.resources.length != 0 || character.resources.includes(i => i.weaponType == damageType))
 		}
 		function runCollision(character,collision) {
 			if(collision.loyalty != "object" && collision.loyalty!= character.loyalty){
+				if(collision.loyalty == "hazard" && character.ignores && character.ignores.includes(collision.damage)) {
+					return;
+				}
 				if(collision.name == "Fire"){
 					if(character.resources && character.resources.filter(r => r.name == "Bucket").length > 0){
 						var bucket = character.resources.filter(r => r.name == "Bucket")[0];
@@ -167,18 +320,60 @@
 						return;
 					}
 				}
-			
-				var characterDamage = Math.max(0,character.hearts + getArmor(character) - getArmor(collision));
-				var collisionDamage = Math.max(0,collision.hearts + getArmor(collision) - getArmor(character));
-				//TODO: swords and shields should not protect from fire
-				if(character.loyalty!= "hazard")character.hearts -= collisionDamage;
-				if(collision.loyalty!= "hazard")collision.hearts -= characterDamage;
+				if(collision.name == "Web"){
+					if(character.resources && character.resources.filter(r => r.name == "Torch").length > 0){
+						collision.loyalty= "object";
+						collision.hearts =0;
+						collision.name = "Ashheap";
+						collision.icon = "assets/Ashheap.svg"
+						return;
+					}
+				}
 				
+				//TODO: Maybe refactor this?
+				if(character.vulnerable && character.vulnerable.includes("water") && collision.resources && collision.resources.filter(r => r.name == "Bucket").length){
+						var bucket = collision.resources.filter(r => r.name == "Bucket")[0];
+						bucket.name = "Empty Bucket";
+						bucket.icon = "assets/EmptyBucket.svg"
+						character.loyalty= "object";
+						character.hearts =0;
+						character.name = "Ashheap";
+						character.icon = "assets/Ashheap.svg"
+						characters.splice(characters.indexOf(character),1);
+						objects.push(character);
+						return;
+				}
+				if(collision.vulnerable && collision.vulnerable.includes("water") && character.resources && character.resources.filter(r => r.name == "Bucket").length){
+						var bucket = character.resources.filter(r => r.name == "Bucket")[0];
+						bucket.name = "Empty Bucket";
+						bucket.icon = "assets/EmptyBucket.svg"
+						collision.loyalty= "object";
+						collision.hearts =0;
+						collision.name = "Ashheap";
+						collision.icon = "assets/Ashheap.svg"
+						characters.splice(characters.indexOf(collision),1);
+						objects.push(collision);
+
+						return;
+				}
+			
+				var characterDamage = getDamage(character, collision)//Math.max(0,character.hearts + getArmor(character) - getArmor(collision));
+				var collisionDamage = getDamage(collision, character)//Math.max(0,collision.hearts + getArmor(collision) - getArmor(character));
+				//TODO: swords and shields should not protect from fire
+				if(character.loyalty!= "hazard" && !(character.ignores && character.ignores.includes("physical")))
+					character.hearts -= collisionDamage;
+				if(collision.loyalty!= "hazard" && !(collision.ignores && collision.ignores.includes("physical")))
+					collision.hearts -= characterDamage;
+					
+				
+				//TODO: check for damage types instead
 				if(character.hearts <= 0) {
 					characters = characters.filter(c => c!=character);
 					objects = objects.filter(o => o!=character);
 					character.loyalty= "object";
 					character.icon = "assets/Skull.svg";
+					if(character.regenerates && !hasDamageType(collision, "fire"))character.icon = "assets/SkullRegen.svg"
+					if(character.regenerates && hasDamageType(collision, "fire")) character.regenerates = false;
 					objects.push(character);
 				}
 				if(collision.hearts <= 0) {
@@ -186,6 +381,8 @@
 					objects = objects.filter(o => o!=collision);
 					collision.loyalty= "object";
 					collision.icon = "assets/Skull.svg";
+					if(collision.regenerates && !hasDamageType(character, "fire"))collision.icon = "assets/SkullRegen.svg"
+					if(collision.regenerates && hasDamageType(character, "fire"))collision.regenerates = false
 					objects.push(collision);
 				}
 				if(protagonist.hearts <= 0) {
@@ -327,13 +524,29 @@
 			}
 			return coords;
 		}
+		function randomUnobstructedQuadrantLocation (x,y) {
+			var coords = {
+				x: Math.floor(Math.random()*9)+x*9,
+				y: Math.floor(Math.random()*9)+y*9
+			};
+			while(characters.concat(objects).filter(obstruction => obstruction.x== coords.x && obstruction.y==coords.y).length){
+				coords.x = Math.floor(Math.random()*9)+x*9;
+				coords.y = Math.floor(Math.random()*9)+y*9;
+			}
+			return coords;
+		}
+		function filterMoves(moves, character) {
+			return moves.filter(m => m.collisions.filter(c=> c.loyalty == "hazard" 
+			&& (!character.ignores || !character.ignores.includes(c.damage))).length == 0);
+		}
 		function NPCTurn (){
 			for(var character of characters) {
 				if(character.name != "protagonist"){
 					var moves = ["Up","Down","Left","Right"]
 						.map(dir=> move(character, dir))
 						.filter(m => m);
-					moves = moves.filter(m => m.collisions.filter(c=> c.loyalty == "hazard").length == 0);
+					//moves = moves.filter(m => m.collisions.filter(c=> c.loyalty == "hazard").length == 0);
+					moves = filterMoves(moves, character);
 					if(moves.length!=1){
 						moves = moves.filter(m => m.x!= character.lastX || m.y != character.lastY);
 					}
@@ -349,20 +562,31 @@
 					}
 				}
 			}
+			objects.filter(object => object.regenerates).forEach(object => {
+				object.hearts++;
+				if(object.hearts== object.maxHearts){
+					objects.splice(objects.indexOf(object),1)
+					object.loyalty = object.liveLoyalty;
+					object.icon = object.liveIcon;
+					characters.push(object);
+				}
+			});
 			draw();
 		}
-		/*
-		//I don't think we use this anymore
-		function protagonistArmor() {
-			return protagonist.resources.filter(r => r.name == "Sword").length? 1:0;
-		}
-		*/
+
 		function getArmor(character) {
 			if(!(character.resources)) return 0;
 			return (character.resources.filter(r => r.name == "Sword").length? 1:0)
+			+(character.resources.filter(r => r.name == "Torch").length? 1:0)
 			+(character.resources.filter(r => r.name == "Shield").length? 1:0);
 		}
-		function setUp(){
+		function restart() {
+			protagonist.score = 0;
+			protagonist.resources= [];
+			protagonist.ignores= [];
+			setUp();
+		}
+		function setUp(levelName){
 			mazes = [
 				[genMaze(9,9), genMaze(9,9)],
 				[genMaze(9,9), genMaze(9,9)],
@@ -371,9 +595,10 @@
 			doors = [];
 			characters = [];
 			protagonist.hearts = protagonist.maxHearts;
-			protagonist.resources = [];
-			populateMaze();
+			//protagonist.resources = []; // maybe don't clear resources now?
+			populateMaze(levelName);
 			protagonist.icon = "assets/protagonist.svg"
+			mode = "walk";
 			draw();
 		}
 		function showDescription(description){
@@ -383,11 +608,22 @@
 		function hideDescription(){
 			document.getElementById("descriptionOverlay").style.display = "none";
 		}
+		function dropObject(object) {
+			objects.push(object);
+			protagonist.resources.splice(protagonist.resources.indexOf(object),1);
+			object.x = protagonist.x;
+			object.y = protagonist.y;
+			document.getElementById("dropItems").style.display = "none";
+			mode = "walk";
+			NPCTurn();
+			draw();
+		}
 		let mazes = [];
 		let characters = [];
 		let doors = [];
 		let objects = [];
 		let protagonist;
+		let mode = "walk";
 		function main() {
 			//Math.seedrandom("dragon");
 			mazes = [
@@ -398,6 +634,7 @@
 			populateMaze();
 			
 			document.addEventListener("keydown", (event) => {
+				if(mode !="walk")return;
 				var character = characters[0];
 				if(["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(event.code)){
 					var dir = event.code.replace("Arrow","");
@@ -454,7 +691,9 @@
 								//object.contents = [];
 								protagonist.score++;
 								object.icon = "assets/OpenChest.svg";
-								
+								object.name = "Opened Chest";
+								object.description = "There used to be treasure here!";
+
 								NPCTurn();
 								draw();
 							}
@@ -470,8 +709,20 @@
 							if(object.resource == true){
 								objects = objects.filter(o => o!== object);
 								protagonist.resources.push(object);
-								NPCTurn();
-								draw();
+								if(protagonist.resources.length > config.itemLimit){
+									document.getElementById("itemsToDrop").innerHTML =""
+									for(let resource of protagonist.resources){
+										let image = document.createElement("img");
+										image.src = resource.icon;
+										image.onclick = () =>  {dropObject(resource)};
+										document.getElementById("itemsToDrop").appendChild(image);
+									}
+									document.getElementById("dropItems").style.display = "";
+									mode = "pause";
+								}else {
+									NPCTurn();
+									draw();
+								}
 							}
 							if(object.name == "Potion") {
 								protagonist.hearts = Math.max(protagonist.maxHearts, protagonist.hearts+1);
@@ -480,7 +731,7 @@
 								draw();
 							}
 							if(object.name == "Stairs") {
-								setUp();
+								setUp(object.destination);
 							}
 						}
 					}
@@ -505,11 +756,15 @@
 	<div id="LRMaze" class="maze"> 
 	</div>
 	<div id="inventory"></div>
-	<div id="gameOver" style="display:none">
+	<div id="dropItems" class = "modal" style="display:none">
+		<div >You must drop one of the following items:</div>
+		<div id="itemsToDrop"></div>
+	</div>
+	<div id="gameOver" style="display:none" class = "modal">
 		<img src= "assets/Skull.svg"><img>
 		<div >You are Dead</div>
 		<div >Your Score is : <span id ="score">0</span></div>
-		<button onclick="setUp()">Restart</button>
+		<button onclick="restart()">Restart</button>
 	</div>
 	<div id="descriptionOverlay" style="display:none" onclick="hideDescription()">
 		<div id="description"></div>
