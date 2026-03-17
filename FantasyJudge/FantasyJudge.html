@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Lawsuit Game</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; color: #333; font-size: 25px; }
+        h1, h2, h3 { color: #444; }
+        button { padding: 10px 15px; margin: 10px; cursor: pointer; }
+        .lawsuit { border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: #fff; }
+        .result { margin: 20px 0; }
+        .stats { margin: 20px 0; border: 1px solid #ddd; padding: 10px; background: #eef; }
+        .stats h3 { margin: 0 0 10px; }
+		.icon { height: 25px; width 25px; position: relative; bottom: -4px;}
+		#modal-backdrop {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: rgba(0, 0, 0, 0.7);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			z-index: 1000;
+		}
+		#modal-container {
+			background: white;
+			padding: 20px;
+			border-radius: 10px;
+			text-align: center;
+			max-width: 500px;
+			width: 90%;
+			box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+		}
+        .hidden { display: none; }
+        #modal-backdrop.hidden { display: none; }
+		td {
+			min-width: 100px;
+		}
+    </style>
+</head>
+<body>
+    <h1>Fantasy Lawsuit Resolution</h1>
+    <p>Resolve lawsuits between Humans, Elves, and Goblins.</p>
+
+    <div id="stats-container" class="stats"></div>
+    <div id="lawsuit-container"></div>
+    <!--div class="result hidden" id="final-result"></div>
+    <button id="restart-button" class="hidden">Play Again</button-->
+	<div id="modal-backdrop" class="hidden">
+		<div id="modal-container">
+			<div id="final-result"></div>
+			<button id="restart-button" class="hidden">Restart</button>
+		</div>
+	</div>
+
+    <script>
+        const communities = ['Humans', 'Elves', 'Goblins'];
+        let resources = {};
+        let opinions = {};
+        let lawsuits = [];
+		let effects = [];
+        let currentLawsuit = 0;
+		
+		let effectLibrary = [
+			{
+				initialize: (self) => {self.value = select([10,20]); self.community = getRandomCommunity()},
+				effect: (lawsuit, self) => {
+					if(lawsuit.offender == self.community) {
+						lawsuit.truthfulness += self.value;
+						lawsuit.truthfulness = Math.max(0, Math.min(10, lawsuit.truthfulness));
+					}
+				},
+				name: (self) => "+"+self.value + " truthfulness to accused "+self.community,
+				order: 80
+			},
+			{
+				initialize: (self) => {self.value = select([-10,-20]); self.community = getRandomCommunity()},
+				effect: (lawsuit, self) => {
+					if(lawsuit.offender == self.community) {
+						lawsuit.truthfulness += self.value;
+						lawsuit.truthfulness = Math.max(0, Math.min(10, lawsuit.truthfulness));
+					}
+				},
+				name: (self) => self.value + " truthfulness to accused "+self.community,
+				order: 80
+			},
+			{
+				initialize: (self) => {self.value = select([-10,-20]); self.community = getRandomCommunity()},
+				effect: (lawsuit, self) => {
+					if(lawsuit.petitioner == self.community) {
+						lawsuit.truthfulness += self.value;
+						lawsuit.truthfulness = Math.max(0, Math.min(10, lawsuit.truthfulness));
+					}
+				},
+				name: (self) => self.value + " truthfulness to acussing "+self.community,
+				order: 80
+			},
+			{
+				initialize: (self) => {self.value = select([10,20]); self.community = getRandomCommunity(); self.angle = select(["offender", "petitioner"])},
+				effect: (lawsuit, self) => {
+					if(lawsuit.petitioner == self.community) {
+						lawsuit.truthfulness += self.value;
+						lawsuit.truthfulness = Math.max(0, Math.min(10, lawsuit.truthfulness));
+					}
+				},
+				name: (self) => "+"+self.value + " truthfulness to acussing "+self.community,
+				order: 80
+			},
+			{
+				name: (self) => self.angle + " "+ self.community + " put Prestige on the line for the case",
+				initialize: (self) => {self.community = getRandomCommunity(); self.angle = select(["offender", "petitioner"])},
+				effect: (lawsuit, self) => {
+					if(lawsuit[self.angle] == self.community) {
+						// lets mostly conserve prestige here
+						lawsuit.costs.push ({resource: "Prestige", value: 5});
+						lawsuit.requests.push ({resource: "Prestige", value: 5});
+					}
+				},
+				order: 60
+			},
+			{
+				name: (self) => self.community + " ask for more "+ self.resource,
+				initialize: (self) => {self.community = getRandomCommunity(); self.resource = getRandomResource();},
+				effect: (lawsuit, self) => {
+					if(lawsuit.petitioner == self.community) {
+						if(rollDice(6)>=2) lawsuit.requests[0].resource = self.resource;
+					}
+				},
+				order: 55
+			},
+			{
+				name: (self) => self.community + " sue more",
+				initialize: (self) => {self.community = getRandomCommunity();},
+				effect: (lawsuit, self) => {
+					if(rollDice(6)>=2 && lawsuit.offender != self.community) lawsuit.petitioner = self.community;
+				},
+				order: 25
+			},
+			{
+				name: (self) => self.community + " get sued more",
+				initialize: (self) => {self.community = getRandomCommunity();},
+				effect: (lawsuit, self) => {
+					if(rollDice(6)>=2 && lawsuit.petitioner != self.community) lawsuit.petitioner = self.community;
+				},
+				order: 25
+			},
+		];
+
+        // Initialize game data
+        function initGame() {
+            resources = {
+                Humans: { Economy: 100, War: 100, Luxury: 100, Prestige: 100 },
+                Elves: { Economy: 100, War: 100, Luxury: 100, Prestige: 100 },
+                Goblins: { Economy: 100, War: 100, Luxury: 100, Prestige: 100 },
+            };
+            opinions = {
+                Humans: { Fairness: 50, Goodwill: 50 },
+                Elves: { Fairness: 50, Goodwill: 50 },
+                Goblins: { Fairness: 50, Goodwill: 50 },
+            };
+            lawsuits = generateLawsuits(20);
+			effects = generateEffects(3);
+            currentLawsuit = 0;
+            displayStats();
+            displayLawsuit();
+            document.getElementById('final-result').classList.add('hidden');
+            document.getElementById('restart-button').classList.add('hidden');
+        }
+
+        // Generate lawsuits
+        function generateLawsuits(count) {
+            const lawsuits = [];
+            for (let i = 0; i < count; i++) {
+                const petitioner = getRandomCommunity();
+                let offender = getRandomCommunity();
+                while (offender === petitioner) offender = getRandomCommunity();
+				const requests = [];
+				const costs = [];
+                const resource = getRandomResource();
+				const value = rollDice(6)*5
+                const request = {resource: resource, value: value};
+				requests.push(request);
+				const cost = {resource: resource, value: value + (2 - rollDice(3))*5};
+				costs.push(cost);
+                const truthfulness = (rollDice(6, 2) - 2) * 10;
+                const petitionerImportance = Math.abs(rollDice(6,2) - 7);
+                const offenderImportance = Math.abs(rollDice(6, 2) - 7);
+                lawsuits.push({ petitioner, offender, resource, requests, costs, truthfulness, petitionerImportance, offenderImportance });
+            }
+            return lawsuits;
+        }
+		
+		function generateEffects(count) {
+			const effects = [];
+			for(let i = 0; i< count; i++) {
+				const template = select(effectLibrary);
+				const effect = {};
+				template.initialize(effect);
+				effect.effect = template.effect;
+				effect.name = template.name(effect);
+				effect.order = template.order;
+				effects.push(effect);
+			}
+			effects.sort((a,b) => a.order - b.order);
+			return effects;
+		}
+		
+		
+		//effect ideas:
+		/*
+		*	Triggered:
+		*	If a stat is too low goodwill goes down even more?
+		*	If a stat gets too high you get lots of low-truth suits for that resource
+		*	
+		*	Permenant:
+		*	A race has justice adjusted for them every single time
+		*	A race is more likely to be the offender
+		*	A race is more likely to be the petitioner
+		*	A race has prestige on the line every single time they accuse/defend
+		*	A race is constantly asking for the same resource
+		*	
+		*	Events:
+		*	Windfall: a community gets extra of a resource
+		*	Distaster: a community looses a bunch of a resource
+		*	Tax Day: Collect taxes into your coffers? -- might be too complex
+		*	Event: A specific race-resource combintation needs to be high, effects goodwill
+		*	Accounting: A specific race-resource combination needs to be high, effects final score. Or a specfic total needs to be high
+		*/
+		
+		// Resolve lawsuit
+        function resolveLawsuit(decideFor) {
+            const lawsuit = lawsuits[currentLawsuit];
+            const { petitioner, offender, requests, costs, truthfulness, petitionerImportance, offenderImportance } = lawsuit;
+
+            // Apply resource changes
+            if (decideFor) {
+				for(item of lawsuit.requests){
+					resources[petitioner][item.resource] += item.value;
+				}
+				for(item of lawsuit.costs){
+					resources[offender][item.resource] -= item.value;
+				}
+            }
+
+            // Update fairness and goodwill
+            const changes = lawsuitPredictions(decideFor);
+            opinions[petitioner].Fairness += changes.petitionerFairnessChange;
+            opinions[offender].Fairness += changes.offenderFairnessChange;
+
+            opinions[petitioner].Goodwill += changes.petitionerGoodwillChange;
+            opinions[offender].Goodwill += changes.offenderGoodwillChange;
+
+            // Update stats and move to next lawsuit or finish
+            displayStats();
+            currentLawsuit++;
+            if (currentLawsuit < lawsuits.length) {
+                displayLawsuit();
+            } else {
+                showFinalResult();
+            }
+        }
+		
+		function lawsuitPredictions(decideFor, lawsuit){
+            if(!lawsuit) lawsuit = lawsuits[currentLawsuit];
+            const { petitioner, offender, resource, request, cost, truthfulness, petitionerImportance, offenderImportance } = lawsuit;
+
+			const fairnessChange = calculateFairnessChange(decideFor? truthfulness: 100 - truthfulness);
+			
+			return {
+				petitionerFairnessChange: fairnessChange + (decideFor ? 1 : -1),
+				offenderFairnessChange : fairnessChange + (decideFor ? -1 : 1),
+
+				petitionerGoodwillChange: decideFor ? petitionerImportance : -petitionerImportance,
+				offenderGoodwillChange: decideFor ? -offenderImportance : offenderImportance
+
+			}
+		}
+
+        // Calculate fairness change
+        function calculateFairnessChange(truthfulness) {
+            const x = truthfulness / 10;
+            return x <= 5 ? x - 5 -1 : 5 - (x - 5)-1;
+        }
+		
+        // Utility functions
+        function getRandomCommunity() {
+            return communities[Math.floor(Math.random() * communities.length)];
+        }
+        function getRandomResource() {
+            return ['Economy', 'War', 'Luxury', 'Prestige'][Math.floor(Math.random() * 4)];
+        }
+        function rollDice(sides, times = 1) {
+            let sum = 0;
+            for (let i = 0; i < times; i++) sum += Math.floor(Math.random() * sides) + 1;
+            return sum;
+        }
+		function select(array){
+			return array[rollDice(array.length)-1];
+		}
+		function formatNumber(number) {
+			return (number >= 0 ? '+' : '') + number
+		}
+		function icon(name) {
+			return `<image class= "icon" title =  "${name}" src='assets/${name}.svg'></image>`;
+		}
+
+        // Display current lawsuit
+        function displayLawsuit() {
+            const lawsuit = lawsuits[currentLawsuit];
+			effects.forEach((effect) => effect.effect(lawsuit, effect));
+            const container = document.getElementById('lawsuit-container');
+			
+			const forChanges = lawsuitPredictions(true);
+			const againstChanges = lawsuitPredictions(false);
+			
+			forFairnessChange = forChanges.petitionerFairnessChange -1;
+			againstfairnessChange = againstChanges.petitionerFairnessChange +1;
+			petitionerGoodwillChangeFor = forChanges.petitionerGoodwillChange;
+			offenderGoodwillChangeFor = forChanges.offenderGoodwillChange;
+			petitionerGoodwillChangeAgainst = againstChanges.petitionerGoodwillChange;
+			offenderGoodwillChangeAgainst = againstChanges.offenderGoodwillChange;
+			
+            text = `
+                <div class="lawsuit">
+                    <h2>Lawsuit ${currentLawsuit + 1}/20</h2>
+                    <p>${icon(lawsuit.petitioner)} Accuse ${icon(lawsuit.offender)}</p>
+					`
+			text += "<p><strong>Request:</strong>" + lawsuit.requests.map(item => item.value + " " + icon(item.resource)).join (",") +"</p>";
+			text += "<p><strong>Cost:</strong>" + lawsuit.costs.map(item => item.value + " " + icon(item.resource)).join (",") +"</p>";
+			text+=`<p><strong>Truthfulness:</strong> ${lawsuit.truthfulness}%</p>
+                    <p><strong>Importance:</strong> ${lawsuit.petitionerImportance} vs. ${lawsuit.offenderImportance}</p>
+					<p><strong>Decision FOR:</strong> 
+						<p>Fairness: 
+						[${opinions[lawsuit.petitioner].Fairness + forFairnessChange +1 } ${icon(lawsuit.petitioner)}/ ${opinions[lawsuit.offender].Fairness + forFairnessChange -1} ${icon(lawsuit.offender)}], 
+						(${formatNumber(forFairnessChange +1)} / ${formatNumber(forFairnessChange -1)} )
+						</p>
+						<p>Goodwill: 
+						[${opinions[lawsuit.petitioner].Goodwill + petitionerGoodwillChangeFor} ${icon(lawsuit.petitioner)}/ ${opinions[lawsuit.offender].Goodwill + offenderGoodwillChangeFor} ${icon(lawsuit.offender)}]
+						(${formatNumber(petitionerGoodwillChangeFor)} / ${formatNumber(offenderGoodwillChangeFor)})
+						</p>
+					</p>
+                    <p><strong>Decision AGAINST:</strong></p>
+					<p>Fairness: 
+						[${opinions[lawsuit.petitioner].Fairness + againstfairnessChange -1} ${icon(lawsuit.petitioner)} / ${opinions[lawsuit.offender].Fairness + againstfairnessChange +1} ${icon(lawsuit.offender)} ]
+						(${formatNumber(againstfairnessChange -1)} / ${formatNumber(againstfairnessChange+1)} )
+					</p>
+					<p>
+						Goodwill: 
+						[${opinions[lawsuit.petitioner].Goodwill + petitionerGoodwillChangeAgainst} ${icon(lawsuit.petitioner)} / ${opinions[lawsuit.offender].Goodwill + offenderGoodwillChangeAgainst} ${icon(lawsuit.offender)} ]
+						(${formatNumber(petitionerGoodwillChangeAgainst)} / ${formatNumber(offenderGoodwillChangeAgainst)})
+					</p>
+
+                </div>
+                <button onclick="resolveLawsuit(true)">Decide FOR</button>
+                <button onclick="resolveLawsuit(false)">Decide AGAINST</button>`;
+			container.innerHTML = text;
+        }
+
+        // Display stats
+        function displayStats() {
+            const container = document.getElementById('stats-container');
+            let statsHTML = '<h3>Community Statistics</h3><table>';
+
+			statsHTML +=  `<tr>
+					<th>Community</th>
+					<th>Economy</th>
+					<th>War</th>
+					<th>Luxury</th>
+					<th>Prestige</th>
+					<th>Fairness</th>
+					<th>Goodwill</th>
+				</tr>`;
+
+			for (const community of communities) {
+				const fairness = opinions[community].Fairness;
+				const goodwill = opinions[community].Goodwill;
+
+				statsHTML +=  `<tr>
+					<td>${icon(community)}${community}</td>
+					<td>${icon('Economy')} ${resources[community].Economy}</td>
+					<td>${icon('War')} ${resources[community].War}</td>
+					<td>${icon('Luxury')} ${resources[community].Luxury}</td>
+					<td>${icon('Prestige')} ${resources[community].Prestige}</td>
+					<td>${icon('Fairness')} ${opinions[community].Fairness}</td>
+					<td>${icon('Goodwill')} ${opinions[community].Goodwill}</td>
+				</tr>`;
+			}
+			
+            statsHTML += '</table>';
+			statsHTML += effects.map(e => e.name).join("<br/>");
+            container.innerHTML = statsHTML;
+        }
+
+		function showFinalResult() {
+			const finalResult = document.getElementById('final-result');
+			const modalBackdrop = document.getElementById('modal-backdrop');
+			const restartButton = document.getElementById('restart-button');
+
+			let lowestScore = Infinity;
+			let resultText = '<h2>Final Scores</h2><ul>';
+			for (const community of communities) {
+				const fairness = opinions[community].Fairness;
+				const goodwill = opinions[community].Goodwill;
+				resultText += `<li>${community}: Fairness ${fairness}, Goodwill ${goodwill}</li>`;
+				lowestScore = Math.min(lowestScore, fairness, goodwill);
+			}
+			resultText += `</ul><p><strong>Final Score:</strong> ${lowestScore}</p>`;
+			finalResult.innerHTML = resultText;
+            finalResult.classList.remove('hidden');
+			modalBackdrop.classList.remove('hidden');
+			restartButton.classList.remove('hidden');
+
+			// Optionally, add an event to close the modal
+			restartButton.addEventListener('click', () => {
+				modalBackdrop.classList.add('hidden');
+			});
+		}
+
+
+        document.getElementById('restart-button').addEventListener('click', initGame);
+        initGame();
+    </script>
+</body>
+</html>
