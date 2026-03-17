@@ -1,0 +1,14 @@
+{
+  "name": "card-game",
+  "version": "1.0.0",
+  "description": "A two-player online card-based game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "crypto": "^1.0.1"
+  }
+}

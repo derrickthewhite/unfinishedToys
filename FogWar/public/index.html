@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #auth, #dashboard, #game {
+            display: none;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(5, 50px);
+            grid-template-rows: repeat(5, 50px);
+            gap: 5px;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .hidden {
+            background-color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="auth">
+        <h2>Sign Up</h2>
+        <form id="signupForm">
+            <input type="text" id="signupUsername" placeholder="Username" required>
+            <input type="password" id="signupPassword" placeholder="Password" required>
+            <button type="submit">Sign Up</button>
+        </form>
+        <h2>Login</h2>
+        <form id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Username" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+    <div id="dashboard">
+        <h2>Dashboard</h2>
+        <button id="createGame">Create Game</button>
+        <form id="joinGameForm">
+            <input type="text" id="joinGameId" placeholder="Game ID" required>
+            <button type="submit">Join Game</button>
+        </form>
+        <div id="gameStatus"></div>
+    </div>
+    <div id="game">
+        <h2>Game Board</h2>
+        <div id="board"></div>
+        <div id="turnStatus"></div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
