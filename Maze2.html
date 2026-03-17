@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fantasy Portal Maze</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+    #location { font-size: 24px; margin-bottom: 20px; }
+    #portals { display: flex; gap: 10px; margin-bottom: 20px; }
+    .portal {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 80px;
+      height: 120px;
+      padding: 10px;
+      background: #e0ccff;
+      cursor: pointer;
+      border-radius: 50%;
+      text-align: center;
+      border: 2px solid purple;
+    }
+    .portal.blocked { background: #aaa; cursor: not-allowed; }
+    .portal:hover:not(.blocked) { background: #d0bbff; }
+    .portal-icon { font-size: 24px; margin-bottom: 5px; }
+    .portal-label { font-size: 16px; }
+    #visited-list { margin-top: 20px; font-size: 14px; }
+    .visited { color: green; }
+    .unvisited { color: gray; }
+    #victory-message { margin-top: 20px; font-size: 18px; color: blue; }
+    #inventory { margin-top: 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <div id="location"></div>
+  <div id="portals"></div>
+  <div id="visited-list"></div>
+  <div id="inventory"></div>
+  <div id="victory-message"></div>
+
+  <script>
+    const numPlaces = 20;
+    const connectionsPerPlace = 3;
+    const totalConnections = numPlaces * connectionsPerPlace;
+
+    const placeNames = ["Sanctum", "Cavern", "Hearth", "Tower", "Glen", "Keep", "Ruins", "Temple", "Fane", "Hollow",
+      "Bastion", "Woods", "Crypt", "Shrine", "Stronghold", "Vault", "Labyrinth", "Chapel", "Arena", "Spire"];
+
+    const emojiMap = { Sanctum: "✨", Cavern: "🕳️", Hearth: "🔥", Tower: "🗼", Glen: "🌲", Keep: "🏰", Ruins: "🏚️",
+      Temple: "⛩️", Fane: "🕍", Hollow: "🌑", Bastion: "🛡️", Woods: "🌳", Crypt: "⚰️", Shrine: "🙏",
+      Stronghold: "🪖", Vault: "🧰", Labyrinth: "🌀", Chapel: "⛪", Arena: "⚔️", Spire: "📡" };
+
+    const objectItems = ["key", "bucket", "rope"];
+    const featureItems = ["hole", "fire", "pond"];
+    const creatureItems = ["dog", "bird", "ghost", "wizard", "hero", "scholar", "princess"];
+    const allItems = [...objectItems, ...featureItems, ...creatureItems];
+
+    const blockTypes = [
+      "Fog of Darkness", "Tangled Roots", "Thorn Patch", "Dragon", "Hairy Ogre", "High Cliff",
+      "Mysterious Chest", "Enchanted Mirror", "Glowing Runes", "Waterfall",
+      "Swirling Vortex", "Stone Guardian", "Cracked Seal", "Arcane Barrier"
+    ];
+
+    const portals = {};
+    const placeItems = {};
+    const blockedPortals = {};
+
+    // Shuffle
+    const shuffledPlaces = placeNames.sort(() => Math.random() - 0.5);
+    const selectedPlaces = shuffledPlaces.slice(0, numPlaces);
+
+    selectedPlaces.forEach(name => {
+      portals[name] = [];
+      placeItems[name] = [];
+      if (Math.random() < 0.4) {
+        const item = allItems[Math.floor(Math.random() * allItems.length)];
+        placeItems[name].push(item);
+      }
+    });
+
+    // Ensure full graph with some guaranteed connections
+    for (let i = 0; i < selectedPlaces.length - 1; i++) {
+      portals[selectedPlaces[i]].push(selectedPlaces[i + 1]);
+    }
+
+    let added = selectedPlaces.length - 1;
+    while (added < totalConnections) {
+      const from = selectedPlaces[Math.floor(Math.random() * numPlaces)];
+      const to = selectedPlaces[Math.floor(Math.random() * numPlaces)];
+      if (from !== to && !portals[from].includes(to)) {
+        portals[from].push(to);
+        added++;
+      }
+    }
+
+    // Randomly block portals
+    const allEdges = [];
+    for (const from of selectedPlaces) {
+      for (const to of portals[from]) {
+        allEdges.push([from, to]);
+      }
+    }
+
+    const numBlocked = Math.floor(0.2 * allEdges.length);
+    const blockedSet = new Set();
+    while (blockedSet.size < numBlocked) {
+      const [from, to] = allEdges[Math.floor(Math.random() * allEdges.length)];
+      blockedPortals[`${from}->${to}`] = blockTypes[Math.floor(Math.random() * blockTypes.length)];
+      blockedSet.add(`${from}->${to}`);
+    }
+
+    const visited = new Set();
+    const inventory = [];
+    let moveCount = 0;
+    let currentPlace = null;
+
+    function showPlace(place) {
+      const loc = document.getElementById("location");
+      const portalDiv = document.getElementById("portals");
+      const visitedDiv = document.getElementById("visited-list");
+      const inventoryDiv = document.getElementById("inventory");
+      const victory = document.getElementById("victory-message");
+
+      currentPlace = place;
+      moveCount++;
+      visited.add(place);
+
+      loc.innerHTML = `<strong>You are in the ${place}</strong>`;
+      portalDiv.innerHTML = "";
+      victory.innerHTML = "";
+
+      // Show room items
+      if (placeItems[place].length) {
+        loc.innerHTML += `<br><strong>In this place:</strong> ` + placeItems[place].map((item, i) =>
+          objectItems.includes(item) ? `<button onclick='pickupItem(${i})'>${item}</button>` : item
+        ).join(" ");
+      }
+
+      for (const dest of portals[place]) {
+        const portal = document.createElement("div");
+        portal.className = "portal";
+        const blocked = blockedPortals[`${place}->${dest}`];
+        if (blocked) portal.classList.add("blocked");
+
+        const icon = document.createElement("div");
+        icon.className = "portal-icon";
+        icon.textContent = emojiMap[dest] || "🌀";
+
+        const label = document.createElement("div");
+        label.className = "portal-label";
+        label.textContent = blocked ? `${dest}\n(${blocked})` : dest;
+
+        portal.appendChild(icon);
+        portal.appendChild(label);
+        if (!blocked) portal.onclick = () => showPlace(dest);
+        portalDiv.appendChild(portal);
+      }
+
+      inventoryDiv.innerHTML = `<strong>Inventory:</strong> ` + (inventory.length ? inventory.map((item, i) =>
+        `<button onclick='dropItem(${i})'>${item}</button>`).join(" ") : "(empty)");
+
+      visitedDiv.innerHTML = `<strong>Places:</strong><br>` + selectedPlaces.map(name =>
+        `<span class="${visited.has(name) ? 'visited' : 'unvisited'}">${name}</span>`
+      ).join(", ");
+
+      if (visited.size === numPlaces) {
+        victory.innerHTML = `<p>🎉 You have explored all locations in ${moveCount} moves.</p>
+          <button onclick="location.reload()">Restart</button>`;
+      }
+    }
+
+    function pickupItem(index) {
+      const item = placeItems[currentPlace][index];
+      if (objectItems.includes(item)) {
+        inventory.push(item);
+        placeItems[currentPlace].splice(index, 1);
+        showPlace(currentPlace);
+      }
+    }
+
+    function dropItem(index) {
+      const item = inventory[index];
+      placeItems[currentPlace].push(item);
+      inventory.splice(index, 1);
+      showPlace(currentPlace);
+    }
+
+    showPlace(selectedPlaces[0]);
+  </script>
+</body>
+</html>

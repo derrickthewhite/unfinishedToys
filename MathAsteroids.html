@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math Asteroids</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    canvas {
+      background: black;
+      display: block;
+    }
+    #answers {
+      position: absolute;
+      bottom: 10px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    button {
+      font-size: 24px;
+      padding: 10px 20px;
+    }
+    #status {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 20px;
+    }
+    #pauseMenu {
+      position: absolute;
+      top: 60px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      display: none;
+    }
+    #pauseMenu label {
+      display: block;
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="answers"></div>
+  <div id="status">
+	<div id = "buildings"></div>
+	<div id = "asterioids"></div>
+  </div>
+  <div id="pauseMenu">
+    <label>Max Asteroids: <input type="number" id="maxAsteroidsInput"></label>
+    <label>Spawn Interval (ms): <input type="number" id="spawnIntervalInput"></label>
+    <label>Problem Speed: <input type="number" id="problemSpeedInput" step="0.1"></label>
+  </div>
+  <button id="pauseBtn" style="position:absolute;top:10px;right:10px;z-index:10">Pause</button>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const answersDiv = document.getElementById("answers");
+    const statusDiv = document.getElementById("status");
+    const buildingDiv = document.getElementById("buildings");
+    const asteroidDiv = document.getElementById("asterioids");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const pauseMenu = document.getElementById("pauseMenu");
+    const maxAsteroidsInput = document.getElementById("maxAsteroidsInput");
+    const spawnIntervalInput = document.getElementById("spawnIntervalInput");
+    const problemSpeedInput = document.getElementById("problemSpeedInput");
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight-175;
+
+    let asteroids = [];
+	let asteroidsComing = 10;
+    let buildings = 3;
+    let cooldown = false;
+    let laserBeams = [];
+    let lastAsteroidTime = 0;
+    let paused = false;
+    const gunX = canvas.width / 2;
+    const gunY = canvas.height - 60;
+    const buildingWidth = 40;
+    let persistentAnswers = [];
+
+    const config = {
+      maxAsteroids: 3,
+      spawnInterval: 2000,
+      problemSpeed: .5
+    };
+	let problemSpeed = config.problemSpeed;
+
+    pauseBtn.onclick = () => {
+      paused = !paused;
+      if (paused) {
+        cancelAnimationFrame(animation);
+        pauseMenu.style.display = "block";
+        maxAsteroidsInput.value = config.maxAsteroids;
+        spawnIntervalInput.value = config.spawnInterval;
+        problemSpeedInput.value = config.problemSpeed;
+      } else {
+        config.maxAsteroids = parseInt(maxAsteroidsInput.value);
+        config.spawnInterval = parseInt(spawnIntervalInput.value);
+        config.problemSpeed = parseFloat(problemSpeedInput.value);
+        problemSpeed = config.problemSpeed;
+        pauseMenu.style.display = "none";
+        updateGame(performance.now());
+      }
+    };
+
+    class Asteroid {
+      constructor(problem, x, y) {
+        this.problem = problem;
+        this.x = x;
+        this.y = y;
+        this.radius = 40;
+        this.destroyed = false;
+        this.lit = false;
+        this.litTimer = 0;
+      }
+
+      draw() {
+        ctx.fillStyle = this.lit ? "yellow" : "gray";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.font = "20px sans-serif";
+        ctx.fillText(this.problem.text, this.x, this.y + 6);
+      }
+
+      update() {
+        this.y += problemSpeed;
+        if (this.lit) {
+          this.litTimer -= 1;
+          if (this.litTimer <= 0) this.lit = false;
+        }
+        this.draw();
+      }
+    }
+
+    function drawBuildings() {
+      for (let i = 0; i < buildings; i++) {
+        const x = i * (buildingWidth + 5) + 10;
+        const y = canvas.height - 30;
+        ctx.fillStyle = "blue";
+        ctx.fillRect(x, y, buildingWidth, 20);
+      }
+    }
+
+    function drawGun() {
+      ctx.fillStyle = "green";
+      ctx.fillRect(gunX - 20, gunY - 20, 40, 40);
+    }
+
+    function drawLasers() {
+      laserBeams.forEach(beam => {
+        ctx.beginPath();
+        ctx.moveTo(gunX, gunY);
+		if(beam.target)
+			ctx.lineTo(beam.target.x, beam.target.y);
+		else
+			ctx.lineTo(beam.x, beam.y);
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 5;
+        ctx.stroke();
+      });
+    }
+
+    function generateProblem() {
+      const a = Math.floor(Math.random() * 10);
+      const b = Math.floor(Math.random() * 10);
+      const op = "+";
+      const answer = a + b;
+      return { text: `${a} ${op} ${b}`, answer };
+    }
+
+    function spawnAsteroid() {
+      const problem = generateProblem();
+      const x = Math.random() * (canvas.width - 80) + 40;
+      const y = -50;
+      const asteroid = new Asteroid(problem, x, y);
+      asteroids.push(asteroid);
+	  asteroidsComing--;
+      updateAnswers();
+    }
+
+    function updateAnswers() {
+		/*
+      const correctAnswers = asteroids.filter(a => !a.destroyed).map(a => a.problem.answer);
+      const choices = new Set(correctAnswers);
+      while (choices.size < 8) {
+        choices.add(Math.floor(Math.random() * 19));
+      }
+      persistentAnswers = Array.from(choices).sort((a, b) => a - b);
+	  */
+	  persistentAnswers= [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+      renderAnswers();
+    }
+	
+	function updateLasers() {
+		laserBeams = laserBeams.filter(l =>  !l.target.destroyed || l.target.lit)
+	}
+
+    function renderAnswers() {
+      answersDiv.innerHTML = "";
+      for (let answer of persistentAnswers) {
+        const btn = document.createElement("button");
+        btn.innerText = answer;
+        btn.onclick = () => handleAnswer(answer);
+        answersDiv.appendChild(btn);
+      }
+    }
+
+    function handleAnswer(answer) {
+      if (cooldown) return;
+      const target = asteroids.find(a => !a.destroyed && a.problem.answer === answer);
+      if (target) {
+        laserBeams.push({ x: target.x, y: target.y, target: target });
+        target.lit = true;
+        target.litTimer = 15;
+        target.destroyed = true;
+        updateAnswers();
+		playLaserSound();
+      } else {
+        cooldown = true;
+        laserBeams.push({ x: gunX, y: 0 });
+		playLaserMissSound();
+        setTimeout(() => {
+          cooldown = false;
+          laserBeams = [];
+        }, 1000);
+      }
+    }
+
+	function playLaserSound() {
+	  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+	  const oscillator = audioCtx.createOscillator();
+	  const gain = audioCtx.createGain();
+
+	  oscillator.type = 'square';
+	  oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); // start frequency
+	  oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2); // end frequency
+
+	  gain.gain.setValueAtTime(0.3, audioCtx.currentTime); // volume
+	  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+
+	  oscillator.connect(gain);
+	  gain.connect(audioCtx.destination);
+
+	  oscillator.start();
+	  oscillator.stop(audioCtx.currentTime + 0.2);
+	}
+	
+	function playLaserMissSound() {
+	  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+	  const oscillator = audioCtx.createOscillator();
+	  const gain = audioCtx.createGain();
+
+	  oscillator.type = 'sawtooth'; // sharper, more energetic
+	  oscillator.frequency.setValueAtTime(200, audioCtx.currentTime); // start low
+	  oscillator.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.75); // rise in pitch
+
+	  gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+	  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.75); // fade out
+
+	  oscillator.connect(gain);
+	  gain.connect(audioCtx.destination);
+
+	  oscillator.start();
+	  oscillator.stop(audioCtx.currentTime + 0.75);
+	}
+
+function playBuildingCollapseSound() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const now = audioCtx.currentTime;
+  const duration = 2.0;
+
+  // --- Debris Noise ---
+  const bufferSize = audioCtx.sampleRate * duration;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
+  }
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = buffer;
+
+  const noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.setValueAtTime(1000, now);
+  noiseFilter.Q.value = 0.5;
+
+  const noiseGain = audioCtx.createGain();
+  noiseGain.gain.setValueAtTime(0.5, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+  // --- Metallic Clang (detuned oscillators) ---
+  const clang = audioCtx.createOscillator();
+  clang.type = 'triangle';
+  clang.frequency.setValueAtTime(600, now);
+
+  const clang2 = audioCtx.createOscillator();
+  clang2.type = 'triangle';
+  clang2.frequency.setValueAtTime(605, now); // slightly detuned for metallic texture
+
+  const clangGain = audioCtx.createGain();
+  clangGain.gain.setValueAtTime(0.8, now);
+  clangGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+  // Connect nodes
+  noise.connect(noiseFilter).connect(noiseGain).connect(audioCtx.destination);
+  clang.connect(clangGain).connect(audioCtx.destination);
+  clang2.connect(clangGain);
+
+  // Start sounds
+  noise.start();
+  clang.start();
+  clang2.start();
+  noise.stop(now + duration);
+  clang.stop(now + duration);
+  clang2.stop(now + duration);
+}
+
+
+function playVictorySong() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const now = audioCtx.currentTime;
+
+  // A simple happy melody in C major
+  const melody = [
+    { note: 523.25, duration: 0.3 }, // C5
+    { note: 659.25, duration: 0.3 }, // E5
+    { note: 783.99, duration: 0.3 }, // G5
+    { note: 1046.50, duration: 0.3 }, // C6
+    { note: 880.00, duration: 0.3 }, // A5
+    { note: 987.77, duration: 0.3 }, // B5
+    { note: 1046.50, duration: 0.6 }, // C6 (long note)
+  ];
+
+  let t = now;
+
+  melody.forEach(({ note, duration }) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(note, t);
+
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + duration);
+
+    t += duration;
+  });
+}
+
+function playDefeatSong() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const now = audioCtx.currentTime;
+
+  // A descending melody in A minor
+  const melody = [
+    { note: 880.00, duration: 0.3 },  // A5
+    { note: 783.99, duration: 0.3 },  // G5
+    { note: 698.46, duration: 0.3 },  // F5
+    { note: 659.25, duration: 0.3 },  // E5
+    { note: 440.00, duration: 0.6 },  // A4 (long sad finish)
+  ];
+
+  let t = now;
+
+  melody.forEach(({ note, duration }) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'sawtooth'; // Slightly rougher tone
+    osc.frequency.setValueAtTime(note, t);
+
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + duration);
+
+    t += duration;
+  });
+}
+
+
+
+
+
+    function updateGame(timestamp) {
+      if (paused) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const a = asteroids[i];
+        if (!a.destroyed) {
+          a.update();
+          if (a.y > canvas.height) {
+			playBuildingCollapseSound();
+            buildings--;
+            asteroids.splice(i, 1);
+            updateAnswers();
+          }
+        } else {
+          a.update();
+          if (!a.lit) {
+            asteroids.splice(i, 1);
+            updateAnswers();
+			updateLasers();
+          }
+        }
+      }
+
+      drawBuildings();
+      drawGun();
+      drawLasers();
+
+      buildingDiv.textContent = `Buildings: ${buildings}`;
+      asteroidDiv.textContent = `Asteroids: ${asteroidsComing + asteroids.length}`;
+	  
+	  
+      animation = requestAnimationFrame(updateGame);
+	  
+      if (buildings <= 0) {
+        ctx.fillStyle = "white";
+        ctx.font = "48px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2);
+        cancelAnimationFrame(animation);
+        answersDiv.innerHTML = "";
+		playDefeatSong()
+        return;
+      }
+	  
+	  if(asteroidsComing + asteroids.length <= 0) {
+		ctx.fillStyle = "white";
+        ctx.font = "48px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("You Won!", canvas.width / 2, canvas.height / 2);
+        cancelAnimationFrame(animation);
+        answersDiv.innerHTML = "";
+		console.log("victory animation!")
+		playVictorySong();
+        return;
+	  }
+
+      if (timestamp - lastAsteroidTime > config.spawnInterval && asteroids.length < config.maxAsteroids && asteroidsComing> 0) {
+        spawnAsteroid();
+        lastAsteroidTime = timestamp;
+      }
+    }
+
+    let animation;
+    spawnAsteroid();
+    lastAsteroidTime = performance.now();
+    updateGame(lastAsteroidTime);
+  </script>
+</body>
+</html>

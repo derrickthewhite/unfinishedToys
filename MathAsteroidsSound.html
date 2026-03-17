@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Math Asteroids Game</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: sans-serif; background: #000; }
+  canvas { display: block; margin: auto; background: #111; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="480" height="640"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const config = {
+  maxAsteroids: 3,
+  spawnInterval: 2000,
+  problemSpeed: 50,
+  laserCooldown: 1000
+};
+
+let buildings = 10;
+let asteroids = [];
+let answerButtons = [];
+let lastAsteroidSpawn = 0;
+let laserCooldown = false;
+let laserBeam = null;
+let paused = false;
+
+const correctSound = new Audio("https://cdn.pixabay.com/download/audio/2022/03/15/audio_e2f9ed54e5.mp3?filename=laser-gun-81720.mp3");
+const wrongSound = new Audio("https://cdn.pixabay.com/download/audio/2021/08/08/audio_c8f55d9904.mp3?filename=click-button-140881.mp3");
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateProblem() {
+  const a = randomInt(1, 9);
+  const b = randomInt(1, 9);
+  return { question: `${a}+${b}`, answer: a + b };
+}
+
+function spawnAsteroid() {
+  const problem = generateProblem();
+  const x = randomInt(20, canvas.width - 60);
+  asteroids.push({ ...problem, x, y: -20 });
+  updateAnswers();
+}
+
+function updateAnswers() {
+  const correctAnswers = asteroids.map(a => a.answer);
+  const totalButtons = 8;
+  const answers = new Set(correctAnswers);
+  while (answers.size < totalButtons) {
+    answers.add(randomInt(2, 18));
+  }
+  answerButtons = Array.from(answers).sort((a, b) => a - b);
+}
+
+function drawLaser(x, y, targetY, isHit) {
+  ctx.strokeStyle = isHit ? "lime" : "red";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x, targetY);
+  ctx.stroke();
+}
+
+function fireLaser(answer) {
+  if (laserCooldown) return;
+  laserCooldown = true;
+  const hitIndex = asteroids.findIndex(a => a.answer === answer);
+  if (hitIndex !== -1) {
+    const asteroid = asteroids[hitIndex];
+    laserBeam = { x: 240, target: asteroid, startTime: Date.now(), isHit: true };
+    correctSound.play();
+  } else {
+    laserBeam = { x: 240, targetY: 0, startTime: Date.now(), isHit: false };
+    wrongSound.play();
+  }
+  setTimeout(() => {
+    laserCooldown = false;
+    if (!laserBeam?.isHit) laserBeam = null;
+  }, config.laserCooldown);
+}
+
+function drawGun() {
+  ctx.fillStyle = "gray";
+  ctx.fillRect(220, canvas.height - 40, 40, 40);
+}
+
+function drawBuildings() {
+  for (let i = 0; i < buildings; i++) {
+    ctx.fillStyle = "cyan";
+    ctx.fillRect(10 + i * 46, canvas.height - 20, 30, 20);
+  }
+}
+
+function drawAsteroids() {
+  ctx.fillStyle = "white";
+  for (const a of asteroids) {
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, 20, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = "black";
+    ctx.fillText(a.question, a.x - 10, a.y + 5);
+    ctx.fillStyle = "white";
+  }
+}
+
+function drawAnswers() {
+  const startY = canvas.height - 80;
+  const buttonWidth = canvas.width / answerButtons.length;
+  answerButtons.forEach((val, i) => {
+    const x = i * buttonWidth;
+    ctx.fillStyle = "darkblue";
+    ctx.fillRect(x + 5, startY, buttonWidth - 10, 30);
+    ctx.fillStyle = "white";
+    ctx.fillText(val, x + buttonWidth / 2 - 5, startY + 20);
+  });
+}
+
+function gameLoop(timestamp) {
+  if (paused) return requestAnimationFrame(gameLoop);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGun();
+  drawBuildings();
+  drawAsteroids();
+  drawAnswers();
+
+  const now = Date.now();
+
+  if (now - lastAsteroidSpawn > config.spawnInterval && asteroids.length < config.maxAsteroids) {
+    spawnAsteroid();
+    lastAsteroidSpawn = now;
+  }
+
+  for (const a of asteroids) {
+    a.y += config.problemSpeed / 60;
+  }
+
+  if (laserBeam) {
+    if (laserBeam.isHit) {
+      drawLaser(laserBeam.x, canvas.height - 40, laserBeam.target.y, true);
+    } else {
+      drawLaser(laserBeam.x, canvas.height - 40, laserBeam.targetY, false);
+    }
+  }
+
+  asteroids = asteroids.filter(a => {
+    if (a.y > canvas.height - 40) {
+      buildings--;
+      return false;
+    }
+    return true;
+  });
+
+  if (buildings <= 0) {
+    ctx.fillStyle = "red";
+    ctx.font = "30px sans-serif";
+    ctx.fillText("Game Over", 150, canvas.height / 2);
+    return;
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+canvas.addEventListener("click", e => {
+  if (paused) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const startY = canvas.height - 80;
+  const buttonWidth = canvas.width / answerButtons.length;
+  if (y > startY && y < startY + 30) {
+    const index = Math.floor(x / buttonWidth);
+    const val = answerButtons[index];
+    fireLaser(val);
+  }
+});
+
+window.addEventListener("keydown", e => {
+  if (e.key === "p") paused = !paused;
+});
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
