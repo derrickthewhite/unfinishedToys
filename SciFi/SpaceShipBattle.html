@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Spaceship Manager</title>
+  <style>
+    body { font-family: Arial; }
+    .system {
+      border: 1px solid #aaa;
+      padding: 6px;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+<h1 id="battleInfo"></h1>
+<button onclick="togglePause()">Pause</button>
+
+<div style="display:flex; gap:40px;">
+
+  <div id="leftShip">
+    <div class="stats"></div>
+    <div class="systems"></div>
+    <div class="teams"></div>
+  </div>
+
+  <div id="rightShip">
+    <div class="stats"></div>
+    <div class="systems"></div>
+    <div class="teams"></div>
+  </div>
+
+</div>
+
+
+<script>
+nextId = 1000;
+function uid() { return nextId++; }
+
+const TICKS_PER_SECOND = 30;
+const TICK_RATE = 1000 / TICKS_PER_SECOND;
+
+
+/* =====================
+   DATA STRUCTURES
+===================== */
+
+class System {
+  constructor(name, type, size, hp ) {
+    this.name = name;
+    this.id = uid();
+    this.type = type;
+    this.size = size;
+    this.hp = hp;
+    this.maxhp = hp;
+  }
+}
+
+class Reactor extends System {
+  constructor(name, size, hp, power) {
+    super(name, "reactor", size, hp);
+    this.powerOutput = power;
+  }
+}
+
+class EnergyWeapon extends System {
+  constructor(name, size, hp, damage, range, power, cooldown) {
+    super(name, "energyWeapon", size, hp);
+    this.damage = damage;
+    this.range = range;
+    this.powerRequired = power;
+    this.power = power;
+    this.enabled = true;
+
+    this.cooldown = cooldown;
+    this.currentCooldown = 0;
+	this.fireMode = "at will"; // "at will", "hold", "pause"
+  }
+  
+  canFireAt(distance) {
+		return this.enabled && this.currentCooldown <= 0 && distance <= this.range;
+  };
+  
+  fire(target) {
+	target.takeDamage(this.damage);
+	this.currentCooldown = this.cooldown;
+  }
+	
+  tick(dt, battle, ship) {
+	if (this.currentCooldown > 0) {
+		this.currentCooldown = Math.max(0, this.currentCooldown - dt);
+	}
+	if(this.canFireAt(battle.distance) && this.fireMode != "hold") {
+		if(this.fireMode == "at will") {
+			const enemyShip = battle.shipA == ship? battle.shipB: battle.shipA;
+			this.fire(enemyShip);
+		}
+		if(this.fireMode == "pause") {
+			running = false;
+		}
+	}
+  }
+}
+
+class Engine extends System {
+  constructor(name, size, hp, maxpower, rate) {
+    super(name, "Engine", size, hp);
+    this.maxpower = maxpower;
+    this.rate = rate;
+    this.power = maxpower;
+  }
+
+  engineOutput() {
+    return this.rate * this.power;
+  }
+}
+
+class Shield extends System {
+  constructor(name, size, hp, capacity, recharge, power) {
+    super(name, "shield", size, hp);
+
+    this.capacity = capacity;
+    this.current = capacity;
+    this.recharge = recharge;
+
+    this.powerRequired = power;
+    this.power = power;
+  }
+
+	tick(dt) {
+	  this.current = Math.min(
+		this.capacity,
+		this.current + this.recharge * dt
+	  );
+	}
+
+}
+
+class CrewTeam {
+  constructor(name) {
+    this.id = uid();
+    this.name = name;
+    this.location = null;
+    this.members = [];
+  }
+
+  size() {
+    return this.members.length;
+  }
+}
+
+class Battle {
+  constructor(shipA, shipB, distance) {
+    this.shipA = shipA;
+    this.shipB = shipB;
+    this.distance = distance;
+	this.time = 0;
+  }
+  
+  tick(dt){
+    this.shipA.tick(dt, this);
+	this.shipB.tick(dt, this);
+	
+	this.time += dt;
+
+	// Relative movement
+	const relativeSpeed =
+		(this.shipA.speed() * this.shipA.vector) +
+		(this.shipB.speed() * this.shipB.vector);
+
+	  this.distance += relativeSpeed * dt;
+
+	  if (this.distance < 0) this.distance = 0;
+  }
+}
+
+class Ship {
+  constructor(hp, size, name) {
+	this.id = uid();
+    this.name = name;
+    this.vector = 0; // -1 to 1
+
+    this.maxHP = hp;
+    this.currentHP = hp;
+    this.size = size;
+
+    this.systems = [];
+    this.teams = [];
+  }
+  
+  remainingSpace() {
+    return this.size - this.systemTotal("size");
+  }
+
+  systemTotal(key) {
+    return this.systems.reduce((s, sys) => s + (sys[key] ?? 0), 0);
+  }
+
+  systemComputedTotal(type, func){
+    return this.systems.reduce((s, sys) => {
+      if (sys.type === type && typeof sys[func] === "function") {
+        return s + sys[func]();
+      }
+      return s;
+    }, 0);
+  }
+
+  powerOutput() {
+    return this.systemTotal("powerOutput");
+  }
+
+  powerUsed() {
+    return this.systems.reduce((s, sys) => {
+      if (sys.type === "energyWeapon" && !sys.enabled) return s;
+      return s + (sys.power ?? 0);
+    }, 0);
+  }
+
+  engineOutput() {
+    return this.systemComputedTotal("Engine", "engineOutput");
+  }
+
+  speed() {
+    return this.engineOutput() / this.size;
+  }
+
+  getSystem(name){
+    return this.systems.find(s => s.name == name || s.type == name);
+  }
+  
+  takeDamage(amount) {
+  let remaining = amount;
+
+  // 1. Shields absorb first (in order)
+  const shields = this.systems.filter(s => s.type === "shield" && s.power > 0);
+
+  for (const shield of shields) {
+    if (remaining <= 0) break;
+
+    const absorbed = Math.min(shield.current, remaining);
+    shield.current -= absorbed;
+    remaining -= absorbed;
+  }
+
+  // 2. Hull takes remaining
+  if (remaining > 0) {
+    this.currentHP -= remaining;
+  }
+
+  // 3. Roll random system hit based on size (including empty space)
+  const totalSlots = this.size;
+  const roll = Math.random() * totalSlots;
+
+  let cumulative = 0;
+
+  for (const system of this.systems) {
+    cumulative += system.size;
+
+    if (roll < cumulative) {
+      // Hit this system
+      system.hp -= remaining;
+      return system;
+    }
+  }
+
+  // Hit empty space (no effect)
+  return null;
+};
+
+  tick(dt, battle) {
+		let pause = false;
+	this.systems.forEach(system => {
+		if (system.type === "shield") {
+		  system.tick(dt);
+		}
+
+		if (system.type === "energyWeapon") {
+			return system.tick(dt, battle, this)
+		}
+		
+	});
+	if (pause) running = false;
+  }
+}
+
+/* =====================
+   SYSTEMS LIBRARY
+===================== */
+
+const coreSystems = {
+  fusionCore: new Reactor("Fusion Core", 20, 100, 100),
+  laser: new EnergyWeapon("Laser", 5, 10, 60, 2000, 10, 5),
+  heavyLaser: new EnergyWeapon("Heavy Laser", 5, 10, 70, 3000, 15, 9),
+  pushDrive: new Engine("Push Drive", 10, 200, 30, 50),
+  starDrive: new System("Star Drive", "System", 10, 200),
+  bridge: new System("Bridge", "System", 3, 100),
+  smallShield: new Shield("Small Shield", 10, 100, 50, 10, 10),
+  largeShield: new Shield("Large Shield", 10, 100, 500, 5, 10),
+
+};
+
+function getSystem(name) {
+  const original = coreSystems[name];
+  if (!original) return null;
+
+  // Create a shallow clone with a new id
+  const copy = Object.create(Object.getPrototypeOf(original));
+  Object.assign(copy, original);
+  copy.id = uid();
+
+  return copy;
+}
+
+
+
+/* =====================
+   SETUP
+===================== */
+
+const playerShip = new Ship(1000, 120, "USS Builder");
+playerShip.vector = -1;
+playerShip.systems.push(getSystem("fusionCore"));
+playerShip.systems.push(getSystem("laser"));
+playerShip.systems.push(getSystem("laser"));
+playerShip.systems.push(getSystem("heavyLaser"));
+playerShip.systems.push(getSystem("pushDrive"));
+playerShip.systems.push(getSystem("pushDrive"));
+playerShip.systems.push(getSystem("bridge"));
+playerShip.systems.push(getSystem("smallShield"));
+
+const enemyShip = new Ship(1000, 120, "ISS Opponent");
+enemyShip.vector = -1;
+enemyShip.systems.push(getSystem("fusionCore"));
+enemyShip.systems.push(getSystem("laser"));
+enemyShip.systems.push(getSystem("pushDrive"));
+enemyShip.systems.push(getSystem("bridge"));
+enemyShip.systems.push(getSystem("largeShield"));
+
+const playerBridgeCrew = new CrewTeam("Bridge Crew");
+playerBridgeCrew.location = playerShip.getSystem("Bridge");
+playerShip.teams.push(playerBridgeCrew);
+
+const enemyBridgeCrew = new CrewTeam("Bridge Crew");
+enemyBridgeCrew.location = enemyShip.getSystem("Bridge");
+enemyShip.teams.push(enemyBridgeCrew);
+
+const battle = new Battle(playerShip, enemyShip, 2000);
+
+/* =====================
+   RENDERING
+===================== */
+
+const statsDiv = document.getElementById("stats");
+const systemsDiv = document.getElementById("systems");
+const teamsDiv = document.getElementById("teams");
+
+function renderStats() {
+  statsDiv.innerHTML = `
+    HP: ${ship.currentHP} / ${ship.maxHP}<br>
+    Size: ${ship.size}<br>
+    Speed: ${ship.speed().toFixed(2)}<br>
+    Power: ${ship.powerUsed()} / ${ship.powerOutput()}<br>
+  `;
+}
+
+function renderBattle() {
+  document.getElementById("battleInfo").innerHTML =
+    `Distance: ${battle.distance.toFixed(2)}<br>
+	Time: ${battle.time.toFixed(2)}`;
+}
+
+function renderShip(ship, containerId, interactive = false) {
+  const container = document.getElementById(containerId);
+
+  const statsDiv = container.querySelector(".stats");
+  const systemsDiv = container.querySelector(".systems");
+  const teamsDiv = container.querySelector(".teams");
+
+  // Stats
+  statsDiv.innerHTML = `
+  <h2>${ship.name}</h2>
+	Vector: ${ship.vector.toFixed(2)}<br>
+	<div>
+	  <input type="range" min="-1" max="1" step="0.1"
+		value="${ship.vector.toFixed(2)}"
+		onchange="setVector(this.value)">
+	</div>
+    HP: ${ship.currentHP.toFixed()} / ${ship.maxHP}<br>
+    Size: ${ship.size}<br>
+    Speed: ${ship.speed().toFixed(2)}<br>
+    Power: ${ship.powerUsed()} / ${ship.powerOutput()}<br>
+  `;
+
+  // Systems
+  const iconMap = {
+    reactor: "⚡",
+    energyWeapon: "🔫",
+    Engine: "🚀",
+    shield: "🛡️",
+    cargo: "📦",
+    bridge: "🧠"
+  };
+
+  const statIcons = {
+    damage: "💥",
+    range: "📡",
+    power: "⚡",
+    powerOutput: "🔋",
+    rate: "🚀"
+  };
+
+  systemsDiv.innerHTML = ship.systems.map(system => {
+    let html = `<div class="system">`;
+
+    const icon = iconMap[system.type] || "❓";
+    html += `<b title="${system.type}">${icon}</b> ${system.name} `;
+    html += `[${system.hp.toFixed()}/${system.maxhp}](${system.size}) `;
+
+    for (let key in statIcons) {
+      if (system[key] !== undefined) {
+        html += `<span title="${key}">${statIcons[key]}${system[key]}</span> `;
+      }
+    }
+	  
+	  if (system.type === "shield") {
+		  html += `
+			<span title="shield">🛡️${system.current.toFixed()}/${system.capacity}</span>
+			<span title="recharge">🔄${system.recharge}</span>
+			<span title="power">⚡${system.power}</span>
+		  `;
+		}
+	
+	  if (system.type === "energyWeapon") {
+			const inRange = system.range >= battle.distance;
+			html += `<span title="range check">${inRange ? "✅" : "❌"}</span> `
+			html += `<span title="cooldown">⏱️${system.currentCooldown.toFixed(2)}/${system.cooldown}</span> `;
+	  }
+
+
+    // Only allow controls if interactive
+    if (interactive) {
+      if (system.type === "energyWeapon") {
+        html += `
+          <button onclick="toggleWeapon(${ship.id},${system.id})">
+            ${system.enabled ? "On" : "Off"}
+          </button>`;
+      }
+
+      if (system.type === "Engine") {
+        html += `
+          <input type="range" min="0" max="${system.maxpower}" value="${system.power}"
+          onchange="setEnginePower(${ship.id},${system.id}, this.value)">`;
+      }
+    }
+
+    html += `</div>`;
+    return html;
+  }).join("");
+
+  // Teams
+  teamsDiv.innerHTML = ship.teams.map(t => t.name).join("<br>");
+}
+
+/* =====================
+   INTERACTIONS
+===================== */
+
+function setEnginePower(shipid, id, value) {
+  const ship = playerShip;
+  const sys = ship.systems.find(s => s.id === id);
+  sys.power = Number(value);
+  update();
+}
+
+function toggleWeapon(shipid, id) {
+  const ship = playerShip
+  const sys = ship.systems.find(s => s.id === id);
+  sys.enabled = !sys.enabled;
+  update();
+}
+
+function setVector(value) {
+  battle.shipA.vector = Number(value);
+  update();
+}
+
+function update() {
+  renderBattle();
+  renderShip(playerShip, "leftShip", true);
+  renderShip(enemyShip, "rightShip", false);
+ }
+ 
+ function togglePause() {
+  running = !running;
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        e.preventDefault(); // prevents page scroll
+        togglePause();
+    }
+});
+/* =====================
+   INIT
+===================== */
+// let the player adjust before the battle starts!
+let running = false;
+
+function gameLoop() {
+  if (running) {
+    const dt = 1 / TICKS_PER_SECOND;
+
+    battle.tick(dt);
+    update();
+  }
+}
+
+setInterval(gameLoop, TICK_RATE);
+
+
+</script>
+
+</body>
+</html>

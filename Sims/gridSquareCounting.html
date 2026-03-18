@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Grid Clustering Visualization</title>
+<style>
+  body { font-family: sans-serif; text-align: center; }
+  canvas { border: 1px solid black; margin: 10px; }
+  #sizes { margin-top: 20px; }
+</style>
+</head>
+<body>
+<h1>Grid Clustering Visualization</h1>
+
+<canvas id="gridCanvas" width="500" height="500"></canvas>
+<canvas id="histCanvas" width="500" height="200"></canvas>
+
+<div id="sizes"></div>
+
+<script>
+var size = 500;
+var odds = 0.5;
+var grid = [];
+var cap = 30;
+
+// Initialize grid
+for(var i =0;i<size;i++) {
+    grid[i]=[];
+    for(var j=0;j<size;j++) {
+        if(Math.random()<odds)
+            grid[i][j]=0;
+        else 
+            grid[i][j]=-1;
+    }
+}
+
+// Flood-fill / cluster labeling
+function crawlGrid (x,y,grid,nextID) {
+    if(x<0||y<0||x==size||y==size) return 0;
+    if(grid[x][y] != -1) return 0; 
+    var result = 1;
+    grid[x][y] = nextID;
+    result += crawlGrid(x+1,y,grid,nextID);
+    result += crawlGrid(x-1,y,grid,nextID);
+    result += crawlGrid(x,y+1,grid,nextID);
+    result += crawlGrid(x,y-1,grid,nextID);
+    return result;
+}
+
+// Find clusters
+var sizes = [];
+var nextID=1;
+for(var i =0;i<size;i++)
+    for(var j=0;j<size;j++) {
+        var count = crawlGrid(i,j,grid,nextID)
+        if(count >0){
+            nextID++;
+            let sizeCat = Math.min(cap,count);
+            if(!sizes[sizeCat]) sizes[sizeCat]=0;
+            sizes[sizeCat]++;
+        }
+    }
+
+console.log(sizes);
+
+// Show sizes as text
+document.getElementById('sizes').innerText = "Cluster sizes (1-"+cap+"): " + sizes.map((v,i)=>v||0).join(", ");
+
+// Draw the grid
+var canvas = document.getElementById("gridCanvas");
+var ctx = canvas.getContext("2d");
+var imgData = ctx.createImageData(size, size);
+function randomColor(id) {
+    // generate a reproducible color based on id
+    var r = (id*123) % 256;
+    var g = (id*321) % 256;
+    var b = (id*213) % 256;
+    return [r,g,b];
+}
+for(var x=0;x<size;x++){
+    for(var y=0;y<size;y++){
+        var index = (y*size + x)*4;
+        if(grid[x][y]==0){
+            imgData.data[index] = 200;
+            imgData.data[index+1] = 200;
+            imgData.data[index+2] = 200;
+            imgData.data[index+3] = 255;
+        } else {
+            let color = randomColor(grid[x][y]);
+            imgData.data[index] = color[0];
+            imgData.data[index+1] = color[1];
+            imgData.data[index+2] = color[2];
+            imgData.data[index+3] = 255;
+        }
+    }
+}
+ctx.putImageData(imgData, 0, 0);
+
+// Draw histogram
+var histCanvas = document.getElementById("histCanvas");
+var hctx = histCanvas.getContext("2d");
+hctx.clearRect(0,0,histCanvas.width,histCanvas.height);
+
+let maxCount = Math.max(...sizes.filter(v=>v!=undefined));
+for(let i=1;i<=cap;i++){
+    let val = sizes[i]||0;
+    let barHeight = (val/maxCount)*histCanvas.height;
+    let barWidth = histCanvas.width/cap;
+    hctx.fillStyle = "steelblue";
+    hctx.fillRect((i-1)*barWidth, histCanvas.height-barHeight, barWidth-2, barHeight);
+    hctx.fillStyle = "black";
+    hctx.fillText(val, (i-1)*barWidth+2, histCanvas.height-barHeight-2);
+}
+</script>
+
+</body>
+</html>

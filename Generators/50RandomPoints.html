@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Points Generator</title>
+</head>
+<body>
+    <h1>Canvas Points Generator</h1>
+    <canvas id="canvas" width="500" height="500" style="border:1px solid #000; background-color: transparent;"></canvas>
+    <br>
+    <button id="downloadBtn">Download Image</button>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Function to generate random points
+        function generatePoints() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const whiteBorderColors = ['red', 'green', 'blue'];
+            const tealBorderColors = ['purple', 'orange', 'yellow', 'pink'];
+
+            const totalPoints = 50;
+            const whiteBorderCount = Math.floor(Math.random() * 6) + 20; // Randomly between 20-25
+
+            for (let i = 0; i < totalPoints; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const color = i < whiteBorderCount
+                    ? whiteBorderColors[Math.floor(Math.random() * whiteBorderColors.length)]
+                    : tealBorderColors[Math.floor(Math.random() * tealBorderColors.length)];
+                const borderColor = i < whiteBorderCount ? 'white' : 'teal';
+
+                // Draw the point
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2, true); // radius of 3 for visibility
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = borderColor;
+                ctx.stroke();
+                ctx.closePath();
+            }
+        }
+
+        // Generate points on load
+        generatePoints();
+
+        // Function to download the canvas as an image
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'canvas_image.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Population Simulation</title>
+<style>
+  body { font-family: sans-serif; padding: 20px; }
+  h1 { font-size: 1.5em; }
+  #results { margin-top: 20px; }
+  .bar {
+    display: inline-block;
+    height: 20px;
+    background-color: steelblue;
+    margin-right: 2px;
+    vertical-align: bottom;
+  }
+  .bar-label { font-size: 10px; writing-mode: vertical-lr; transform: rotate(180deg); }
+</style>
+</head>
+<body>
+<h1>Population Simulation Results</h1>
+
+<div id="summary"></div>
+<div id="results"></div>
+
+<script>
+var ages = [];
+var deaths = 0;
+var splits = 0;
+
+// Initialize ages
+for (var i = 0; i < 100; i++) {
+  ages[i] = i <= 80 ? 10 : 0;
+}
+
+// Count total population
+function countPeople(ages) {
+  return ages.reduce((a, b) => a + b, 0);
+}
+
+// Get age of a random index
+function ageOfIndex(ages, index) {
+  var sofar = 0;
+  for (var i = 0; i < ages.length; i++) {
+    sofar += ages[i];
+    if (sofar >= index) return i;
+  }
+  return -1;
+}
+
+// Run one year of simulation
+function runYear(ages) {
+  var count = countPeople(ages);
+  var toSplit = 0;
+
+  for (var i = 0; i < count; i++) {
+    if (Math.random() <= 0.02) toSplit++;
+  }
+
+  for (var i = 0; i < toSplit; i++) {
+    var index = Math.floor(Math.random() * count);
+    var age = ageOfIndex(ages, index);
+    ages[age]--;
+    ages[Math.floor(age / 2)]++;
+    ages[Math.ceil(age / 2)]++;
+    splits++;
+  }
+
+  // Everyone ages by 1
+  for (var i = ages.length - 1; i >= 0; i--) ages[i + 1] = ages[i];
+  ages[0] = 0;
+
+  // Handle deaths
+  for (var i = 70; i < ages.length; i++) {
+    for (var j = ages[i]; j > 0; j--) {
+      if (i > 80) {
+        ages[i]--;
+        deaths++;
+      }
+    }
+    if (i > 100) delete ages[i];
+    ages.length = 101;
+  }
+
+  // Population control
+  if (countPeople(ages) > 5000) {
+    for (var i = 0; i < ages.length; i++) {
+      ages[i] = Math.random() > 0.5 ? Math.ceil(ages[i] / 2) : Math.floor(ages[i] / 2);
+    }
+  }
+}
+
+// Run the simulation for 5 years
+for (var year = 0; year < 5; year++) {
+  runYear(ages);
+}
+
+// Display results
+var summaryDiv = document.getElementById("summary");
+summaryDiv.innerHTML = `<p>Total population: ${countPeople(ages)}</p>
+<p>Total deaths: ${deaths}</p>
+<p>Total splits: ${splits}</p>`;
+
+var resultsDiv = document.getElementById("results");
+ages.forEach((count, age) => {
+  if (count > 0) {
+    var bar = document.createElement("div");
+    bar.className = "bar";
+    bar.style.height = `${count}px`;
+    bar.title = `Age ${age}: ${count}`;
+    resultsDiv.appendChild(bar);
+  }
+});
+</script>
+</body>
+</html>

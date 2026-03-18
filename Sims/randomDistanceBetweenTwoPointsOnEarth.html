@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Average Random Distance on Sphere</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    input, button {
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+    #output {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Average Distance Between Random Points on a Sphere</h1>
+  <label for="runs">Number of runs:</label>
+  <input type="number" id="runs" value="1000" min="1">
+  <button onclick="runSimulation()">Run Simulation</button>
+  
+  <div id="output"></div>
+
+  <script>
+    function randomLocation() {
+      var lon = Math.random() * Math.PI * 2;
+      var lat = Math.asin(Math.random() * 2 - 1);
+      return { lon: lon, lat: lat };
+    }
+
+    function distance(a, b) {
+      return Math.acos(
+        Math.sin(a.lat) * Math.sin(b.lat) +
+        Math.cos(a.lat) * Math.cos(b.lat) * Math.cos(Math.abs(a.lon - b.lon))
+      );
+    }
+
+    function averageAngle(n) {
+      var runs = [];
+      for (var i = 0; i < n; i++) {
+        runs.push(distance(randomLocation(), randomLocation()) * 180 / Math.PI);
+      }
+      return runs.reduce((a, b) => a + b, 0) / n;
+    }
+
+    function runSimulation() {
+      var n = parseInt(document.getElementById('runs').value);
+      if (isNaN(n) || n < 1) {
+        document.getElementById('output').innerText = "Please enter a valid number of runs.";
+        return;
+      }
+      var avg = averageAngle(n);
+      document.getElementById('output').innerText = `Average distance: ${avg.toFixed(4)}° over ${n} runs`;
+    }
+  </script>
+</body>
+</html>

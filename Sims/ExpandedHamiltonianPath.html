@@ -1,0 +1,249 @@
+<html>
+<head>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+	<script>
+		var startingPath = [17,8,1,15,10,6,3,13,12,4,5,11,14,2,7,9,16];
+		function buildBaseGraph (){
+			var paths = [[1]];
+			var resultingPath;
+			var targetNumber = 500;
+			var regroupNumber = 20;
+			for(var n = 2;n<targetNumber;n++)
+			{
+				var added = false;
+				for(var p in paths){
+					resultingPath = addNumber(paths[p],n);
+					if(resultingPath.length > paths[p].length){
+						paths[p] = resultingPath;
+						added=true;
+						break;
+					}
+				}
+				if(!added)paths.push([n]);
+				
+				if(n%20 ==0)
+				{
+					//try and merge paths
+					//addSequence(path,altPath,n)
+				}
+			}
+			for(var i = 0;i<paths.length;i++)
+			for(var j=i+1;j<paths.length;j++)
+			{
+				var endPath = addSequence(paths[i],paths[j],targetNumber);
+				if(endPath.length!=paths[i].length){
+					paths.splice(j,1);
+					paths.splice(i,1,endPath);
+				}
+			}
+			console.log(paths);
+		}
+		function addSequence (existingPath,sequence,maxNumber){
+			var resultingPath = existingPath.slice(0);
+			var locationMap = existingPath.reduce((out,a,index)=>{ out[a]=index;return out;},{});
+			var doubleConn = doubleConnection (
+				connectionsByIndex(sequence[0],maxNumber,locationMap),
+				connectionsByIndex(sequence[sequence.length-1],maxNumber,locationMap)
+			)
+			if(doubleConn){
+				if(doubleConn[0] > doubleConn[1]) sequence.reverse();
+				resultingPath.splice(Math.min(...doubleConn),0,...sequence);
+			}
+			return resultingPath;
+		}
+		function addNumber (existingPath,number,maxNumber){
+			var maxNumber = maxNumber?maxNumber:number;
+			var locationMap = existingPath.reduce((out,a,index)=>{ out[a]=index;return out;},{});
+			var resultingPath = existingPath.slice(0);
+			
+			var connections = calculateConnections(number,maxNumber);
+			var connectionIndices = connectionsByIndex(number,maxNumber,locationMap);
+			var simpleConnection = singleConnection(connectionIndices,existingPath.length,false);
+			if(simpleConnection){
+				resultingPath.splice(simpleConnection[0]+1,0,number);
+			}
+			else{
+				var doubleConn;
+				for(var i of connectionIndices)
+				for(var j of connectionIndices)
+				if(i<j && j-i>2){ //Eventually we can look at single points, but that gets recursive!
+					var frayedEnds = [existingPath[i+1],existingPath[j-1]];
+					var doubleConn = doubleConnection(
+						connectionsByIndex(frayedEnds[0],maxNumber,locationMap),
+						connectionsByIndex(frayedEnds[1],maxNumber,locationMap)
+					);
+					if(doubleConn) {
+						//both points are less than the lower or greater than the upper
+						var outsideSelf = (doubleConn[0]<i && doubleConn[1] <i)
+							|| (doubleConn[0] > j && doubleConn[1] > j);
+						if(outsideSelf){
+							doubleConn = {frayed:[i+1,j-1],frayInsert:doubleConn,outerFray:[i,j]};
+							break;
+						}
+						else {
+							console.log("self threading exception!",number,doubleConn,i,j);
+							doubleConn=false;
+						}
+					}
+				}
+			}
+			if(doubleConn){
+				console.log("adding double",number);
+				var rearranged = resultingPath.slice(0,doubleConn.outerFray[0]+1)
+						.concat([number])
+						.concat(resultingPath.slice(doubleConn.outerFray[1]));
+				var transplant = resultingPath.slice(doubleConn.frayed[0],doubleConn.frayed[1]+1);
+				var flipped = doubleConn.frayInsert[0]>doubleConn.frayInsert[1];
+				if(flipped) transplant.reverse();
+				rearranged.splice(Math.min(doubleConn.frayInsert[0],doubleConn.frayInsert[1]),0,...transplant);
+				resultingPath = rearranged;
+			}
+			//TODO: try and matchup ends to make loops
+			/*
+			console.log("starting Path",existingPath);
+			console.log("connections",connections);
+			console.log("solution",simpleConnection || doubleConn);
+			console.log("result",resultingPath);
+			*/
+			return resultingPath;
+		}
+		function connectionsByIndex(number,maxNumber,locationMap){
+			return calculateConnections(number,maxNumber)
+				.map(c => locationMap[c])
+				.filter(a=>a!=undefined)
+				.sort((a,b)=>a-b);
+		}
+		function singleConnection (connections,length,isCircut){
+			for(var i=1;i<connections.length;i++)
+				if(connections[i-1]+1 == connections[i]) return [connections[i-1],connections[i]];
+			if(connections[connections.length-1] == length-1 && connections[0]==0) 
+				return [connections[connections.length-1],connections[0]];
+			if(!isCircut && connections[connections.length-1] == length-1)
+				return [length-1];
+			if(!isCircut && connections[0]==0)
+				return [-1];
+			return false;
+		}
+		function doubleConnection(Aconn,Bconn){
+			
+			var a = 0;
+			var b = 0;
+			while(a<Aconn.length && b<Aconn.length){
+				if(Aconn[a]+1==Bconn[b] || Aconn[a]-1==Bconn[b]) return [Aconn[a],Bconn[b]];
+				if(Aconn[a]<Bconn[b]) a++;
+				else b++;
+			}
+			//TODO Add End Checking!
+			return false;
+		}
+		function calculateConnections (number,currentNumber){
+			var result = [];
+			var floorSquare = Math.floor(Math.sqrt(number));
+			for(var i = floorSquare+1; i*i < currentNumber*2;i++)
+				result.push(i*i-number);
+			return result;
+		}
+		/// STATISTICS SECTION
+		function randomCircleLocations(locations,circleSize){
+
+			spots = randomLocations(locations,circleSize);
+			for(var i=1;i<spots.length;i++)
+				if(spots[i-1]+1 == spots[i]) return [spots[i-1],spots[i]];
+			if(spots[spots.length-1] == circleSize-1 && spots[0]==0) return [spots[spots.length-1],spots[0]];
+			
+			return false;
+		}
+		
+		function randomLocations(locations,circleSize){
+			var spots = [];
+			var possibleNums = [];
+			for(var i =1; i<=circleSize;i++) possibleNums.push(i);
+			for(var i =0;i<locations;i++) {
+				var l = Math.floor(Math.random()*possibleNums.length);
+				spots.push(possibleNums[l]);
+				possibleNums.splice(l,1);
+			}
+			spots.sort((a,b)=>a-b);
+			return spots;
+		}
+		
+		function intersection(locations,circleSize){
+			var A = randomLocations(locations,circleSize);
+			var B = randomLocations(locations,circleSize);
+			
+			var a = 0;
+			var b = 0;
+			while(a<A.length && b<B.length){
+				if(A[a]+1==B[b] || A[a]-1==B[b]) return [A[a],B[b]];
+				if(A[a]<B[b]) a++;
+				else b++;
+			}
+			return false;
+		}
+		
+		function theoretical(locations,circleSize){
+			var result = 1;
+			for(var i=0;i<locations;i++)
+				result *= (circleSize-i*2)/circleSize;
+			return 1- result;
+		}
+		
+		function theoreticalPair(locations,circleSize){
+			return 1 - Math.pow((circleSize - locations*2)/circleSize,locations);
+		}
+		
+		function main(){
+			var model = {};
+			model.attempts = ko.observable(1000);
+			model.circleSize = ko.observable(1000);
+			model.locations = ko.pureComputed(function (){
+				return Math.floor(Math.pow(model.circleSize(),.5)*(Math.pow(2,.5)-1));
+			});
+			
+			model.theoretical = ko.observable("not computed");
+			model.experimental = ko.observable("not computed");
+			model.theoreticalPair = ko.observable("not computed");
+			model.experimentalPair = ko.observable("not computed");
+			model.lastCalculation = ko.observable("no calculations run");
+			
+			model.calculate = function (){
+			
+				//*
+				var successes = 0;
+				for(var i = 0;i<model.attempts();i++)
+					if(randomCircleLocations(model.locations(),model.circleSize()))successes++;
+				model.experimental(Math.round(successes/model.attempts()*10000)/100+"%");
+				//*/
+				//*
+				successes = 0;
+				for(var i = 0;i<model.attempts();i++)
+					if(intersection(model.locations(),model.circleSize()))successes++;
+				model.experimentalPair(Math.round(successes/model.attempts()*10000)/100+"%");
+				//*/
+
+				model.theoretical(Math.round(theoretical(model.locations(),model.circleSize())*10000)/100+"%");
+				model.theoreticalPair(Math.round(theoreticalPair(model.locations(),model.circleSize())*10000)/100+"%");
+				model.lastCalculation(model.circleSize()+" numbers with "+model.locations()+" breaks");
+			}
+			ko.applyBindings(model,document.getElementById('display'));
+			
+		}
+		
+		
+	</script>
+</head>
+<body onload = "main()">
+	<div id="display">
+		Circle Size: <input type = "number" data-bind="value:circleSize"></input><br>
+		Locations: <span data-bind="text:locations"></span><br>
+		Attempts: <input type = "number" data-bind="value:attempts"></input><br>
+		<br>
+		Theoretical: <span data-bind="text:theoretical"></span><br>
+		Experimental: <span data-bind="text:experimental"></span><br>
+		Theoretical (Two Sets): <span data-bind="text:theoreticalPair"></span><br>
+		Experimental (Two Sets): <span data-bind="text:experimentalPair"></span><br>
+		Last Calculation: <span data-bind="text:lastCalculation"></span><br>
+		<button data-bind="click:calculate">Calculate</button>
+	</div>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<html>
+<head>
+	<title>Dealing</title>
+	<style>
+	#input *{
+		vertical-align:top;
+	}
+	.section{
+	 display: inline-block;
+	}
+	</style>
+	<script type="text/javascript" src= "../Tools/seededGenerator.js"></script>
+	<script >
+		function parseCard(cardText){
+			var breaks = ['(',')','[',']','>','/'];
+			var breaksMap = breaks.map(b=>cardText.indexOf(b));
+			if(breaksMap.indexOf(-1)!=-1) return undefined;
+			breaksMap.push(cardText.length);
+			var feilds = breaksMap.map((breakIndex,i)=>cardText.substring(i=0?0:breaksMap[i-1]+1,breakIndex))
+				.map(a=>a.trim())
+				.filter(field=>field);
+			var feildNames = ["name","score","type","constraint","up","down"];
+			var result = {};
+			for(var i in feildNames){
+				result[feildNames[i]]=feilds[i];
+			}
+			return result;
+		}
+		function process(){
+			Math.seedrandom(document.getElementById("seed").value);
+			var gndt = document.getElementById("GNDT").value.split("\n").map(a=>a.split("\t").map(f=>f.trim())).sort((a,b)=>a[0].localeCompare(b[0]));
+			var heldCards = gndt.map(a=>a[1]).join(",").split(",").map(name=>name.trim()).sort();
+			var allCards = document.getElementById("CardList").value.split("\n")
+				.map(line=>parseCard(line))
+				.filter(card=>card);
+			var attachedCards = document.getElementById("attached").value.split("\n").map(a=>a.trim()).filter(f=>f);
+			var validCards = allCards.filter(card => heldCards.indexOf(card.name)==-1).filter(card => attachedCards.indexOf(card.name)==-1).sort((a,b)=>a.name.localeCompare(b.name));
+		
+			if(validCards.length+heldCards.length + attachedCards.length!= allCards.length) {
+					document.getElementById("validCards").innerHTML = "ERROR! ERROR! cards not all accounted for!<br>"+
+					heldCards.filter(heldCard => allCards.map(card => card.name).indexOf(heldCard)==-1).join(",");
+				}
+			else{
+				
+				document.getElementById("validCards").innerHTML = "<ol><li>"+validCards.map(card=>card.name).join("<li>")+"</ol>";
+			}
+			
+			var WizardList = [];
+			while(gndt.length){
+				var removeAt = Math.floor(Math.random()*gndt.length);
+				WizardList.push(gndt[removeAt]);
+				gndt.splice(removeAt,1);
+			}
+			var cardsDrawn = [];
+			for(var wizard of WizardList){
+				var draw = {wizard:wizard[0],card:undefined};
+				if(validCards.length>0 && wizard[1].split(',').length < 4){
+					var cardIndex = Math.floor(Math.random()*validCards.length);
+					draw.card = validCards[cardIndex].name;
+					validCards.splice(cardIndex,1);
+				}
+				cardsDrawn.push(draw);
+			}
+			
+			console.log(WizardList);
+			console.log(gndt);
+			console.log(heldCards);
+			console.log(allCards);
+			console.log(validCards);
+			console.log(cardsDrawn);
+			var display = "<table>";
+			for(var draw of cardsDrawn){
+				display+="<tr><td>"+draw.wizard+"</td><td>"+(draw.card?draw.card:"No card")+"</td><tr>";
+			}
+			display+="</table>"
+			document.getElementById("results").innerHTML = display;
+		
+		}
+		function main(){
+			document.getElementById("GNDT").value="Kevan\tRed Potion, Fable, Trade Network\t-\t0\nBrendan\tFaked Intel, Framed, Mad Beast\tSwamp\t0\npokes\tMudling Princess, The Miasma, Raiding Goblins\t-\t0\nderrick\tThe Prophecy, Brown Potion, Grassfolk Poet\t-\t0\ncard\tMudling Inventor, Redland Settlers, The Behemoth\tThe Harbour\t0\nAxemabaro\tGrassfolk Settlers, Fertility, The Metamorphosis\t-\t0\nVJRada\tForget, Teleport, Alliance\t-\t0\nTrigon\tBarban Warrior, Redlander King, Barban Roamer\tThe Red Plains\t0\nCorona\tThe Haruspex, Slight of Hand, Swirly Potion\tThe Red Plains\t0\nJumble\tBarban Settlers, Small Dragon, Grassfolk Herald\t-\t0\n9spaceking\tFire, Slayer, The Infiltration\tSwamp\t0";
+			document.getElementById("CardList").value="\n    Fire (1) [Spell] No Constraint. > Add 1 War to any Community. / Reduce a Rating of any Community by 1 and Vex it.\n    Flood (1) [Spell] No Constraint. > Add 1 Economy to any Community. / Reduce a Rating of any Community by 1 and Vex it.\n    Fable (1) [Spell] No Constraint. > Add 1 Culture to any Community. / Reduce a Rating of any Community by 1 and Vex it.\n    Forget (1) [Spell] No Constraint. > Set a Community to be Indifferent to all Wizards. / Set a Community to be Indifferent to a Wizard of your choice.\n    Brown Potion (1) [Potion] No Constraint. > Draw a Card. / Nothing Happens.\n    Red Potion (1) [Potion] No Constraint. > Set a Community to be Friendly to you. / Nothing Happens.\n    Clear Potion (1) [Potion] No Constraint. > Discard your hand. / Nothing Happens.\n    Black Potion (1) [Potion] No Constraint. > Vex a community. / Nothing Happens.\n    Swirly Potion (1) [Potion] No Constraint. > Apply the Up Effect of any other Potion card, then discard your hand. / Nothing Happens.\n    Mudling Settlers (1) [Labor] May only affect communities that are not suspicious of the wizard playing the card. > Raise the economy rating of a ruin by 2 and change the Faction to Mudling. / Change the Faction of a Neutral Village to Mudling.\n    Barban Settlers (1) [Labor] May only affect communities that are not suspicious of the wizard playing the card. > Raise the war rating of a ruin by 2 and change the Faction to Barban. / Change the Faction of a Neutral Village to Barban.\n    Grassfolk Settlers (1) [Labor] May only affect communities that are not suspicious of the wizard playing the card. > Raise the culture rating of a ruin by 2 and change the Faction to Grassfolk . / Change the Faction of a Neutral Village to Grassfolk .\n    Redland Settlers (1) [Labor] May only affect communities that are not suspicious of the wizard playing the card. > Change the Faction of a Neutral Village or Town to Redlander. / Change the Faction of a Village to Neutral.\n    Plague (2) [Spell] No Constraint > Reduce all ratings of a community by 1 and vex it / Reduce one rating of a community by 2 and vex it.\n    Fertility (4) [Spell] May only effect communities friendly to the wizard playing the card > discard a card and increase all ratings of a community with positive size by 1 / Discard a card and place a Person type card of your choice in your hand from the deck .\n    Barban Warrior (1) [person] there must exist at least one Barban community > Increase the War rating of a Barban community by 1 / Reduce any rating of a community that is not Barban by 1.\n    Grassfolk Poet (1) [person] there must exist at least one Grassfolk community > Increase the Culture rating of any community by 1 / Increase any rating of a Grassfolk community by 1 .\n    Mudling Inventor (1) [person] there must exist at least one Mudling community > Increase the Economy rating of a Mudling community by 1 / Discard a potion from your hand and play either its up effect or its down effect twice .\n    Redlander King (1) [person] there must exist at least one Redlander community > Increase any rating of a neutral town or city by 1 / Increase two ratings of a redlander town or city by 1.\n    Teleport (1) [Spell] no constraint > Set your Home to any Village, Town or City. / Set your Home to any Ruin.\n    The Prophecy (2) [Ritual] You must have a Potion and a Person in your hand > Discard a Potion and a Person, then draw a card; instead of selecting this card randomly, you may choose any card which is not in a Wizard’s hand / Discard a Potion and a Person.\n    The Metamorphosis (2) [Ritual] You must have a Person and a Monster in your hand> Discard a Person and a Monster, then swap the contents of your hand with that of another Wizard / Discard a Person and a Monster.\n    The Haruspex (2) [Ritual] You must have a Monster and a Potion in your hand > Discard a Monster and a Potion, then draw six cards / Discard a Monster and a Potion.\n    The Behemoth (2) [Ritual] You must have two Monsters in your hand > Discard two Monsters, then set all Ratings of any one Community to zero / Discard two Monsters.\n    The Miasma (2) [Ritual] You must have two Potions in your hand > Discard two Potions, then set any one Community to be Suspicious to all Wizards / Discard two Potions.\n    The Infiltration (2) [Ritual] You must have two Persons in your hand > Discard two Persons, choose a Faction and change all Communities of that Faction to be Neutral / Discard two Persons.\n    Slight of Hand (2) [Trick] You must be in a community which has a card attached to it > Add that card to your hand and unattach it from the community / if you have a card which can be attached to a community in your hand, attach it in the up state and remove a different attached card from the community you are in.\n    Pick Pocket (2) [Trick] Must be in the same location as the Wizard(s) you target > Choose a Wizard and play a card in their hand that you satisfy the constraints of as if it were in your hand. The card is removed from their hand. / choose two Wizards who have at least one card in their Hand. Choose a card from each hand and swap them.\n    Stage Magic (1) [Trick] Must have at least 1 Friendly community > Choose an Indiferent community and make them Friendly towards you. / Choose a Friendly community and increase their culture by 1.\n    Faked Intel (2) [Trick] Must have at least 1 Suspicious community > Choose a suspicious community and decrease their War by 2. / Choose a nuetral community, make them friendly towards you and increase their War by 1.\n    Bridge Troll (3) [Trick] Must have a Person in hand and be in the community you target to attach this card to. This is a card which may be attached if a Person in your hand is discarded when it is attached. > Whenever a Wizard sets their home from this community to a different one they must as an additional cost transfer 1 Thaum to the Wizard who attached this card here. / Whenever a Wizard sets their home to this community they must as an additional cost transfer 1 Thaum to the Wizard who attached this card here.\n    Framed (2) [Trick] Must be in the same community as another Wizard > Choose another Wizard, change the attitude of that Wizard’s home towards them to Suspicious. / Choose another Wizard, change the attitude of that Wizard’s home towards them to Friendly.\n    Small Dragon (1) [Monster] This card may be attached to a village by discarding one card, but not played > Reduce the economy of this card’s community by 1. If the economy rating was already 0, reduce all ratings of the community to 0 and unattach this card. / No effect.\n    Child-Stealer (1) [Monster] This card may be attached to a village by discarding one card, but not played > Reduce the culture rating of this card’s community by 1. If the culture rating was already 0, reduce all ratings of the community to 0 and unattach this card / No Effect\n    Raiding Goblins (1) [Monster] This card may be attached to a village by discarding one card, but not played > Reduce the war rating of this card’s community by 1. If the culture rating was already 0, reduce all ratings of the community to 0 and unattach this card / No Effect\n    Toll Troll (1) [Monster] This card may be attached to a village or town by discarding one card, but may not be played > The economy rating of this card’s community may not be raised / Lower the economy rating of this card’s community by 2 and unattach this card.\n    Proud Ghost (1) [Monster] This card may be attached to a village or town by discarding one card, but may not be played > The war rating of this card’s community may not be raised / Lower the war rating of this card’s community by 2 and unattach this card.\n    Mad Beast (1) [Monster] This card may be attached to a village or town by discarding one card, but may not be played > The economy rating of this card’s community may not be raised / Lower the economy rating of this card’s community by 2 and unattach this card.\n    Slayer (1) [Person] May be played for the up effect or attached in a down state > unattach a monster from a community / No monsters may be attached to this card’s community.\n    Alliance (1) [Labor] No constraint> Discard a faction card and increase the war rating of all communities with that faction by 1/ Discard a faction card and reduce the war rating of all communities with that faction by 1\n    Trade Network (1) [Labor] No constraint> Discard a faction card and increase the economy rating of all communities with that faction by 1/ Discard a faction card and reduce the economy rating of all communities with that faction by 1\n    Marital Ties (1) [Labor] No constraint> Discard a faction card and increase the culture rating of all communities with that faction by 1/ Discard a faction card and reduce the culture rating of all communities with that faction by 1\n    Barban Roamer (1) [Person] No constraint > Increase the war rating a a village by 1 / Increase the Culture of a Barban community by 1.\n    Grassfolk Herald (1) [Person] No constraint > discard a card and change a village or town’s attitude towards a wizard to friendly / discard a card and change a village or town’s attitude towards a wizard to suspicious.\n    Mudling Princess (1) [Person] No constraint > Increase the culture of a mudling town by 1 / move an attached person from one community to a mudling community.\n    Redlander Gardener (1) [Person] No constraint > set your home to a redlander community / Set the attitude of your home towards you to friendly\n    Barban Renegade (1) [Person] No constraint > increase the war rating of a neutral community by 1 / Set the attitude of non-barban community towards a wizard to suspicious.\n    Mudling Monk (1) [Person] may only be played if a mudling town or city exists > increase the culture of a mudling town by 1 / discard a card and lower the war rating of all mudling communities by 1.\n    Fame Spreader (1) [Person] Must have at least 3 thaum to play. Reduces your thaum by 3 upon play. > Make a community friendly to another wizard/ Make a community friendly to yourself\n    Blackmailer (1) [Person] Must have at least 3 thaum to play. Reduces your thaum by 3 upon play. > Make a community suspicious to another wizard/ Make a community suspicious to yourself\n    Amnesiac (1) [Person] Must have at least 3 thaum to play. Reduces your thaum by 3 upon play. > Make a community indifferent to another wizard/ Make a community indifferent to yourself\n    Booster (0) [Person] No constraint. > Double the amount of thaum gained upon the next card played; this does not stack with other effects./ Nothing happens.\n    Tamer (1) [Person] May be played for the up effect or attached in a down state. > For each tamer, exactly one monster will have no effect on the community./ Monsters will have no effect so long as this person is attached to the community.\n    Briber (1) [Person] No constraint. > Remove exactly one person attached to a community./ Nothing happens.\n    Spring Cleaning (3) [Spell] As an additional cost to playing this card, spend Thaum equal to the score of the chosen cards > Choose any number of other cards in your hand and draw cards equal to their number / Choose any number of other cards in your hand and draw cards queal to their number. Discard up to the number of chosen cards and spend 3 Thaum for each discarded card.\n    Highway Man (1) [Person] No constraint > Reduce the Economy of any community by 1 / Increase the War of any community by 1\n    Mercenaries (3) [Person] Must have a friendly community with an Economy greater or equal to the average of all Economy ratings > Choose a friendly community which satisfies the constraint of this card, called community A. Decrease the War rating of a community which is Suspicious to you by half of the Economy of community A. Halve community A’s Economy. / Halve the Economy of a community which satisfies the constraint of this card.\n    Flip (2) [Trick] Must be in a community with an attached card. As an additional cost pay an amount of thaum that you can pay. > Choose a number of cards whose score does not exceed half the amount of Thaum paid as part of this card’s constraint. Change those card’s state to Down. / Choose a number of cards whose score does not exceed half the amount of Thaum paid as part of this card’s constraint. Change those card’s state to Up.\n    Wall (4) [Structure] Must have a friendly community with an Economy rating of at least 1 and a War rating of at least 1. This card can be attached to a community which satisfies the previous sentence. > When this card is first attached to this community reduce the Economy rating by 1 and increase the War rating by 1. Reduce any decreases to ratings of this community by 1. / Nothing happens.\n    Mudling Temple (4) [Structure] This card can be attached to any Mudling community which has another Mudling card attached to it > The Ratings of this community are all considered equal to this community’s highest Rating / When a card causes a rating of this community to be reduced the Wizard which played that card must choose between the lowest ratings instead of the rating which the played card directed them to reduce.\n    Mudling Robes (1) [Structure] Have a Person in your hand > Play a Person in your hand as if it were a Mudling card. / Play a Mudling Person card as if it were any other faction card.\n    Caves (4) [Structure] This card can be attached to any Barban community which has another Barban card attached to it > This community’s War rating cannot be lowered / This community’s War rating increases by one each time a Barban card is played by a Wizard which this community is non-Suspicious towards.\n    Barban Loincloth (1) [Structure] Have a Person in your hand > Play a Person in your hand as if it were a Barban card. / Play a Barban Person card as if it were any other faction card.\n    Redlander Market (4) [Sructure] This card can be attached to any Redlander communtiy that has another Redlander card attached to it > This community’s Economy rating cannot be lowered / This community’s Economy rating increases by one each time a Redlander card is played by a Wizard which this community is non-Suspicious towards.\n    Redlander Afgan (1) [Structure] Have a Person in your hand > Play a Person in your hand as if it were a Redlander card. / Play a Redlander Person card as if it were any other faction card.\n    Grassfolk (4) [Sructure] This card can be attached to any Grassfolk communtiy that has another Grassfolk card attached to it > This community’s Culture rating cannot be lowered / This community’s Culture rating increases by one each time a Grassfolk card is played by a Wizard which this community is non-Suspicious towards.\n    Grassfolk Toga (1) [Structure] Have a Person in your hand > Play a Person in your hand as if it were a Grassfolk card. / Play a Grassfolk Person card as if it were any other faction card.\n";
+		}
+	</script>
+</head>
+<body onload="main()">
+	<div id="results">
+	  <p>The GNDT feild should contain a copy-pasted version of the GNDT table. tabs seperate feilds, and \n seperates lines.</p>
+	  <p>The Card list should be copied from the Deck rule. No cards should be removed.</p>
+	  <p>The seed is run as a string, though in practice it will almost always be the string of a number. I am using the <a href="https://github.com/davidbau/seedrandom">davidbau seedRandom js</a> Library </p>
+	  <p>This page does not use php, only javascript.</p>
+	  <p>The initial values provided in the GNDT and Card List text areas are the valid values as of July 2nd, 2018. They are only for use in testing and demonstration. You will need to populate them yourself to use this tool.
+	</div>
+	<div id = "input" >
+		<div class="section">GNDT<br><textarea rows = 20 id = "GNDT"></textarea></div>
+		<div class="section">Card List<br><textarea rows= 20 id="CardList"></textarea></div>
+		<div class="section">Attached<br> <textarea rows=20 id="attached"></textarea></div>
+		<div class="section">Seed<br> <input id="seed"></input></div>
+		<button onclick="process()">process</button>
+	</div>
+	Valid Cards:
+	<div id="validCards"></div>
+	
+</body>
+</html>
