@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swamp Explorer</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #132118;
+    --panel: rgba(13, 24, 21, 0.92);
+    --panel-strong: #0b1512;
+    --accent: #d3e46d;
+    --accent-2: #73b0ff;
+    --line: rgba(211, 228, 109, 0.22);
+    --text: #ecf4db;
+    --muted: #a8b594;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top left, rgba(115, 176, 255, 0.12), transparent 32%),
+      radial-gradient(circle at bottom right, rgba(211, 228, 109, 0.11), transparent 36%),
+      linear-gradient(160deg, #0c1512 0%, #132118 42%, #101913 100%);
+    color: var(--text);
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    padding: 20px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    backdrop-filter: blur(12px);
+  }
+
+  h1, h2 {
+    margin: 0 0 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1rem; margin-top: 22px; }
+
+  p, label, .meta, .hint {
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    background: rgba(5, 12, 10, 0.45);
+    border-radius: 16px;
+    padding: 14px;
+    margin-top: 12px;
+  }
+
+  .button-row, .step-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .step-grid { margin-top: 10px; }
+
+  button, .file-label {
+    border: 1px solid rgba(211, 228, 109, 0.28);
+    background: rgba(16, 31, 24, 0.95);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+    transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+  }
+
+  button:hover, .file-label:hover {
+    transform: translateY(-1px);
+    border-color: rgba(211, 228, 109, 0.55);
+  }
+
+  button.is-active {
+    background: linear-gradient(135deg, rgba(211, 228, 109, 0.28), rgba(115, 176, 255, 0.24));
+    border-color: rgba(211, 228, 109, 0.75);
+  }
+
+  input[type="file"] { display: none; }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 12px;
+    margin-top: 10px;
+  }
+
+  .meta-grid strong { color: var(--text); }
+
+  .radio-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+  }
+
+  .viewport {
+    position: relative;
+    padding: 22px;
+    min-width: 0;
+  }
+
+  .viewport-shell {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 44px);
+    border-radius: 26px;
+    overflow: hidden;
+    border: 1px solid rgba(115, 176, 255, 0.22);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+    background: #08100d;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    cursor: grab;
+  }
+
+  canvas[data-mode="reveal"] { cursor: crosshair; }
+  canvas[data-mode="obscure"] { cursor: crosshair; }
+  canvas[data-mode="measure"] { cursor: crosshair; }
+
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+    .viewport { padding-top: 0; }
+    .viewport-shell { height: 70vh; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <h1>Swamp Explorer</h1>
+    <p>Player-facing map with procedural terrain outside the authored center image. Use pan or reveal mode from the left, and import your session JSON when resuming.</p>
+
+    <div class="panel">
+      <h2>Viewport</h2>
+      <div class="radio-row">
+        <label><input type="radio" name="step" value="200" checked> 200 px</label>
+        <label><input type="radio" name="step" value="400"> 400 px</label>
+      </div>
+      <div class="step-grid">
+        <button type="button" data-dx="0" data-dy="-1">Up</button>
+        <button type="button" data-dx="-1" data-dy="0">Left</button>
+        <button type="button" data-dx="1" data-dy="0">Right</button>
+        <button type="button" data-dx="0" data-dy="1">Down</button>
+      </div>
+      <div class="button-row" style="margin-top:10px;">
+        <button type="button" id="resetView">Reset View</button>
+      </div>
+      <div class="meta-grid">
+        <strong>Zoom</strong><span id="zoomValue"></span>
+        <strong>Center</strong><span id="centerValue"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Tools</h2>
+      <div class="button-row">
+        <button type="button" data-mode="pan">Pan</button>
+        <button type="button" data-mode="measure">Measure</button>
+        <button type="button" data-mode="reveal">Reveal</button>
+        <button type="button" data-mode="obscure">Obscure</button>
+      </div>
+      <div class="button-row" style="margin-top:10px;">
+        <button type="button" data-radius="20">Reveal 20</button>
+        <button type="button" data-radius="100">Reveal 100</button>
+      </div>
+      <label style="display:block;margin-top:12px;"><input type="checkbox" id="toggleLocations" checked> Show locations</label>
+      <label style="display:block;margin-top:8px;"><input type="checkbox" id="toggleGrid"> Show grid</label>
+      <div class="meta-grid">
+        <strong>Mask edits</strong><span id="revealCount"></span>
+        <strong>Measure</strong><span id="measurementValue"></span>
+        <strong>Status</strong><span id="statusValue"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Session Files</h2>
+      <div class="button-row">
+        <button type="button" id="exportSession">Download Session</button>
+        <label class="file-label" for="importSession">Import Session</label>
+      </div>
+      <input id="importSession" type="file" accept="application/json">
+      <p class="hint">The page now tries to auto-load currentExploration.json and currentLocations.json from the same folder on startup. Import is still available as a manual fallback.</p>
+    </div>
+  </aside>
+
+  <main class="viewport">
+    <div class="viewport-shell">
+      <canvas id="swampCanvas"></canvas>
+    </div>
+  </main>
+</div>
+
+<script src="swamp-data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js" integrity="sha512-+Ru50BzEpZjlFzVnjSmJfYFPFfY2hS0Kjlu/IvqaJoux7maF5lJrRVUJWJ2LevPls7rd242GLbWEt+zAo4OVVQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="swamp-shared.js"></script>
+<script>
+  window.addEventListener('load', async () => {
+    const app = new SwampMapApp({
+      canvas: 'swampCanvas',
+      initialLocations: window.DEFAULT_SWAMP_LOCATION_DATA.locations,
+      defaultMode: 'pan',
+      defaultRevealRadius: 20,
+      ui: {
+        stepInputs: document.querySelectorAll('input[name="step"]'),
+        stepButtons: document.querySelectorAll('[data-dx]'),
+        modeButtons: document.querySelectorAll('[data-mode]'),
+        revealButtons: document.querySelectorAll('[data-radius]'),
+        toggleLocations: document.getElementById('toggleLocations'),
+        toggleGrid: document.getElementById('toggleGrid'),
+        resetViewButton: document.getElementById('resetView'),
+        exportSessionButton: document.getElementById('exportSession'),
+        importSessionInput: document.getElementById('importSession'),
+        zoomValue: document.getElementById('zoomValue'),
+        centerValue: document.getElementById('centerValue'),
+        revealCountValue: document.getElementById('revealCount'),
+        measurementValue: document.getElementById('measurementValue'),
+        statusValue: document.getElementById('statusValue')
+      }
+    });
+    await app.init();
+    document.getElementById('swampCanvas').dataset.mode = app.mode;
+    document.querySelectorAll('[data-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.getElementById('swampCanvas').dataset.mode = button.dataset.mode;
+      });
+    });
+  });
+</script>
+</body>
+</html>

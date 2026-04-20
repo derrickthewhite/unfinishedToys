@@ -1,0 +1,33 @@
+(function (global) {
+  global.DEFAULT_SWAMP_LOCATION_DATA = {
+    version: 1,
+    source: 'randomSwampLocationsOnly.png',
+    locations: [
+      { id: 'poi-00', name: '', x: 889.58, y: 71, color: '#040000', notes: '', gmNotes: '' },
+      { id: 'poi-01', name: '', x: 47.5, y: 144, color: '#0012FB', notes: '', gmNotes: '' },
+      { id: 'poi-02', name: '', x: 1078, y: 156.24, color: '#5D006B', notes: '', gmNotes: '' },
+      { id: 'poi-03', name: '', x: 950.82, y: 224.68, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-04', name: '', x: 1181, y: 257, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-05', name: '', x: 164.5, y: 277.83, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-06', name: '', x: 663.76, y: 405.76, color: '#5D006B', notes: '', gmNotes: '' },
+      { id: 'poi-07', name: '', x: 1098.18, y: 454.32, color: '#0D0203', notes: '', gmNotes: '' },
+      { id: 'poi-08', name: '', x: 533.13, y: 612.13, color: '#5D006B', notes: '', gmNotes: '' },
+      { id: 'poi-09', name: '', x: 6.5, y: 644.83, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-10', name: '', x: 942, y: 656.5, color: '#5D006B', notes: '', gmNotes: '' },
+      { id: 'poi-11', name: '', x: 1359.41, y: 680, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-12', name: '', x: 735, y: 742, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-13', name: '', x: 1436.5, y: 756, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-14', name: '', x: 873.13, y: 797.87, color: '#050ECB', notes: '', gmNotes: '' },
+      { id: 'poi-15', name: '', x: 962.5, y: 826, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-16', name: '', x: 1038.28, y: 896.61, color: '#710179', notes: '', gmNotes: '' },
+      { id: 'poi-17', name: '', x: 1055.5, y: 953.5, color: '#5D006B', notes: '', gmNotes: '' },
+      { id: 'poi-18', name: '', x: 826, y: 1046, color: '#05BBCB', notes: '', gmNotes: '' },
+      { id: 'poi-19', name: '', x: 747.83, y: 1184.5, color: '#050ECB', notes: '', gmNotes: '' },
+      { id: 'poi-20', name: '', x: 738.5, y: 1194.83, color: '#0012FB', notes: '', gmNotes: '' },
+      { id: 'poi-21', name: '', x: 1311.87, y: 1307.13, color: '#6D000A', notes: '', gmNotes: '' },
+      { id: 'poi-22', name: '', x: 484.5, y: 1355.17, color: '#5D006B', notes: '', gmNotes: '' },
+      { id: 'poi-23', name: '', x: 1222.42, y: 1371.58, color: '#EA0BA5', notes: '', gmNotes: '' },
+      { id: 'poi-24', name: '', x: 597, y: 1380.76, color: '#0111EE', notes: '', gmNotes: '' }
+    ]
+  };
+})(window);

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Fractal Forested Swamp Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js" integrity="sha512-+Ru50BzEpZjlFzVnjSmJfYFPFfY2hS0Kjlu/IvqaJoux7maF5lJrRVUJWJ2LevPls7rd242GLbWEt+zAo4OVVQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  body { background: #222; }
+  canvas { display:block; margin:auto; background:#111; }
+</style>
+</head>
+<body>
+<div id="controls" style="text-align:center;color:#ddd;margin:12px;">
+  <label>Tile X: <input id="tileX" type="number" value="0" style="width:80px"></label>
+  <label>Tile Y: <input id="tileY" type="number" value="0" style="width:80px"></label>
+  <button id="left">◀</button>
+  <button id="up">▲</button>
+  <button id="down">▼</button>
+  <button id="right">▶</button>
+  <button id="regen">Regenerate</button>
+</div>
+<canvas id="map" width="1600" height="1600"></canvas>
+
+<script>
+
+Math.seedrandom("derrick");
+
+// Simplex noise (from https://github.com/josephg/noisejs)
+class Grad {
+  constructor(x, y, z) { this.x = x; this.y = y; this.z = z; }
+  dot2(x, y) { return this.x*x + this.y*y; }
+}
+let grad3 = [
+  new Grad(1,1,0),new Grad(-1,1,0),new Grad(1,-1,0),new Grad(-1,-1,0),
+  new Grad(1,0,1),new Grad(-1,0,1),new Grad(1,0,-1),new Grad(-1,0,-1),
+  new Grad(0,1,1),new Grad(0,-1,1),new Grad(0,1,-1),new Grad(0,-1,-1)
+];
+let p = []; for (let i=0; i<256; i++) p[i] = Math.floor(Math.random()*256);
+let perm = []; let gradP = [];
+for(let i=0; i<512; i++){ perm[i]=p[i&255]; gradP[i]=grad3[perm[i]%12]; }
+function fade(t){return t*t*t*(t*(t*6-15)+10);}
+function lerp(a,b,t){return (1-t)*a+t*b;}
+function simplex2(xin, yin) {
+  let s = (xin+yin)*0.366025403, i = Math.floor(xin+s), j = Math.floor(yin+s);
+  let t = (i+j)*0.211324865, X0 = i-t, Y0 = j-t;
+  let x0 = xin-X0, y0 = yin-Y0;
+  let i1 = x0>y0 ? 1:0, j1 = x0>y0 ? 0:1;
+  let x1 = x0 - i1 + 0.211324865;
+  let y1 = y0 - j1 + 0.211324865;
+  let x2 = x0 - 1 + 0.42264973;
+  let y2 = y0 - 1 + 0.42264973;
+  let ii = i & 255, jj = j & 255;
+  let gi0 = gradP[ii+perm[jj]];
+  let gi1 = gradP[ii+i1+perm[jj+j1]];
+  let gi2 = gradP[ii+1+perm[jj+1]];
+  let t0 = 0.5 - x0*x0-y0*y0;
+  let n0 = t0<0 ? 0 : (t0*=t0)*t0*gi0.dot2(x0,y0);
+  let t1 = 0.5 - x1*x1-y1*y1;
+  let n1 = t1<0 ? 0 : (t1*=t1)*t1*gi1.dot2(x1,y1);
+  let t2 = 0.5 - x2*x2-y2*y2;
+  let n2 = t2<0 ? 0 : (t2*=t2)*t2*gi2.dot2(x2,y2);
+  return 70*(n0+n1+n2);
+}
+
+// Fractal Brownian Motion helper
+function fbm(x, y, octaves=5, lacunarity=2, gain=0.5) {
+  let amp = 1.0;
+  let freq = 1.0;
+  let sum = 0.0;
+  let maxSum = 0.0;
+  for (let i = 0; i < octaves; i++) {
+    sum += simplex2(x * freq, y * freq) * amp;
+    maxSum += amp;
+    freq *= lacunarity;
+    amp *= gain;
+  }
+  return sum / maxSum; // normalize to roughly -1..1
+}
+
+// Map generation
+let canvas = document.getElementById('map');
+let ctx = canvas.getContext('2d');
+let w = canvas.width, h = canvas.height;
+
+// Tile offsets (integer tiles of the canvas)
+let tileX = 0, tileY = 0;
+
+// Wire up controls
+function updateControls() {
+  document.getElementById('tileX').value = tileX;
+  document.getElementById('tileY').value = tileY;
+}
+
+function changeTile(dx, dy) {
+  tileX += dx; tileY += dy; updateControls(); generateSwamp();
+}
+
+window.addEventListener('load', () => {
+  document.getElementById('left').addEventListener('click', () => changeTile(-1,0));
+  document.getElementById('right').addEventListener('click', () => changeTile(1,0));
+  document.getElementById('up').addEventListener('click', () => changeTile(0,-1));
+  document.getElementById('down').addEventListener('click', () => changeTile(0,1));
+  document.getElementById('regen').addEventListener('click', () => generateSwamp());
+  document.getElementById('tileX').addEventListener('change', (e)=>{ tileX = parseInt(e.target.value)||0; generateSwamp(); });
+  document.getElementById('tileY').addEventListener('change', (e)=>{ tileY = parseInt(e.target.value)||0; generateSwamp(); });
+  updateControls();
+});
+
+function generateSwamp() {
+  let img = ctx.createImageData(w, h);
+  let data = img.data;
+
+  // Larger scale for big terrain shapes
+  let baseDepthScale = 0.002; // bigger features than before
+  let baseTreeScale  = 0.0075; // tree patch scale
+  
+  // compute pixel shift from integer tile coordinates
+  let pixelShiftX = tileX * w;
+  let pixelShiftY = tileY * h;
+
+  for (let y=0; y<h; y++) {
+    for (let x=0; x<w; x++) {
+      // Depth field (big + fractal)
+      let depthNoise = fbm((x + pixelShiftX)*baseDepthScale, (y + pixelShiftY)*baseDepthScale, 5, 2, 0.5);
+
+      // Tree noise with bias from depth
+      // Trees more likely if dry, less if deep
+      let treeBias = depthNoise * 0.5; // weight of depth influence
+      let rawTreeNoise = fbm((x + pixelShiftX)*baseTreeScale+100, (y + pixelShiftY)*baseTreeScale+100, 5, 2, 0.5);
+      let treeNoise = rawTreeNoise + treeBias;
+
+      // Classify depth
+      let depthType;
+      if (depthNoise > 0.35) depthType = 'dry';
+      else if (depthNoise > -0.15) depthType = 'shallow';
+      else depthType = 'deep';
+
+      // Classify vegetation
+      let hasTrees = treeNoise > -.1;
+
+      // Colors by depth
+      let r=0,g=0,b=0;
+      if (depthType === 'deep') { r=20; g=50; b=100; }
+      if (depthType === 'shallow') { r=50; g=80; b=60; }
+      if (depthType === 'dry') { r=80; g=60; b=30; }
+
+      // Trees darken + add green tint
+	  /*
+      if (hasTrees) {
+        g += 40;
+        r -= 10;
+        b -= 10;
+      }
+	  //*/
+	  
+	  //*
+	 if (hasTrees) {
+		if(Math.random()>.3){
+			g = 120;
+			r = 60;
+			b = 70;
+		}
+      }
+	  //*/
+	  
+	  if(depthType == "dry" && hasTrees==false){
+		
+	  }
+
+      // Clamp
+      r = Math.min(255, Math.max(0, r));
+      g = Math.min(255, Math.max(0, g));
+      b = Math.min(255, Math.max(0, b));
+
+      let idx = (y*w + x)*4;
+      data[idx] = r;
+      data[idx+1] = g;
+      data[idx+2] = b;
+      data[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+}
+
+generateSwamp();
+</script>
+</body>
+</html>

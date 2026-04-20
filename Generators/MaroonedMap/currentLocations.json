@@ -1,0 +1,249 @@
+{
+  "version": 1,
+  "type": "swamp-locations",
+  "locations": [
+    {
+      "id": "poi-00",
+      "name": "Kolipod Camp",
+      "x": 889.58,
+      "y": 71,
+      "color": "#040000",
+      "notes": "got their quick-heal",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-01",
+      "name": "Orion Pod",
+      "x": 47.5,
+      "y": 144,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-02",
+      "name": "Morass Ship (abandoned)",
+      "x": 1078,
+      "y": 156.24,
+      "color": "#5D006B",
+      "notes": "Veracity know where it is. ",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-03",
+      "name": "Veracity pod",
+      "x": 950.82,
+      "y": 224.68,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-04",
+      "name": "",
+      "x": 1181,
+      "y": 257,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-05",
+      "name": "",
+      "x": 164.5,
+      "y": 277.83,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-06",
+      "name": "",
+      "x": 663.76,
+      "y": 405.76,
+      "color": "#5D006B",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-07",
+      "name": "Kolipod pod",
+      "x": 1098.18,
+      "y": 454.32,
+      "color": "#0D0203",
+      "notes": "Got their quick heal",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-08",
+      "name": "",
+      "x": 533.13,
+      "y": 612.13,
+      "color": "#5D006B",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-09",
+      "name": "",
+      "x": 6.5,
+      "y": 644.83,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-10",
+      "name": "Morass Ship",
+      "x": 942,
+      "y": 656.5,
+      "color": "#5D006B",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-11",
+      "name": "Veracity Shock trooper pod",
+      "x": 1359.41,
+      "y": 680,
+      "color": "#6D000A",
+      "notes": "Terlix and Arxix\n(not there anymore)",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-12",
+      "name": "Mortash's camp",
+      "x": 735,
+      "y": 742,
+      "color": "#6D000A",
+      "notes": "Gathering place for Veracity",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-13",
+      "name": "Veracity Worker Pod",
+      "x": 1436.5,
+      "y": 756,
+      "color": "#6D000A",
+      "notes": "Not there anymore",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-14",
+      "name": "Dyian Pod Landing",
+      "x": 873.13,
+      "y": 797.87,
+      "color": "#050ECB",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-15",
+      "name": "Ogamm Pod landing",
+      "x": 962.5,
+      "y": 826,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-17",
+      "name": "Hyree's Ship",
+      "x": 1055.5,
+      "y": 953.5,
+      "color": "#5D006B",
+      "notes": "working radio",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-18",
+      "name": "Fallen Star Ship",
+      "x": 826,
+      "y": 1046,
+      "color": "#05BBCB",
+      "notes": "Referred to as \"The Village\"",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-19",
+      "name": "Orion Pod landing",
+      "x": 747.83,
+      "y": 1184.5,
+      "color": "#050ECB",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-20",
+      "name": "Orion Pod camp",
+      "x": 738.5,
+      "y": 1194.83,
+      "color": "#0012FB",
+      "notes": "sgt. Koran (hawfax)\nLt. Kyra (furbit)\nQuadi (keverling)\nReactor",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-21",
+      "name": "Veracity Shock Trooper Pod",
+      "x": 1311.87,
+      "y": 1307.13,
+      "color": "#6D000A",
+      "notes": "Virnox and Trindol\n(not there any more)",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-22",
+      "name": "Yeedik's Ship",
+      "x": 484.5,
+      "y": 1355.17,
+      "color": "#5D006B",
+      "notes": "(Morass, nearby camp)",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-23",
+      "name": "Veracity Engineer Pod",
+      "x": 1222.42,
+      "y": 1371.58,
+      "color": "#EA0BA5",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-24",
+      "name": "Orion Pod",
+      "x": 597,
+      "y": 1380.76,
+      "color": "#0111EE",
+      "notes": "cpl Telik (Furbite)\nQuadi (Keverling)\nNove (Keverling)",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-25",
+      "name": "Orion Pod resting place",
+      "x": 872.74,
+      "y": 968.13,
+      "color": "#1100fa",
+      "notes": "Hauled by Ogamm here",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-26",
+      "name": "Ogamm Pod ",
+      "x": 877.74,
+      "y": 976.13,
+      "color": "#610000",
+      "notes": "Hauled by Ogamm here",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-27",
+      "name": "Pakchekki Ship",
+      "x": 833.36,
+      "y": 877.14,
+      "color": "#00660c",
+      "notes": "Burned out an abandoned",
+      "gmNotes": ""
+    }
+  ]
+}

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swamp Editor</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #1d1210;
+    --panel: rgba(28, 17, 15, 0.92);
+    --line: rgba(255, 183, 112, 0.24);
+    --text: #fff1dd;
+    --muted: #cab49c;
+    --accent: #ffb770;
+    --accent-2: #79c7c2;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top left, rgba(255, 183, 112, 0.16), transparent 34%),
+      radial-gradient(circle at bottom right, rgba(121, 199, 194, 0.16), transparent 28%),
+      linear-gradient(155deg, #150d0c 0%, #1d1210 42%, #120d0b 100%);
+    color: var(--text);
+    font-family: 'Palatino Linotype', 'Book Antiqua', serif;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    padding: 20px;
+    overflow-y: auto;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    backdrop-filter: blur(12px);
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(9, 6, 5, 0.45);
+    margin-top: 12px;
+  }
+
+  h1, h2 {
+    margin: 0 0 12px;
+    letter-spacing: 0.03em;
+  }
+
+  h1 { font-size: 1.9rem; }
+  h2 { font-size: 1rem; margin-top: 0; }
+
+  p, label, .hint {
+    color: var(--muted);
+    line-height: 1.45;
+  }
+
+  .button-row, .field-stack, .radio-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .field-stack {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  button, .file-label, input[type="color"], textarea {
+    border-radius: 14px;
+    font: inherit;
+  }
+
+  button, .file-label {
+    border: 1px solid rgba(255, 183, 112, 0.28);
+    background: rgba(31, 18, 15, 0.95);
+    color: var(--text);
+    padding: 9px 12px;
+    cursor: pointer;
+    transition: transform 120ms ease, border-color 120ms ease;
+  }
+
+  button:hover, .file-label:hover { transform: translateY(-1px); border-color: rgba(255, 183, 112, 0.55); }
+  button.is-active { background: linear-gradient(135deg, rgba(255, 183, 112, 0.3), rgba(121, 199, 194, 0.22)); }
+
+  input[type="file"] { display: none; }
+
+  input[type="color"] {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid rgba(255, 183, 112, 0.28);
+    background: transparent;
+    padding: 4px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid rgba(255, 183, 112, 0.28);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text);
+    padding: 10px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    border: 1px solid rgba(255, 183, 112, 0.28);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text);
+    padding: 10px;
+    resize: vertical;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 12px;
+  }
+
+  .viewport {
+    position: relative;
+    padding: 22px;
+    min-width: 0;
+  }
+
+  .viewport-shell {
+    width: 100%;
+    height: calc(100vh - 44px);
+    border-radius: 26px;
+    overflow: hidden;
+    border: 1px solid rgba(121, 199, 194, 0.22);
+    background: #090606;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  canvas[data-mode="pan"] { cursor: grab; }
+  canvas[data-mode="measure"] { cursor: crosshair; }
+  canvas[data-mode="reveal"] { cursor: crosshair; }
+  canvas[data-mode="obscure"] { cursor: crosshair; }
+  canvas[data-mode="select"] { cursor: pointer; }
+  canvas[data-mode="create"] { cursor: copy; }
+
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+    .viewport { padding-top: 0; }
+    .viewport-shell { height: 70vh; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <h1>Swamp Editor</h1>
+    <p>GM-facing map with reveal tools, mask toggle, and point-of-interest editing. The location export matches the JSON schema used for the seeded locations file.</p>
+
+    <div class="panel">
+      <h2>Viewport</h2>
+      <div class="radio-row">
+        <label><input type="radio" name="step" value="200" checked> 200 px</label>
+        <label><input type="radio" name="step" value="400"> 400 px</label>
+      </div>
+      <div class="button-row" style="margin-top:10px;">
+        <button type="button" data-dx="0" data-dy="-1">Up</button>
+        <button type="button" data-dx="-1" data-dy="0">Left</button>
+        <button type="button" data-dx="1" data-dy="0">Right</button>
+        <button type="button" data-dx="0" data-dy="1">Down</button>
+        <button type="button" id="resetView">Reset View</button>
+      </div>
+      <div class="meta-grid" style="margin-top:10px;">
+        <strong>Zoom</strong><span id="zoomValue"></span>
+        <strong>Center</strong><span id="centerValue"></span>
+        <strong>Locations</strong><span id="locationCount"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Modes</h2>
+      <div class="button-row">
+        <button type="button" data-mode="pan">Pan</button>
+        <button type="button" data-mode="measure">Measure</button>
+        <button type="button" data-mode="reveal">Reveal</button>
+        <button type="button" data-mode="obscure">Obscure</button>
+        <button type="button" data-mode="select">Select</button>
+        <button type="button" data-mode="create">Create</button>
+      </div>
+      <div class="button-row" style="margin-top:10px;">
+        <button type="button" data-radius="20">Reveal 20</button>
+        <button type="button" data-radius="100">Reveal 100</button>
+      </div>
+      <label style="display:block;margin-top:12px;"><input type="checkbox" id="toggleLocations" checked> Show locations</label>
+      <label style="display:block;margin-top:8px;"><input type="checkbox" id="toggleGrid"> Show grid</label>
+      <label style="display:block;margin-top:8px;"><input type="checkbox" id="toggleGridLabels"> Label grid squares</label>
+      <label style="display:block;margin-top:8px;"><input type="checkbox" id="toggleMask" checked> Show mask</label>
+      <div class="meta-grid" style="margin-top:10px;">
+        <strong>Mask edits</strong><span id="revealCount"></span>
+        <strong>Measure</strong><span id="measurementValue"></span>
+        <strong>Status</strong><span id="statusValue"></span>
+        <strong>Selected</strong><span id="selectedLocation"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Location Details</h2>
+      <div class="field-stack">
+        <label for="locationName">Name</label>
+        <input id="locationName" type="text" placeholder="Optional display name">
+        <label for="locationColor">Color</label>
+        <input id="locationColor" type="color" value="#ff33cc">
+        <label for="locationNotes">Notes</label>
+        <textarea id="locationNotes" placeholder="Notes for the selected location, or defaults for create mode."></textarea>
+        <label for="locationGmNotes">GM Notes</label>
+        <textarea id="locationGmNotes" placeholder="GM-only notes for the selected location."></textarea>
+      </div>
+      <div class="button-row" style="margin-top:10px;">
+        <button type="button" id="clearSelection">Clear Selection</button>
+        <button type="button" id="deleteLocation">Delete Selected</button>
+        <button type="button" id="randomizeLocation">Randomize Position</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Files</h2>
+      <div class="button-row">
+        <button type="button" id="exportSession">Download Session</button>
+        <label class="file-label" for="importSession">Import Session</label>
+      </div>
+      <input id="importSession" type="file" accept="application/json">
+      <div class="button-row" style="margin-top:10px;">
+        <button type="button" id="exportLocations">Download Locations</button>
+        <label class="file-label" for="importLocations">Import Locations</label>
+      </div>
+      <input id="importLocations" type="file" accept="application/json">
+      <p class="hint">The page now tries to auto-load currentExploration.json and currentLocations.json from the same folder on startup. Import is still available as a fallback.</p>
+    </div>
+  </aside>
+
+  <main class="viewport">
+    <div class="viewport-shell">
+      <canvas id="swampCanvas"></canvas>
+    </div>
+  </main>
+</div>
+
+<script src="swamp-data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js" integrity="sha512-+Ru50BzEpZjlFzVnjSmJfYFPFfY2hS0Kjlu/IvqaJoux7maF5lJrRVUJWJ2LevPls7rd242GLbWEt+zAo4OVVQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="swamp-shared.js"></script>
+<script>
+  window.addEventListener('load', async () => {
+    const canvas = document.getElementById('swampCanvas');
+    const modeButtons = document.querySelectorAll('[data-mode]');
+    const app = new SwampMapApp({
+      canvas: 'swampCanvas',
+      initialLocations: window.DEFAULT_SWAMP_LOCATION_DATA.locations,
+      defaultMode: 'pan',
+      defaultRevealRadius: 20,
+      ui: {
+        stepInputs: document.querySelectorAll('input[name="step"]'),
+        stepButtons: document.querySelectorAll('[data-dx]'),
+        modeButtons,
+        revealButtons: document.querySelectorAll('[data-radius]'),
+        toggleLocations: document.getElementById('toggleLocations'),
+        toggleGrid: document.getElementById('toggleGrid'),
+        toggleGridLabels: document.getElementById('toggleGridLabels'),
+        toggleMask: document.getElementById('toggleMask'),
+        resetViewButton: document.getElementById('resetView'),
+        exportSessionButton: document.getElementById('exportSession'),
+        importSessionInput: document.getElementById('importSession'),
+        exportLocationsButton: document.getElementById('exportLocations'),
+        importLocationsInput: document.getElementById('importLocations'),
+        zoomValue: document.getElementById('zoomValue'),
+        centerValue: document.getElementById('centerValue'),
+        locationCountValue: document.getElementById('locationCount'),
+        revealCountValue: document.getElementById('revealCount'),
+        measurementValue: document.getElementById('measurementValue'),
+        statusValue: document.getElementById('statusValue'),
+        selectedLocationValue: document.getElementById('selectedLocation'),
+        locationNameInput: document.getElementById('locationName'),
+        locationColorInput: document.getElementById('locationColor'),
+        locationNotesInput: document.getElementById('locationNotes'),
+        locationGmNotesInput: document.getElementById('locationGmNotes'),
+        deleteLocationButton: document.getElementById('deleteLocation'),
+        clearSelectionButton: document.getElementById('clearSelection'),
+        randomizeLocationButton: document.getElementById('randomizeLocation')
+      }
+    });
+    await app.init();
+    canvas.dataset.mode = app.mode;
+    modeButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        canvas.dataset.mode = button.dataset.mode;
+      });
+    });
+  });
+</script>
+</body>
+</html>

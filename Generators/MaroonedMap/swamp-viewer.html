@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swamp Viewer</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #11171b;
+    --panel: rgba(13, 18, 22, 0.92);
+    --line: rgba(154, 214, 233, 0.2);
+    --text: #e9f5f7;
+    --muted: #aac1c7;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top left, rgba(154, 214, 233, 0.12), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(115, 176, 255, 0.1), transparent 28%),
+      linear-gradient(160deg, #0b1115 0%, #11171b 42%, #0c1318 100%);
+    color: var(--text);
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    padding: 20px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    backdrop-filter: blur(12px);
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    background: rgba(5, 10, 13, 0.5);
+    border-radius: 16px;
+    padding: 14px;
+    margin-top: 12px;
+  }
+
+  h1, h2 { margin: 0 0 12px; letter-spacing: 0.03em; }
+  h1 { font-size: 1.85rem; }
+  h2 { font-size: 1rem; }
+
+  p, label { color: var(--muted); line-height: 1.45; }
+
+  .button-row, .step-grid, .radio-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  button {
+    border: 1px solid rgba(154, 214, 233, 0.25);
+    background: rgba(17, 29, 35, 0.95);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  button.is-active {
+    background: linear-gradient(135deg, rgba(154, 214, 233, 0.24), rgba(115, 176, 255, 0.18));
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 12px;
+    margin-top: 10px;
+  }
+
+  .meta-grid strong { color: var(--text); }
+
+  .viewport {
+    position: relative;
+    padding: 22px;
+    min-width: 0;
+  }
+
+  .viewport-shell {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 44px);
+    border-radius: 26px;
+    overflow: hidden;
+    border: 1px solid rgba(154, 214, 233, 0.22);
+    background: #081018;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  canvas[data-mode="pan"] { cursor: grab; }
+  canvas[data-mode="measure"] { cursor: crosshair; }
+
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+    .viewport { padding-top: 0; }
+    .viewport-shell { height: 70vh; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <h1>Swamp Viewer</h1>
+    <p>Read-only view for navigation and location notes. Click locations in pan mode to read their notes.</p>
+
+    <div class="panel">
+      <h2>Viewport</h2>
+      <div class="radio-row">
+        <label><input type="radio" name="step" value="200" checked> 200 px</label>
+        <label><input type="radio" name="step" value="400"> 400 px</label>
+      </div>
+      <div class="step-grid" style="margin-top:10px;">
+        <button type="button" data-dx="0" data-dy="-1">Up</button>
+        <button type="button" data-dx="-1" data-dy="0">Left</button>
+        <button type="button" data-dx="1" data-dy="0">Right</button>
+        <button type="button" data-dx="0" data-dy="1">Down</button>
+      </div>
+      <div class="button-row" style="margin-top:10px;">
+        <button type="button" id="resetView">Reset View</button>
+      </div>
+      <div class="meta-grid">
+        <strong>Zoom</strong><span id="zoomValue"></span>
+        <strong>Center</strong><span id="centerValue"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Tools</h2>
+      <div class="button-row">
+        <button type="button" data-mode="pan">Pan</button>
+        <button type="button" data-mode="measure">Measure</button>
+      </div>
+      <label style="display:block;margin-top:12px;"><input type="checkbox" id="toggleLocations" checked> Show locations</label>
+      <label style="display:block;margin-top:8px;"><input type="checkbox" id="toggleGrid"> Show grid</label>
+      <div class="button-row" style="margin-top:10px;">
+        <button type="button" id="clearNotes">Clear Info Boxes</button>
+      </div>
+      <div class="meta-grid">
+        <strong>Measure</strong><span id="measurementValue"></span>
+        <strong>Status</strong><span id="statusValue"></span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="viewport">
+    <div class="viewport-shell">
+      <canvas id="swampCanvas"></canvas>
+    </div>
+  </main>
+</div>
+
+<script src="swamp-data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js" integrity="sha512-+Ru50BzEpZjlFzVnjSmJfYFPFfY2hS0Kjlu/IvqaJoux7maF5lJrRVUJWJ2LevPls7rd242GLbWEt+zAo4OVVQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="swamp-shared.js"></script>
+<script>
+  window.addEventListener('load', async () => {
+    const canvas = document.getElementById('swampCanvas');
+    const modeButtons = document.querySelectorAll('[data-mode]');
+    const app = new SwampMapApp({
+      canvas: 'swampCanvas',
+      initialLocations: window.DEFAULT_SWAMP_LOCATION_DATA.locations,
+      defaultMode: 'pan',
+      showMask: true,
+      ui: {
+        stepInputs: document.querySelectorAll('input[name="step"]'),
+        stepButtons: document.querySelectorAll('[data-dx]'),
+        modeButtons,
+        toggleLocations: document.getElementById('toggleLocations'),
+        toggleGrid: document.getElementById('toggleGrid'),
+        clearNotesButton: document.getElementById('clearNotes'),
+        resetViewButton: document.getElementById('resetView'),
+        zoomValue: document.getElementById('zoomValue'),
+        centerValue: document.getElementById('centerValue'),
+        measurementValue: document.getElementById('measurementValue'),
+        statusValue: document.getElementById('statusValue')
+      }
+    });
+    await app.init();
+    canvas.dataset.mode = app.mode;
+    modeButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        canvas.dataset.mode = button.dataset.mode;
+      });
+    });
+  });
+</script>
+</body>
+</html>
