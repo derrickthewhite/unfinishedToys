@@ -9,9 +9,12 @@
   const NOTE_OFFSET_X = 18;
   const NOTE_OFFSET_Y = -18;
   const BASE_MILLIMETERS = 400;
+  const MILLIMETERS_PER_MILE = 60;
   const GRID_MILLIMETERS = 60;
   const PIXELS_PER_MILLIMETER = BASE_SIZE / BASE_MILLIMETERS;
   const GRID_SPACING_PX = GRID_MILLIMETERS * PIXELS_PER_MILLIMETER;
+  const PATHFINDING_STEP_PX = 8;
+  const PATHFINDING_MAX_VISITED = 22000;
 
   function rgbaWithAlpha(color, alpha) {
     if (!color.startsWith('rgba(')) {
@@ -242,10 +245,15 @@
     return round2(value / PIXELS_PER_MILLIMETER);
   }
 
-  function buildTerrainColor(depthNoise, treeNoise, treeVisible) {
-    let red;
-    let green;
-    let blue;
+  function pixelsToMiles(value) {
+    return (value / PIXELS_PER_MILLIMETER) / MILLIMETERS_PER_MILE;
+  }
+
+  function formatMiles(value) {
+    return round2(value) + ' mi';
+  }
+
+  function describeTerrain(depthNoise, treeNoise, treeVisible) {
     let depthType;
 
     if (depthNoise > 0.35) {
@@ -256,11 +264,23 @@
       depthType = 'deep';
     }
 
-    if (depthType === 'deep') {
+    return {
+      depthType,
+      hasTrees: treeNoise > -0.1 && treeVisible
+    };
+  }
+
+  function buildTerrainColor(depthNoise, treeNoise, treeVisible) {
+    const terrain = describeTerrain(depthNoise, treeNoise, treeVisible);
+    let red;
+    let green;
+    let blue;
+
+    if (terrain.depthType === 'deep') {
       red = 20;
       green = 50;
       blue = 100;
-    } else if (depthType === 'shallow') {
+    } else if (terrain.depthType === 'shallow') {
       red = 50;
       green = 80;
       blue = 60;
@@ -270,7 +290,7 @@
       blue = 30;
     }
 
-    if (treeNoise > -0.1 && treeVisible) {
+    if (terrain.hasTrees) {
       red = TREE_GREEN.r;
       green = TREE_GREEN.g;
       blue = TREE_GREEN.b;
@@ -338,6 +358,7 @@
       this.openNotes = new Map();
       this.noteZIndex = 10;
       this.measurement = null;
+      this.pathfinding = null;
       this.needsRender = false;
       this.ui = this.options.ui || {};
       this.statusMessage = this.options.statusMessage || 'Ready';
@@ -437,6 +458,8 @@
           this.requestRender();
         });
       }
+
+      
 
       if (this.ui.resetViewButton) {
         this.ui.resetViewButton.addEventListener('click', () => {
@@ -629,19 +652,16 @@
       if (dragMode === 'reveal' || dragMode === 'obscure') {
         this.startMaskStroke(dragMode);
         this.addMaskPoint(world.x, world.y, dragMode);
-      } else if (dragMode === 'measure') {
-        this.measurement = {
-          start: { x: round2(world.x), y: round2(world.y) },
-          end: { x: round2(world.x), y: round2(world.y) }
-        };
-        this.statusMessage = 'Measuring';
-        this.updateUiState();
-        this.requestRender();
       }
     }
 
     onPointerMove(event) {
       this.pointerWorld = this.screenToWorld(event.offsetX, event.offsetY);
+      if (this.mode === 'measure' && this.measurement && !this.measurement.completed && !this.dragState) {
+        this.measurement.preview = { x: round2(this.pointerWorld.x), y: round2(this.pointerWorld.y) };
+        this.updateUiState();
+        this.requestRender();
+      }
       if (!this.dragState || this.dragState.pointerId !== event.pointerId) {
         this.requestRender();
         return;
@@ -661,10 +681,6 @@
         this.requestRender();
       } else if (this.dragState.mode === 'reveal' || this.dragState.mode === 'obscure') {
         this.addMaskPoint(this.pointerWorld.x, this.pointerWorld.y, this.dragState.mode);
-      } else if (this.dragState.mode === 'measure' && this.measurement) {
-        this.measurement.end = { x: round2(this.pointerWorld.x), y: round2(this.pointerWorld.y) };
-        this.updateUiState();
-        this.requestRender();
       }
 
       this.dragState.lastScreenX = event.offsetX;
@@ -678,8 +694,16 @@
 
       if (this.dragState.pointerId === event.pointerId && !this.dragState.moved) {
         const world = this.screenToWorld(event.offsetX, event.offsetY);
-        if (this.mode === 'pan') {
+        if (event.button === 2 && this.mode === 'measure') {
+          this.finishMeasurement();
+        } else if (event.button === 2 && this.mode === 'pathfinding') {
+          this.clearPathfinding();
+        } else if (this.mode === 'pan') {
           this.openNoteAt(world.x, world.y);
+        } else if (this.mode === 'measure') {
+          this.addMeasurementPoint(world.x, world.y);
+        } else if (this.mode === 'pathfinding') {
+          this.handlePathfindingClick(world.x, world.y);
         } else if (this.mode === 'create') {
           this.createLocation(world.x, world.y);
         } else if (this.mode === 'select') {
@@ -689,6 +713,10 @@
 
       if (this.dragState.stroke && this.dragState.stroke.points.length === 0) {
         this.maskOps.pop();
+      }
+
+      if (this.canvas.hasPointerCapture(event.pointerId)) {
+        this.canvas.releasePointerCapture(event.pointerId);
       }
 
       this.dragState = null;
@@ -758,6 +786,441 @@
         top: this.camera.y - halfHeight,
         bottom: this.camera.y + halfHeight
       };
+    }
+
+    getTerrainInfoAt(worldX, worldY) {
+      const sampleX = clamp(Math.round(worldX), 0, BASE_SIZE - 1);
+      const sampleY = clamp(Math.round(worldY), 0, BASE_SIZE - 1);
+      const depthNoise = this.noise.fbm(sampleX * 0.002, sampleY * 0.002, 5, 2, 0.5);
+      const rawTreeNoise = this.noise.fbm((sampleX * 0.0075) + 100, (sampleY * 0.0075) + 100, 5, 2, 0.5);
+      const treeNoise = rawTreeNoise + (depthNoise * 0.5);
+      const treeVisible = hash2d(this.seedSalt, sampleX, sampleY) > 0.3;
+      return describeTerrain(depthNoise, treeNoise, treeVisible);
+    }
+
+    getTerrainCostMultiplierAt(worldX, worldY) {
+      const terrain = this.getTerrainInfoAt(worldX, worldY);
+      if (terrain.hasTrees && terrain.depthType !== 'dry') {
+        return 5;
+      }
+      if (terrain.depthType === 'deep') {
+        return 20;
+      }
+      if (terrain.hasTrees) {
+        return 2;
+      }
+      if (terrain.depthType === 'dry') {
+        return 0.5;
+      }
+      return 1;
+    }
+
+    addMeasurementPoint(worldX, worldY) {
+      const point = { x: round2(worldX), y: round2(worldY) };
+      if (!this.measurement || this.measurement.completed) {
+        this.measurement = {
+          points: [point],
+          preview: point,
+          completed: false
+        };
+        this.statusMessage = 'Measurement started';
+      } else {
+        this.measurement.points.push(point);
+        this.measurement.preview = point;
+        this.statusMessage = 'Measurement point added';
+      }
+      this.updateUiState();
+      this.requestRender();
+    }
+
+    finishMeasurement() {
+      if (!this.measurement) {
+        return;
+      }
+      if (this.measurement.points.length < 2) {
+        this.measurement = null;
+        this.statusMessage = 'Measurement cleared';
+      } else {
+        this.measurement.preview = this.measurement.points[this.measurement.points.length - 1];
+        this.measurement.completed = true;
+        this.statusMessage = 'Measurement complete';
+      }
+      this.updateUiState();
+      this.requestRender();
+    }
+
+    getMeasurementCommittedPoints() {
+      if (!this.measurement) {
+        return [];
+      }
+      return this.measurement.points || [];
+    }
+
+    hasMeasurementPreviewSegment() {
+      if (!this.measurement || this.measurement.completed || !this.measurement.preview || this.measurement.points.length === 0) {
+        return false;
+      }
+      const lastPoint = this.measurement.points[this.measurement.points.length - 1];
+      return lastPoint.x !== this.measurement.preview.x || lastPoint.y !== this.measurement.preview.y;
+    }
+
+    getMeasurementRenderPoints() {
+      const points = this.getMeasurementCommittedPoints().slice();
+      if (this.hasMeasurementPreviewSegment()) {
+        points.push(this.measurement.preview);
+      }
+      return points;
+    }
+
+    calculateEffectiveSegmentPixels(start, end) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.sqrt((dx * dx) + (dy * dy));
+      if (!length) {
+        return 0;
+      }
+
+      const steps = Math.max(1, Math.ceil(length));
+      const stepLength = length / steps;
+      let weightedLength = 0;
+
+      for (let index = 0; index < steps; index += 1) {
+        const sampleT = (index + 0.5) / steps;
+        const sampleX = start.x + (dx * sampleT);
+        const sampleY = start.y + (dy * sampleT);
+        weightedLength += stepLength * this.getTerrainCostMultiplierAt(sampleX, sampleY);
+      }
+
+      return weightedLength;
+    }
+
+    calculateMeasurementMetrics(points) {
+      if (!points || points.length < 2) {
+        return {
+          miles: 0,
+          effectiveMiles: 0
+        };
+      }
+
+      let distancePixels = 0;
+      let effectivePixels = 0;
+      for (let index = 1; index < points.length; index += 1) {
+        const start = points[index - 1];
+        const end = points[index];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const segmentLength = Math.sqrt((dx * dx) + (dy * dy));
+        distancePixels += segmentLength;
+        effectivePixels += this.calculateEffectiveSegmentPixels(start, end);
+      }
+
+      return {
+        miles: pixelsToMiles(distancePixels),
+        effectiveMiles: pixelsToMiles(effectivePixels)
+      };
+    }
+
+    formatMeasurementText(metrics) {
+      return formatMiles(metrics.miles) + ' | Eff ' + formatMiles(metrics.effectiveMiles);
+    }
+
+    getPathfindingStepSize() {
+      return PATHFINDING_STEP_PX;
+    }
+
+    snapPathNode(worldX, worldY, stepSize) {
+      return {
+        x: clamp(Math.round(worldX / stepSize) * stepSize, 0, BASE_SIZE),
+        y: clamp(Math.round(worldY / stepSize) * stepSize, 0, BASE_SIZE)
+      };
+    }
+
+    getPathNodeKey(node) {
+      return node.x + ',' + node.y;
+    }
+
+    getPathBounds(start, goal, stepSize) {
+      const straightDistance = Math.sqrt(((goal.x - start.x) ** 2) + ((goal.y - start.y) ** 2));
+      const margin = Math.max(stepSize * 12, Math.min(BASE_SIZE / 2.5, straightDistance * 0.55));
+      return {
+        left: clamp(Math.floor((Math.min(start.x, goal.x) - margin) / stepSize) * stepSize, 0, BASE_SIZE),
+        top: clamp(Math.floor((Math.min(start.y, goal.y) - margin) / stepSize) * stepSize, 0, BASE_SIZE),
+        right: clamp(Math.ceil((Math.max(start.x, goal.x) + margin) / stepSize) * stepSize, 0, BASE_SIZE),
+        bottom: clamp(Math.ceil((Math.max(start.y, goal.y) + margin) / stepSize) * stepSize, 0, BASE_SIZE)
+      };
+    }
+
+    isPathNodeInBounds(node, bounds) {
+      return node.x >= bounds.left && node.x <= bounds.right && node.y >= bounds.top && node.y <= bounds.bottom;
+    }
+
+    getPathHeuristic(node, goal) {
+      const dx = goal.x - node.x;
+      const dy = goal.y - node.y;
+      return Math.sqrt((dx * dx) + (dy * dy)) * 0.45;
+    }
+
+    reconstructPathNodes(cameFrom, endKey, nodeLookup) {
+      const nodes = [];
+      let currentKey = endKey;
+      while (currentKey) {
+        const currentNode = nodeLookup.get(currentKey);
+        if (!currentNode) {
+          break;
+        }
+        nodes.push(currentNode);
+        currentKey = cameFrom.get(currentKey) || null;
+      }
+      nodes.reverse();
+      return nodes;
+    }
+
+    simplifyPathPoints(points) {
+      if (points.length <= 2) {
+        return points;
+      }
+      const simplified = [points[0]];
+      for (let index = 1; index < points.length - 1; index += 1) {
+        const prev = simplified[simplified.length - 1];
+        const current = points[index];
+        const next = points[index + 1];
+        const dx1 = current.x - prev.x;
+        const dy1 = current.y - prev.y;
+        const dx2 = next.x - current.x;
+        const dy2 = next.y - current.y;
+        if ((dx1 === 0 && dx2 === 0) || (dy1 === 0 && dy2 === 0) || ((dx1 !== 0 && dx2 !== 0) && (dy1 / dx1 === dy2 / dx2))) {
+          continue;
+        }
+        simplified.push(current);
+      }
+      simplified.push(points[points.length - 1]);
+      return simplified;
+    }
+
+    getPathSegmentCost(start, end) {
+      const weightedLength = this.calculateEffectiveSegmentPixels(start, end);
+      const midpoint = {
+        x: (start.x + end.x) / 2,
+        y: (start.y + end.y) / 2
+      };
+      const terrain = this.getTerrainInfoAt(midpoint.x, midpoint.y);
+      let hazardPenalty = 0;
+      if (terrain.depthType === 'deep') {
+        hazardPenalty += 30;
+      } else if (terrain.depthType === 'shallow') {
+        hazardPenalty += 4;
+      }
+      if (terrain.hasTrees) {
+        hazardPenalty += terrain.depthType === 'dry' ? 4 : 10;
+      }
+      return weightedLength + hazardPenalty;
+    }
+
+    findPath(start, goal) {
+      const stepSize = this.getPathfindingStepSize();
+      const startNode = this.snapPathNode(start.x, start.y, stepSize);
+      const goalNode = this.snapPathNode(goal.x, goal.y, stepSize);
+      const startKey = this.getPathNodeKey(startNode);
+      const goalKey = this.getPathNodeKey(goalNode);
+
+      if (startKey === goalKey) {
+        const directPoints = [
+          { x: round2(start.x), y: round2(start.y) },
+          { x: round2(goal.x), y: round2(goal.y) }
+        ];
+        return {
+          points: directPoints,
+          visited: 1,
+          complete: true
+        };
+      }
+
+      const bounds = this.getPathBounds(startNode, goalNode, stepSize);
+      const gridWidth = Math.max(1, Math.round((bounds.right - bounds.left) / stepSize) + 1);
+      const gridHeight = Math.max(1, Math.round((bounds.bottom - bounds.top) / stepSize) + 1);
+      const maxVisited = Math.min(PATHFINDING_MAX_VISITED, gridWidth * gridHeight);
+      const open = [{ key: startKey, node: startNode, f: this.getPathHeuristic(startNode, goalNode) }];
+      const openSet = new Set([startKey]);
+      const cameFrom = new Map();
+      const gScore = new Map([[startKey, 0]]);
+      const nodeLookup = new Map([[startKey, startNode], [goalKey, goalNode]]);
+      const closedSet = new Set();
+      let visited = 0;
+      let bestKey = startKey;
+      let bestHeuristic = this.getPathHeuristic(startNode, goalNode);
+
+      while (open.length > 0 && visited < maxVisited) {
+        let bestIndex = 0;
+        for (let index = 1; index < open.length; index += 1) {
+          if (open[index].f < open[bestIndex].f) {
+            bestIndex = index;
+          }
+        }
+
+        const current = open.splice(bestIndex, 1)[0];
+        openSet.delete(current.key);
+        if (closedSet.has(current.key)) {
+          continue;
+        }
+
+        closedSet.add(current.key);
+        visited += 1;
+
+        const currentHeuristic = this.getPathHeuristic(current.node, goalNode);
+        if (currentHeuristic < bestHeuristic) {
+          bestHeuristic = currentHeuristic;
+          bestKey = current.key;
+        }
+
+        if (current.key === goalKey) {
+          const snappedPath = this.reconstructPathNodes(cameFrom, goalKey, nodeLookup);
+          const points = [
+            { x: round2(start.x), y: round2(start.y) },
+            ...snappedPath.slice(1, -1),
+            { x: round2(goal.x), y: round2(goal.y) }
+          ];
+          return {
+            points,
+            visited,
+            complete: true
+          };
+        }
+
+        for (let stepY = -1; stepY <= 1; stepY += 1) {
+          for (let stepX = -1; stepX <= 1; stepX += 1) {
+            if (stepX === 0 && stepY === 0) {
+              continue;
+            }
+            const neighbor = {
+              x: current.node.x + (stepX * stepSize),
+              y: current.node.y + (stepY * stepSize)
+            };
+            if (!this.isPathNodeInBounds(neighbor, bounds)) {
+              continue;
+            }
+            const neighborKey = this.getPathNodeKey(neighbor);
+            if (closedSet.has(neighborKey)) {
+              continue;
+            }
+
+            const segmentCost = this.getPathSegmentCost(current.node, neighbor);
+            const currentG = gScore.has(current.key) ? gScore.get(current.key) : Number.POSITIVE_INFINITY;
+            const tentativeG = currentG + segmentCost;
+
+            const neighborG = gScore.has(neighborKey) ? gScore.get(neighborKey) : Number.POSITIVE_INFINITY;
+            if (tentativeG >= neighborG) {
+              continue;
+            }
+
+            cameFrom.set(neighborKey, current.key);
+            gScore.set(neighborKey, tentativeG);
+            nodeLookup.set(neighborKey, neighbor);
+
+            const nextF = tentativeG + this.getPathHeuristic(neighbor, goalNode);
+
+            if (!openSet.has(neighborKey)) {
+              open.push({
+                key: neighborKey,
+                node: neighbor,
+                f: nextF
+              });
+              openSet.add(neighborKey);
+            } else {
+              const existing = open.find((entry) => entry.key === neighborKey);
+              if (existing) {
+                existing.node = neighbor;
+                existing.f = nextF;
+              }
+            }
+          }
+        }
+      }
+
+      const partialPath = this.reconstructPathNodes(cameFrom, bestKey, nodeLookup);
+      if (partialPath.length > 0) {
+        return {
+          points: [
+            { x: round2(start.x), y: round2(start.y) },
+            ...partialPath.slice(1)
+          ],
+          visited,
+          complete: false
+        };
+      }
+
+      return null;
+    }
+
+    handlePathfindingClick(worldX, worldY) {
+      const point = { x: round2(worldX), y: round2(worldY) };
+      if (!this.pathfinding || this.pathfinding.goal) {
+        this.pathfinding = {
+          start: point,
+          goal: null,
+          points: [point],
+          metrics: null,
+          visited: 0,
+          complete: false
+        };
+        this.statusMessage = 'Path start set';
+        this.updateUiState();
+        this.requestRender();
+        return;
+      }
+
+      const result = this.findPath(this.pathfinding.start, point);
+      if (!result) {
+        this.pathfinding = {
+          start: point,
+          goal: null,
+          points: [point],
+          metrics: null,
+          visited: 0,
+          complete: false
+        };
+        this.statusMessage = 'Path search failed; pick a new start';
+        this.updateUiState();
+        this.requestRender();
+        return;
+      }
+
+      const metrics = this.calculateMeasurementMetrics(result.points);
+      this.pathfinding = {
+        start: this.pathfinding.start,
+        goal: point,
+        points: result.points,
+        metrics,
+        visited: result.visited,
+        complete: result.complete
+      };
+      this.statusMessage = result.complete
+        ? 'Path found'
+        : 'Path approximated at search limit';
+      this.updateUiState();
+      this.requestRender();
+    }
+
+    clearPathfinding() {
+      if (!this.pathfinding) {
+        return;
+      }
+      this.pathfinding = null;
+      this.statusMessage = 'Path cleared';
+      this.updateUiState();
+      this.requestRender();
+    }
+
+    formatPathfindingText() {
+      if (!this.pathfinding) {
+        return 'None';
+      }
+      if (!this.pathfinding.goal || !this.pathfinding.metrics) {
+        return 'Start set';
+      }
+      const summary = this.formatMeasurementText(this.pathfinding.metrics);
+      return this.pathfinding.complete
+        ? summary
+        : summary + ' approx';
     }
 
     getProceduralChunk(chunkX, chunkY) {
@@ -990,37 +1453,130 @@
       if (!this.measurement) {
         return;
       }
-      const start = this.worldToScreen(this.measurement.start.x, this.measurement.start.y);
-      const end = this.worldToScreen(this.measurement.end.x, this.measurement.end.y);
-      const dx = this.measurement.end.x - this.measurement.start.x;
-      const dy = this.measurement.end.y - this.measurement.start.y;
-      const millimeters = formatMillimeters(Math.sqrt((dx * dx) + (dy * dy)));
+      const committedPoints = this.getMeasurementCommittedPoints();
+      const renderPoints = this.getMeasurementRenderPoints();
+      if (renderPoints.length === 0) {
+        return;
+      }
+      const metrics = this.calculateMeasurementMetrics(renderPoints);
+      const lastPoint = renderPoints[renderPoints.length - 1];
+      const lastScreenPoint = this.worldToScreen(lastPoint.x, lastPoint.y);
 
       this.ctx.save();
       this.ctx.strokeStyle = 'rgba(255, 214, 112, 0.95)';
       this.ctx.lineWidth = 2;
-      this.ctx.beginPath();
-      this.ctx.moveTo(start.x, start.y);
-      this.ctx.lineTo(end.x, end.y);
-      this.ctx.stroke();
+      if (committedPoints.length > 1) {
+        this.ctx.beginPath();
+        committedPoints.forEach((point, index) => {
+          const screenPoint = this.worldToScreen(point.x, point.y);
+          if (index === 0) {
+            this.ctx.moveTo(screenPoint.x, screenPoint.y);
+          } else {
+            this.ctx.lineTo(screenPoint.x, screenPoint.y);
+          }
+        });
+        this.ctx.stroke();
+      }
+
+      if (this.hasMeasurementPreviewSegment()) {
+        const previewStart = committedPoints[committedPoints.length - 1];
+        const previewEnd = this.measurement.preview;
+        const previewStartScreen = this.worldToScreen(previewStart.x, previewStart.y);
+        const previewEndScreen = this.worldToScreen(previewEnd.x, previewEnd.y);
+        this.ctx.save();
+        this.ctx.setLineDash([8, 6]);
+        this.ctx.beginPath();
+        this.ctx.moveTo(previewStartScreen.x, previewStartScreen.y);
+        this.ctx.lineTo(previewEndScreen.x, previewEndScreen.y);
+        this.ctx.stroke();
+        this.ctx.restore();
+      }
 
       this.ctx.fillStyle = '#ffe6a7';
-      this.ctx.beginPath();
-      this.ctx.arc(start.x, start.y, 4, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.beginPath();
-      this.ctx.arc(end.x, end.y, 4, 0, Math.PI * 2);
-      this.ctx.fill();
+      committedPoints.forEach((point) => {
+        const screenPoint = this.worldToScreen(point.x, point.y);
+        this.ctx.beginPath();
+        this.ctx.arc(screenPoint.x, screenPoint.y, 4, 0, Math.PI * 2);
+        this.ctx.fill();
+      });
+      if (this.hasMeasurementPreviewSegment()) {
+        this.ctx.beginPath();
+        this.ctx.arc(lastScreenPoint.x, lastScreenPoint.y, 3, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
 
-      const midX = (start.x + end.x) / 2;
-      const midY = (start.y + end.y) / 2;
-      const label = millimeters + ' mm';
+      const labelLines = [formatMiles(metrics.miles), 'Eff ' + formatMiles(metrics.effectiveMiles)];
       this.ctx.font = '13px Georgia';
-      const textWidth = this.ctx.measureText(label).width;
+      const textWidth = Math.max(...labelLines.map((line) => this.ctx.measureText(line).width));
+      const lineHeight = 16;
+      const textX = lastScreenPoint.x + 12;
+      const textY = lastScreenPoint.y - 10;
       this.ctx.fillStyle = 'rgba(13, 19, 18, 0.9)';
-      this.ctx.fillRect(midX - (textWidth / 2) - 8, midY - 18, textWidth + 16, 22);
+      this.ctx.fillRect(textX - 8, textY - 16, textWidth + 16, (labelLines.length * lineHeight) + 10);
       this.ctx.fillStyle = '#ffe6a7';
-      this.ctx.fillText(label, midX - (textWidth / 2), midY - 3);
+      labelLines.forEach((line, index) => {
+        this.ctx.fillText(line, textX, textY + (index * lineHeight));
+      });
+      this.ctx.restore();
+    }
+
+    drawPathfinding() {
+      if (!this.pathfinding || !Array.isArray(this.pathfinding.points) || this.pathfinding.points.length === 0) {
+        return;
+      }
+
+      const points = this.pathfinding.points.map((point) => this.worldToScreen(point.x, point.y));
+      const startPoint = points[0];
+      const endPoint = points[points.length - 1];
+
+      this.ctx.save();
+      this.ctx.strokeStyle = this.pathfinding.complete ? 'rgba(121, 199, 194, 0.96)' : 'rgba(121, 199, 194, 0.72)';
+      this.ctx.lineWidth = 3;
+      if (!this.pathfinding.complete) {
+        this.ctx.setLineDash([10, 6]);
+      }
+      if (points.length > 1) {
+        this.ctx.beginPath();
+        points.forEach((point, index) => {
+          if (index === 0) {
+            this.ctx.moveTo(point.x, point.y);
+          } else {
+            this.ctx.lineTo(point.x, point.y);
+          }
+        });
+        this.ctx.stroke();
+      }
+      this.ctx.setLineDash([]);
+
+      this.ctx.fillStyle = '#79c7c2';
+      this.ctx.beginPath();
+      this.ctx.arc(startPoint.x, startPoint.y, 5, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      if (points.length > 1) {
+        this.ctx.fillStyle = '#d9fff8';
+        this.ctx.beginPath();
+        this.ctx.arc(endPoint.x, endPoint.y, 5, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+
+      const labelLines = !this.pathfinding.goal || !this.pathfinding.metrics
+        ? ['Path start set']
+        : [
+          formatMiles(this.pathfinding.metrics.miles),
+          'Eff ' + formatMiles(this.pathfinding.metrics.effectiveMiles)
+        ];
+      this.ctx.font = '13px Georgia';
+      const textWidth = Math.max(...labelLines.map((line) => this.ctx.measureText(line).width));
+      const lineHeight = 16;
+      const textX = endPoint.x + 12;
+      const textY = endPoint.y - 10;
+      this.ctx.fillStyle = 'rgba(10, 24, 25, 0.9)';
+      this.ctx.fillRect(textX - 8, textY - 16, textWidth + 16, (labelLines.length * lineHeight) + 10);
+      this.ctx.fillStyle = '#d9fff8';
+      labelLines.forEach((line, index) => {
+        this.ctx.fillText(line, textX, textY + (index * lineHeight));
+      });
       this.ctx.restore();
     }
 
@@ -1035,6 +1591,7 @@
       this.drawMask();
       this.drawGrid();
       this.drawPointerPreview();
+      this.drawPathfinding();
       this.drawMeasurement();
       this.updateOpenNotePositions();
     }
@@ -1483,6 +2040,8 @@
         this.ui.centerValue.textContent = round2(this.camera.x) + ', ' + round2(this.camera.y);
       }
 
+      
+
       if (this.ui.revealCountValue) {
         this.ui.revealCountValue.textContent = String(this.maskOps.length);
       }
@@ -1491,10 +2050,13 @@
         if (!this.measurement) {
           this.ui.measurementValue.textContent = 'None';
         } else {
-          const dx = this.measurement.end.x - this.measurement.start.x;
-          const dy = this.measurement.end.y - this.measurement.start.y;
-          this.ui.measurementValue.textContent = formatMillimeters(Math.sqrt((dx * dx) + (dy * dy))) + ' mm';
+          const metrics = this.calculateMeasurementMetrics(this.getMeasurementRenderPoints());
+          this.ui.measurementValue.textContent = this.formatMeasurementText(metrics);
         }
+      }
+
+      if (this.ui.pathValue) {
+        this.ui.pathValue.textContent = this.formatPathfindingText();
       }
 
       if (this.ui.statusValue) {

@@ -154,6 +154,7 @@
       </div>
       <label style="display:block;margin-top:12px;"><input type="checkbox" id="toggleLocations" checked> Show locations</label>
       <label style="display:block;margin-top:8px;"><input type="checkbox" id="toggleGrid"> Show grid</label>
+      <label style="display:block;margin-top:8px;"><input type="checkbox" id="toggleGridLabels"> Label grid squares</label>
       <div class="button-row" style="margin-top:10px;">
         <button type="button" id="clearNotes">Clear Info Boxes</button>
       </div>
@@ -183,12 +184,14 @@
       initialLocations: window.DEFAULT_SWAMP_LOCATION_DATA.locations,
       defaultMode: 'pan',
       showMask: true,
+      showGridLabels: false,
       ui: {
         stepInputs: document.querySelectorAll('input[name="step"]'),
         stepButtons: document.querySelectorAll('[data-dx]'),
         modeButtons,
         toggleLocations: document.getElementById('toggleLocations'),
         toggleGrid: document.getElementById('toggleGrid'),
+        toggleGridLabels: document.getElementById('toggleGridLabels'),
         clearNotesButton: document.getElementById('clearNotes'),
         resetViewButton: document.getElementById('resetView'),
         zoomValue: document.getElementById('zoomValue'),

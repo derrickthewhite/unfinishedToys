@@ -152,6 +152,7 @@
 
   canvas[data-mode="pan"] { cursor: grab; }
   canvas[data-mode="measure"] { cursor: crosshair; }
+  canvas[data-mode="pathfinding"] { cursor: crosshair; }
   canvas[data-mode="reveal"] { cursor: crosshair; }
   canvas[data-mode="obscure"] { cursor: crosshair; }
   canvas[data-mode="select"] { cursor: pointer; }
@@ -196,6 +197,7 @@
       <div class="button-row">
         <button type="button" data-mode="pan">Pan</button>
         <button type="button" data-mode="measure">Measure</button>
+        <button type="button" data-mode="pathfinding">Pathfinding</button>
         <button type="button" data-mode="reveal">Reveal</button>
         <button type="button" data-mode="obscure">Obscure</button>
         <button type="button" data-mode="select">Select</button>
@@ -212,6 +214,7 @@
       <div class="meta-grid" style="margin-top:10px;">
         <strong>Mask edits</strong><span id="revealCount"></span>
         <strong>Measure</strong><span id="measurementValue"></span>
+        <strong>Pathfinding</strong><span id="pathValue"></span>
         <strong>Status</strong><span id="statusValue"></span>
         <strong>Selected</strong><span id="selectedLocation"></span>
       </div>
@@ -290,6 +293,7 @@
         locationCountValue: document.getElementById('locationCount'),
         revealCountValue: document.getElementById('revealCount'),
         measurementValue: document.getElementById('measurementValue'),
+        pathValue: document.getElementById('pathValue'),
         statusValue: document.getElementById('statusValue'),
         selectedLocationValue: document.getElementById('selectedLocation'),
         locationNameInput: document.getElementById('locationName'),

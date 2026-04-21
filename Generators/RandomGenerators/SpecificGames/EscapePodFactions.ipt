@@ -1,0 +1,33 @@
+; Escape Pod Factions.ipt
+; created 8/15/2025 2:39:09 PM
+
+Table: Faction
+4:Orion Alliance ([@{1d3+1} OrionRace >> implode])
+Kolipods
+Vuto
+2:Marass
+Squellions
+2:Koidrac
+Yeti
+Traders (Kletchtin)
+Pacchekki
+6:Veracity ([@Veracity])
+
+Table: OrionRace
+Furbite
+Hermit Squid
+Hawfax
+Tortholite
+Keverling
+
+Table: Veracity
+4:Baxxit
+2:Quarius
+2:Boral (climbing bugs)
+2:Sorgumm
+Rotalith
+Orchecki
+Shadoi
+Prime Soldiers
+3:Prime Workers
+Prime Thinker
