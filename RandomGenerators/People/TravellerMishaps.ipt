@@ -1,0 +1,221 @@
+; TravellerMishaps.ipt
+; created 2/1/2016 3:17:42 PM
+
+Table: TravellerMishaps
+[|Law Enforcement Agent| Intelligence agent], [@AgentMishap], [@AgentCarreer] 
+[|Infantry | Armor | Support] Soldier, [@ArmyMishap], [@ArmyCarreer]
+[|Corporate Suit| Worker | Colonist], [@CivilianMishap], [@CivilianCarreer]
+[|Artist| Journalist | Performer], [@entertainerMishap], [@entertainerCarreer]
+Star Marine, [@ArmyMishap],[@ArmyCarreer] 
+[|Merchant Marine|Free Trader| Broker]  [@merchantMishap],[@merchantCarreer]
+[|Navy Crew|Naval Pilot| Naval Engineering], [@navyMishap],[@navyCarreer]
+[|Administrator|Diplomat|Dilettante], [@nobilityMishap],[@nobilityCarreer] 
+[|Theif|Enforcer|Pirate],  [@rougeMishap],[@rougeCarreer]
+[|Scientist|Physician|Field Researcher],  [@scienceMishap],[@scienceCarreer]
+[|Courier|Survor|World Scout], [@scoutMishap],[@scoutCarreer]
+
+Table: AgentMishap
+Criminal Offers Deal! 
+An Investigation goes wrong/involes higher ups!
+You learn something you shouldn't know 
+Someone you know is hurt by criminals becuase of you
+2:[@Injury]
+
+Table: AgentCarreer
+1:[@Mishap]
+2: Involved in dangerous criminal Investigation
+4: Gain many Law enforcement Contacts
+10: [@LifeEvent] 
+5: Undercover Experience
+2: Gained valuable Mentor
+
+Table: ArmyMishap  
+4:[@Injury]
+Military Unit Slaughtered (commander's fault)
+Heavy Combat in [|Jungle|Swamp|Desert|Arctic|Urban] Region
+Crooked Upper Officer
+Internal Military Fued
+Stranded Behind Enemy Lines
+black ops mission [|refused|participated]
+Captured and mistreated as POW
+
+Table: ArmyCarreer
+1:[@ArmyMishap]
+2: Time in [|space|vaccum|arctic|lowtech|Jungle|Swamp|Desert]
+3: Time in wartorn place
+3: Part of Failed assualt
+4: Major War, gained [|[@Injury]|]
+10: [@LifeEvent]  
+4: Held out against enemy assualt
+2: Captured as POW
+3: Served as Military Police
+1: Displayed hotable heroism
+
+Table: CivilianMishap
+Lived around criminal Gang in rough neighborhood
+Hard Times from economic downturn
+Business shut down by foverment
+Planet was invaded
+Lived through Revolution
+[@Injury]
+
+Table: CivilianCarreer
+1:[@CivilianMishap]
+2: Political Upheaval
+3: Heavy Vehicle experience
+10: [@LifeEvent]  
+4: Had inside scoop on scandal
+2: Had valuable mentor
+
+Table: entertainerMishap
+[@Injury]
+involved in a scandal 
+gained a bad reputation
+betrayed by a peer 
+got stranded far from home
+got involved in controversy
+
+Table: entertainerCarreer
+1:[@entertainerMishap]
+2: Participted in controvesry and rode it out
+3: Knows famous people
+4: Minor Celebrity for one work
+10: [@LifeEvent]  
+4: notable conflict with questionable political leader
+3: Well Traveled
+2: [@UnusualEvent]
+
+Table: merchantMishap
+[@Injury]
+Bankrupted (intentionally)
+Bankrupted (non-intentionally) 
+Business destroyed by Criminals
+Business destroyed by govement interference
+
+Table: merchantCarreer
+1:[@merchantMishap]
+2: Smuggling oppertunity [|refused|participated]
+3: high risk carreer move
+4: Legal Trouble
+10: [@LifeEvent]  
+4: Lived the high life
+
+Table: navyMishap
+2:[@Injury]
+Spent time in cryostatis/ relativistic travel
+At fault for major ship mishap[| | not]in battle
+Blamed for major ship mishap[| | not]in battle
+Bad internal Politics
+
+Table: navyCarreer
+1:[@navyMishap]
+2: member of gamblers
+3: participated in major battle
+4: Foiled crime on board
+10: [@LifeEvent]  
+2: Abused position on board
+
+Table: nobilityMishap
+Family Scandal
+Involved in war
+Involved in natural disaster
+Position usurped
+Assasination attempt
+Faction falls from Power
+Accident: [@Injury]
+
+Table: nobilityCarreer
+1:[@nobilityMishap]
+2: participated In duel
+3: Notable Inheritence
+4: Involved in Political Intrigue
+10: [@LifeEvent] 
+5: recruited by Consipiracy [|refused|participated]
+
+Table: rougeMishap
+arrested
+betrayed
+fugative
+2:[@Injury]
+
+Table: rougeCarreer
+1:[@rougeMishap]
+2: Long trial, not convicted
+3: Part of Major heist
+4: [|betrayed|stood by] another  [|refused|participated]
+10: [@LifeEvent] 
+5: Gang war
+4: Active in criminal community
+2: ran gambling ring
+
+Table: scienceMishap
+blamed for disaster
+Political opposition to feild
+You were sabotaged
+Another took credit for your work
+Accident: [@Injury]
+
+Table: scienceCarreer
+1:[@scienceMishap]
+2: Ethically questionable research [|refused|participated]
+3: Worked on a secret project
+4: steal anothers work [|refused|participated]
+10: [@LifeEvent] 
+5: entangled in bureaucratic morass
+
+Table: scoutMishap
+4:ship broke down in nowhere
+ship had near fatal accident
+Caused international incident
+2:[@Injury]
+
+Table: scoutCarreer
+1:[@scoutMishap]
+2: Ship ambushed by enemy vessels
+3: Familiar with alien race
+4: First apon a disaster in space
+10: [@LifeEvent] 
+3: served on high-profile mission
+
+Table: Mishap
+2: Injured (major)
+Criminal Offers Deal! 
+An Investigation goes wrong/involes higher ups!
+You learn something you shouldn't know 
+Someone you know is hurt by criminals becuase of you
+Injured (minor)
+Military Unit Slaughtered (commander's fault)
+Combat in Jungle Region
+
+Table: LifeEvent
+2:Contracted bad Illness
+2:Notable Birth!
+2:Notable Death!
+4:Bad romantic relationship
+5:Good romantic relationship
+6:Gained a really good friend
+4:Betrayal by a freind
+3:Well travelled
+1:Unexpected Money
+1:Life long dream comes true
+1:accused of a crime
+1:commits a crime
+1:[@UnusualEvent]
+
+Table: UnusualEvent
+spent time Among aliens
+access to alien artifact
+time in very high society
+dealt with ancient artifact
+
+Table: Injury
+Lost Eye
+Injured Arm
+Lost Fingers
+2:Nasty Scar
+Back Injury
+Lost Leg
+Injured Leg
+Lost both legs
+Head Injury
+Broken Back

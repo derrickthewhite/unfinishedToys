@@ -1,0 +1,41 @@
+; ModernProfessions.ipt
+; created 4/9/2018 9:49:06 AM
+Table: modernProfessions
+60: management
+30: Business and financial
+19: computers and math
+13: engineering and architechture
+6: scientists
+10: community and social services
+7: Legal
+36: teachers and Librarians
+13: Artists, Actors, and cameramen
+4: doctor
+12: nurse
+20: healthcare (not doctor or nurse)
+14: healthcare support
+12: protective services
+33: Food services
+23: Building and Grounds cleaning and maintaince
+24: personal care and service (childcare, barbers, bellhops, funeral directors, ushers, recreation workers)
+40: cashiers and retail
+4: real estate sales
+5: wholesale/manufacturing sales
+4: marketing and sales managers
+11: Sales (not real estate, wholesale, marking, or retail)
+11: secretary
+10: customer service
+8: stock and traffic clerk
+5: receptionist
+11: General office clerks
+4: accounting clerks
+22: office and administrative
+8: agriculture
+32: Construction and Extraction
+19: installation, maintainace, repair
+34: manufacturing
+1: air travel
+14: truck driver
+8: stock moving
+5: public transit driver
+10: Transportation industry (not air, truck, stock, or public transit driver)

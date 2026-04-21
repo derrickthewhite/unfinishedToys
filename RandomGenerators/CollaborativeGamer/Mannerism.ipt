@@ -1,0 +1,75 @@
+; Mannerism.ipt
+; created 4/14/2016 6:36:11 AM
+
+Table: Mannerism
+[@Hands]
+[@HandsPlus]
+[@Head]
+[@Speech]
+[@Expressions]
+[@Eyes]
+
+Table: Hands
+Rubs Hands Together
+Tight Cramped Gestures
+Quick staccato Gestures
+Snaps fingers for emphasis
+Keeps Hands Concealed
+Big Open Gestures
+Claps hands for Emphasis
+Wrings hands
+Points a lot
+
+Table: HandsPlus
+Fiddles with Object
+Plays with ear or lip
+Taps nose or ear
+Gesticulates with object
+Rubs chin while thinking
+Brushes Hair back
+Rubs Temple
+Slaps people on back
+Defensive Arm Posture
+
+Table: Head
+Rests Chin in Palm
+Very upright
+Head cocked sideways
+Head tilted back
+Head tilted forward and down
+Looks rapidly from person to person
+Either nods or shakes head a lot
+Slow Head movements
+
+Table: Speech
+Lisp, Rasp, cough, or odd hisssing
+Foreign accent
+Voice very high or low
+Uses few words or babbles incessantly
+Makes breathy sounds of some kind
+Thanks long thoughtful pauses
+Stutters or fumbles speech
+Laughs loudly and often
+Speeks very loud or very quiet
+
+Table: Expressions
+Smiles
+Dull and Expressionless
+Animated and expressive
+Scowls
+Skews mouth to one side
+Pouts or purses lips
+Open mouthed
+Looks eager
+Frowns
+
+Table: Eyes
+Arched eyebrows
+Furrowed brows
+squints or narrows eyes
+Winks
+Stares unblinkingly
+Blinks a lot
+Rolls eyes
+Sits back with eyes closed and hands folded
+looks off to the side

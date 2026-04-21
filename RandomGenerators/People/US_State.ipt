@@ -1,0 +1,50 @@
+; US_State.ipt
+; created 12/22/2015 11:02:51 AM
+
+Table: State_By_Population_1910
+21:Alabama
+16:Arkansas
+24:California
+8:Colorado
+11:Connecticut
+2:Delaware
+8:Florida
+26:Georgia
+3:Idaho
+56:Illinois
+27:Indiana
+22:Iowa
+17:Kansas
+23:Kentucky
+17:Louisiana
+7:Maine
+13:Maryland
+34:Massachusetts
+28:Michigan
+21:Minnesota
+18:Mississippi
+33:Missouri
+4:Montana
+12:Nebraska
+1:Nevada
+4:New Hampshire
+25:New Jersey
+91:New York
+22:North Carolina
+6:North Dakota
+48:Ohio
+17:Oklahoma
+7:Oregon
+77:Pennsylvania
+5:Rhode Island
+15:South Carolina
+6:South Dakota
+22:Tennessee
+39:Texas
+4:Utah
+4:Vermont
+21:Virginia
+11:Washington
+12:West Virginia
+23:Wisconsin
+1:Wyoming

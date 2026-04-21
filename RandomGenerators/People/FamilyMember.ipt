@@ -1,0 +1,11 @@
+; FamilyMember.ipt
+; created 1/18/2017 10:15:03 AM
+
+Table: FamilyMember
+Father
+Mother
+Brother
+Sister
+Spouse
+Daughter
+Son

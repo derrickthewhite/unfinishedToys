@@ -1,0 +1,13 @@
+; AdventurePerilAdjuster.ipt
+; created 4/14/2016 8:10:02 AM
+
+Table:AdventurePerilAdjuster
+roll: 3d6
+3-5: +1 peril for reward only
+6-10: nominated Peril
+11-12: +1 Peril
+13-14: -1 Peril
+15: +2 Peril
+16: -2 Peril
+17: +3 Peril
+18: -3 Peril

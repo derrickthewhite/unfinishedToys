@@ -1,0 +1,19 @@
+; CulturalValues.ipt
+; created 11/7/2018 2:30:48 PM
+
+Table: PsiWarsCultureValues
+[!{1d3+1d2} Values >> implode]
+
+Table: Values
+Charity
+Courage
+Cunning
+Indepedence
+Innocence
+Mysticism
+Prestige
+Reliability
+Restraint
+Tolerance
+Tradition
+Nationalism

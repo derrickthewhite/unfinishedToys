@@ -1,0 +1,14 @@
+Use: ../Generators/CollaborativeGamer/Sabotage.ipt
+Use: ../Generators/CollaborativeGamer/Convince.ipt
+Use: ../Generators/CollaborativeGamer/Slay.ipt
+Use: ../Generators/CollaborativeGamer/Fetch.ipt
+Use: ../Generators/CollaborativeGamer/Protect.ipt
+Use: ../Generators/CollaborativeGamer/Investigate.ipt
+
+Table: Chase
+[@Sabatage]
+[@Convince]
+[@Slay]
+[@Fetch]
+[@Investigate]
+[@Protect]

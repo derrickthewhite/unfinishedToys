@@ -1,0 +1,16 @@
+; RoleInSociety.ipt
+; created 4/13/2016 5:09:27 PM
+
+Table: RoleInSociety
+Nobility
+Foreign
+Travler/Tansit
+Magic
+Religion
+Military
+Mercantile
+Craft
+Agriculture
+Entertainment
+Underworld
+Underclass

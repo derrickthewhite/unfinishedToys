@@ -1,0 +1,110 @@
+; Goblinkin.ipt
+; created 10/5/2016 2:56:44 PM
+
+Prompt: Peril {0|1|2|3|4|5|6|7} 2
+
+Table: Goblin
+SET: ST =[@Strength]
+SET: DX =[@Dexterity]
+SET: IQ =[@Intelligence]
+SET: HT =[@Health]
+SET: HP =[when]{$prompt1>1}[do] {ST+2} [else] {ST} [end]
+Peril {$prompt1} Goblinkin \n&
+ST {ST} DX {DX} IQ {IQ} HT {HT} \n&
+HP {HP}   Will [@Will]  Per [@Per] FP {HT} \n&
+Stealth - [@Stealth] Weapon - [when]{$prompt1}>5[do] {DX+$prompt1 + 4} {$prompt1>5} [else] {DX+$prompt1} [end]\n&
+Damage [#{ST} Damage] \n&
+[@Mentality], [@sun] 
+
+Table: Strength
+Type: Lookup 
+Roll: 3d6
+3-8: {4+2*$prompt1}
+9-10: {7+2*$prompt1}
+11-12: {10+$prompt1}
+13-18: {12+$prompt1}
+
+Table: Dexterity
+Type: Lookup 
+Roll: 3d6
+3-8: {8+floor(.5*$prompt1)}
+9-13: {9+floor(.5*$prompt1)}
+14-18: {10+floor(.5*$prompt1)}
+
+Table: Health
+Type: Lookup 
+Roll: 3d6
+3-5: 9
+6-8: 10
+9-12: 11
+13-18: 12
+
+Table: Intelligence
+Type: Lookup 
+Roll: 3d6
+3-8: 8
+9-13: {10+floor(.5*$prompt1)}
+14-18: {9+$prompt1}
+
+Table: Will
+Type: Lookup 
+Roll: 3d6
+3-8: {6+$prompt1}
+9-13: {10+floor(.5*$prompt1)}
+14-18: {9+$prompt1}
+
+Table: Per
+Type: Lookup 
+Roll: 3d6
+3-8: {8+$prompt1}
+9-13: {9+$prompt1}
+14-18: {10+$prompt1}
+
+Table: Mentality
+4: Bad Temper
+4: Bully
+4: Callous
+Cowardice
+Jelousy
+Laziness
+Sadism
+Selfishness
+{}
+
+Table: Stealth
+Type: Lookup 
+Roll: 3d6
+3-8: {9+floor(.5*$prompt1)}
+9-13: {8+$prompt1}
+14-18: {10+$prompt1}
+
+Table: sun
+Type: Lookup
+Roll: 3d6+{$prompt1}
+0-8: sunlight damage
+9-12: sunlight annoyance
+13-30: sunlight tolerant
+
+Table: Damage
+Type: Lookup
+4:1d-4
+5-6:1d-3
+7-8:1d-2
+9: 1d-1
+9-10:1d
+11: 1d+1
+12: 1d+2
+13: 2d-1
+14: 2d
+15: 2d+1
+16: 2d+2
+17: 3d-1
+18: 3d
+19: 3d+1
+20: 3d+2
+21: 4d-1
+22: 4d
+23: 4d+1
+24: 4d+2
+25: 5d-1
+26: 5d 

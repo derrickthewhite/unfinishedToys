@@ -1,0 +1,36 @@
+; JourneyEvents.ipt
+; created 4/21/2016 8:38:22 AM
+
+Table: JourneyEvents
+roll: 3d6
+1-5: [@JourneyOpportunity]
+6-8: [@JourneyMishaps] for [@JourneyOpportunity]
+9: Opening to Adventure
+10-12: Uneventful
+13-20: [@JourneyMishaps] or [@JourneyMishaps]
+
+Table: JourneyOpportunity
+2:Standard Hoard
+Small Hoard
+Save two units of time
+Gain a weak Ally for the rest of the adventure
+Gain a strong Ally for the rest of the adventure
+gain information about region or dungeon (2 rolls)
+gain information about region or dungeon (3 rolls)
+Lower peril by 2
+Gain a plot point for personal plot
+Gain two 'social points'
+Do good, be virtuous, or help someone without reward
+
+Table: JourneyMishaps
+Negotiate [|Obstacle|Obstacle|Hazard|Hazard|Trap|Ward]
+2:Negotiate Obstacle
+brave a Hazard
+add two units time
+raise peril by two
+Lose or expend supplies (10x1d6*N*Peril)
+Standard Encounter
+Standard Encounter
+Deadly Encounter
+-5 in social points
+hurt someone, or allow someone to be hurt

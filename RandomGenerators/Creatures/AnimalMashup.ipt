@@ -1,0 +1,135 @@
+; AnimalMashup.ipt
+; created 9/16/2016 4:25:58 PM
+
+Table: chimera
+[@Animal] Crossed with [@Animal]
+
+Table: Animal
+ant
+Archerfish
+Armadillo
+Baboon
+Bat
+Bull
+Camel
+Chameleon
+Cheetah
+Chimpanzee
+Coyote
+Crocodile
+Dragonfly
+Eagle
+Electric Eel
+Elephant
+Giraffe
+Gorilla
+Great White Shark
+Grizzly Bear
+Hammerhead Shark
+Hippopotamus
+Hornet
+Hyena
+Killer Whale
+Komodo Dragon
+Lemming
+Lioness
+Lobster
+Mountain Lion
+Musk Ox
+Black Panther
+Piranah
+Poison Frog
+Polar Bear
+Porcupine
+Praying Mantis
+Ram
+Rat
+Rhinoceros
+Scorpion
+Skunk
+Snapping Turtle
+Snowy Owl
+Calot (sperm whale)
+Spitting Cobra
+Tiger
+Vulture
+Wolf
+Wolverine
+Zebra
+Warthog
+Moose
+Raven
+Walrus
+Horse
+Dolphin
+Mammoth
+Garfish
+Kangaroo
+Rattlesnake
+Anaconda
+Black Widow
+Bombardier Bettle
+Cockroad
+Condor
+Firefly
+Garden Spider
+Giant Anteater
+Hercules Beetle
+Sheild Bug
+Tarantula
+Termine
+Walking Stick
+Wasp
+Aligator
+Beaver
+Blue Whale
+Dachshund
+Octopus
+Rabbit
+Albatross
+Alpaca
+Anglerfish
+Beluga
+Blue Ringed Octopus
+Blue Whale
+Tuna
+Cocanut Crab
+Cuttlefish
+Giant Squid
+Hatchetfish
+Hornbill
+Tapir
+Man O war
+Mantis Shrimp
+Naken Mole Rate
+Narwhal
+Ostrich
+Pistol Shrimp
+skipper catapillar
+Snail
+Spitting Spider
+Velvet Worm
+Whale Shark
+Barracuda
+Black Marlin
+Boa Constrictor
+Diplodocus
+Flying Fish
+Fox
+Grasshopper
+Masuosour
+Smilodon
+Snow Leopard
+Wild Dog
+Woodpecker
+T-Rex
+Ankalosaurous
+hardosaur
+Triceratops
+stegosarous
+Dragon
+Leopard
+Dire Wolf
+Tiger Shark
+Squirrel
+flying tree snake

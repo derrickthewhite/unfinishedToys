@@ -1,0 +1,9 @@
+; Relationship.ipt
+; created 1/25/2017 11:41:38 AM
+
+Table: Relationship
+Sibling
+Cousin
+Sibling-In Law
+Nephew/Uncle
+Childhood Friend

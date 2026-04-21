@@ -1,0 +1,108 @@
+; EuropeanCountry.ipt
+; created 4/11/2018 9:28:02 AM
+
+Table: EuropeanCountryByPopulace
+394: [@WesternEurope]
+193: [@EasternEurope]
+142: [@RussiaNoSiberia]  
+37: Siberia
+
+Table: Russia
+142:[@RussiaNoSiberia]
+37: Siberia
+
+Table:NotRussia
+394: [@WesternEurope]
+193: [@EasternEurope]
+
+Table: Not Western
+193: [@EasternEurope]
+142: [@RussiaNoSiberia]  
+37: Siberia
+
+Table: NoSiberia
+394: [@WesternEurope]
+193: [@EasternEurope]
+142: [@RussiaNoSiberia] 
+
+Table: EasternEurope
+44: Ukraine
+38: Poland
+21: Romania
+11: Greece
+10: Czech Republic
+10: Hungary
+9: Serbia
+9: Belarus
+7: Bulgaria
+5: Finland
+5: Slovakia
+4: Croatia
+4: Bosnia/Herzegovia
+3: Moldova
+3: Albania
+3: Lithuania
+2: Macedonia
+2: Slovenia
+2: Latvia
+1: Estonia
+
+; total of 394
+Table: WesternEurope   
+82: [@Germany]
+64: [@France]
+63: [@UnitedKingdom]
+61: [@Italy]
+47: Spain   
+8: Austria
+8: Switzerland 
+5: Norway   
+5: Denmark  
+9: Sweeden 
+16: Netherlands
+11: Belgium  
+5: Ireland    
+10: Portugaul
+
+; modern UK has outliers at half listed value
+Table: UnitedKingdom
+55: England
+12: Scotland
+6: Wales
+4: Northern Ireland
+
+Table: RussiaNoSiberia
+25: Caucasus Russia
+38: Central Russia (moscow)
+13: North West Russia (st petersburg)
+30: Volga
+
+Table: Germany
+18: Westphalia (Germany)
+23: Bavaria (Germany)
+8: Lower Saxony (Germany)
+6: Hesse (Germany)
+4: Saxony (Germany)
+4: Rhineland-Palatinate (Germany)
+6: Brandenburg (Germany)
+2: Saxony-Anhalt (Germany)
+3: Schleswig-Holstein (Germany)
+2: Thuringia (Germany)
+
+Table: France
+14:Paris
+8: French Alps
+6: Hauts-de-france (Flander, Calai)
+6: Aquitaine (France)
+5: Occitanie (France)
+8: Eastern France
+5: Provence (Mediterranian France)
+7: Brittany (France)
+3: Normandy (France)
+
+Table: Italy
+7: Italian Islands
+14: South Italy
+12: Central Italy
+8: Northeast Italy
+20: Northwest Italy

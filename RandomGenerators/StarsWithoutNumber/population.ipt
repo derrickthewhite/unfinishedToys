@@ -1,0 +1,13 @@
+; population.ipt
+; created 6/14/2018 8:30:36 AM
+
+Table: Population
+Type: Lookup
+Roll: 2d6
+2: Failed Colony
+3: Outpost
+4-5: less than a million
+6-8: several million
+9-10: hundreds of millions
+11: Billions
+12: Aliens [@Population]

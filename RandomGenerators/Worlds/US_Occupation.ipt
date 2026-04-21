@@ -1,0 +1,1285 @@
+; US_Occupation.ipt
+; created 12/19/2017 10:13:32 AM
+
+Table: us_occupation
+7000000: Full Time Students   // hard to tell: some of these folks work to0 -- true number is 14M
+10000000: Stay at home mothers
+4528550:Retail Salespersons
+3925640:Fast Food and Counter Workers
+3730410:Laborers and Material Movers, Hand
+3675140:Secretaries and Administrative Assistants
+3564130:Cashiers
+3101400:Building Cleaning Workers
+2989540:Driver/Sales Workers and Truck Drivers
+2955550:Office Clerks, General
+2857180:Registered Nurses
+2707040:Customer Service Representatives
+2564610:Waiters and Waitresses
+2377790:Nursing, Psychiatric, and Home Health Aides
+2340280:Cooks
+2188870:General and Operations Managers
+2031700:Elementary and Middle School Teachers
+2016340:Stock Clerks and Order Fillers
+1732420:Sales Representatives, Wholesale and Manufacturing
+1604570:Software Developers and Programmers
+1566960:Bookkeeping, Accounting, and Auditing Clerks
+1492250:Personal Care Aides
+1446900:First-Line Supervisors of Sales Workers
+1443150:First-Line Supervisors of Office and Administrative Support Workers
+1388860:Miscellaneous Healthcare Support Occupations
+1363280:Miscellaneous Assemblers and Fabricators
+1332480:Maintenance and Repair Workers, General
+1263820:Teacher Assistants
+1246540:Accountants and Auditors
+1113580:Security Guards and Gaming Surveillance Officers
+1083350:Secondary School Teachers
+1042750:Supervisors of Food Preparation and Serving Workers
+997770:Receptionists and Information Clerks
+987670:Grounds Maintenance Workers
+958670:Miscellaneous Business Operations Specialists
+953870:Miscellaneous Sales Representatives, Services
+912100:Construction Laborers
+902910:Miscellaneous Teachers and Instructors
+888880:Miscellaneous Production Workers
+850670:Food Preparation Workers
+809930:Automotive Technicians and Repairers
+791580:Computer Support Specialists
+752050:Health Practitioner Support Technologists and Technicians
+702400:Licensed Practical and Licensed Vocational Nurses
+699070:Counter and Rental Clerks and Parts Salespersons
+684690:Bus Drivers
+676990:Shipping, Receiving, and Traffic Clerks
+676980:Carpenters
+665830:Computer and Information Analysts
+662500:Police Officers
+659890:Counselors
+651500:Therapists
+649850:Physicians and Surgeons
+649470:Miscellaneous Community and Social Service Specialists
+647610:Database and Systems Administrators and Network Architects
+637690:Management Analysts
+632940:Lawyers and Judicial Law Clerks
+631730:Social Workers
+610480:First-Line Supervisors of Production and Operating Workers
+607120:Electricians
+605040:Human Resources Workers
+603320:Bartenders
+594280:Recreation and Fitness Workers
+575110:Financial Analysts and Advisors
+571120:Marketing and Sales Managers
+569370:Childcare Workers
+558630:Market Research Analysts and Marketing Specialists
+543300:Financial Managers
+542750:Industrial Truck and Tractor Operators
+538220:First-Line Supervisors of Construction Trades and Extraction Workers
+536840:Preschool and Kindergarten Teachers
+521750:Postal Service Workers
+518950:Inspectors, Testers, Sorters, Samplers, and Weighers
+506450:Dishwashers
+496760:Tellers
+492930:Designers
+485220:Billing and Posting Clerks
+481600:Special Education Teachers
+466790:Miscellaneous Postsecondary Teachers
+465330:Industrial Machinery Installation, Repair, and Maintenance Workers
+464070:Education Administrators
+453330:First-Line Supervisors of Mechanics, Installers, and Repairers
+451500:Pipelayers, Plumbers, Pipefitters, and Steamfitters
+449480:Bailiffs, Correctional Officers, and Jailers
+432270:Engineering Technicians, Except Drafters
+429650:Welding, Soldering, and Brazing Workers
+423080:Dining Room and Cafeteria Attendants and Bartender Helpers
+418530:Buyers and Purchasing Agents
+412190:Construction Equipment Operators
+404360:Hosts and Hostesses, Restaurant, Lounge, and Coffee Shop
+403670:Miscellaneous Managers
+395870:Miscellaneous Protective Service Workers
+391120:Machinists
+386520:Packaging and Filling Machine Operators and Tenders
+385700:Insurance Sales Agents
+375690:Diagnostic Related Technologists and Technicians
+368280:Barbers, Hairdressers, Hairstylists and Cosmetologists
+364460:Butchers and Other Meat, Poultry, and Fish Processing Workers
+354250:Miscellaneous Installation, Maintenance, and Repair Workers
+353780:Securities, Commodities, and Financial Services Sales Agents
+352510:Computer and Information Systems Managers
+342870:Miscellaneous Agricultural Workers
+339800:Credit Counselors and Loan Officers
+332150:Medical and Health Services Managers
+331110:Machine Tool Cutting Setters, Operators, and Tenders, Metal and Plastic
+326920:Clinical Laboratory Technologists and Technicians
+325970:Miscellaneous Entertainment Attendants and Related Workers
+321780:Production, Planning, and Expediting Clerks
+315910:Firefighters
+315870:Electrical and Electronics Engineers
+305510:Pharmacists
+298960:Bill and Account Collectors
+294730:Heating, Air Conditioning, and Refrigeration Mechanics and Installers
+293090:Dispatchers
+289550:Claims Adjusters, Appraisers, Examiners, and Investigators
+287800:Civil Engineers
+285790:Mechanical Engineers
+281950:Industrial Engineers, Including Health and Safety
+278150:Electrical, Electronics, and Electromechanical Assemblers
+277310:Paralegals and Legal Assistants
+274350:Insurance Claims and Policy Processing Clerks
+273910:Compliance Officers
+272170:Arts, Communications, and Humanities Teachers, Postsecondary
+269710:Training and Development Specialists
+266280:Administrative Services Managers
+264210:First-Line Supervisors of Building and Grounds Cleaning and Maintenance Workers
+262040:Data Entry and Information Processing Workers
+261520:Food Servers, Nonrestaurant
+261210:Miscellaneous Computer Occupations
+259850:Athletes, Coaches, Umpires, and Related Workers
+255980:Printing Workers
+254280:Bus and Truck Mechanics and Diesel Engine Specialists
+249650:Construction Managers
+248440:Hotel, Motel, and Resort Desk Clerks
+248200:Miscellaneous Food Processing Workers
+244960:Emergency Medical Technicians and Paramedics
+243790:Miscellaneous Electrical and Electronic Equipment Mechanics, Installers, and Repairers
+242940:Health Teachers, Postsecondary
+242550:Radio and Telecommunications Equipment Installers and Repairers
+229840:Self-Enrichment Education Teachers
+228590:Helpers, Construction Trades
+226940:Public Relations Specialists
+224340:Loan Interviewers and Clerks
+223260:Chief Executives
+220470:Painters and Paperhangers
+217750:Line Installers and Repairers
+216650:Miscellaneous Office and Administrative Support Workers
+215290:Telemarketers
+214610:Cost Estimators
+207710:Laundry and Dry-Cleaning Workers
+204990:Dental Hygienists
+202760:First-Line Supervisors of Transportation and Material-Moving Machine and Vehicle Operators
+202710:Drafters
+201470:Food Service Managers
+200140:Medical Records and Health Information Technicians
+192690:Real Estate Brokers and Sales Agents
+191640:Writers and Editors
+190420:First-Line Supervisors of Personal Service Workers
+188860:Taxi Drivers and Chauffeurs
+187360:Nonfarm Animal Caretakers
+186980:Crushing, Grinding, Polishing, Mixing, and Blending Workers
+186030:Interviewers, Except Eligibility and Loan
+183620:First-Line Supervisors of Helpers, Laborers, and Material Movers, Hand
+180760:Heavy Vehicle and Mobile Equipment Service Technicians and Mechanics
+180450:Bakers
+180290:Property, Real Estate, and Community Association Managers
+178390:Architectural and Engineering Managers
+177340:Cement Masons, Concrete Finishers, and Terrazzo Workers
+176850:Order Clerks
+171370:Computer Control Programmers and Operators
+168400:Industrial Production Managers
+166850:Miscellaneous Information and Record Clerks
+163130:Actors, Producers, and Directors
+159650:Payroll and Timekeeping Clerks
+158370:Molders and Molding Machine Setters, Operators, and Tenders, Metal and Plastic
+156070:Painting Workers
+153460:Miscellaneous Personal Appearance Workers
+150230:Nurse Practitioners
+147330:Instructional Coordinators
+146370:Miscellaneous Life, Physical, and Social Science Technicians
+146350:Reservation and Transportation Ticket Agents and Travel Clerks
+146350:Parking Lot Attendants
+146060:Logisticians
+143430:First-Line Supervisors of Law Enforcement Workers
+143320:Highway Maintenance Workers
+141100:Advertising Sales Agents
+139500:Sewing Machine Operators
+137150:Human Resources Assistants, Except Payroll and Timekeeping
+136410:Miscellaneous Health Technologists and Technicians
+135940:Eligibility Interviewers, Government Programs
+135610:Physical Therapist Assistants and Aides
+135430:Miscellaneous Vehicle and Mobile Equipment Mechanics, Installers, and Repairers
+134450:Sheet Metal Workers
+130950:File Clerks
+129810:Human Resources Managers
+129350:Librarians
+128620:Court, Municipal, and License Clerks
+128570:Aircraft Mechanics and Service Technicians
+128480:Tax Examiners, Collectors and Preparers, and Revenue Agents
+126760:Woodworking Machine Setters, Operators, and Tenders
+126230:Social and Community Service Managers
+123390:Miscellaneous Engineers
+123270:Miscellaneous Financial Specialists
+122330:Dentists
+122310:Psychologists
+121010:Chemical Processing Machine Setters, Operators, and Tenders
+120970:Environmental Scientists and Geoscientists
+120500:Aircraft Pilots and Flight Engineers
+120170:Forming Machine Setters, Operators, and Tenders, Metal and Plastic
+119280:Architects, Except Naval
+118170:Gaming Services Workers
+117920:Ushers, Lobby Attendants, and Ticket Takers
+117300:Multiple Machine Tool Setters, Operators, and Tenders, Metal and Plastic
+117220:Miscellaneous Legal Support Workers
+116410:Roofers
+116080:Broadcast and Sound Engineering Technicians and Radio Operators
+115840:Water and Wastewater Treatment Plant and System Operators
+114680:Refuse and Recyclable Material Collectors
+114560:Medical Scientists
+114230:Social Sciences Teachers, Postsecondary
+113390:Flight Attendants
+113270:Transportation, Storage, and Distribution Managers
+111650:Drywall Installers, Ceiling Tile Installers, and Tapers
+110330:Residential Advisors
+109790:Automotive and Watercraft Service Attendants
+109150:Operations Research Analysts
+104980:Detectives and Criminal Investigators
+104250:Miscellaneous Plant and System Operators
+104050:Physician Assistants
+103690:Biological Scientists
+102170:Computer, Automated Teller, and Office Machine Repairers
+100640:Miscellaneous Education, Training, and Library Workers
+98560:Library Assistants, Clerical
+97980:Cabinetmakers and Bench Carpenters
+96910:Miscellaneous Metal Workers and Plastic Workers
+95850:Meeting, Convention, and Event Planners
+95830:Massage Therapists
+94960:Construction and Building Inspectors
+94410:Chemists and Materials Scientists
+93410:Library Technicians
+93190:Occupational Health and Safety Specialists and Technicians
+91530:Mail Clerks and Mail Machine Operators, Except Postal Service
+90910:Switchboard Operators, Including Answering Service
+90890:Models, Demonstrators, and Product Promoters
+89620:Artists and Related Workers
+89120:Miscellaneous Sales and Related Workers
+88920:Cargo and Freight Agents
+84560:Math and Computer Teachers, Postsecondary
+83030:Business Teachers, Postsecondary
+80240:Medical, Dental, and Ophthalmic Laboratory Technicians
+79190:Compensation, Benefits, and Job Analysis Specialists
+77800:Textile Machine Setters, Operators, and Tenders
+77560:Brickmasons, Blockmasons, and Stonemasons
+77410:Carpet, Floor, and Tile Installers and Finishers
+77270:Structural Metal Fabricators and Fitters
+76760:Baggage Porters, Bellhops, and Concierges
+75580:Cutting Workers
+75270:Opticians, Dispensing
+74720:Biological Technicians
+74660:Miscellaneous Media and Communication Workers
+74460:Weighers, Measurers, Checkers, and Samplers, Recordkeeping
+74330:Sales Engineers
+74120:Couriers and Messengers
+72950:Computer Hardware Engineers
+72930:Credit Analysts
+72880:Miscellaneous First-Line Supervisors, Protective Service Workers
+72830:Pest Control Workers
+72820:Miscellaneous Textile, Apparel, and Furnishings Workers
+72210:Tool and Die Makers
+72120:Procurement Clerks
+71860:Derrick, Rotary Drill, and Service Unit Operators, Oil, Gas, and Mining
+71750:Purchasing Managers
+71260:Extruding, Forming, Pressing, and Compacting Machine Setters, Operators, and Tenders
+69440:Structural Iron and Steel Workers
+69280:Small Engine Mechanics
+68910:Fundraisers
+68680:Travel Agents
+68510:Aerospace Engineers
+68360:Precision Instrument and Equipment Repairers
+67650:Veterinarians
+65590:Control and Valve Installers and Repairers
+65510:Chemical Technicians
+63970:Public Relations and Fundraising Managers
+63720:Education and Library Science Teachers, Postsecondary
+62920:Life Sciences Teachers, Postsecondary
+62850:Miscellaneous Health Practitioners and Technical Workers
+61430:Dietitians and Nutritionists
+60770:Appraisers and Assessors of Real Estate
+59820:Brokerage Clerks
+59060:Miscellaneous Food Preparation and Serving Related Workers
+58810:Adult Basic and Secondary Education and Literacy Teachers and Instructors
+58490:Musicians, Singers, and Related Workers
+58160:Office Machine Operators, Except Computer
+57170:First-Line Supervisors of Fire Fighting and Prevention Workers
+56770:Insulation Workers
+55440:Surveyors, Cartographers, and Photogrammetrists
+54780:Natural Sciences Managers
+54700:Budget Analysts
+54520:Miscellaneous Personal Care and Service Workers
+53920:Surveying and Mapping Technicians
+53680:Miscellaneous Motor Vehicle Operators
+53670:Legislators
+53560:Power Plant Operators, Distributors, and Dispatchers
+53530:Miscellaneous Social Scientists and Related Workers
+52620:Dredge, Excavating, and Loading Machine Operators
+52280:Environmental Engineers
+51780:Physical Sciences Teachers, Postsecondary
+51590:Television, Video, and Motion Picture Camera Operators and Editors
+51290:Roustabouts, Oil and Gas
+49750:Financial Examiners
+49320:Clergy
+48660:Photographers
+48050:Judges, Magistrates, and Other Judicial Workers
+47140:Glaziers
+46810:Computer Operators
+45640:Locomotive Engineers and Operators
+45380:Occupational Therapy Assistants and Aides
+45370:Engineering and Architecture Teachers, Postsecondary
+45160:News Analysts, Reporters and Correspondents
+45150:Pressers, Textile, Garment, and Related Materials
+45020:Crane and Tower Operators
+44280:Hazardous Materials Removal Workers
+42880:Railroad Conductors and Yardmasters
+42490:Law, Criminal Justice, and Social Work Teachers, Postsecondary
+42010:Aircraft Structure, Surfaces, Rigging, and Systems Assemblers
+41690:Tour and Travel Guides
+41630:New Accounts Clerks
+40010:Ship and Boat Captains and Operators
+39860:Nurse Anesthetists
+38780:Graders and Sorters, Agricultural Products
+38650:Logging Workers
+38150:Engine and Other Machine Assemblers
+37680:Credit Authorizers, Checkers, and Clerks
+37660:Miscellaneous Transportation Workers
+37230:Announcers
+37070:Miscellaneous Construction and Related Workers
+36430:Optometrists
+36280:Miscellaneous Health Diagnosing and Treating Practitioners
+35770:Funeral Attendants
+35410:Lodging Managers
+34810:Urban and Regional Planners
+34540:Miscellaneous Financial Clerks
+34070:Meter Readers, Utilities
+33720:Stationary Engineers and Boiler Operators
+33480:Home Appliance Repairers
+33440:Statisticians
+32960:Chiropractors
+32880:Training and Development Managers
+32780:Petroleum Engineers
+32530:Sailors and Marine Oilers
+32000:Air Traffic Controllers and Airfield Operations Specialists
+31990:Chemical Engineers
+31350:Agricultural and Food Scientists
+30030:Social Science Research Assistants
+29780:First-Line Supervisors of Gaming Workers
+28890:Conservation Scientists and Foresters
+28860:Advertising and Promotions Managers
+28590:Conveyor Operators and Tenders
+28490:Private Detectives and Investigators
+28200:Tailors, Dressmakers, and Sewers
+27900:Archivists, Curators, and Museum Technicians
+27540:Pumping Station Operators
+27430:Transportation Inspectors
+26800:Materials Engineers
+26580:Computer and Information Research Scientists
+26480:Jewelers and Precious Stone and Metal Workers
+26430:Photographic Process Workers and Processing Machine Operators
+26320:Septic Tank Servicers and Sewer Pipe Cleaners
+26300:Metal Furnace Operators, Tenders, Pourers, and Casters
+25850:Morticians, Undertakers, and Funeral Directors
+24430:Semiconductor Processors
+23880:Miscellaneous Material Moving Workers
+22810:Plasterers and Stucco Masons
+22240:Elevator Installers and Repairers
+21500:Fence Erectors
+20590:Directors, Religious Activities and Education
+20590:Biomedical Engineers
+20420:Agricultural and Food Science Technicians
+20120:Mining Machine Operators
+20020:Reinforcing Iron and Rebar Workers
+19940:Actuaries
+19860:Railroad Brake, Signal, and Switch Operators
+19550:First-Line Supervisors of Farming, Fishing, and Forestry Workers
+19520:Furnace, Kiln, Oven, Drier, and Kettle Operators and Tenders
+19380:Economists
+18960:Miscellaneous Physical Scientists
+18810:Gaming Cage Workers
+18620:Miscellaneous Media and Communication Equipment Workers
+18510:Astronomers and Physicists
+18500:Earth Drillers, Except Oil and Gas
+18410:Transportation Attendants, Except Flight Attendants
+17680:Nuclear Engineers
+17660:Helpers--Extraction Workers
+17370:Furniture Finishers
+17300:Ambulance Drivers and Attendants, Except Emergency Medical Technicians
+16660:Boilermakers
+15230:Compensation and Benefits Managers
+15220:Dancers and Choreographers
+15100:Geological and Petroleum Technicians
+14720:Postmasters and Mail Superintendents
+14710:Agricultural Inspectors
+14250:Rail-Track Laying and Maintenance Equipment Operators
+13590:Animal Trainers
+13570:Fire Inspectors
+13470:Agents and Business Managers of Artists, Performers, and Athletes
+13150:Miscellaneous Entertainers and Performers, Sports and Related Workers
+13090:Desktop Publishers
+12970:Animal Control Workers
+12350:Subway and Streetcar Operators
+12310:Audiologists
+11930:Survey Researchers
+11430:Proofreaders and Copy Markers
+11280:Shoe and Leather Workers
+10920:Tank Car, Truck, and Ship Loaders
+10900:Statistical Assistants
+10300:Audio-Visual and Multimedia Collections Specialists
+9800:Atmospheric and Space Scientists
+9800:Podiatrists
+9750:Ship Engineers
+9680:Model Makers and Patternmakers, Metal and Plastic
+9570:Emergency Management Directors
+8920:Parking Enforcement Workers
+8870:Solar Photovoltaic Installers
+8860:Telephone Operators
+8620:Farm and Home Management Advisors
+8370:Funeral Service Managers
+8250:Miscellaneous Religious Workers
+8120:Marine Engineers and Naval Architects
+7890:Miscellaneous Life Scientists
+7460:Aircraft Cargo Handling Supervisors
+7170:Forest and Conservation Workers
+6940:Mining and Geological Engineers, Including Mining Safety Engineers
+6840:Nuclear Technicians
+6780:Correspondence Clerks
+6750:Miscellaneous Woodworkers
+6610:Fish and Game Wardens
+6410:Traffic Technicians
+6310:Explosives Workers, Ordnance Handling Experts, and Blasters
+6270:Nurse Midwives
+5480:Motion Picture Projectionists
+4580:Wind Turbine Service Technicians
+4560:Farmers, Ranchers, and Other Agricultural Managers
+4470:Miscellaneous Rail Transportation Workers
+4320:Miscellaneous Extraction Workers
+4280:Gaming Managers
+3930:Roof Bolters, Mining
+3770:Rock Splitters, Quarry
+3710:Embalmers
+3510:Bridge and Lock Tenders
+2960:Hoist and Winch Operators
+2870:Sociologists
+2730:Mathematicians
+2510:Miscellaneous Mathematical Science Occupations
+2150:Miscellaneous Communications Equipment Operators
+2000:Model Makers and Patternmakers, Wood
+1980:Agricultural Engineers
+1590:Mine Shuttle Car Operators
+1270:Animal Breeders
+520:Fishers and Related Fishing Workers
+"
+stats.sort((a,b)=> a.TOT_EMP < b.TOT_EMP? 1:-1).filter(a => a.OCC_GROUP == "detailed").reduce((out,a) => out + a.TOT_EMP +":"+ a.OCC_TITLE+"\n","");
+"4528550:Retail Salespersons
+3541010:Cashiers
+3426090:Combined Food Preparation and Serving Workers, Including Fast Food
+2955550:Office Clerks, General
+2857180:Registered Nurses
+2707040:Customer Service Representatives
+2587900:Laborers and Freight, Stock, and Material Movers, Hand
+2564610:Waiters and Waitresses
+2295510:Secretaries and Administrative Assistants, Except Legal, Medical, and Executive
+2188870:General and Operations Managers
+2161740:Janitors and Cleaners, Except Maids and Housekeeping Cleaners
+2016340:Stock Clerks and Order Fillers
+1704520:Heavy and Tractor-Trailer Truck Drivers
+1566960:Bookkeeping, Accounting, and Auditing Clerks
+1492250:Personal Care Aides
+1443150:First-Line Supervisors of Office and Administrative Support Workers
+1443150:Nursing Assistants
+1404050:Sales Representatives, Wholesale and Manufacturing, Except Technical and Scientific Products
+1392660:Elementary School Teachers, Except Special Education
+1332480:Maintenance and Repair Workers, General
+1263820:Teacher Assistants
+1246540:Accountants and Auditors
+1217370:Cooks, Restaurant
+1194220:First-Line Supervisors of Retail Sales Workers
+1112780:Team Assemblers
+1103120:Security Guards
+1003250:Secondary School Teachers, Except Special and Career/Technical Education
+997770:Receptionists and Information Clerks
+958670:Business Operations Specialists, All Other
+953870:Sales Representatives, Services, All Other
+924640:Maids and Housekeeping Cleaners
+912100:Construction Laborers
+908550:First-Line Supervisors of Food Preparation and Serving Workers
+906570:Landscaping and Groundskeeping Workers
+858710:Light Truck or Delivery Services Drivers
+850670:Food Preparation Workers
+814300:Home Health Aides
+794000:Software Developers, Applications
+705660:Packers and Packagers, Hand
+702400:Licensed Practical and Licensed Vocational Nurses
+676990:Shipping, Receiving, and Traffic Clerks
+676980:Carpenters
+657690:Police and Sheriff's Patrol Officers
+647380:Automotive Service Technicians and Mechanics
+637690:Management Analysts
+631610:Executive Secretaries and Executive Administrative Assistants
+626310:Middle School Teachers, Except Special and Career/Technical Education
+623560:Medical Assistants
+619530:Lawyers
+610480:First-Line Supervisors of Production and Operating Workers
+609960:Substitute Teachers
+607120:Electricians
+603320:Bartenders
+602840:Computer User Support Specialists
+569370:Childcare Workers
+568960:Computer Systems Analysts
+558630:Market Research Analysts and Marketing Specialists
+556820:Medical Secretaries
+543300:Financial Managers
+542750:Industrial Truck and Tractor Operators
+538220:First-Line Supervisors of Construction Trades and Extraction Workers
+524800:Human Resources Specialists
+518950:Inspectors, Testers, Sorters, Samplers, and Weighers
+515020:Bus Drivers, School or Special Client
+513200:Cooks, Fast Food
+506450:Dishwashers
+499550:Counter Attendants, Cafeteria, Food Concession, and Coffee Shop
+496760:Tellers
+485220:Billing and Posting Clerks
+453330:First-Line Supervisors of Mechanics, Installers, and Repairers
+450330:Counter and Rental Clerks
+431600:Correctional Officers and Jailers
+429890:Helpers--Production Workers
+426310:Driver/Sales Workers
+423080:Dining Room and Cafeteria Attendants and Bartender Helpers
+411870:Plumbers, Pipefitters, and Steamfitters
+409850:Cooks, Institution and Cafeteria
+409820:Software Developers, Systems Software
+404360:Hosts and Hostesses, Restaurant, Lounge, and Coffee Shop
+403670:Managers, All Other
+398390:Pharmacy Technicians
+391120:Machinists
+386520:Packaging and Filling Machine Operators and Tenders
+385700:Insurance Sales Agents
+385550:Preschool Teachers, Except Special Education
+382730:Welders, Cutters, Solderers, and Brazers
+376820:Network and Computer Systems Administrators
+365230:Sales Managers
+360650:Social and Human Service Assistants
+356750:Operating Engineers and Other Construction Equipment Operators
+353780:Securities, Commodities, and Financial Services Sales Agents
+352510:Computer and Information Systems Managers
+352380:Hairdressers, Hairstylists, and Cosmetologists
+348770:Cleaners of Vehicles and Equipment
+338620:Physicians and Surgeons, All Other
+336880:Recreation Workers
+334490:Industrial Machinery Mechanics
+332150:Medical and Health Services Managers
+328950:Postal Service Mail Carriers
+328370:Sales Representatives, Wholesale and Manufacturing, Technical and Scientific Products
+327290:Dental Assistants
+321780:Production, Planning, and Expediting Clerks
+315910:Firefighters
+305700:Loan Officers
+305510:Pharmacists
+298960:Bill and Account Collectors
+298840:Child, Family, and School Social Workers
+297600:Purchasing Agents, Except Wholesale, Retail, and Farm Products
+294730:Heating, Air Conditioning, and Refrigeration Mechanics and Installers
+292950:Teachers and Instructors, All Other, Except Substitute Teachers
+287800:Civil Engineers
+286740:Amusement and Recreation Attendants
+285790:Mechanical Engineers
+281610:Financial Analysts
+277310:Paralegals and Legal Assistants
+274420:Claims Adjusters, Examiners, and Investigators
+274350:Insurance Claims and Policy Processing Clerks
+273910:Compliance Officers
+273450:Farmworkers and Laborers, Crop, Nursery, and Greenhouse
+271200:Computer Programmers
+269710:Training and Development Specialists
+266280:Administrative Services Managers
+261520:Food Servers, Nonrestaurant
+261210:Computer Occupations, All Other
+260670:Educational, Guidance, School, and Vocational Counselors
+257410:Fitness Trainers and Aerobics Instructors
+256550:Industrial Engineers
+254280:Bus and Truck Mechanics and Diesel Engine Specialists
+252670:First-Line Supervisors of Non-Retail Sales Workers
+251670:Production Workers, All Other
+249650:Construction Managers
+248740:Parts Salespersons
+248440:Hotel, Motel, and Resort Desk Clerks
+244960:Emergency Medical Technicians and Paramedics
+242970:Education Administrators, Elementary and Secondary School
+230930:Coaches and Scouts
+230310:Assemblers and Fabricators, All Other
+229840:Self-Enrichment Education Teachers
+228430:Telecommunications Equipment Installers and Repairers, Except Line Installers
+226940:Public Relations Specialists
+224340:Loan Interviewers and Clerks
+223260:Chief Executives
+218530:Electrical and Electronic Equipment Assemblers
+217280:Painters, Construction and Maintenance
+216920:Physical Therapists
+216650:Office and Administrative Support Workers, All Other
+215290:Telemarketers
+214610:Cost Estimators
+210710:Graphic Designers
+207710:Laundry and Dry-Cleaning Workers
+205900:Marketing Managers
+204990:Dental Hygienists
+202760:First-Line Supervisors of Transportation and Material-Moving Machine and Vehicle Operators
+201850:Personal Financial Advisors
+201470:Food Service Managers
+200650:Radiologic Technologists
+200140:Medical Records and Health Information Technicians
+197910:Dispatchers, Except Police, Fire, and Ambulance
+194870:Postsecondary Teachers, All Other
+194810:Data Entry Keyers
+192800:Cutting, Punching, and Press Machine Setters, Operators, and Tenders, Metal and Plastic
+191200:Legal Secretaries
+190530:Special Education Teachers, Kindergarten and Elementary School
+190420:First-Line Supervisors of Personal Service Workers
+188860:Taxi Drivers and Chauffeurs
+188740:Computer Network Support Specialists
+187360:Nonfarm Animal Caretakers
+186740:Health Specialties Teachers, Postsecondary
+186030:Interviewers, Except Eligibility and Loan
+183990:Cooks, Short Order
+183770:Electrical Engineers
+183620:First-Line Supervisors of Helpers, Laborers, and Material Movers, Hand
+180450:Bakers
+180290:Property, Real Estate, and Community Association Managers
+178390:Architectural and Engineering Managers
+176850:Order Clerks
+173920:Cement Masons and Concrete Finishers
+169910:Printing Press Operators
+169680:Bus Drivers, Transit and Intercity
+168400:Industrial Production Managers
+166850:Information and Record Clerks, All Other
+166730:Medical and Clinical Laboratory Technologists
+161140:First-Line Supervisors of Housekeeping and Janitorial Workers
+160190:Medical and Clinical Laboratory Technicians
+159650:Payroll and Timekeeping Clerks
+159310:Healthcare Social Workers
+157070:Computer Network Architects
+151840:Real Estate Sales Agents
+151290:Kindergarten Teachers, Except Special Education
+150230:Nurse Practitioners
+149800:Meat, Poultry, and Fish Cutters and Trimmers
+148540:Food Batchmakers
+147330:Instructional Coordinators
+146460:Installation, Maintenance, and Repair Workers, All Other
+146350:Reservation and Transportation Ticket Agents and Travel Clerks
+146350:Parking Lot Attendants
+146190:Computer-Controlled Machine Tool Operators, Metal and Plastic
+146060:Logisticians
+145560:Molding, Coremaking, and Casting Machine Setters, Operators, and Tenders, Metal and Plastic
+145100:Lifeguards, Ski Patrol, and Other Recreational Protective Service Workers
+143940:Automotive Body and Related Repairers
+143320:Highway Maintenance Workers
+141100:Advertising Sales Agents
+139820:Mental Health Counselors
+139500:Sewing Machine Operators
+138430:Education Administrators, Postsecondary
+137150:Human Resources Assistants, Except Payroll and Timekeeping
+135980:Speech-Language Pathologists
+135940:Eligibility Interviewers, Government Programs
+135130:Graduate Teaching Assistants
+135120:Protective Service Workers, All Other
+134870:Electrical and Electronics Engineering Technicians
+134450:Sheet Metal Workers
+134190:Chefs and Head Cooks
+133880:Butchers and Meat Cutters
+132490:Special Education Teachers, Secondary School
+132100:Electronics Engineers, Except Computer
+130950:File Clerks
+130480:Mixing and Blending Machine Setters, Operators, and Tenders
+129810:Human Resources Managers
+129540:Web Developers
+129350:Librarians
+128620:Court, Municipal, and License Clerks
+128570:Aircraft Mechanics and Service Technicians
+126770:Respiratory Therapists
+126230:Social and Community Service Managers
+123570:Mobile Heavy Equipment Mechanics, Except Engines
+123390:Engineers, All Other
+123270:Financial Specialists, All Other
+122970:Family and General Practitioners
+122170:Health Technologists and Technicians, All Other
+120970:Phlebotomists
+118720:Helpers--Installation, Maintenance, and Repair Workers
+118070:Occupational Therapists
+117920:Ushers, Lobby Attendants, and Ticket Takers
+117670:Electrical Power-Line Installers and Repairers
+117300:Multiple Machine Tool Setters, Operators, and Tenders, Metal and Plastic
+116430:Vocational Education Teachers, Postsecondary
+116410:Roofers
+115840:Water and Wastewater Treatment Plant and System Operators
+114690:Merchandise Displayers and Window Trimmers
+114680:Refuse and Recyclable Material Collectors
+114510:Producers and Directors
+114040:Mental Health and Substance Abuse Social Workers
+113730:Database Administrators
+113390:Flight Attendants
+113270:Transportation, Storage, and Distribution Managers
+110770:Postal Service Mail Sorters, Processors, and Processing Machine Operators
+110330:Residential Advisors
+109790:Automotive and Watercraft Service Attendants
+109440:Wholesale and Retail Buyers, Except Farm Products
+109350:Tire Repairers and Changers
+109150:Operations Research Analysts
+108870:Medical Scientists, Except Epidemiologists
+107980:Clinical, Counseling, and School Psychologists
+105720:Surgical Technologists
+105620:Dentists, General
+104980:Detectives and Criminal Investigators
+104050:Physician Assistants
+103070:First-Line Supervisors of Landscaping, Lawn Service, and Groundskeeping Workers
+103030:Rehabilitation Counselors
+102170:Computer, Automated Teller, and Office Machine Repairers
+100640:Education, Training, and Library Workers, All Other
+100200:First-Line Supervisors of Police and Detectives
+100080:Telecommunications Line Installers and Repairers
+99860:Architects, Except Landscape and Naval
+99390:Veterinary Technologists and Technicians
+99020:Art, Drama, and Music Teachers, Postsecondary
+98560:Library Assistants, Clerical
+97980:Cabinetmakers and Bench Carpenters
+97170:Editors
+96870:Information Security Analysts
+96810:Architectural and Civil Drafters
+95850:Meeting, Convention, and Event Planners
+95830:Massage Therapists
+95170:Police, Fire, and Ambulance Dispatchers
+94960:Construction and Building Inspectors
+94570:Gaming Dealers
+93830:Healthcare Support Workers, All Other
+93410:Library Technicians
+93180:Drywall and Ceiling Tile Installers
+93100:Paper Goods Machine Setters, Operators, and Tenders
+91860:Community and Social Service Specialists, All Other
+91650:Insurance Underwriters
+91530:Mail Clerks and Mail Machine Operators, Except Postal Service
+91040:Substance Abuse and Behavioral Disorder Counselors
+90910:Switchboard Operators, Including Answering Service
+90630:Manicurists and Pedicurists
+90250:Special Education Teachers, Middle School
+89630:Maintenance Workers, Machinery
+88920:Cargo and Freight Agents
+88070:Machine Feeders and Offbearers
+87500:Probation Officers and Correctional Treatment Specialists
+86660:Chemists
+86500:Demonstrators and Product Promoters
+85760:Coating, Painting, and Spraying Machine Setters, Operators, and Tenders
+85580:Physical Therapist Assistants
+84250:Environmental Scientists and Specialists, Including Health
+83030:Business Teachers, Postsecondary
+82030:Postal Service Clerks
+81520:Airline Pilots, Copilots, and Flight Engineers
+81080:Sales and Related Workers, All Other
+80780:Slaughterers and Meat Packers
+80100:Career/Technical Education Teachers, Secondary School
+79990:Veterinary Assistants and Laboratory Animal Caretakers
+79430:Labor Relations Specialists
+79190:Compensation, Benefits, and Job Analysis Specialists
+77270:Structural Metal Fabricators and Fitters
+76630:Occupational Health and Safety Specialists
+76130:Woodworking Machine Setters, Operators, and Tenders, Except Sawing
+75270:Opticians, Dispensing
+74720:Biological Technicians
+74600:Grinding, Lapping, Polishing, and Buffing Machine Tool Setters, Operators, and Tenders, Metal and Plastic
+74460:Weighers, Measurers, Checkers, and Samplers, Recordkeeping
+74330:Sales Engineers
+74290:Engineering Technicians, Except Drafters, All Other
+74120:Couriers and Messengers
+73840:Chemical Equipment Operators and Tenders
+72950:Computer Hardware Engineers
+72930:Credit Analysts
+72900:Crossing Guards
+72880:First-Line Supervisors of Protective Service Workers, All Other
+72830:Pest Control Workers
+72210:Tool and Die Makers
+72150:Civil Engineering Technicians
+72120:Procurement Clerks
+71960:Extruding and Drawing Machine Setters, Operators, and Tenders, Metal and Plastic
+71890:Helpers--Electricians
+71750:Purchasing Managers
+71270:English Language and Literature Teachers, Postsecondary
+71260:Extruding, Forming, Pressing, and Compacting Machine Setters, Operators, and Tenders
+70030:Tax Preparers
+69670:Audio and Video Equipment Technicians
+69440:Structural Iron and Steel Workers
+68910:Fundraisers
+68680:Travel Agents
+68540:Life, Physical, and Social Science Technicians, All Other
+68510:Aerospace Engineers
+67700:Security and Fire Alarm Systems Installers
+67650:Veterinarians
+67410:Psychiatric Aides
+67390:Electrical and Electronics Repairers, Commercial and Industrial Equipment
+67230:Word Processors and Typists
+65790:Diagnostic Medical Sonographers
+65510:Chemical Technicians
+64370:Brickmasons and Blockmasons
+63970:Public Relations and Fundraising Managers
+63630:Mechanical Drafters
+63220:Industrial Engineering Technicians
+61720:Psychiatric Technicians
+61430:Dietitians and Nutritionists
+61330:Cutting and Slicing Machine Setters, Operators, and Tenders
+60770:Appraisers and Assessors of Real Estate
+59820:Brokerage Clerks
+59540:Social Workers, All Other
+59060:Food Preparation and Serving Related Workers, All Other
+58850:Education Teachers, Postsecondary
+58810:Adult Basic and Secondary Education and Literacy Teachers and Instructors
+58450:Tax Examiners and Collectors, and Revenue Agents
+58160:Office Machine Operators, Except Computer
+57570:Health Educators
+57170:First-Line Supervisors of Fire Fighting and Prevention Workers
+56210:Nursing Instructors and Teachers, Postsecondary
+54860:Painters, Transportation Equipment
+54780:Natural Sciences Managers
+54700:Budget Analysts
+54560:Title Examiners, Abstractors, and Searchers
+54520:Personal Care and Service Workers, All Other
+54080:Helpers--Pipelayers, Plumbers, Pipefitters, and Steamfitters
+54070:Medical Transcriptionists
+53920:Surveying and Mapping Technicians
+53760:Cardiovascular Technologists and Technicians
+53680:Motor Vehicle Operators, All Other
+53670:Legislators
+53160:Interior Designers
+52940:Orderlies
+52730:Print Binding and Finishing Workers
+52500:Medical Equipment Preparers
+52280:Environmental Engineers
+52020:Mathematical Science Teachers, Postsecondary
+51900:Community Health Workers
+51880:Paving, Surfacing, and Tamping Equipment Operators
+51350:Interpreters and Translators
+51290:Roustabouts, Oil and Gas
+50820:Biological Science Teachers, Postsecondary
+50640:Sawing Machine Setters, Operators, and Tenders, Wood
+50030:Physical Therapist Aides
+49780:Technical Writers
+49750:Financial Examiners
+49320:Clergy
+48660:Photographers
+48620:Actors
+48530:Education Administrators, Preschool and Childcare Center/Program
+48320:Excavating and Loading Machine and Dragline Operators
+47160:Separating, Filtering, Clarifying, Precipitating, and Still Machine Setters, Operators, and Tenders
+47140:Glaziers
+46920:Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders
+46810:Computer Operators
+45740:Control and Valve Installers and Repairers, Except Mechanical Door
+45540:Electromechanical Equipment Assemblers
+45510:Mechanical Engineering Technicians
+45290:Internists, General
+45150:Pressers, Textile, Garment, and Related Materials
+45020:Crane and Tower Operators
+44960:Legal Support Workers, All Other
+44750:Baggage Porters and Bellhops
+44690:Writers and Authors
+44280:Hazardous Materials Removal Workers
+43990:Floral Designers
+43990:Ophthalmic Medical Technicians
+43980:Skincare Specialists
+43370:Medical Equipment Repairers
+43340:Surveyors
+43230:First-Line Supervisors of Correctional Officers
+43070:Food Processing Workers, All Other
+42890:Service Unit Operators, Oil, Gas, and Mining
+42880:Railroad Conductors and Yardmasters
+42750:Transportation Security Screeners
+42010:Aircraft Structure, Surfaces, Rigging, and Systems Assemblers
+41630:New Accounts Clerks
+41630:Petroleum Pump System Operators, Refinery Operators, and Gaugers
+41190:Surgeons
+40850:Real Estate Brokers
+40680:Tree Trimmers and Pruners
+40190:Special Education Teachers, All Other
+40110:Musicians and Singers
+40090:Reporters and Correspondents
+39900:Locomotive Engineers
+39860:Nurse Anesthetists
+39670:Millwrights
+39620:Pipelayers
+39450:Molders, Shapers, and Casters, Except Metal and Plastic
+38980:Commercial Pilots
+38780:Graders and Sorters, Agricultural Products
+38660:Tour Guides and Escorts
+38170:Occupational Therapy Assistants
+38150:Engine and Other Machine Assemblers
+38000:Engineering Teachers, Postsecondary
+37680:Credit Authorizers, Checkers, and Clerks
+37660:Transportation Workers, All Other
+37640:Psychology Teachers, Postsecondary
+37110:Dental Laboratory Technicians
+36960:Marriage and Family Therapists
+36830:Tile and Marble Setters
+36720:Captains, Mates, and Pilots of Water Vessels
+36660:Pharmacy Aides
+36520:Food Cooking Machine Operators and Tenders
+36430:Optometrists
+36380:Social Scientists and Related Workers, All Other
+36280:Health Diagnosing and Treating Practitioners, All Other
+36210:Art Directors
+36000:Healthcare Practitioners and Technical Workers, All Other
+35890:Helpers--Carpenters
+35850:Magnetic Resonance Imaging Technologists
+35770:Funeral Attendants
+35670:Farmworkers, Farm, Ranch, and Aquacultural Animals
+35570:Plating and Coating Machine Setters, Operators, and Tenders, Metal and Plastic
+35410:Lodging Managers
+35340:Construction and Related Workers, All Other
+35110:Farm Equipment Mechanics and Service Technicians
+35110:Biological Scientists, All Other
+35010:Power Plant Operators
+34810:Urban and Regional Planners
+34540:Financial Clerks, All Other
+34140:Education Administrators, All Other
+34110:Credit Counselors
+34070:Meter Readers, Utilities
+33850:Lathe and Turning Machine Tool Setters, Operators, and Tenders, Metal and Plastic
+33720:Stationary Engineers and Boiler Operators
+33600:Coin, Vending, and Amusement Machine Servicers and Repairers
+33480:Home Appliance Repairers
+33440:Statisticians
+33340:Prepress Technicians and Workers
+33300:Chemical Plant and System Operators
+33020:Outdoor Power Equipment and Other Small Engine Mechanics
+32960:Chiropractors
+32950:Environmental Science and Protection Technicians, Including Health
+32880:Training and Development Managers
+32780:Petroleum Engineers
+32540:Computer Science Teachers, Postsecondary
+32530:Sailors and Marine Oilers
+32520:Upholsterers
+32240:Dietetic Technicians
+32020:Concierges
+31990:Chemical Engineers
+31860:Commercial and Industrial Designers
+30420:Geoscientists, Except Hydrologists and Geographers
+30340:Textile Winding, Twisting, and Drawing Out Machine Setters, Operators, and Tenders
+30330:Broadcast Technicians
+30190:Anesthesiologists
+30090:Forest and Conservation Technicians
+30030:Social Science Research Assistants
+29880:Film and Video Editors
+29830:Crushing, Grinding, and Polishing Machine Setters, Operators, and Tenders
+29810:Multimedia Artists and Animators
+29500:Insulation Workers, Floor, Ceiling, and Wall
+29210:Radio and Television Announcers
+29200:Biochemists and Biophysicists
+29060:Rolling Machine Setters, Operators, and Tenders, Metal and Plastic
+28860:Advertising and Promotions Managers
+28720:Foreign Language and Literature Teachers, Postsecondary
+28700:Agricultural Equipment Operators
+28590:Conveyor Operators and Tenders
+28570:Ophthalmic Laboratory Technicians
+28490:Private Detectives and Investigators
+28380:Counselors, All Other
+28180:Communications Teachers, Postsecondary
+28140:Special Education Teachers, Preschool
+27430:Transportation Inspectors
+27270:Insulation Workers, Mechanical
+27250:Logging Equipment Operators
+27210:Judges, Magistrate Judges, and Magistrates
+26960:Pediatricians, General
+26800:Materials Engineers
+26750:Electrical and Electronics Drafters
+26670:Grinding and Polishing Workers, Hand
+26580:Computer and Information Research Scientists
+26480:Jewelers and Precious Stone and Metal Workers
+26430:Photographic Process Workers and Processing Machine Operators
+26320:Septic Tank Servicers and Sewer Pipe Cleaners
+25850:Morticians, Undertakers, and Funeral Directors
+25660:Carpet Installers
+25550:Electronic Home Entertainment Equipment Installers and Repairers
+25410:Health and Safety Engineers, Except Mining Safety Engineers and Inspectors
+25230:Pesticide Handlers, Sprayers, and Applicators, Vegetation
+25180:Computer Numerically Controlled Machine Tool Programmers, Metal and Plastic
+24820:Psychiatrists
+24430:Semiconductor Processors
+24130:Athletic Trainers
+23950:Helpers--Brickmasons, Blockmasons, Stonemasons, and Tile and Marble Setters
+23880:Material Moving Workers, All Other
+23310:Media and Communication Workers, All Other
+23240:Air Traffic Controllers
+23180:Philosophy and Religion Teachers, Postsecondary
+23120:Gaming Change Persons and Booth Cashiers
+23060:Electrical and Electronics Repairers, Powerhouse, Substation, and Relay
+22930:Metal Workers and Plastic Workers, All Other
+22810:Plasterers and Stucco Masons
+22280:Tire Builders
+22240:Elevator Installers and Repairers
+22130:Gaming Supervisors
+22090:Rail Car Repairers
+21820:Helpers, Construction Trades, All Other
+21800:History Teachers, Postsecondary
+21710:Camera Operators, Television, Video, and Motion Picture
+21670:Microbiologists
+21660:Tailors, Dressmakers, and Custom Sewers
+21550:Textile Knitting and Weaving Machine Setters, Operators, and Tenders
+21500:Fence Erectors
+21250:Chemistry Teachers, Postsecondary
+21020:Riggers
+20590:Biomedical Engineers
+20590:Directors, Religious Activities and Education
+20470:Conservation Scientists
+20420:Agricultural and Food Science Technicians
+20260:Motorboat Mechanics and Service Technicians
+20080:Food and Tobacco Roasting, Baking, and Drying Machine Operators and Tenders
+20020:Reinforcing Iron and Rebar Workers
+19940:Actuaries
+19860:Railroad Brake, Signal, and Switch Operators
+19840:Mechanical Door Repairers
+19800:Obstetricians and Gynecologists
+19780:Heat Treating Equipment Setters, Operators, and Tenders, Metal and Plastic
+19650:Nuclear Medicine Technologists
+19550:First-Line Supervisors of Farming, Fishing, and Forestry Workers
+19520:Furnace, Kiln, Oven, Drier, and Kettle Operators and Tenders
+19420:Landscape Architects
+19400:Fiberglass Laminators and Fabricators
+19380:Economists
+19340:Extruding and Forming Machine Setters, Operators, and Tenders, Synthetic and Glass Fibers
+19230:Fashion Designers
+19160:Forging Machine Setters, Operators, and Tenders, Metal and Plastic
+18960:Physical Scientists, All Other
+18810:Gaming Cage Workers
+18660:Umpires, Referees, and Other Sports Officials
+18640:Locksmiths and Safe Repairers
+18620:Media and Communication Equipment Workers, All Other
+18610:Automotive Glass Installers and Repairers
+18500:Earth Drillers, Except Oil and Gas
+18480:Tapers
+18410:Transportation Attendants, Except Flight Attendants
+18380:Music Directors and Composers
+18100:Recreational Therapists
+18040:Locker Room, Coatroom, and Dressing Room Attendants
+17880:Bailiffs
+17860:Cleaning, Washing, and Metal Pickling Equipment Operators and Tenders
+17730:Metal-Refining Furnace Operators and Tenders
+17720:Zoologists and Wildlife Biologists
+17700:Court Reporters
+17680:Nuclear Engineers
+17660:Helpers--Extraction Workers
+17560:Milling and Planing Machine Setters, Operators, and Tenders, Metal and Plastic
+17450:Radiation Therapists
+17400:Rotary Drill Operators, Oil and Gas
+17390:Recreation and Fitness Studies Teachers, Postsecondary
+17370:Furniture Finishers
+17350:Gas Plant Operators
+17330:Avionics Technicians
+17300:Ambulance Drivers and Attendants, Except Emergency Medical Technicians
+17050:Electric Motor, Power Tool, and Related Repairers
+16940:Adhesive Bonding Machine Operators and Tenders
+16720:Political Science Teachers, Postsecondary
+16680:Physicists
+16660:Boilermakers
+16560:Occupational Health and Safety Technicians
+16550:Environmental Engineering Technicians
+16010:Law Teachers, Postsecondary
+16000:Motorcycle Mechanics
+15900:Barbers
+15650:Textile, Apparel, and Furnishings Workers, All Other
+15530:Drafters, All Other
+15490:Cooks, All Other
+15450:Painting, Coating, and Decorating Workers
+15240:Shampooers
+15230:Compensation and Benefits Managers
+15210:Sound Engineering Technicians
+15170:Grounds Maintenance Workers, All Other
+15130:Insurance Appraisers, Auto Damage
+15100:Geological and Petroleum Technicians
+15040:Textile Cutting Machine Setters, Operators, and Tenders
+15020:Building Cleaning Workers, All Other
+14800:Forensic Science Technicians
+14720:Postmasters and Mail Superintendents
+14710:Agricultural Inspectors
+14690:Soil and Plant Scientists
+14620:Criminal Justice and Law Enforcement Teachers, Postsecondary
+14580:Sociology Teachers, Postsecondary
+14570:Medical Appliance Technicians
+14550:Entertainment Attendants and Related Workers, All Other
+14540:Administrative Law Judges, Adjudicators, and Hearing Officers
+14250:Rail-Track Laying and Maintenance Equipment Operators
+14250:Cutters and Trimmers, Hand
+14200:Food Scientists and Technologists
+14160:Physics Teachers, Postsecondary
+14120:Radio, Cellular, and Tower Equipment Installers and Repairers
+14090:Coil Winders, Tapers, and Finishers
+13960:Electrical and Electronics Installers and Repairers, Transportation Equipment
+13710:Electro-Mechanical Technicians
+13590:Animal Trainers
+13520:Recreational Vehicle Service Technicians
+13470:Agents and Business Managers of Artists, Performers, and Athletes
+13410:Judicial Law Clerks
+13320:Social Sciences Teachers, Postsecondary, All Other
+13310:Psychologists, All Other
+13190:Stonemasons
+13150:Entertainers and Performers, Sports and Related Workers, All Other
+13090:Desktop Publishers
+13060:Economics Teachers, Postsecondary
+12970:Animal Control Workers
+12810:Foundry Mold and Coremakers
+12730:Career/Technical Education Teachers, Middle School
+12560:Bicycle Repairers
+12350:Subway and Streetcar Operators
+12310:Audiologists
+12290:Drilling and Boring Machine Tool Setters, Operators, and Tenders, Metal and Plastic
+12140:Gaming Service Workers, All Other
+12100:Cartographers and Photogrammetrists
+12060:Set and Exhibit Designers
+12030:Pump Operators, Except Wellhead Pumpers
+12030:Continuous Mining Machine Operators
+11970:Aerospace Engineering and Operations Technicians
+11970:Plant and System Operators, All Other
+11930:Survey Researchers
+11910:Fire Inspectors and Investigators
+11860:Social Work Teachers, Postsecondary
+11750:Electronic Equipment Installers and Repairers, Motor Vehicles
+11640:Precision Instrument and Equipment Repairers, All Other
+11610:Wellhead Pumpers
+11580:Derrick Operators, Oil and Gas
+11520:Fine Artists, Including Painters, Sculptors, and Illustrators
+11490:Buyers and Purchasing Agents, Farm Products
+11460:Gaming and Sports Book Writers and Runners
+11430:Proofreaders and Copy Markers
+11380:Power Distributors and Dispatchers
+11320:Therapists, All Other
+11170:Curators
+10970:Museum Technicians and Conservators
+10920:Tank Car, Truck, and Ship Loaders
+10900:Statistical Assistants
+10860:Textile Bleaching and Dyeing Machine Operators and Tenders
+10850:Atmospheric, Earth, Marine, and Space Sciences Teachers, Postsecondary
+10780:Helpers--Painters, Paperhangers, Plasterers, and Stucco Masons
+10600:Respiratory Therapy Technicians
+10460:Gaming Surveillance Officers and Gaming Investigators
+10340:Agricultural Sciences Teachers, Postsecondary
+10340:Floor Layers, Except Carpet, Wood, and Hard Tiles
+10300:Audio-Visual and Multimedia Collections Specialists
+10260:Athletes and Sports Competitors
+10190:Helpers--Roofers
+10060:Dancers
+9800:Atmospheric and Space Scientists
+9800:Podiatrists
+9750:Ship Engineers
+9570:Emergency Management Directors
+9550:Tool Grinders, Filers, and Sharpeners
+9520:Etchers and Engravers
+9070:Layout Workers, Metal and Plastic
+9060:Area, Ethnic, and Cultural Studies Teachers, Postsecondary
+8920:Parking Enforcement Workers
+8870:Solar Photovoltaic Installers
+8860:Telephone Operators
+8760:Airfield Operations Specialists
+8680:Signal and Track Switch Repairers
+8620:Farm and Home Management Advisors
+8560:Pourers and Casters, Metal
+8420:Foresters
+8370:Funeral Service Managers
+8250:Religious Workers, All Other
+8170:Cooling and Freezing Equipment Operators and Tenders
+8120:Marine Engineers and Naval Architects
+8040:Door-to-Door Sales Workers, News and Street Vendors, and Related Workers
+8020:Public Address System and Other Announcers
+7980:Musical Instrument Repairers and Tuners
+7890:Life Scientists, All Other
+7780:Shoe and Leather Workers and Repairers
+7750:Materials Scientists
+7640:Slot Supervisors
+7500:Orthotists and Prosthetists
+7460:Aircraft Cargo Handling Supervisors
+7370:Architecture Teachers, Postsecondary
+7230:Designers, All Other
+7210:Occupational Therapy Aides
+7170:Nuclear Power Reactor Operators
+7170:Forest and Conservation Workers
+7010:Artists and Related Workers, All Other
+6940:Mining and Geological Engineers, Including Mining Safety Engineers
+6880:Exercise Physiologists
+6840:Nuclear Technicians
+6780:Correspondence Clerks
+6750:Woodworkers, All Other
+6740:Hearing Aid Specialists
+6640:Costume Attendants
+6610:Fish and Game Wardens
+6540:Sewers, Hand
+6470:Anthropologists and Archeologists
+6410:Traffic Technicians
+6350:Political Scientists
+6310:Explosives Workers, Ordnance Handling Experts, and Blasters
+6300:Hydrologists
+6300:Arbitrators, Mediators, and Conciliators
+6270:Nurse Midwives
+6250:Model Makers, Metal and Plastic
+5930:Mine Cutting and Channeling Machine Operators
+5760:Archivists
+5700:Anthropology and Archeology Teachers, Postsecondary
+5690:Epidemiologists
+5520:Environmental Science Teachers, Postsecondary
+5480:Motion Picture Projectionists
+5380:Dentists, All Other Specialists
+5380:Oral and Maxillofacial Surgeons
+5370:Fallers
+5310:Fabric and Apparel Patternmakers
+5200:Orthodontists
+5160:Choreographers
+5070:Craft Artists
+5070:Broadcast News Analysts
+5040:Agricultural Workers, All Other
+4870:Library Science Teachers, Postsecondary
+4810:Transit and Railroad Police
+4590:Floor Sanders and Finishers
+4580:Wind Turbine Service Technicians
+4560:Farmers, Ranchers, and Other Agricultural Managers
+4530:Rail Yard Engineers, Dinkey Operators, and Hostlers
+4470:Rail Transportation Workers, All Other
+4390:Models
+4320:Extraction Workers, All Other
+4280:Gaming Managers
+4140:Geography Teachers, Postsecondary
+3930:Roof Bolters, Mining
+3890:Gas Compressor and Gas Pumping Station Operators
+3770:Rock Splitters, Quarry
+3760:Camera and Photographic Equipment Repairers
+3710:Embalmers
+3600:Makeup Artists, Theatrical and Performance
+3570:Pile-Driver Operators
+3510:Bridge and Lock Tenders
+3500:Shoe Machine Operators and Tenders
+3420:Patternmakers, Metal and Plastic
+3420:Terrazzo Workers and Finishers
+3370:Commercial Divers
+3290:Motorboat Operators
+3200:Manufactured Building and Mobile Home Installers
+3190:Paperhangers
+3030:Travel Guides
+3020:Log Graders and Scalers
+3010:Logging Workers, All Other
+2970:Home Economics Teachers, Postsecondary
+2960:Hoist and Winch Operators
+2950:Historians
+2870:Sociologists
+2730:Mathematicians
+2720:Genetic Counselors
+2550:Loading Machine Operators, Underground Mining
+2470:Animal Scientists
+2160:Mining Machine Operators, All Other
+2150:Communications Equipment Operators, All Other
+2000:Mathematical Science Occupations, All Other
+1980:Agricultural Engineers
+1830:Astronomers
+1760:Dredge Operators
+1750:Forestry and Conservation Science Teachers, Postsecondary
+1720:Segmental Pavers
+1650:Forest Fire Inspectors and Prevention Specialists
+1620:Watch Repairers
+1590:Mine Shuttle Car Operators
+1540:Refractory Materials Repairers, Except Brickmasons
+1370:Geographers
+1270:Animal Breeders
+1210:Locomotive Firers
+1040:Model Makers, Wood
+1020:Industrial-Organizational Psychologists
+970:Patternmakers, Wood
+870:Radio Operators
+810:Farm Labor Contractors
+790:Timing Device Assemblers and Adjusters
+750:Prosthodontists
+550:Fabric Menders, Except Garment
+520:Fishers and Related Fishing Workers
+510:Mathematical Technicians
+370:Cooks, Private Household

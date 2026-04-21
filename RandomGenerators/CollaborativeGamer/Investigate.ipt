@@ -1,0 +1,14 @@
+Table: Investigate
+Investigate [@Subject]
+
+Table: Subject
+roll: 3d6
+3-6:How well does this work
+7-8:What's causing this strangeness
+9-10:What's behind these attacks?
+11-12: The truth behind this [|Ancient|Magical] lore
+13: Who is really pulling the strings
+14: Who commited this crime, and why
+15: Political secrets
+16: Trade secrets
+17-18: some dirt on someone

@@ -1,0 +1,93 @@
+; GeneralAppearance.ipt
+; created 4/13/2016 5:28:11 PM
+
+Table: GeneralAppearance
+[@Face] Face
+[@Hair] Hair
+[@Voice] Voice
+[@Speech]
+[@Dress] Clothes
+Distinctive [@Object]
+
+Table: Face
+Puffy
+Guant
+Pale
+Plump
+Lopsided
+Cruel
+Aquiline
+Heart-shaped
+Open
+Stern
+Welcoming
+Freindly
+
+Table: Hair
+Golden Blonde
+Tawny Blonde
+Auburn Red
+Ginger
+Sandy Brown
+Chestnut Brown
+Glack
+Mixed with Grey
+Grey
+White
+Oddly Dyed
+
+Table: Voice
+Reedy
+Tinny
+Broken
+Rasping
+Guttural
+Wheedling
+Quiet
+Loud
+Forceful
+Beautiful
+Mellifluous
+Authoritative
+
+Table: Speech
+Catchphrase
+Expostulations
+Stutter
+Hesitant Speech
+Babbling
+Softly Spoken
+Rythimical Speech
+Considered Speech
+Few Words
+Insinuating
+Empathatic
+Authoritative
+
+Table: Dress
+Worn
+Unkempt
+Unfashionable
+Impractical
+Inappropriate
+Cheap
+New
+Well kept
+Fashionable
+Practical
+Tasteful
+Costly
+
+Table: Object
+Tool
+Jewelry
+Weapon
+Food or Drink
+Clothing
+Pet
+Book or Scroll
+Bottle
+Letter, deed, or Contract
+Grooming implement
+Work of Craft
+Musical Instument

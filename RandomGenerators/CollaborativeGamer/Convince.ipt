@@ -1,0 +1,45 @@
+Table:Convince
+Convince ([@ConvinceDifficulty]), key is [@ConvinceKey]
+
+Table: ConvinceDifficulty
+roll: 3d6
+3-5: 10+Peril
+6-8: 12+peril
+9-12: 14+peril
+13-15: 16+peril
+16-18: 18+peril
+
+Table: ConvinceKey
+Music
+Poetry
+Dance
+art
+Theater
+Storytelling
+Displays of Wealth
+Superior Status
+Haute cuisine
+Social connections
+High Fashion
+Expensive Wine
+Magical Power
+Divine Power
+Martial Prowess
+Agility
+Erudition
+Jewelry
+Horses
+Arms
+Trade goods
+food
+books
+Blackmail
+Bribery
+Indimidation
+Fast Talk
+Diplomacy
+Acting
+Physical Beauty
+Exotic People
+Innocence
+Sophistication

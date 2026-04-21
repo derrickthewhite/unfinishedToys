@@ -1,0 +1,138 @@
+; ModernCountryByWealth.ipt
+; created 8/23/2018 7:37:54 AM
+
+Table: countryByWealth
+2540:United States
+986:Japan
+877:China
+471:United Kingdom
+465:Germany
+434:Italy
+414:India
+349:France
+236:Spain
+213:Brazil
+170:Canada
+151:Russia
+146:Mexico
+138:Taiwan
+132:South Korea
+120:Netherlands
+108:Australia
+104:Indonesia
+95:Turkey
+84:Argentina
+78:Hong Kong
+69:Iran
+65:Egypt
+61: Switzerland
+59:Philippines
+59:Poland
+55:Belgium
+53:Pakistan
+53:Thailand
+51:Bangladesh
+48:Greece
+46:South Africa
+43:Sweden
+37:Austria
+36:Colombia
+34:Portugal
+29:Saudi Arabia
+29:Ukraine
+28:Singapore
+28:Vietnam
+26:Chile
+25:Israel
+23:Morocco
+22:Denmark
+22:Ireland
+22:Norway
+22:Venezuela
+21:Czech Republic
+20:Hungary
+20:Romania
+19:Peru
+19:Puerto Rico
+18:Malaysia
+17:Finland
+14:Algeria
+13:Kazakhstan
+13:New Zealand
+13:Sri Lanka
+12:Tunisia
+9:Belarus
+9:Guatemala
+9:Syria
+8:Bulgaria
+8:Slovakia
+7:Dominican Republic
+7:El Salvador
+7:Kenya
+7:Nigeria
+6:Croatia
+6:Ethiopia
+5:Cameroon
+5:Ivory Coast
+5:Ecuador
+5:Ghana
+5:Lithuania
+5:Luxembourg
+5:Mauritius
+5:Slovenia
+5:Zimbabwe
+4:Cambodia
+4:Democratic Republic of the Congo
+4:Costa Rica
+4:Georgia
+4:Guinea
+4:Lebanon
+4:Paraguay
+4:Trinidad and Tobago
+4:Uganda
+4:Uruguay
+3:Azerbaijan
+3:Bolivia
+3:Haiti
+3:Jordan
+3:Latvia
+3:Mozambique
+3:Panama
+3:Senegal
+3:Tanzania
+2:Albania
+2:Armenia
+2:Barbados
+2:Benin
+2:Botswana
+2:Burkina Faso
+2:Estonia
+2:Honduras
+2:Jamaica
+2:Kyrgyzstan
+2:Macau
+2:Macedonia
+2:Madagascar
+2:Malawi
+2:Malta
+2:Moldova
+2:Nicaragua
+2:Rwanda
+2:Yemen
+1:Burundi
+1:Central African Republic
+1:Chad
+1:Republic of the Congo
+1:Fiji
+1:Gabon
+1:Iceland
+1:Mali
+1:Mauritania
+1:Namibia
+1:Niger
+1:Papua New Guinea
+1:Sierra Leone
+1:Swaziland
+1:Tajikistan
+1:Togo
+1:Zambia

@@ -1,0 +1,107 @@
+; Cultures.ipt
+; created 12/18/2015 2:34:04 PM
+
+;divergence is out of 100
+Table: CultureFromTech
+Type: Lookup
+Set: divergence = [when]{$1}[do]{$1}[else]10[end]
+1: [when]{1d100}>{divergence}[do][@LowTech][else][@LowTechVariance][end] 
+2: [when]{1d100}>{divergence}[do][@LowTech][else][@LowTechVariance][end] 
+3: [when]{1d100}>{divergence}[do][@IronTech][else][@IronTechVariance][end] 
+4: [when]{1d100}>{divergence}[do][@MedivalTech][else][@MedivalVariance][end] 
+5: [when]{1d100}>{divergence}[do][@MedivalTech][else][@MedivalVariance][end] 
+6: [when]{1d100}>{divergence}[do][@IndustrialTech][else][@IndustrialVariance][end] 
+7: [when]{1d100}>{divergence}[do][@IndustrialTech][else][@IndustrialVariance][end] 
+8: [when]{1d100}>{divergence}[do][@IndustrialTech][else][@IndustrialVariance][end] 
+9: [when]{1d100}>{divergence}[do][@IndustrialTech][else][@IndustrialVariance][end] 
+10: [when]{1d100}>{divergence}[do][@IndustrialTech][else][@IndustrialVariance][end] 
+11: [when]{1d100}>{divergence}[do][@IndustrialTech][else][@IndustrialVariance][end] 
+
+Table: LowTech
+3:Andean
+5:MesoAmerican
+10:Chinese
+15:Egyptian
+10:Indus
+7:Minoean
+5:Hittite
+3:West Africa
+3:MainLand Europe
+3:West Mediteranian
+3:Indonesia
+2:Mississippian
+2:Polynesian
+1:South Africa
+1:Neanderthals
+
+Table: LowTechVariance
+20:[@IronTech]
+10:[@MedivalTech]
+5:[@IndustrialTech]
+
+Table: IronTech
+5:Andean
+5:MesoAmerican
+15:Chinese
+10:Celtic
+7:Bactrian
+15:Indic
+10:Iranic
+10:Hellanic
+15:Roman
+10:Stepe
+8:Mesopotamian
+3:West African
+3:Indonesia
+2:Mississippian
+2:Polynesian
+1:South African
+
+Table: IronTechVariance
+30:[@LowTech]
+15:[@MedivalTech]
+5:[@IndustrialTech]
+
+Table: MedivalTech
+5:Andean
+5:MesoAmerican
+2:Mississippian
+25:Chinese
+15:Western
+15:Islamic
+15:Indic
+10:Orthodox
+10:Stepe
+5:Roman
+5:West African
+5:Indonesia
+3:Polynesian
+1:South African
+
+Table: MedivalVariance
+10:[@LowTech]
+40:[@IronTech]
+15:[@IndustrialTech]
+
+Table: IndustrialTech
+20:Chinese
+40:Western
+10:Mexican
+10:Brazilian
+5:South American
+15:Islamic
+15:Indic
+10:Orthodox
+10:Japanese
+5:Stepe
+5:West African
+5:Indonesia
+1:Polynesian
+3:South African
+
+Table: IndustrialVariance
+5:[@LowTech]
+10:[@IronTech]
+30:[@MedivalTech]
+
+

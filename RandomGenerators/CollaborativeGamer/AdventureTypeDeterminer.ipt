@@ -1,0 +1,25 @@
+; AdventureTypeDeterminer.ipt
+; created 4/14/2016 8:22:20 AM
+Use: ../Generators/CollaborativeGamer/Adventures/Compete.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/Sabotage.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/Convince.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/Slay.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/Fetch.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/Protect.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/Investigate.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/Chase.ipt
+
+Table: AdventureType
+Roll: 3d6
+3-5: [@Compete]
+6-7: [@Sabatage]
+8: [@Convince]
+9: Chase to [@Chase]
+10: [@Slay]
+11: [@Fetch]
+12: [@Protect]
+13-14: [@Investigate]
+15-18: [|Produce A Map | Find a route through]
+
+
+

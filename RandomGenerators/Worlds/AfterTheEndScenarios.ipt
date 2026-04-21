@@ -1,0 +1,76 @@
+; AfterTheEndScenarios.ipt
+; created 10/6/2017 4:05:54 PM
+
+Table: AfterTheEndScenario
+[@Bombs]
+[@Cosmic]
+[@Dinosaur]
+[@Virus]
+[@Mother] [| + [@Virus]|]
+[@Steel]
+[@Fall] [| + [@Bombs]| + [@Steel]||]
+[@Zombie]
+[@XFactor]
+
+Table: Bombs
+Bombs Away  [| + [@BombsSec]|] [| and [@Fall]|]
+
+Table: Cosmic
+Cosmic Rays + [@CosmicSec] and [@Fall]
+
+Table: Dinosaur
+Dinosaur Killer [| + [@DinosaurSec]|] [| and [@Fall]|]
+
+Table: Virus
+Mega Virus [| + [@VirusSec]|] [| and [@Fall]| and [@Fall]|]
+
+Table: Steel
+Reign of Steel [| + [@SteelSec]|] [| and [@Fall]|]
+
+Table: XFactor
+X-Factor [| + [@XSec]|] [| and [@Fall]|]
+
+Table: Fall
+Things Fall Apart
+
+Table: Mother
+Mother Nature and [@Fall]
+
+Table: Zombie
+Shufflers and Walkers [| + [@ZombieSec]| + [@ZombieSec]|] [| and [@Fall]| and [@Fall]|]
+
+Table: BombsSec
+[@Virus]
+[@Mother]
+[@Zombie]
+
+Table: CosmicSec
+[@Mother]
+[@Steel]
+[@XFactor]
+[@Zombie]
+
+Table: DinosaurSec
+[@Cosmic]
+[@Virus]
+[@XFactor]
+
+Table: VirusSec
+[@Bombs]
+[@Steel]
+[@Zombie]
+
+Table: SteelSec
+[@Dinosaur]
+[@Virus]
+[@Bombs]
+
+Table: ZombieSec
+Place Holder
+#[@Virus]
+#[@Steel]
+
+Table: XSec
+[@Bombs]
+[@Dinosaur]
+[@Virus]

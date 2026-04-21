@@ -1,0 +1,7 @@
+Table: Slay
+roll:3d6
+3-7: Slay the beast! (Peril+1+N/2)
+8-10: Cut off the head! (leader of organization) (Peril+N/2)
+11-12: Collect the bounty! ($5xperilxperil per head)
+13-15: Eradicate the Vermin! (certain kind at location)
+16-18: Kill everything! (at location)

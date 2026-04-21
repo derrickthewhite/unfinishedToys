@@ -1,0 +1,12 @@
+; AdventurePayDeterminer.ipt
+; created 4/14/2016 8:12:06 AM
+
+Table: AdventurePayDeterminer
+Roll: 3d6
+3-4: Excellent Rates, Fame and Glory
+5-6: Standard Rates
+7-8: Standard Rates, Fame and Glory
+9-11: Standard Rates,
+12: Low Rates With Gratitude
+13: Low Rates
+14-18: Promising Oppertunity

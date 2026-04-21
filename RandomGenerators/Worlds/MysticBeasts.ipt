@@ -1,0 +1,32 @@
+; MysticBeasts.ipt
+; created 4/2/2021 9:21:55 AM
+
+Table: MysticBeast
+[@Beast] granting [@Ability]
+
+Table: Beast
+Burrowing Mammal
+Climbing Mammal
+Herbivore
+Carnivore
+Passerine Bird
+Shorebird
+Lizard
+Spider
+Beetle
+
+Table: Ability
+Flight/Walk on Air
+Walk on Water
+Extra Strength
+Superb Balance
+speed when running
+Telekinesis
+12: [|Fire | Cold | Electric | Poison] [|Breath | Control | Resistance]
+3: [|Earth | Water | Air] Control
+Speed
+Mind Control
+Illusion
+Far Sight
+Super Hearing
+Superior smell

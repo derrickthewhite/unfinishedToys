@@ -1,0 +1,277 @@
+; RandomSkill.ipt
+; created 4/21/2016 10:55:50 AM
+
+Table: Skill
+Accounting
+Acrobatics
+Acting
+Administration
+Airshipman
+Alchemy
+Animal Handling
+Anthropology
+Aquabatics
+Archaeology
+Architecture
+Area Knowledge
+Armoury
+Artillery
+Artist
+Astronomy
+Autohypnosis
+Axe/Mace
+Battlesuit
+Beam Weapons
+Bicycling
+Bioengineering
+Biology
+Blind Fighting
+Blowpipe
+Boating
+Body Control
+Body Language
+Body Sense
+Bolas
+Bow
+Boxing
+Brain Hacking
+Brainwashing
+Brawling
+Breaking Blow
+Breath Control
+Broadsword
+Camouflage
+Captivate
+Carousing
+Carpentry
+Cartography
+Chemistry
+Climbing
+Cloak
+Combat Art or Sport
+Computer Hacking
+Computer Operation
+Computer Programming
+Connoisseur
+Cooking
+Counterfeiting
+Crewman
+Criminology
+Crossbow
+Cryptography
+Current Affairs
+Dancing
+Detect Lies
+Diagnoses
+Diplomacy
+Disguise
+Diving Suit
+Dreaming
+Driving
+Dropping
+Economics
+Electrician
+Electronics Operation
+Electronics Repair
+Engineer
+Enthrallment
+Environment Suit
+Erotic Art
+Escape
+Esoteric Medicine
+Exorcism
+Expert Skill
+Explosives
+Falconry
+Farming
+Fast Draw
+Fast-Talk
+Filch
+Finance
+Fire Eating
+First Aid
+Fishing
+Flail
+Flight
+Flying Leap
+Force Sword
+Force Whip
+Forced Entry
+Forensics
+Forgery
+Fortune Telling
+Forward Observer
+Free Fall
+Freight Handling
+Gambling
+Games
+Gardening
+Garrote
+Geography
+Geology
+Gesture
+Group Performance
+Gunner
+Guns
+Hazardous Materials
+Heraldry
+Herb Lore
+Hidden Lore
+Hiking
+History
+Hobby Skill
+Holdout
+Housekeeping
+Hypnotism
+Immovable Stance
+Innate Attack
+Intelligence Analysis
+Interrogation
+Intimidation
+Invisible Art
+Jeweler
+Judo
+Jumping
+Karate
+Kiai
+Knife
+Knot-Tying
+Kusari
+Lance
+Lasso
+Law
+Leadership
+Leatherworking
+Lifting
+Light Walk
+Linguistics
+Lip Reading
+Liquid Projector
+Literature
+Lockpicking
+Machinist
+Main-Gauche
+Makeup
+Market Analysis
+Masonry
+Mathematics
+Mechanic
+Meditation
+Melee Weapon
+Mental Strength
+Merchant
+Metallurgy
+Meteorology
+Mimicry
+Mind Block
+Monowire Whip
+Mount
+Musical Composition
+Musical Influence
+Musical Instrument
+Naturalist
+Navigation
+NBC Suit
+Net
+Observation
+Occultism
+Packing
+Paleontology
+Panhandling
+Parachuting
+Parry Missile Weapons
+Performance
+Persuade
+Pharmacy
+Philosophy
+Photography
+Physician
+Physics
+Physiology
+Pickpocket
+Piloting
+Poetry
+Poisons
+Polearm
+Politics
+Power Blow
+Pressure Points
+Pressure Secrets
+Professional Skill
+Propaganda
+Prospecting
+Psychology
+Public Speaking
+Push
+Rapier
+Religious Ritual
+Research
+Riding
+Ritual Magic
+Running
+Saber
+Savoire-Faire
+Scrounging
+Scuba
+Seamanship
+Search
+Sewing
+Sex Appeal
+Shadowing
+Shield
+Shiphandling
+Shortsword
+Singing
+Skating
+Skiing
+Sleight of Hand
+Sling
+Smallsword
+Smith
+Smuggling
+Sociology
+Soldier
+Spacer
+Spear
+Spear Thrower
+Speed-Reading
+Sports
+Staff
+Stage Combat
+Stealth
+Strategy
+Streetwise
+Submarine
+Submariner
+Suggest
+Sumo Wresting
+Surgery
+Survival
+Sway Emotions
+Swimming
+Symbol Drawing
+Tactics
+Teaching
+Teamster
+Thaumatology
+Theology
+Throwing
+Throwing Art
+Thrown Weapon
+Tonfa
+Tracking
+Traps
+Two-Handed Axe/Mace
+Two-Handed Flail
+Two-Handed Sword
+Typing
+Urban Survival
+Vacc Suit
+Ventriloquism
+Veterinary
+Weather Sense
+Weird Science
+Whip
+Wrestling
+Writing
+Zen Archery

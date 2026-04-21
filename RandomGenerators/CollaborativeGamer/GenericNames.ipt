@@ -1,0 +1,76 @@
+; GenericNames.ipt
+; created 4/29/2016 12:12:46 PM
+Table: GenericLandName
+[@Prefix][|([@Center])|]([@Suffix])
+
+Table:Prefix
+cal
+Car
+Card
+Chess
+Chon
+Cor
+Da
+Dam
+Dor
+Esta
+Gon
+Hal
+Lan
+Lui
+Mul
+Ras
+
+Table: Center
+a
+e
+i
+o
+y
+be/bi/bo
+ce/ci/co
+de/di/do
+ed/id/od
+he/hi/ho
+je/ji/jo
+le/li/lo
+me/mi/mo
+se/si/so
+te/ti/to
+2: [@Center]+[@Center]
+
+Table: Suffix
+tia/atia
+r/ar/ara/iara/or/iora
+ath/iath/rath/riath
+eth/ieth/oth/ioth
+n/an/in/ania/inia/onia
+bia/biara/biaria/biatia
+brath/briath/briaria
+bara/baria/baratia
+cara/caria/caratia
+dara/idara/daria/idaria
+dim/idim/idimia
+dolan/dolian/idolian
+nta/ntia/enta/entia
+and/iand/andia/iandia
+nara/inara/naria/inaria
+nath.enath/enatia/inath
+myr/omry/myria/imyria
+olan/ilan/elan/ulan
+patia/phatia/iphatia
+phar/ophar/ephar
+rand/irand/iren
+rath/irath/erath
+rua/irua/erua
+tar/itar/tan/itan
+tia/itia/tria/itria
+rill/irill/erill/aril
+nolan/enolan
+lad/elad/olad/ilad
+orlad/erlad/irlad
+had/ihad/ehad
+nen/inen
+waith/waithe
+gar/igar/egar
+or/oria/dor/doria

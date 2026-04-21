@@ -1,0 +1,18 @@
+; Person.ipt
+; created 4/6/2016 9:35:52 AM
+Table: Tribe
+[@{1d5+1} Person >> implode]
+
+Table: Person
+ [@Age] [@Gender]
+
+Table: Gender
+male
+female
+
+Table: Age
+10:Child
+10:Adolescant
+10: Young Adult
+15: Adult
+10: Old

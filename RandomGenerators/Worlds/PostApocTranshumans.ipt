@@ -1,0 +1,13 @@
+; PostApocTranshumans.ipt
+; created 7/13/2018 9:12:51 AM
+
+Table: PostApocTranshumans
+[@2 Transhumans >> implode]
+
+Table: Transhumans
+Cloned
+Uplifted
+Uploaded
+Cybernetic
+Genegeneered
+Baseline

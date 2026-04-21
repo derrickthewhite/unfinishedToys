@@ -1,0 +1,18 @@
+; InfiniteWorldsActionPlots.ipt
+; created 7/13/2017 8:21:56 PM
+
+Table: InfiniteWorldsActionPlot
+[@Background] from [@Foe] [@Threat]
+
+Table: Background
+Criminals
+Government Agents
+
+Table: Foe
+3:HomeLine
+2:the current world
+4:Centrum  
+
+Table: Threat
+Made an agent disapear
+Have been detected 

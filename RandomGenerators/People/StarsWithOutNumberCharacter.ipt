@@ -1,0 +1,33 @@
+; StarsWithOutNumberCharacter.ipt
+; created 10/23/2018 3:00:03 PM
+
+Table: StarsWithOutNumberCharacter
+[@background] [@Class]
+
+Table: background
+barbarian
+clergy
+courtesan
+Criminal
+Dilettante
+Entertainer
+Merchant
+Noble
+Official
+Peasant
+Physician
+Pilot
+Politician
+Scholar
+Soldier
+Spacer
+Technician
+Thug
+Vagabond
+Worker
+
+Table: Class
+Expert
+Warrior
+Psychic
+Adventurer

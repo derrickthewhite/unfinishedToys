@@ -1,0 +1,22 @@
+; IW_Monster.ipt
+; created 4/14/2016 2:17:07 PM
+
+Table: IW_Foe
+[@Faction] [@Role]
+
+Table: Faction
+Centrum/Reich 5
+Local Politics
+Infinity Criminal
+Internal Conflict
+Local Criminal
+Cabal
+
+Table: Role
+Soldier or Thug
+Smooth Talker
+Tech
+Assasin
+Investigator 
+Theif
+Organizer

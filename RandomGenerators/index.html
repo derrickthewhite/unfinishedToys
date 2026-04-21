@@ -1,0 +1,470 @@
+<html>
+<head>
+	<title>Random Generators</title>
+	<script src= ""></script>
+	<script type="text/javascript" src= "../../tools/seededGenerator.js"></script>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.4.0/knockout-min.js"></script>
+	<script type="text/javascript" src="../../tools/knockout-3.4.0.js"></script>
+	<script type="text/javascript" src="Tables.js"></script>
+	<script>
+		//var seed = Math.random().toString(36).slice(2)
+		//var seed = "qyzsoux3hkh"
+		//Math.seedrandom(seed);
+		//console.log("using", seed);
+	
+		async function getFileContents(filePath) {
+			try {
+				const response = await fetch(filePath);
+				if (response.ok) {
+					const text = await response.text();
+					return text;
+				} else {
+					throw new Error(`Failed to fetch ${filePath}`);
+				}
+			} catch (error) {
+				console.error('Error:', error);
+				return null;
+			}
+		}
+
+		async function loadMultipleFiles(filePaths) {
+			const promises = filePaths.map(filePath => getFileContents(filePath));
+
+			try {
+				const contents = await Promise.all(promises);
+				return contents;
+			} catch (error) {
+				console.error('Error loading files:', error);
+				return null;
+			}
+		}
+		const tableIndex = {
+			creatures: ["MysticBeast", "Demon", "chimera", "DF_MonsterType", "MonstersHuntersMonster"],
+			people: ["Workforce", "AncientWorldLocation", "EuropeanCountryByPopulace", "modernProfessions", "RandomModernNationality", "disadvantages", "FamilyMember", "countryByWealth", "RandomEthnicity", "NegativeCharacterTrait", "NeutralCharacterTrait", "PositiveTrait", "ModernEthnicity", "RandomIslamicTheme", "Relationship", "Tribe", "State_By_Population_1910" ],
+			worlds: ["StrangePeople", "PsiWarsCultureValues", "AfterTheEndScenario", "BizarreLife", "EnergyBeing", "FantasyWorld", "AlternateWorldsPolitics", "MagicDescription", "PostApocTranshumans", "PsiWarsCulture", "GurpsSpells", "SpaceCampaign", "StrangePeople", "TechLevel", "UltraTechDescription", "RandomWorld"],
+			ColGamer: ["Adventure", "NPC", "WildernessMishaps", "GenericLandName", "MH_ClueType", "JourneyEvents", "Solo8", "Solo6"],
+			specificGames: ["IW_Steel_Ecounter",  "IW_Foe", "JourneyEvents", "NPC", "InfiniteWorldsActionPlot", "ISWAT_Stakes", "FortyElementalRealms", "RandomCentrumEthnicity", "Riask_Ceiling_Inhabitants", "StarsWoNumberPlanet", "SwoNLesserWorld", "StarsWithOutNumberCharacter", "TravellerMishaps", ],
+			misc: ["GurpsBooks", ]
+		}
+	
+	function main () {
+		const urlsNotImplemented = ["Cultures.ipt","HumanoidChanges.ipt","test.ipt",]
+		let worldURLs = ["AfterTheEndScenarios.ipt","AncientWorldLocation.ipt","AnimalInspiration.ipt","BizarreLife.ipt","CulturalValues.ipt","EnergyBeing.ipt","EuropeanCountry.ipt","FantasyWorld.ipt","GovernmentType.ipt","GurpsBooks.ipt","InfiniteWorldsActionPlots.ipt","ISWAT_Mission_World.ipt","Magic.ipt","ModernProfessions.ipt","PostApocTranshumans.ipt","PsiWarsCultures.ipt","RandomSpell.ipt","Realms.ipt","SpaceCampaign.ipt","StrangePeople.ipt","TechLevel.ipt","Terrain.ipt","UltraTech.ipt","World.ipt","MysticBeasts.ipt","RandomCentrumEthnicty.ipt","RandomEthnicity.ipt","MonsterForDF.ipt"];
+		worldURLs = worldURLs.map(url=> "Worlds/"+url);
+		
+		let ColGamList = ["Compete.ipt","Convince.ipt","Fetch.ipt","Investigate.ipt","Protect.ipt","sabotage.ipt","Slay.ipt","WhatsAtStake.ipt","Adventure.ipt","AdventureDistanceDeterminer.ipt","AdventurePayDeterminer.ipt","AdventurePerilAdjuster.ipt","AdventureRushDeterminer.ipt","AdventureTypeDeterminer.ipt","Chase.ipt","Goblinkin.ipt","IW_Centrum_Names.ipt","IW_Monster.ipt","IW_Steel_Encounter.ipt","IW_workforceDemographics.ipt","MH_ClueType.ipt","MH_MonsterList.ipt","JourneyEvents.ipt","WildernessMishaps.ipt","BodilyAppearance.ipt","CurrentSituation.ipt","GeneralAppearance.ipt","HopesOrFears.ipt","InterestingFacts.ipt","Mannerism.ipt","NPC.ipt","RandomSkill.ipt","RoleInSociety.ipt","GenericNames.ipt","Theme.ipt","District.ipt","MemorableFeatures.ipt","Settlement.ipt","Solo8.ipt","Solo6.ipt"];
+		ColGamList = ColGamList.map(url=> "CollaborativeGamer/"+url);
+		//const fileURLs = ["EnergyBeing.ipt"];
+		
+		let CreatureFiles = ["MonsterHuntersMonster.ipt","AnimalMashup.ipt","DF_Demon.ipt","DFServitor.ipt"];
+		CreatureFiles = CreatureFiles.map(url=> "Creatures/"+url);
+		
+		let peopleFiles = ["BAT disadvantage Groups.ipt","CentrumEthnicty.ipt","FamilyMember.ipt","Gender.ipt","ModernCountryByWealth.ipt","ModernCulture.ipt","NegativeCharacterTrait.ipt","NeutralCharacterTrait.ipt","PositiveCharacterTrait.ipt","randomEthnic(Modern).ipt","RandomIslamicCountry.ipt","Relationship.ipt","Riask_Ceiling_Inhabitants.ipt","StarsWithOutNumberCharacter.ipt","TravellerMishaps.ipt","Tribe.ipt","US_State.ipt"];
+		peopleFiles = peopleFiles.map(url=> "People/"+url);
+		
+		let StarWorldsGenerator = ["worldTags.ipt","Atmosphere.ipt" ,"Biosphere.ipt", "Planet.ipt", "population.ipt", "Relationship.ipt", "TechLevel.ipt", "Temperature.ipt"];
+		StarWorldsGenerator = StarWorldsGenerator.map(url=> "StarsWithoutNumber/"+url);
+		
+		loadMultipleFiles(ColGamList.concat(worldURLs).concat(CreatureFiles).concat(peopleFiles).concat(StarWorldsGenerator))
+			.then(contents => {
+				if (contents !== null) {
+					console.log('All files loaded:', contents);
+					const tableList = contents.map(file => getFirstTableName(file));
+					parseFiles(contents.join("\n\n\n\n"), tableList);
+				} else {
+					console.log('Failed to load all files.');
+				}
+			});
+	}
+	
+	function getFirstTableName(fileContent) {
+		const lines = fileContent.split('\n');
+		
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+			
+			// Check if the line starts with "Table:" to identify table definitions
+			if (line.startsWith('Table:')) {
+				// Extract the table name by removing "Table:" and trimming whitespace
+				console.log(lines[0], line);
+				return line.substring(6).trim();
+			}
+		}
+		return null; // Return null if no table is found
+	}
+	
+	function parseFiles(contents, tableList) {
+		function parseTables(inputString) {
+			const standardTables = {};
+			const rollTables = {};
+			const allTables = {};
+			inputString = removeSemicolonsAndContentAfter(inputString);
+			inputString = removeUseLines(inputString);
+			
+			//const tableRegex = /Table:\s+(\w+)\s+([\s\S]+?)(?=Table:|\n*$)/g;
+			const tableRegex = /table:\s*(\w+)\s+([\s\S]+?)(?=table:|\n*$)/gi;
+			const matches = inputString.matchAll(tableRegex);
+
+			for (const match of matches) {
+				const tableName = match[1];
+				const tableContent = match[2].trim();
+				const rows = tableContent.split('\n').filter(row => row.trim() !== '');
+
+				if (rows.length > 0 && rows[0].startsWith('roll:')) {
+					const rollInfo = rows[0].split(':');
+					const diceRoll = rollInfo[1].trim();
+
+					const tableEntries = rows.slice(1).reduce((acc, row) => {
+						const [range, value] = row.split(':').map(item => item.trim());
+						const rangeValues = range.split('-').map(item => parseInt(item));
+
+						if (rangeValues.length === 1) {
+							acc[rangeValues[0]] = value;
+						} else {
+							const [min, max] = rangeValues;
+							for (let i = min; i <= max; i++) {
+								acc[i] = value;
+							}
+						}
+						return acc;
+					}, {});
+
+					rollTables[tableName] = {
+						roll: diceRoll,
+						table: tableEntries
+					};
+					rollTables[tableName].generate = () => {
+						const rollTable = rollTables[tableName];
+						const roll = rollDice(rollTable.roll);
+						const selectedValue =  rollTable.table[roll];
+						return resolvePlaceholders(selectedValue, allTables);
+					};
+					allTables[tableName] = rollTables[tableName];
+				} else {
+					const tableEntries = rows.map(row => {
+						const [probability, value] = row.split(':').map(item => item.trim());
+						const weight = parseInt(probability);
+						return { value: isNaN(weight) ? row.trim() : value, weight: isNaN(weight) ? 1 : weight };
+					});
+
+					standardTables[tableName] = createRandomGenerator(tableEntries, allTables);
+					allTables[tableName] = standardTables[tableName];
+				}
+			}
+
+			return { allTables, standardTables, rollTables };
+		}
+		
+		function removeSemicolonsAndContentAfter(input) {
+			const lines = input.split('\n'); // Split the input into lines
+			const modifiedLines = lines.map(line => {
+				const index = line.indexOf(';'); // Find the index of the semicolon
+				if (index !== -1) {
+					return line.substring(0, index); // Remove content after the semicolon
+				}
+				return line; // Return the original line if no semicolon found
+			});
+			return modifiedLines.join('\n'); // Join the modified lines back into a string
+		}
+		
+		function removeUseLines(fileContent) {
+			const lines = fileContent.split('\n');
+			const filteredLines = lines.filter(line => !line.trim().startsWith('Use:'));
+			return filteredLines.join('\n');
+		}
+
+		function createRandomGenerator(entries, allTables) {
+			const weightedEntries = [];
+			const totalWeights = entries.reduce((acc, entry) => acc + entry.weight, 0);
+
+			entries.forEach(entry => {
+				//const weightRatio = entry.weight / totalWeights;
+				//const repeatCount = Math.floor(weightRatio * 100); // Multiply by 100 for more accuracy
+				
+				//for (let i = 0; i < repeatCount; i++) {
+				for (let i = 0; i < entry.weight; i++) {
+					weightedEntries.push(entry.value);
+				}
+			});
+
+			return {
+			table: weightedEntries,
+			generate: () =>  {
+				const randomIndex = Math.floor(Math.random() * weightedEntries.length);
+				const selectedValue = weightedEntries[randomIndex];
+				return resolvePlaceholders(selectedValue, allTables);
+			}};
+		}
+		
+		function hasNestedBrackets(input) {
+			let hasNested = false;
+			let stack = 0;
+
+			for (let i = 0; i < input.length; i++) {
+				if (input[i] === '[') {
+					stack++;
+					if (stack > 1) {
+						hasNested = true;
+						break;
+					}
+				} else if (input[i] === ']') {
+					stack--;
+					if (stack < 0) {
+						hasNested = true;
+						break;
+					}
+				}
+			}
+
+			return hasNested;
+		}
+		
+		function parseInnermost(content) {
+			let stack = [];
+			let innermost = '';
+			let maxDepth = 0;
+
+			for (let i = 0; i < content.length; i++) {
+				if (content[i] === '[') {
+					stack.push(i);
+				} else if (content[i] === ']' && stack.length > 0) {
+					const startIndex = stack.pop();
+					const depth = stack.length;
+					if (depth === maxDepth) {
+						innermost = content.substring(startIndex, i +1);
+					} else if (depth > maxDepth) {
+						maxDepth = depth;
+						innermost = content.substring(startIndex, i +1);
+					}
+				}
+			}
+			return innermost;
+		}
+
+		function resolvePlaceholders(value, allTables) {
+			let result = parseAndCalculateDiceMath(value);
+			
+			while(hasNestedBrackets(result)) {
+				let innermost = parseInnermost(result);
+				var innermostResolved = resolvePlaceholders(innermost, allTables);
+				result = result.replace(innermost, innermostResolved)
+			}
+			
+			result = parseAndReplaceInline(result);
+			
+			const implosionMultipleRegex = /\[[!@][0-9]+[^\]]*>> implode\]/g;
+			const negativeMultipleRegex = /\[[!@]-[0-9]+[^\]]*\]/g;
+			const placeholderRegex = /\[@(\w+)\]/g;
+			
+			const matchesNegativeMultiple = result.match(negativeMultipleRegex);
+			if(matchesNegativeMultiple){
+				for(const match of matchesNegativeMultiple) {
+					const fixedMatch = match.replace("-","");
+					result = result.replace(match, fixedMatch);
+				}
+			}
+			
+			const matchesMultiple = result.match(implosionMultipleRegex);
+			if(matchesMultiple) {
+				for (const match of matchesMultiple) {
+						const extract = match.match(/\[[@!](\d+)\s*([^>]*)\s*>>\s*implode\]/);
+						if (extract && extract[1] && extract[2]) {
+							const numberEntries = parseInt(extract[1]);
+							const tableName= matchCaseFromList(extract[2].trim(),Object.keys(allTables));
+							if (allTables.hasOwnProperty(tableName)) {
+								var results = [];
+								for(var i =0;i< numberEntries; i++){
+									results.push(allTables[tableName].generate());
+								}
+								result = result.replace(match, results.join(", "));
+							}
+						}
+				}
+			}
+
+			const matches = result.matchAll(placeholderRegex);
+			for (const match of matches) {
+				const tableReference = match[1];
+				const tableName = matchCaseFromList(tableReference,Object.keys(allTables));
+				if (allTables.hasOwnProperty(tableName)) {
+					const randomValue = allTables[tableName].generate();
+					result = result.replace(`[@${tableReference}]`, randomValue);
+				}
+			}
+
+			return result;
+		}
+
+		//const { allTables, standardTables, rollTables } = parseTables(inputString);
+		const { allTables, standardTables, rollTables } = parseTables(contents);
+
+		// Testing the random generator functions for standardTables
+		for (const tableName in standardTables) {
+			console.log(`Random value from ${tableName}: ${standardTables[tableName].generate()}`);
+		}
+
+		// Function to test the roll table
+		function testRollTable(tableName) {
+			const rollTable = rollTables[tableName];
+			const roll = rollDice(rollTable.roll);
+
+			console.log(`Rolled ${roll} on ${tableName}`);
+			console.log(`Result: ${rollTable.table[roll]}`);
+		}
+
+		function rollDice(dice) {
+			const [numDice, numSides] = dice.split('d').map(item => parseInt(item));
+			let result = 0;
+
+			for (let i = 0; i < numDice; i++) {
+				result += Math.floor(Math.random() * numSides) + 1;
+			}
+
+			return result;
+		}
+		
+		function calculateExpression(expression) {
+			const replacedDice = expression.replace(/{([^}]+)}/g, (match, diceExpr) => {
+				const diceRegex = /(\d+)?d(\d+)([+\-*\/]\d+)?/;
+				if (diceExpr.match(diceRegex)) {
+					const [_, numDice, numSides, modifier] = diceExpr.match(diceRegex);
+					let result = rollDice(`${numDice || 1}d${numSides}`);
+					if (modifier) {
+						result = eval(`${result}${modifier}`);
+					}
+					return result;
+				}
+				return match;
+			});
+
+			return replacedDice;
+		}
+
+		function parseAndCalculateDiceMath(text) {
+			const expressions = text.match(/{([^}]*)}/g);
+			if (!expressions) return text;
+
+			let result = text;
+			expressions.forEach(expression => {
+				const calculatedValue = calculateExpression(expression);
+				result = result.replace(expression, calculatedValue);
+			});
+
+			return result
+		}
+		
+		function chooseRandomFromArray(arr) {
+			return arr[Math.floor(Math.random() * arr.length)];
+		}
+
+		function parseAndReplaceInline(text) {
+			return text.replace(/\[\|[^\]]*\]/g, (match, content) => {
+				const options = match.replace("[","").replace("]","").split('|').filter(item => item !== '');
+				if (options.length > 1) {
+					return chooseRandomFromArray(options);
+				} else if (options.length === 1) {
+					return Math.random() < 0.5 ? options[0] : '';
+				}
+				return match;
+			});
+		}
+		
+		function matchCaseFromList(input, list) {
+			const lowercasedList = list.map(item => item.toLowerCase());
+			const index = lowercasedList.indexOf(input.toLowerCase());
+
+			if (index !== -1) {
+				return list[index];
+			}
+
+			return input; // Return the original string if no match is found in the list
+		}
+		
+		// Updated examples to match [|dogs|cats]
+		const text1 = "[|dogs|cats]";
+		const text2 = "[|a|b|c|d|e|f|g]";
+		const text3 = "[|dog|dog|cat]";
+		const text4 = "[|moo|]";
+
+		console.log(`Random choice: ${parseAndReplaceInline(text1)}`);
+		console.log(`Random choice: ${parseAndReplaceInline(text2)}`);
+		console.log(`Biased choice: ${parseAndReplaceInline(text3)}`);
+		console.log(`Random or empty: ${parseAndReplaceInline(text4)}`);
+
+		// Testing the roll table
+		//testRollTable('SpecialBonus');
+		
+		//const generatorsToShow = dispayedTables.split("\n").map(l=>l.trim());
+		const generatorsToShow = tableList;
+		tableIndex.all = Object.keys(allTables);
+		root = {
+			allTables: ko.observableArray(Object.keys(allTables).map(key => ({
+				name: key, 
+				generate: () =>  {
+					var results =[];
+					for(var i =0; i< root.numToGenerate(); i++)
+						results.push(allTables[key].generate());
+					root.generatedResults(results);
+				}
+			}))),
+			generatedResults: ko.observableArray([]),
+			numToGenerate: ko.observable(25),
+			//TODO:
+			newTables: ko.observable(),
+			parseNewTables: () => {
+				var newTables = parseTables(inputString)
+			}
+		}
+		root.displayedTables = ko.pureComputed(() => {
+			return root.allTables().filter(table=> generatorsToShow.includes(table.name))
+		});
+		root.indexedTables = Object.keys(tableIndex);
+		root.currentFocusedTable = ko.observable();
+		root.focusedTables = ko.pureComputed(() => {
+			/*
+			var result=  root.allTables().filter(table=> tableIndex[root.currentFocusedTable()].includes(table.name));
+			return result;
+			*/
+			return tableIndex[root.currentFocusedTable()].map(name => root.allTables().find(table => table.name == name)).filter(table => table);
+		});
+		ko.applyBindings(root,document.getElementById('main'));
+
+	}
+	</script>
+	<style>
+		#generators, #results {
+			display: inline-block;
+			vertical-align: top;
+		}
+		
+		#results {
+			width: 70%;
+			line-height: 150%
+		}
+		#generators{
+			width: 29%;
+		}
+	</style>
+</head>
+<body onload="main()">
+	<div id="main">
+		<div id="generators">
+			<div>
+				# of Results: 
+				<br>
+				<input type="number" data-bind="value:numToGenerate"></input>
+			</div>
+			<div><select data-bind="options:indexedTables, value:currentFocusedTable "></select></div>
+			<div data-bind="foreach:focusedTables">
+				<div>
+					<span data-bind="text: name"></span>
+					<button data-bind="click:generate">Generate</button>
+				</div>
+			</div>
+		</div>
+		<div data-bind="foreach:generatedResults" id = "results">
+			<div data-bind="text:$data"></div>
+		</div>
+	</div>
+</body>
+</html>

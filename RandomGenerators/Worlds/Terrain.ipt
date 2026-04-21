@@ -1,0 +1,67 @@
+; Terrain.ipt
+; created 12/21/2015 8:57:21 PM
+
+Table: VariedTerrain
+[@RandomFeature] [@MoistureZone] [@TemperatureZone] [@TerrainZone] [@CommunityType]
+
+Table: MoistureZone
+5:Rainy
+5:Seasonally Rainy
+5:Moderate
+3:Arid
+2:Desert
+
+Table: TemperatureZone
+10:Tropical
+15:Subtropical
+15:Temperate
+5:Subarctic
+5:Artic
+
+Table: TerrainZone
+10:Coastal
+3:Mountain
+10:River
+10:Flat
+10:Hills
+5:Cliffs
+
+Table: CommunityType
+City Center
+Suburb of City
+Cultivated Land
+Wilderness
+Small Villiage
+Industial Area
+
+Table: CommunityModifier
+Poor
+Violent
+Affluent
+Artsy
+2:Mundane
+Tech-Savy
+
+Table: RandomFeature
+25:{}
+[|Low|High] Gravity
+3:Super [|Hot|Cold]               
+[|Low|High] Pressure
+Irradiated
+5:Hot Springs
+3:[|Inert|Clorine|CO2|[|Low|High] Oxygen] Atmosphere
+Toxic [|Sulfur|Nitrogen|Organic] Compounds
+Floating Objects
+Magically Shaped
+[|Red|Orange|Blue] Spectrum
+Airless
+3:Glowing
+Permanent Cloudcover                                
+Solid Earth
+Complete Ocean
+Special Topology
+Biological Apocolypse
+Ecological Apocolypse
+Nuclear Apocolypse
+5:Space Station
+5:[@RandomFeature] and [@RandomFeature]

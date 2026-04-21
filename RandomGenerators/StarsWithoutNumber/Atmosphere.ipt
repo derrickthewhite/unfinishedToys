@@ -1,0 +1,13 @@
+; Atmosphere.ipt
+; created 6/14/2018 8:22:00 AM
+
+Table: atmosphere
+Type: Lookup
+Roll: 2d6
+2: Corrosive
+3: Inert
+4: Airless/Thin
+5-9: Breathable
+10: Thick
+11: Invasive
+12: Corrosive and Invasive

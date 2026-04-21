@@ -1,0 +1,16 @@
+; WildernessMishaps.ipt
+; created 4/15/2016 7:18:49 AM
+
+Table:WildernessMishaps
+[|Obstacle|Hazard|Ward or Tra]
+Obstacle
+Obstacle
+Hazard
+Delays (2 units)
+Raise Peril by 2
+Lose or expend Supplies
+Standard Encounter
+Standard Encouter
+Deadly Encounter
+Bad Social Situation
+Hurt someone else

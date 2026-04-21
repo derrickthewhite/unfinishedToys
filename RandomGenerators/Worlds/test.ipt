@@ -1,0 +1,9 @@
+; test.ipt
+; created 12/18/2015 7:38:11 AM
+Use: ../Generators/Worlds/Magic.ipt
+Use: ../Generators/Worlds/TechLevel.ipt
+
+Table: Main
+Set: tl={1d10} 
+Set: numMagic = {min(1d10,1d10)-round(tl/3)-1}
+[#{tl}TechLevel]<br>[!{numMagic+0} Magic] <br>{numMagic}

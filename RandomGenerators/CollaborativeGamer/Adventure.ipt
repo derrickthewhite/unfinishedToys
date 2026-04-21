@@ -1,0 +1,12 @@
+; Adventure.ipt
+; created 4/14/2016 9:11:41 AM
+Use: ../Generators/CollaborativeGamer/Adventures/AdventureTypeDeterminer.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/AdventurePerilAdjuster.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/AdventureRushDeterminer.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/AdventureDistanceDeterminer.ipt
+Use: ../Generators/CollaborativeGamer/Adventures/AdventurePayDeterminer.ipt
+Use: ../Generators/CollaborativeGamer/NPC/NPC.ipt
+
+
+Table: Adventure
+[@AdventureType] at [@AdventurePerilAdjuster] for [@AdventurePayDeterminer] with [@Rush] thats [@AdventureDistanceDeterminer]

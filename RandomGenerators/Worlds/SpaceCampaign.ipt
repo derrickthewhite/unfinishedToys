@@ -1,0 +1,42 @@
+; SpaceCampaign.ipt
+; created 5/18/2018 12:50:08 PM
+
+Table: SpaceCampaign
+[@tone] [@activity] [@aliens] [@Society]
+
+Table:tone
+Action-Adventure
+Horror
+Romance
+Space Opera
+Surreal
+Thriller
+Travelogue
+Wonder
+
+Table:activity
+Exploring new Places
+Colony Alpha
+Space Colonies
+Survivors and Refugees
+Starship Troopers
+Ace Pilots
+Commanding a Ship
+Space Patrol
+Bounty Hunters
+Criminals
+Espionauge
+Merchants
+Prospectors
+
+Table:aliens
+One Speicies
+A few Aliens
+Many Aliens
+
+Table: Society
+Anarchy
+Alliance
+Federation
+Corporate
+Empire

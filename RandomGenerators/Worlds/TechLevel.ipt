@@ -1,0 +1,139 @@
+; TechLevel.ipt
+; created 12/18/2015 6:52:57 AM
+
+Table: TechLevel
+Type: Lookup    
+1:Stone Age (TL0) [@antiTech with 1]
+2:Agriculture Age (TL1) [@antiTech with 2]
+3:Iron Age (TL2)[@antiTech with 3]
+4:City Age (TL3)[@antiTech with 4]
+5:Enlightened Age(TL4)[@antiTech with 5]
+6:Industrial Age (TL5)[@antiTech with 6]
+7:Mechanized Age (TL6)[@antiTech with 7] 
+8:Nuclear Age(TL7)[@antiTech with 8] [#{1d6} SuperScience]
+9:Information Age, (TL8) [#{1d6} SuperScience]
+10:Near Future (TL9) [#{1d6+1} SuperScience]<br> [#{1d4} Degree] AI, [#{1d4} Degree] BioTech, [#{1d4} Degree] NanoTech, [#{1d4} Degree] Neural Interfaces
+11:Mature Future (TL10) [#{1d6+6} SuperScience]<br> [#{1d3+1} Degree] AI, [#{1d3+1} Degree] BioTech, [#{1d3+1} Degree] NanoTech, [#{1d3+1} Degree] Neural Interfaces
+
+
+Table: AltHistSkewTL
+5:1
+12:2
+18:3
+25:4
+28:5
+32:6
+25:7
+22:8
+10:9
+5:10
+
+Table: HighTechSkewTL
+5:1
+2:2
+2:3
+3:4
+5:5
+10:6
+15:7
+15:8
+20:9
+20:10
+10:11
+
+Table: FantasyGenreSkewTL
+10:1
+15:2
+20:3
+30:4
+20:5
+5:6
+5:7
+5:8
+5:9
+
+Table: HistoricalGenreSkewTL
+50:1
+25:2
+15:3
+10:4
+7:5
+5:6
+3:7
+2:8
+1:9
+
+
+Table: SuperScience
+1-3:{''} 
+4-6:<br>[!{1d4} SuperSciences >> implode]
+7-9:<br>[!{1d3} SuperSciences >> implode] 
+10-12:{''}
+
+Table: Degree
+Type: Lookup
+1: No
+2: No
+3: Weak
+4: Strong
+5: Strong
+
+Table: SuperSciences
+4:[@FasterThanLight]
+7:[|Weak|Strong] Gravity Manip
+5:Force [|Fields|Manipulation]
+3:Reactionless Drives
+3:Holograms
+Statis Fields
+2:Nuclear Dampers
+2:Stun Rays
+
+Table: FasterThanLight
+Warp
+HyperSpace
+Gates
+Jump Points
+Teleportation
+
+Table: antiTech
+Set: tl = {$1}
+Set: chance = {1d100}
+[when] {chance} < [#{tl} antiTechPossibility] [do] [#{tl} antiTechByTL >> implode][end] <br>
+
+;chance is out of 100
+Table: antiTechPossibility
+Type: Lookup
+1:70
+2:65
+3:60
+4:50
+5:40
+6:30
+7:20
+8:10
+9-11:0
+
+
+Table: antiTechByTL
+Type: Lookup
+1:[#{1d8} antiTechTypes] 
+2:[#{1d8} antiTechTypes] 
+3:[#{1d6} antiTechTypes]  
+4:[#{1d6} antiTechTypes] 
+5:[#{1d6} antiTechTypes] 
+6:[#{1d4} antiTechTypes] 
+7:[#{1d2} antiTechTypes] 
+8:[#1 antiTechTypes]   
+9-11:{''}
+
+
+Table: antiTechTypes
+Type:Lookup
+1:No Minaturization
+2:No Nuclear
+3:No Radio
+4:No Electricty 
+5:Super-Murphy Law 
+6:No Explosions 
+7:No Fire
+8:Super Corrosion
