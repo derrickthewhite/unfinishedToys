@@ -18,7 +18,7 @@
       "y": 144,
       "color": "#0012FB",
       "notes": "",
-      "gmNotes": ""
+      "gmNotes": "Keverling, Keverling, Keverling"
     },
     {
       "id": "poi-02",
@@ -40,21 +40,21 @@
     },
     {
       "id": "poi-04",
-      "name": "",
+      "name": "Veracity Pod",
       "x": 1181,
       "y": 257,
       "color": "#6D000A",
       "notes": "",
-      "gmNotes": ""
+      "gmNotes": "Thinker"
     },
     {
       "id": "poi-05",
-      "name": "",
+      "name": "Verasity",
       "x": 164.5,
       "y": 277.83,
       "color": "#6D000A",
-      "notes": "",
-      "gmNotes": ""
+      "notes": "Quarius",
+      "gmNotes": "Quarius"
     },
     {
       "id": "poi-06",
@@ -85,12 +85,12 @@
     },
     {
       "id": "poi-09",
-      "name": "",
+      "name": "Veracity",
       "x": 6.5,
       "y": 644.83,
       "color": "#6D000A",
       "notes": "",
-      "gmNotes": ""
+      "gmNotes": "Prime Workers"
     },
     {
       "id": "poi-10",
@@ -241,8 +241,287 @@
       "name": "Pakchekki Ship",
       "x": 833.36,
       "y": 877.14,
-      "color": "#00660c",
+      "color": "#10da28",
       "notes": "Burned out an abandoned",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-28",
+      "name": "Marass Ship",
+      "x": -803.72,
+      "y": -753.58,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-29",
+      "name": "Marass Ship",
+      "x": -237.18,
+      "y": -689,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-30",
+      "name": "Marass Ship",
+      "x": 735.67,
+      "y": -578.53,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-31",
+      "name": "Varasity",
+      "x": -781.3,
+      "y": -37.66,
+      "color": "#6d000a",
+      "notes": "",
+      "gmNotes": "Baxxid"
+    },
+    {
+      "id": "poi-32",
+      "name": "Varasity",
+      "x": -783.16,
+      "y": 500.24,
+      "color": "#6d000a",
+      "notes": "",
+      "gmNotes": "Prime Soldiers"
+    },
+    {
+      "id": "poi-33",
+      "name": "Baxid",
+      "x": -725.75,
+      "y": 1114.18,
+      "color": "#6d000a",
+      "notes": "",
+      "gmNotes": "Prime Soldiers"
+    },
+    {
+      "id": "poi-34",
+      "name": "Baxid",
+      "x": -820.72,
+      "y": 1126.16,
+      "color": "#6d000a",
+      "notes": "",
+      "gmNotes": "Prime Workers"
+    },
+    {
+      "id": "poi-35",
+      "name": "Baxid",
+      "x": -637.69,
+      "y": 1053.44,
+      "color": "#6d000a",
+      "notes": "",
+      "gmNotes": "Sorgum (trader pod)"
+    },
+    {
+      "id": "poi-36",
+      "name": "Veracity",
+      "x": -326.1,
+      "y": -555.49,
+      "color": "#6d000a",
+      "notes": "",
+      "gmNotes": "Quarius"
+    },
+    {
+      "id": "poi-37",
+      "name": "Veracity",
+      "x": -306.94,
+      "y": -375.18,
+      "color": "#6d000a",
+      "notes": "",
+      "gmNotes": "Baxxid"
+    },
+    {
+      "id": "poi-38",
+      "name": "Marass Ship",
+      "x": -211.03,
+      "y": -18.85,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-39",
+      "name": "Veracity",
+      "x": 51.42,
+      "y": -194.61,
+      "color": "#6d000a",
+      "notes": "Baxxid",
+      "gmNotes": "Prime Workers"
+    },
+    {
+      "id": "poi-40",
+      "name": "Verasity",
+      "x": 308.45,
+      "y": -544.53,
+      "color": "#6d000a",
+      "notes": "Sorgum",
+      "gmNotes": "Quarius"
+    },
+    {
+      "id": "poi-41",
+      "name": "Veracity pod",
+      "x": 967.55,
+      "y": -61.91,
+      "color": "#6d000a",
+      "notes": "",
+      "gmNotes": "Prime Thinker (Philgo)"
+    },
+    {
+      "id": "poi-42",
+      "name": "Vuto Pod",
+      "x": -859.43,
+      "y": 1180.93,
+      "color": "#eeff00",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-43",
+      "name": "Vuto Pod",
+      "x": 828.11,
+      "y": -125.17,
+      "color": "#eeff00",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-44",
+      "name": "Orion Pod",
+      "x": -854.83,
+      "y": 1402.89,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Furbite, Hermit Squid"
+    },
+    {
+      "id": "poi-45",
+      "name": "Orion Pod",
+      "x": -559.31,
+      "y": -242.48,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Furbite, Hermit Squid, Tortholite, Tortholite"
+    },
+    {
+      "id": "poi-46",
+      "name": "Orion Pod",
+      "x": -528.95,
+      "y": 714.16,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Furbite, Hermit Squid"
+    },
+    {
+      "id": "poi-47",
+      "name": "Orion Pod",
+      "x": -555.1,
+      "y": 631.74,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Hawfax, Hawfax, Tortholite, Hermit Squid"
+    },
+    {
+      "id": "poi-48",
+      "name": "Orion Pod",
+      "x": -624.41,
+      "y": 1205.4,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Hermit squid, Hermit Squid, Furbite"
+    },
+    {
+      "id": "poi-49",
+      "name": "Orion Pod",
+      "x": -252.75,
+      "y": 24.16,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Furbite, Tortholite, Tortholite"
+    },
+    {
+      "id": "poi-50",
+      "name": "Orion Pod",
+      "x": 829.63,
+      "y": -672.06,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Keverling, Keverling"
+    },
+    {
+      "id": "poi-51",
+      "name": "Orion Pod",
+      "x": 1188.96,
+      "y": -521.82,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Hermit squid, Hawfax"
+    },
+    {
+      "id": "poi-52",
+      "name": "Orion Pod",
+      "x": 1225.17,
+      "y": -355,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Tortholite, Hermit squid, Hawfax"
+    },
+    {
+      "id": "poi-53",
+      "name": "Orion Pod",
+      "x": 1328.68,
+      "y": -445.73,
+      "color": "#0012fb",
+      "notes": "",
+      "gmNotes": "Tortholite, Furbite"
+    },
+    {
+      "id": "poi-54",
+      "name": "Kolipods",
+      "x": -650.82,
+      "y": 1279.03,
+      "color": "#040000",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-55",
+      "name": "Traders (actual)",
+      "x": -326.87,
+      "y": -445.95,
+      "color": "#2a4c41",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-56",
+      "name": "Traders (actual)",
+      "x": -375.51,
+      "y": 276.97,
+      "color": "#2a4c41",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-57",
+      "name": "Pakchekki Ship",
+      "x": -209.06,
+      "y": 285.03,
+      "color": "#10da28",
+      "notes": "Burned out an abandoned",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-58",
+      "name": "Koidrac Ship",
+      "x": 1227.56,
+      "y": -571.96,
+      "color": "#05bbcb",
+      "notes": "",
       "gmNotes": ""
     }
   ]

@@ -1451,10 +1451,12 @@
       const cellIndexY = Math.floor((location.y - this.gridOffsetY) / GRID_SPACING_PX);
       const cellOriginX = this.gridOffsetX + (cellIndexX * GRID_SPACING_PX);
       const cellOriginY = this.gridOffsetY + (cellIndexY * GRID_SPACING_PX);
+      const cellMaxX = cellOriginX + GRID_SPACING_PX;
+      const cellMaxY = cellOriginY + GRID_SPACING_PX;
       const newX = cellOriginX + (Math.random() * GRID_SPACING_PX);
       const newY = cellOriginY + (Math.random() * GRID_SPACING_PX);
-      location.x = round2(clamp(newX, 0, BASE_SIZE));
-      location.y = round2(clamp(newY, 0, BASE_SIZE));
+      location.x = round2(clamp(newX, cellOriginX, cellMaxX - 0.01));
+      location.y = round2(clamp(newY, cellOriginY, cellMaxY - 0.01));
       this.statusMessage = 'Randomized ' + getLocationLabel(location);
       this.updateUiState();
       this.requestRender();
