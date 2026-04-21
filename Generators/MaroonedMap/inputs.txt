@@ -1,0 +1,25 @@
+(11,14) - Veracity (Baxxit)
+(11,16) - Veracity (Sorgumm)
+(11,16) - Orion Alliance (Hermit Squid, Tortholite, Furbite, Furbite)
+(13,12) - Veracity (Baxxit)
+(13,15) - Marass
+(14,16) - Veracity (Baxxit)
+(15,13) - Orion Alliance (Keverling, Tortholite)
+(15,16) - Yeti
+(15,17) - Kolipods
+(16,11) - Squellions
+(16,13) - Orion Alliance (Hawfax, Hawfax, Tortholite)
+(16,15) - Kolipods
+(16,17) - Orion Alliance (Keverling, Hermit Squid, Hermit Squid)
+(17,12) - Koidrac
+(17,13) - Marass
+(17,20) - Veracity (Boral (climbing bugs))
+(18,12) - Veracity (Prime Workers)
+(18,12) - Orion Alliance (Hermit Squid, Hermit Squid, Furbite, Hermit Squid)
+(18,16) - Veracity (Boral (climbing bugs))
+(18,18) - Veracity (Baxxit)
+(19,17) - Pacchekki
+(19,18) - Orion Alliance (Furbite, Hermit Squid)
+(20,15) - Vuto
+(20,15) - Pacchekki
+(20,16) - Orion Alliance (Keverling, Hermit Squid)

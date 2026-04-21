@@ -523,6 +523,699 @@
       "color": "#05bbcb",
       "notes": "",
       "gmNotes": ""
+    },
+    {
+      "id": "poi-59",
+      "name": "Yeti",
+      "x": 1518.8,
+      "y": -462.8,
+      "color": "#FFFFFF",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-60",
+      "name": "Koidrac",
+      "x": 1677.2,
+      "y": 151.6,
+      "color": "#05BBCB",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-61",
+      "name": "Veracity",
+      "x": 1571.6,
+      "y": 1250.8,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Boral (climbing bugs)"
+    },
+    {
+      "id": "poi-62",
+      "name": "Orion Alliance",
+      "x": 1710.8,
+      "y": 1402,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Tortholite, Tortholite"
+    },
+    {
+      "id": "poi-63",
+      "name": "Orion Alliance",
+      "x": 1862,
+      "y": -885.2,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Tortholite, Furbite"
+    },
+    {
+      "id": "poi-64",
+      "name": "Orion Alliance",
+      "x": 1734.8,
+      "y": 230.8,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Furbite, Hermit Squid, Furbite, Hermit Squid"
+    },
+    {
+      "id": "poi-65",
+      "name": "Marass",
+      "x": 1890.8,
+      "y": 168.4,
+      "color": "#7E00C2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-66",
+      "name": "Veracity",
+      "x": 1828.4,
+      "y": 509.2,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Sorgumm"
+    },
+    {
+      "id": "poi-67",
+      "name": "Squellions",
+      "x": 1929.2,
+      "y": 859.6,
+      "color": "#2A4C41",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-68",
+      "name": "Orion Alliance",
+      "x": 2039.6,
+      "y": -374,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Keverling, Tortholite, Keverling, Hawfax"
+    },
+    {
+      "id": "poi-69",
+      "name": "Yeti",
+      "x": 2006,
+      "y": 454,
+      "color": "#FFFFFF",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-70",
+      "name": "Pacchekki",
+      "x": 2354,
+      "y": 665.2,
+      "color": "#10DA28",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-71",
+      "name": "Koidrac",
+      "x": 2565.2,
+      "y": 240.4,
+      "color": "#05BBCB",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-72",
+      "name": "Veracity",
+      "x": 2620.4,
+      "y": 1042,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Boral (climbing bugs)"
+    },
+    {
+      "id": "poi-73",
+      "name": "Veracity",
+      "x": 2702,
+      "y": -803.6,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Prime Soldiers"
+    },
+    {
+      "id": "poi-74",
+      "name": "Veracity",
+      "x": 2776.4,
+      "y": 775.6,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Quarius"
+    },
+    {
+      "id": "poi-75",
+      "name": "Orion Alliance",
+      "x": 3155.6,
+      "y": -599.6,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Hermit Squid, Tortholite, Hawfax, Furbite"
+    },
+    {
+      "id": "poi-76",
+      "name": "Vuto",
+      "x": 2980.4,
+      "y": -513.2,
+      "color": "#EEFF00",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-77",
+      "name": "Squellions",
+      "x": 3306.8,
+      "y": 521.2,
+      "color": "#2A4C41",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-78",
+      "name": "Marass",
+      "x": 3381.2,
+      "y": 655.6,
+      "color": "#7E00C2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-79",
+      "name": "Veracity",
+      "x": 3515.6,
+      "y": -868.4,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Sorgumm"
+    },
+    {
+      "id": "poi-80",
+      "name": "Veracity",
+      "x": 3431.6,
+      "y": -738.8,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Quarius"
+    },
+    {
+      "id": "poi-81",
+      "name": "Veracity",
+      "x": 3561.2,
+      "y": 866.8,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Baxxit"
+    },
+    {
+      "id": "poi-82",
+      "name": "Pacchekki",
+      "x": 3726.8,
+      "y": 1462,
+      "color": "#10DA28",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-83",
+      "name": "Koidrac",
+      "x": 3842,
+      "y": 1298.8,
+      "color": "#05BBCB",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-84",
+      "name": "Veracity",
+      "x": -618.85,
+      "y": 1559.23,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Prime Soldiers"
+    },
+    {
+      "id": "poi-85",
+      "name": "Veracity",
+      "x": -531.71,
+      "y": 1810.6,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Quarius"
+    },
+    {
+      "id": "poi-86",
+      "name": "Veracity",
+      "x": -614.41,
+      "y": 2847.92,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Baxxit"
+    },
+    {
+      "id": "poi-87",
+      "name": "Orion Alliance",
+      "x": -634.53,
+      "y": 3797.96,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Hermit Squid, Hermit Squid, Tortholite"
+    },
+    {
+      "id": "poi-88",
+      "name": "Vuto",
+      "x": -387.55,
+      "y": 2060.92,
+      "color": "#eeff00",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-89",
+      "name": "Veracity",
+      "x": 43.14,
+      "y": 2639.32,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Rotalith"
+    },
+    {
+      "id": "poi-90",
+      "name": "Koidrac",
+      "x": -168.35,
+      "y": 2794.36,
+      "color": "#05bbcb",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-91",
+      "name": "Veracity",
+      "x": 438.17,
+      "y": 3107.8,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Quarius"
+    },
+    {
+      "id": "poi-92",
+      "name": "Traders",
+      "x": 308.74,
+      "y": 3017.81,
+      "color": "#2a4c41",
+      "notes": "",
+      "gmNotes": "Kletchtin"
+    },
+    {
+      "id": "poi-93",
+      "name": "Koidrac",
+      "x": 495.32,
+      "y": 3663.9,
+      "color": "#05bbcb",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-94",
+      "name": "Squellions",
+      "x": 580.07,
+      "y": 1827.82,
+      "color": "#2A4C41",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-95",
+      "name": "Veracity",
+      "x": 547.74,
+      "y": 2102.02,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Rotalith"
+    },
+    {
+      "id": "poi-96",
+      "name": "Marass",
+      "x": 552.1,
+      "y": 2112.08,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-97",
+      "name": "Squellions",
+      "x": 731.9,
+      "y": 2465.58,
+      "color": "#2A4C41",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-98",
+      "name": "Orion Alliance",
+      "x": 614.62,
+      "y": 2707.6,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Keverling, Hermit Squid"
+    },
+    {
+      "id": "poi-99",
+      "name": "Kolipods",
+      "x": 664.76,
+      "y": 2884.18,
+      "color": "#040000",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-100",
+      "name": "Orion Alliance",
+      "x": 589.26,
+      "y": 3203.87,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Tortholite, Tortholite, Furbite"
+    },
+    {
+      "id": "poi-101",
+      "name": "Orion Alliance",
+      "x": 722.11,
+      "y": 3699.04,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Keverling, Hermit Squid, Hawfax, Hawfax"
+    },
+    {
+      "id": "poi-102",
+      "name": "Marass",
+      "x": 947.16,
+      "y": 1800.55,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-103",
+      "name": "Orion Alliance",
+      "x": 1003.97,
+      "y": 2658.47,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Keverling, Keverling"
+    },
+    {
+      "id": "poi-104",
+      "name": "Marass",
+      "x": 952.06,
+      "y": 3276.47,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-105",
+      "name": "Orion Alliance",
+      "x": 1191.48,
+      "y": 2836.13,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Keverling, Keverling, Hawfax, Hermit Squid"
+    },
+    {
+      "id": "poi-106",
+      "name": "Marass",
+      "x": 1405.64,
+      "y": 2573.65,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-107",
+      "name": "Marass",
+      "x": 1474.74,
+      "y": 3522.14,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-108",
+      "name": "Veracity",
+      "x": 1285.86,
+      "y": 3681.33,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Baxxit"
+    },
+    {
+      "id": "poi-109",
+      "name": "Veracity",
+      "x": 1492.52,
+      "y": 2259.31,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Baxxit"
+    },
+    {
+      "id": "poi-110",
+      "name": "Veracity",
+      "x": 1662.13,
+      "y": 2874.55,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Sorgumm"
+    },
+    {
+      "id": "poi-111",
+      "name": "Orion Alliance",
+      "x": 1606.6,
+      "y": 2736.65,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Hermit Squid, Tortholite, Furbite, Furbite"
+    },
+    {
+      "id": "poi-112",
+      "name": "Veracity",
+      "x": 2057.35,
+      "y": 1904.59,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Baxxit"
+    },
+    {
+      "id": "poi-113",
+      "name": "Marass",
+      "x": 2059.98,
+      "y": 2611.7,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-114",
+      "name": "Veracity",
+      "x": 2257.81,
+      "y": 2861.96,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Baxxit"
+    },
+    {
+      "id": "poi-115",
+      "name": "Orion Alliance",
+      "x": 2480.14,
+      "y": 2218.32,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Keverling, Tortholite"
+    },
+    {
+      "id": "poi-116",
+      "name": "Yeti",
+      "x": 2577.46,
+      "y": 2731.15,
+      "color": "#FFFFFF",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-117",
+      "name": "Kolipods",
+      "x": 2633.09,
+      "y": 3163.72,
+      "color": "#040000",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-118",
+      "name": "Squellions",
+      "x": 2878.2,
+      "y": 1512.69,
+      "color": "#2A4C41",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-119",
+      "name": "Orion Alliance",
+      "x": 2711.46,
+      "y": 2016.47,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Hawfax, Hawfax, Tortholite"
+    },
+    {
+      "id": "poi-120",
+      "name": "Kolipods",
+      "x": 2781.85,
+      "y": 2634.64,
+      "color": "#040000",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-121",
+      "name": "Orion Alliance",
+      "x": 2809,
+      "y": 2988.48,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Keverling, Hermit Squid, Hermit Squid"
+    },
+    {
+      "id": "poi-122",
+      "name": "Koidrac",
+      "x": 2946.59,
+      "y": 1800.14,
+      "color": "#05bbcb",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-123",
+      "name": "Marass",
+      "x": 3122.68,
+      "y": 2121.93,
+      "color": "#7e00c2",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-124",
+      "name": "Veracity",
+      "x": 3157.25,
+      "y": 3897.39,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Boral (climbing bugs)"
+    },
+    {
+      "id": "poi-125",
+      "name": "Veracity",
+      "x": 3251.8,
+      "y": 1812.52,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Prime Workers"
+    },
+    {
+      "id": "poi-126",
+      "name": "Orion Alliance",
+      "x": 3264.42,
+      "y": 1908.06,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Hermit Squid, Hermit Squid, Furbite, Hermit Squid"
+    },
+    {
+      "id": "poi-127",
+      "name": "Veracity",
+      "x": 3292.41,
+      "y": 2877.4,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Boral (climbing bugs)"
+    },
+    {
+      "id": "poi-128",
+      "name": "Veracity",
+      "x": 3178.33,
+      "y": 3333.89,
+      "color": "#6D000A",
+      "notes": "",
+      "gmNotes": "Baxxit"
+    },
+    {
+      "id": "poi-129",
+      "name": "Pacchekki",
+      "x": 3599.68,
+      "y": 3051.99,
+      "color": "#10DA28",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-130",
+      "name": "Orion Alliance",
+      "x": 3621.25,
+      "y": 3301.68,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Furbite, Hermit Squid"
+    },
+    {
+      "id": "poi-131",
+      "name": "Vuto",
+      "x": 3714.46,
+      "y": 2575.63,
+      "color": "#eeff00",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-132",
+      "name": "Pacchekki",
+      "x": 3848.38,
+      "y": 2570.94,
+      "color": "#10DA28",
+      "notes": "",
+      "gmNotes": ""
+    },
+    {
+      "id": "poi-133",
+      "name": "Orion Alliance",
+      "x": 3881.02,
+      "y": 2828.57,
+      "color": "#0012FB",
+      "notes": "",
+      "gmNotes": "Keverling, Hermit Squid"
+    },
+    {
+      "id": "poi-134",
+      "name": "Veracity New Pod",
+      "x": 1402.98,
+      "y": -209.89,
+      "color": "#ea0ba5",
+      "notes": "",
+      "gmNotes": "Not engineers."
+    },
+    {
+      "id": "poi-135",
+      "name": "Veracity New Pod",
+      "x": -264.26,
+      "y": 244.91,
+      "color": "#ea0ba5",
+      "notes": "",
+      "gmNotes": "engineers"
     }
   ]
 }
