@@ -1,0 +1,2045 @@
+{
+  "raceParameters": {
+    "lookup_name_0": {
+      "name": "Human",
+      "proportion": 50,
+      "ages": {
+        "schoolAge": 6,
+        "youngAdultAge": 18,
+        "settledAdultAge": 30,
+        "elderlyAge": 65,
+        "maxAge": 90
+      },
+      "femaleHeights": {
+        "maxBabyHeight": 107,
+        "maxSchoolChildHeight": 160,
+        "averageAdultHeight": 163
+      },
+      "maleHeights": {
+        "maxBabyHeight": 109,
+        "maxSchoolChildHeight": 170,
+        "averageAdultHeight": 177
+      },
+      "nameGenerators": [
+        "GENERIC_NAME_GENERATOR"
+      ],
+      "customNameGenerators": [],
+      "allGenders": false,
+      "specificGenders": [
+        "1",
+        "0"
+      ],
+      "appearanceTemplate": {
+        "templateLines": [
+          {
+            "key": 0,
+            "template": "Has $option1, $option2, $option3 hair, ",
+            "elseTemplate": "Has a bald head, ",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": 0,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 1,
+            "template": "$option4, ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "minimumAgeType": "ELDERLY",
+            "valueConditional": {
+              "optionIndex": 3,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 2,
+            "template": "and $option5 eyes.",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 3,
+            "template": "$option6.",
+            "elseTemplate": "",
+            "hideForGenders": [
+              "1"
+            ],
+            "randomlyHideForGenders": [
+              "2",
+              "3"
+            ],
+            "minimumAgeType": "YOUNG_ADULT",
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 4,
+            "template": "Has $option7 $option8 skin.",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 5,
+            "template": "Stands $height tall and has $aOrAn $option9 build.",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          }
+        ],
+        "options": [
+          {
+            "label": "Hair length",
+            "values": [
+              {
+                "key": 0,
+                "value": "bald",
+                "proportion": 10
+              },
+              {
+                "key": 1,
+                "value": "cropped",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "short",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "medium-length",
+                "proportion": 50
+              },
+              {
+                "key": 4,
+                "value": "long",
+                "proportion": 25
+              },
+              {
+                "key": 7,
+                "value": "very long",
+                "proportion": 25
+              }
+            ]
+          },
+          {
+            "label": "Hair texture",
+            "values": [
+              {
+                "key": 0,
+                "value": "braided",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "curly",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "frazzled",
+                "proportion": 30
+              },
+              {
+                "key": 3,
+                "value": "greasy",
+                "proportion": 30
+              },
+              {
+                "key": 4,
+                "value": "limp",
+                "proportion": 30
+              },
+              {
+                "key": 5,
+                "value": "messy",
+                "proportion": 30
+              },
+              {
+                "key": 6,
+                "value": "strange",
+                "proportion": 30
+              },
+              {
+                "key": 7,
+                "value": "straight",
+                "proportion": 50
+              },
+              {
+                "key": 8,
+                "value": "streaked",
+                "proportion": 50
+              },
+              {
+                "key": 9,
+                "value": "thick",
+                "proportion": 50
+              },
+              {
+                "key": 10,
+                "value": "thinning",
+                "proportion": 30
+              },
+              {
+                "key": 11,
+                "value": "wavy",
+                "proportion": 50
+              },
+              {
+                "key": 12,
+                "value": "well groomed",
+                "proportion": 50
+              },
+              {
+                "key": 13,
+                "value": "wiry",
+                "proportion": 30
+              }
+            ]
+          },
+          {
+            "label": "Hair colour",
+            "values": [
+              {
+                "key": -1,
+                "value": "black",
+                "proportion": 50
+              },
+              {
+                "key": -2,
+                "value": "gray",
+                "proportion": 50
+              },
+              {
+                "key": -3,
+                "value": "platinum",
+                "proportion": 50
+              },
+              {
+                "key": -4,
+                "value": "white",
+                "proportion": 50
+              },
+              {
+                "key": -5,
+                "value": "dark blonde",
+                "proportion": 50
+              },
+              {
+                "key": -6,
+                "value": "blonde",
+                "proportion": 50
+              },
+              {
+                "key": -7,
+                "value": "bleach blonde",
+                "proportion": 50
+              },
+              {
+                "key": -8,
+                "value": "dark red",
+                "proportion": 50
+              },
+              {
+                "key": -9,
+                "value": "orange",
+                "proportion": 50
+              },
+              {
+                "key": -10,
+                "value": "light red",
+                "proportion": 50
+              },
+              {
+                "key": -11,
+                "value": "brunette",
+                "proportion": 50
+              },
+              {
+                "key": -12,
+                "value": "auburn",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Elderly hair",
+            "values": [
+              {
+                "key": 0,
+                "value": "none",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "that is beginning to turn grey",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "that is now almost fully grey",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "that is now almost fully white",
+                "proportion": 50
+              },
+              {
+                "key": 4,
+                "value": "that is beginning to thin",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Eye colour",
+            "values": [
+              {
+                "key": -1,
+                "value": "amber",
+                "proportion": 50
+              },
+              {
+                "key": -2,
+                "value": "brown",
+                "proportion": 50
+              },
+              {
+                "key": -3,
+                "value": "hazel",
+                "proportion": 50
+              },
+              {
+                "key": -4,
+                "value": "green",
+                "proportion": 50
+              },
+              {
+                "key": -5,
+                "value": "blue",
+                "proportion": 50
+              },
+              {
+                "key": -6,
+                "value": "gray",
+                "proportion": 50
+              },
+              {
+                "key": -7,
+                "value": "light blue",
+                "proportion": 50
+              },
+              {
+                "key": -8,
+                "value": "light gray",
+                "proportion": 50
+              },
+              {
+                "key": -9,
+                "value": "blue-gray",
+                "proportion": 50
+              },
+              {
+                "key": -10,
+                "value": "green-gray",
+                "proportion": 50
+              },
+              {
+                "key": -11,
+                "value": "light brown",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Beard",
+            "values": [
+              {
+                "key": -1,
+                "value": "Is clean shaven",
+                "proportion": 50
+              },
+              {
+                "key": -2,
+                "value": "Has a short, cropped beard",
+                "proportion": 10
+              },
+              {
+                "key": -4,
+                "value": "Has a long, bushy beard",
+                "proportion": 10
+              },
+              {
+                "key": -5,
+                "value": "Has a thick, bushy beard",
+                "proportion": 10
+              },
+              {
+                "key": -6,
+                "value": "Has a long, braided beard",
+                "proportion": 10
+              },
+              {
+                "key": -7,
+                "value": "Has a rough, stubbly beard",
+                "proportion": 30
+              },
+              {
+                "key": -8,
+                "value": "Has an unkempt beard",
+                "proportion": 10
+              },
+              {
+                "key": -9,
+                "value": "Has a thick, short beard",
+                "proportion": 10
+              },
+              {
+                "key": -10,
+                "value": "Has a mustache",
+                "proportion": 10
+              },
+              {
+                "key": -11,
+                "value": "Has a goatee",
+                "proportion": 10
+              },
+              {
+                "key": -12,
+                "value": "Has a dusting of stubble",
+                "proportion": 30
+              },
+              {
+                "key": -13,
+                "value": "Has a thin, wispy beard",
+                "proportion": 10
+              },
+              {
+                "key": -14,
+                "value": "Has a few baby hairs on their chin",
+                "proportion": 10
+              },
+              {
+                "key": -15,
+                "value": "Has a mutton chop beard",
+                "proportion": 10
+              }
+            ]
+          },
+          {
+            "label": "Skin tone modifier",
+            "values": [
+              {
+                "key": 0,
+                "value": "dark",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "deep",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "rich",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "cool",
+                "proportion": 50
+              },
+              {
+                "key": 4,
+                "value": "warm",
+                "proportion": 50
+              },
+              {
+                "key": 5,
+                "value": "tanned",
+                "proportion": 50
+              },
+              {
+                "key": 6,
+                "value": "fair",
+                "proportion": 50
+              },
+              {
+                "key": 7,
+                "value": "light",
+                "proportion": 50
+              },
+              {
+                "key": 8,
+                "value": "pale",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Skin tone",
+            "values": [
+              {
+                "key": -1,
+                "value": "black",
+                "proportion": 50
+              },
+              {
+                "key": -2,
+                "value": "brown",
+                "proportion": 50
+              },
+              {
+                "key": -3,
+                "value": "beige",
+                "proportion": 50
+              },
+              {
+                "key": -4,
+                "value": "white",
+                "proportion": 50
+              },
+              {
+                "key": -5,
+                "value": "pink",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Build type",
+            "values": [
+              {
+                "key": 0,
+                "value": "athletic",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "round",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "large",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "skinny",
+                "proportion": 50
+              },
+              {
+                "key": 4,
+                "value": "medium",
+                "proportion": 50
+              },
+              {
+                "key": 5,
+                "value": "lean",
+                "proportion": 50
+              },
+              {
+                "key": 6,
+                "value": "muscular",
+                "proportion": 50
+              },
+              {
+                "key": 7,
+                "value": "fat",
+                "proportion": 50
+              },
+              {
+                "key": 8,
+                "value": "regular",
+                "proportion": 50
+              },
+              {
+                "key": 9,
+                "value": "thin",
+                "proportion": 50
+              },
+              {
+                "key": 10,
+                "value": "stocky",
+                "proportion": 50
+              },
+              {
+                "key": 11,
+                "value": "soft",
+                "proportion": 50
+              },
+              {
+                "key": 12,
+                "value": "wide",
+                "proportion": 50
+              },
+              {
+                "key": 13,
+                "value": "bony",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "$option10",
+            "values": []
+          },
+          {
+            "label": "$option11",
+            "values": []
+          },
+          {
+            "label": "$option12",
+            "values": []
+          },
+          {
+            "label": "$option13",
+            "values": []
+          },
+          {
+            "label": "$option14",
+            "values": []
+          },
+          {
+            "label": "$option15",
+            "values": []
+          }
+        ]
+      }
+    },
+    "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d": {
+      "key": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+      "proportion": 15,
+      "ages": {
+        "schoolAge": 4,
+        "youngAdultAge": 16,
+        "settledAdultAge": 45,
+        "elderlyAge": 120,
+        "maxAge": 180
+      },
+      "femaleHeights": {
+        "maxBabyHeight": 35,
+        "maxSchoolChildHeight": 100,
+        "averageAdultHeight": 145
+      },
+      "maleHeights": {
+        "maxBabyHeight": 35,
+        "maxSchoolChildHeight": 100,
+        "averageAdultHeight": 145
+      },
+      "nameGenerators": [
+        "FAIR_NAME_GENERATOR"
+      ],
+      "customNameGenerators": [],
+      "allGenders": false,
+      "specificGenders": [
+        "3"
+      ],
+      "appearanceTemplate": {
+        "templateLines": [
+          {
+            "key": 0,
+            "template": "Has a $option1 frame with $option2 joints and $option3 panels. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 1,
+            "template": "Its core housing is $option4 and $option5. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 2,
+            "template": "Moves on $option6 legs with $option7 forelimbs. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 3,
+            "template": "Has $option8 glasswork and $option9 energy blocks. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 4,
+            "template": "Stands about $height tall and has $aOrAn $option10 build.",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          }
+        ],
+        "options": [
+          {
+            "label": "Frame profile",
+            "values": [
+              {
+                "key": 0,
+                "value": "low wooden",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "broad platform",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "arched carriage",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "long-bodied",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Joint material",
+            "values": [
+              {
+                "key": 0,
+                "value": "brass",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "bronze",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "iron",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "steel",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Panel finish",
+            "values": [
+              {
+                "key": 0,
+                "value": "polished wood",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "lacquered wood",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "etched metal",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "inlaid metal",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Housing state",
+            "values": [
+              {
+                "key": 0,
+                "value": "clear crystal",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "smoked glass",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "faceted glass",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "multi-chambered crystal",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Core mounting",
+            "values": [
+              {
+                "key": 0,
+                "value": "bracketed in brass",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "nested in carved wood",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "suspended in a metal cage",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "set behind a glass shield",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Leg arrangement",
+            "values": [
+              {
+                "key": 0,
+                "value": "six spider-like",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "six low-slung",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "six broad-set",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "six high-jointed",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Forelimb type",
+            "values": [
+              {
+                "key": 0,
+                "value": "small clawed",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "fine-jointed grasping",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "tool-rigged manipulator",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Glasswork style",
+            "values": [
+              {
+                "key": 0,
+                "value": "clear sensory lenses",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "engraved viewing glass",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "colored indicator glass",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "faceted glass arrays",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Energy block color",
+            "values": [
+              {
+                "key": 0,
+                "value": "amber",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "blue-white",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "green",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "violet",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Build type",
+            "values": [
+              {
+                "key": 0,
+                "value": "compact",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "broad",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "heavy",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "spindly",
+                "proportion": 50
+              },
+              {
+                "key": 4,
+                "value": "long-framed",
+                "proportion": 50
+              },
+              {
+                "key": 5,
+                "value": "high-backed",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "$option11",
+            "values": []
+          },
+          {
+            "label": "$option12",
+            "values": []
+          },
+          {
+            "label": "$option13",
+            "values": []
+          },
+          {
+            "label": "$option14",
+            "values": []
+          },
+          {
+            "label": "$option15",
+            "values": []
+          }
+        ]
+      },
+      "name": "Clanker"
+    },
+    "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01": {
+      "key": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+      "proportion": 30,
+      "ages": {
+        "schoolAge": 2,
+        "youngAdultAge": 8,
+        "settledAdultAge": 15,
+        "elderlyAge": 35,
+        "maxAge": 50
+      },
+      "femaleHeights": {
+        "maxBabyHeight": 12,
+        "maxSchoolChildHeight": 28,
+        "averageAdultHeight": 55
+      },
+      "maleHeights": {
+        "maxBabyHeight": 12,
+        "maxSchoolChildHeight": 28,
+        "averageAdultHeight": 55
+      },
+      "nameGenerators": [
+        "FAIR_NAME_GENERATOR"
+      ],
+      "customNameGenerators": [],
+      "allGenders": false,
+      "specificGenders": [
+        "0"
+      ],
+      "appearanceTemplate": {
+        "templateLines": [
+          {
+            "key": 0,
+            "template": "Has a $option1 body with $option2 eyes. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 1,
+            "template": "Its upper tentacles are $option3 and its lower tentacles are $option4. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 2,
+            "template": "Has $option5 arms ending in $option6 claw-hands. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 3,
+            "template": "Its hide is $option7 $option8 and marked with $option9 paint. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 4,
+            "template": "Measures about $height across and has $aOrAn $option10 body.",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          }
+        ],
+        "options": [
+          {
+            "label": "Body shape",
+            "values": [
+              {
+                "key": 0,
+                "value": "small spherical",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "round leathery",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "firm-shelled",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "broad orb-like",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Eye layout",
+            "values": [
+              {
+                "key": 0,
+                "value": "forward-set central",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "wide-set bright",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "dark central",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Upper tentacles",
+            "values": [
+              {
+                "key": 0,
+                "value": "short feeler-like",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "fine waving",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "crest-like",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "long frilled",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Lower tentacles",
+            "values": [
+              {
+                "key": 0,
+                "value": "dangling sensory",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "hooked grasping",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "soft trailing",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Arm type",
+            "values": [
+              {
+                "key": 0,
+                "value": "thin dangling",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "spidery narrow",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "slender jointed",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Claw-hand type",
+            "values": [
+              {
+                "key": 0,
+                "value": "matched pincer-like",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "tiny lobster-like",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "sharp neat",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Hide texture",
+            "values": [
+              {
+                "key": 0,
+                "value": "leathery",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "shell-backed",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "tight-skinned",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Hide color",
+            "values": [
+              {
+                "key": 0,
+                "value": "black",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "dark gray",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "brown",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "dark green",
+                "proportion": 30
+              }
+            ]
+          },
+          {
+            "label": "Paint style",
+            "values": [
+              {
+                "key": 0,
+                "value": "bright swirling",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "striped ceremonial",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "dotted festival",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "minimal clan",
+                "proportion": 30
+              }
+            ]
+          },
+          {
+            "label": "Body type",
+            "values": [
+              {
+                "key": 0,
+                "value": "compact",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "round",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "dense",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "broad",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "$option11",
+            "values": []
+          },
+          {
+            "label": "$option12",
+            "values": []
+          },
+          {
+            "label": "$option13",
+            "values": []
+          },
+          {
+            "label": "$option14",
+            "values": []
+          },
+          {
+            "label": "$option15",
+            "values": []
+          }
+        ]
+      },
+      "name": "Floater"
+    },
+    "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4": {
+      "key": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+      "proportion": 5,
+      "ages": {
+        "schoolAge": 6,
+        "youngAdultAge": 16,
+        "settledAdultAge": 30,
+        "elderlyAge": 75,
+        "maxAge": 110
+      },
+      "femaleHeights": {
+        "maxBabyHeight": 40,
+        "maxSchoolChildHeight": 150,
+        "averageAdultHeight": 260
+      },
+      "maleHeights": {
+        "maxBabyHeight": 40,
+        "maxSchoolChildHeight": 150,
+        "averageAdultHeight": 260
+      },
+      "nameGenerators": [
+        "FAIR_NAME_GENERATOR"
+      ],
+      "customNameGenerators": [],
+      "allGenders": true,
+      "specificGenders": [],
+      "appearanceTemplate": {
+        "templateLines": [
+          {
+            "key": 0,
+            "template": "Has a $option1 body with $option2 skin. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 1,
+            "template": "Its head is $option3 with $option4 eyes. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 2,
+            "template": "Moves on $option5 walking limbs and uses $option6 forelimbs for work. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 3,
+            "template": "Each hand ends in $option7 fingers tipped with $option8 claws. ",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          },
+          {
+            "key": 4,
+            "template": "Measures about $height long and has $aOrAn $option9 build.",
+            "elseTemplate": "",
+            "hideForGenders": [],
+            "randomlyHideForGenders": [],
+            "valueConditional": {
+              "optionIndex": null,
+              "valueIndex": 0,
+              "equals": false
+            }
+          }
+        ],
+        "options": [
+          {
+            "label": "Body plan",
+            "values": [
+              {
+                "key": 0,
+                "value": "long low",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "streamlined horizontal",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "broad-backed",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "eel-like",
+                "proportion": 30
+              }
+            ]
+          },
+          {
+            "label": "Skin style",
+            "values": [
+              {
+                "key": 0,
+                "value": "smooth pale",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "shark-smooth gray",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "cool beige",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "muted white",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Head shape",
+            "values": [
+              {
+                "key": 0,
+                "value": "short blunt",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "broad-snouted",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "flat-faced",
+                "proportion": 30
+              }
+            ]
+          },
+          {
+            "label": "Eye color",
+            "values": [
+              {
+                "key": 0,
+                "value": "dark gray",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "blue-gray",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "black",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "pale green",
+                "proportion": 30
+              }
+            ]
+          },
+          {
+            "label": "Walking limb set",
+            "values": [
+              {
+                "key": 0,
+                "value": "four sturdy",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "four splayed",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "four low-slung",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Forelimb set",
+            "values": [
+              {
+                "key": 0,
+                "value": "four deft",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "four narrow",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "four strong manipulative",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Finger type",
+            "values": [
+              {
+                "key": 0,
+                "value": "three long",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "three slender",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "three wide-spread",
+                "proportion": 30
+              }
+            ]
+          },
+          {
+            "label": "Claw type",
+            "values": [
+              {
+                "key": 0,
+                "value": "bony",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "hooked",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "ivory-colored",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "Build type",
+            "values": [
+              {
+                "key": 0,
+                "value": "streamlined",
+                "proportion": 50
+              },
+              {
+                "key": 1,
+                "value": "low broad",
+                "proportion": 50
+              },
+              {
+                "key": 2,
+                "value": "dense",
+                "proportion": 50
+              },
+              {
+                "key": 3,
+                "value": "slender",
+                "proportion": 50
+              }
+            ]
+          },
+          {
+            "label": "$option10",
+            "values": []
+          },
+          {
+            "label": "$option11",
+            "values": []
+          },
+          {
+            "label": "$option12",
+            "values": []
+          },
+          {
+            "label": "$option13",
+            "values": []
+          },
+          {
+            "label": "$option14",
+            "values": []
+          },
+          {
+            "label": "$option15",
+            "values": []
+          }
+        ]
+      },
+      "name": "Swimmer"
+    }
+  },
+  "raceParametersCustomConfig": "EQUAL",
+  "racePartners": [
+    {
+      "partnerId": "13516a37-5bb7-44b1-a444-1c31b7c40b17",
+      "race1Id": "lookup_name_0",
+      "race2Id": "lookup_name_0",
+      "partnerProportion": 100,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_0",
+          "proportion": 100
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "b5383e3c-2157-48bb-b8e4-076af6adf61b",
+      "race1Id": "lookup_name_0",
+      "race2Id": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+      "partnerProportion": 0,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_0",
+          "proportion": 50
+        },
+        {
+          "raceId": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+          "proportion": 50
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "74e04ab2-c3a2-4db7-84a0-ac7875b677fb",
+      "race1Id": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+      "race2Id": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+      "partnerProportion": 100,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+          "proportion": 100
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "1ca7d6bf-5d4c-45c2-a5a5-5cb4f8c996e1",
+      "race1Id": "lookup_name_0",
+      "race2Id": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+      "partnerProportion": 0,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_0",
+          "proportion": 50
+        },
+        {
+          "raceId": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+          "proportion": 50
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "a8a330ef-4026-49c7-b02f-e1d4b7e8baf0",
+      "race1Id": "lookup_name_0",
+      "race2Id": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+      "partnerProportion": 0,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_0",
+          "proportion": 50
+        },
+        {
+          "raceId": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+          "proportion": 50
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "f83e7a91-6e32-4d7b-8eb0-73e1a954c0ad",
+      "race1Id": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+      "race2Id": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+      "partnerProportion": 0,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+          "proportion": 50
+        },
+        {
+          "raceId": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+          "proportion": 50
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "56b7d3fd-3461-4692-9492-09d4cf6df885",
+      "race1Id": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+      "race2Id": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+      "partnerProportion": 0,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d",
+          "proportion": 50
+        },
+        {
+          "raceId": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+          "proportion": 50
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "2dcd0f05-f0c9-4f2b-8633-8c53b73417f0",
+      "race1Id": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+      "race2Id": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+      "partnerProportion": 100,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+          "proportion": 100
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "a0f4e567-85be-4e52-9d77-57e574cd7ee1",
+      "race1Id": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+      "race2Id": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+      "partnerProportion": 0,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01",
+          "proportion": 50
+        },
+        {
+          "raceId": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+          "proportion": 50
+        }
+      ],
+      "adopt": true
+    },
+    {
+      "partnerId": "528e0c1f-2eb7-4b88-aa31-72c112e9bf0b",
+      "race1Id": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+      "race2Id": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+      "partnerProportion": 100,
+      "biologicalChildRaces": [
+        {
+          "raceId": "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4",
+          "proportion": 100
+        }
+      ],
+      "adopt": true
+    }
+  ],
+  "genderPartners": {
+    "0": {
+      "0": 4,
+      "1": 92,
+      "2": 3,
+      "3": 1
+    },
+    "1": {
+      "0": 92,
+      "1": 4,
+      "2": 3,
+      "3": 1
+    },
+    "2": {
+      "0": 3,
+      "1": 3,
+      "2": 3,
+      "3": 1
+    },
+    "3": {
+      "0": 1,
+      "1": 1,
+      "2": 1,
+      "3": 1
+    }
+  },
+  "genders": {
+    "lookup_name_0": {
+      "id": "0",
+      "name": "male",
+      "subjectPronoun": "he",
+      "objectPronoun": "him",
+      "possessiveAdjective": "his",
+      "newPersonProportion": 47,
+      "nameType": "MASCULINE",
+      "heightConfig": "MALE"
+    },
+    "lookup_name_1": {
+      "id": "1",
+      "name": "female",
+      "subjectPronoun": "she",
+      "objectPronoun": "her",
+      "possessiveAdjective": "her",
+      "newPersonProportion": 47,
+      "nameType": "FEMININE",
+      "heightConfig": "FEMALE"
+    },
+    "lookup_name_2": {
+      "id": "2",
+      "name": "non-binary",
+      "subjectPronoun": "they",
+      "objectPronoun": "them",
+      "possessiveAdjective": "their",
+      "newPersonProportion": 5,
+      "nameType": "NEUTRAL",
+      "heightConfig": "RANDOM"
+    },
+    "lookup_name_3": {
+      "id": "3",
+      "name": "agender",
+      "subjectPronoun": "they",
+      "objectPronoun": "them",
+      "possessiveAdjective": "their",
+      "newPersonProportion": 1,
+      "nameType": "NEUTRAL",
+      "heightConfig": "RANDOM"
+    }
+  },
+  "educationParameters": {
+    "lifestylesEligibleForEducation": [
+      "COMFORTABLE",
+      "WEALTHY",
+      "ARISTOCRATIC"
+    ],
+    "educationCustomisation": false
+  },
+  "statsGenerationParameters": {
+    "stats": [
+      {
+        "key": "1",
+        "statName": "strength",
+        "correspondsTo": "STRENGTH"
+      },
+      {
+        "key": "2",
+        "statName": "dexterity",
+        "correspondsTo": "DEXTERITY"
+      },
+      {
+        "key": "3",
+        "statName": "constitution",
+        "correspondsTo": "CONSTITUTION"
+      },
+      {
+        "key": "4",
+        "statName": "intelligence",
+        "correspondsTo": "INTELLIGENCE"
+      }
+    ],
+    "minStat": 7,
+    "maxStat": 14,
+    "baseline": 11,
+    "statGenerationType": "NORMAL_DISTRIBUTION",
+    "statModifierType": "HALF_PER_BASELINE_DIFF"
+  },
+  "formState": {
+    "religionsPreset": "GENERIC",
+    "raceNameMap": {
+      "lookup_name_0": "Human",
+      "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d": "Clanker",
+      "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01": "Floater",
+      "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4": "Swimmer"
+    },
+    "genderNameMap": {
+      "0": "male",
+      "1": "female",
+      "2": "non-binary",
+      "3": "agender"
+    }
+  },
+  "religionParameters": {
+    "configuration": "NORMAL",
+    "religionTargetPercentage": 0.005,
+    "religions": [
+      {
+        "religionLabel": "Clanker Continuities",
+        "religionName": "the continuities",
+        "distribution": 85,
+        "key": "101",
+        "secret": false,
+        "allGenders": true,
+        "specificGenders": [],
+        "allRaces": false,
+        "specificRaces": [
+          "lookup_name_c78be64a-55ee-4021-8f58-b0a6abdac95d"
+        ],
+        "gods": [
+          {
+            "formatName": "Archivists",
+            "distribution": 70,
+            "key": "201"
+          },
+          {
+            "formatName": "Growers",
+            "distribution": 50,
+            "key": "202"
+          },
+          {
+            "formatName": "Designers",
+            "distribution": 30,
+            "key": "203"
+          },
+          {
+            "formatName": "Cloners",
+            "distribution": 10,
+            "key": "204"
+          }
+        ]
+      },
+      {
+        "religionLabel": "Floater Pond-Bond",
+        "religionName": "the pond-bond",
+        "distribution": 85,
+        "key": "102",
+        "secret": false,
+        "allGenders": true,
+        "specificGenders": [],
+        "allRaces": false,
+        "specificRaces": [
+          "lookup_name_5d6d2f64-2c0b-4ab0-a9b1-8c4bc2d3ef01"
+        ],
+        "gods": [
+          {
+            "formatName": "The Mother Below",
+            "distribution": 100,
+            "key": "205"
+          }
+        ]
+      },
+      {
+        "religionLabel": "Swimmer Open Spawn",
+        "religionName": "the open spawn",
+        "distribution": 85,
+        "key": "103",
+        "allGenders": true,
+        "specificGenders": [],
+        "allRaces": false,
+        "secret": false,
+        "specificRaces": [
+          "lookup_name_9d7a6f2b-38b8-45cb-9d1d-20a5f6c9e2a4"
+        ],
+        "gods": [
+          {
+            "formatName": "The Wide Current",
+            "distribution": 100,
+            "key": "206"
+          }
+        ]
+      },
+      {
+        "religionLabel": "Human Placeholder",
+        "religionName": "human placeholder",
+        "distribution": 15,
+        "key": "104",
+        "allGenders": true,
+        "specificGenders": [],
+        "allRaces": true,
+        "secret": false,
+        "specificRaces": [],
+        "gods": [
+          {
+            "formatName": "Placeholder Patron",
+            "distribution": 100,
+            "key": "207"
+          }
+        ]
+      }
+    ],
+    "practiceReligionPercentage": 90
+  }
+}
