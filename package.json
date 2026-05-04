@@ -1,0 +1,13 @@
+{
+  "name": "fantasycity-formatters",
+  "version": "1.0.0",
+  "description": "JSON formatting helpers for unfinishedToys",
+  "bin": {
+    "format-json": "tools/format-json.js"
+  },
+  "scripts": {
+    "format": "node tools/format-json.js"
+  },
+  "author": "",
+  "license": "MIT"
+}

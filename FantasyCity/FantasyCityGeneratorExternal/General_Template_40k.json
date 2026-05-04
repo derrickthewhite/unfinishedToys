@@ -1,0 +1,18 @@
+{
+	"settlementName": "Rename Me",
+	"size": "CUSTOM",
+	"customSize": 40000,
+	"averageLifestyle": "CUSTOM",
+	"lifestyleDistribution": {
+		"SQUALID": 1,
+		"POOR": 1,
+		"MODEST": 20,
+		"COMFORTABLE": 40,
+		"WEALTHY": 20,
+		"ARISTOCRATIC": 10
+	},
+	"militaryParameters": {
+		"configuration": "CUSTOM",
+		"militaryTargetPercentage": 0.0067
+	}
+}

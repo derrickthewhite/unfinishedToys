@@ -1,0 +1,37 @@
+{
+	"settlementName": "Rename Me",
+	"size": "TOWN",
+	"customSize": 40000,
+	"averageLifestyle": "CUSTOM",
+	"lifestyleDistribution": {
+		"SQUALID": 1,
+		"POOR": 1,
+		"MODEST": 20,
+		"COMFORTABLE": 40,
+		"WEALTHY": 20,
+		"ARISTOCRATIC": 10
+	},
+	"militaryParameters": {
+		"configuration": "CUSTOM",
+		"militaryTargetPercentage": 0.0067
+	},
+	"formState": {
+		"raceNameMap": {
+			"lookup_name_0": "Human",
+			"lookup_name_1": "Elf",
+			"lookup_name_2": "Dwarf",
+			"lookup_name_3": "Halfling",
+			"lookup_name_4": "Gnome",
+			"lookup_name_5": "Half-Orc",
+			"lookup_name_6": "Dragonkin",
+			"lookup_name_7": "Demonkin",
+			"lookup_name_8": "Half-Elf"
+		},
+		"genderNameMap": {
+			"0": "male",
+			"1": "female",
+			"2": "non-binary",
+			"3": "agender"
+		}
+	}
+}
