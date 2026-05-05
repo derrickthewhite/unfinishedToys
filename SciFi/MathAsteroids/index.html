@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Math Asteroids</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="game-shell">
+    <aside class="answer-rail left-answer-rail" id="leftAnswers" aria-label="Left answer choices"></aside>
+    <main class="game-stage">
+      <div class="canvas-wrap">
+        <canvas id="gameCanvas"></canvas>
+      </div>
+    </main>
+    <aside class="answer-rail right-answer-rail" id="rightAnswers" aria-label="Right answer choices"></aside>
+    <div id="status" class="status-bar">
+      <div id="challengeInfo"></div>
+      <div id="roundInfo"></div>
+      <div id="levelInfo"></div>
+      <div id="buildings"></div>
+      <div id="asteroids"></div>
+    </div>
+    <button id="pauseBtn" class="control-button">Pause</button>
+  </div>
+
+  <div id="overlay" class="overlay visible" aria-live="polite">
+    <div class="overlay-panel">
+      <p class="overlay-kicker">Math Asteroids</p>
+      <h1 id="overlayTitle">Setup</h1>
+      <p id="overlayMessage">Press start when you are ready for round 1.</p>
+      <div id="setupControls" class="setup-controls">
+        <label class="setup-field">
+          <span>Challenge</span>
+          <select id="challengeModeSelect"></select>
+        </label>
+        <p id="setupModeDescription" class="setup-description"></p>
+        <label id="singleTableField" class="setup-field" hidden>
+          <span>Single table</span>
+          <select id="singleTableSelect"></select>
+        </label>
+        <div id="specifiedTablesFields" class="setup-stack" hidden>
+          <label class="setup-field">
+            <span>Table A</span>
+            <select id="specifiedTableASelect"></select>
+          </label>
+          <label class="setup-field">
+            <span>Table B</span>
+            <select id="specifiedTableBSelect"></select>
+          </label>
+        </div>
+        <div class="setup-footer">
+          <label class="setup-field compact-field">
+            <span>Rounds</span>
+            <select id="roundCountSelect"></select>
+          </label>
+          <label class="setup-field compact-field">
+            <span>Level</span>
+            <select id="levelSelect"></select>
+          </label>
+        </div>
+      </div>
+      <div class="overlay-actions">
+        <button id="secondaryActionBtn" class="overlay-button overlay-button-secondary" hidden>Hall of Fame</button>
+        <button id="primaryActionBtn" class="overlay-button">Start</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="hallOfFameScreen" class="overlay" aria-live="polite">
+    <div class="overlay-panel hall-of-fame-panel">
+      <p class="overlay-kicker">Math Asteroids</p>
+      <h1>Hall of Fame</h1>
+      <p id="hallOfFameMessage">Best progress for each challenge and level.</p>
+      <div id="hallOfFameList" class="hall-of-fame-list"></div>
+      <div class="overlay-actions">
+        <button id="closeHallOfFameBtn" class="overlay-button">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="math-problem-manager.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

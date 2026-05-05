@@ -6,7 +6,8 @@
     "format-json": "tools/format-json.js"
   },
   "scripts": {
-    "format": "node tools/format-json.js"
+    "format": "node tools/format-json.js",
+    "test": "node --test SciFi/MathAsteroids/math-problem-manager.test.js"
   },
   "author": "",
   "license": "MIT"
