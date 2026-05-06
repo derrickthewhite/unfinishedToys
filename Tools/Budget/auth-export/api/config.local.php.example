@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'db' => [
+        'host' => '127.0.0.1',
+        'port' => '3306',
+        'name' => 'auth_export',
+        'user' => 'auth_export_user',
+        'pass' => 'change-me-db-secret',
+        'charset' => 'utf8mb4',
+    ],
+    'session' => [
+        'name' => 'auth_export_session',
+        'save_path' => __DIR__ . '/../data/sessions',
+    ],
+    'cors' => [
+        'allow_origin' => '*',
+    ],
+    'auth' => [
+        'enforce_https' => true,
+        'srp_challenge_ttl_seconds' => 300,
+    ],
+];

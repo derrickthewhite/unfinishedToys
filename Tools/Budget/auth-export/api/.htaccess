@@ -1,0 +1,21 @@
+Options -Indexes
+
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+<Files ".htaccess">
+  Require all granted
+</Files>
+
+<FilesMatch "^(config\.php|config\.local\.php|config\.local\.php\.example)$">
+  Require all denied
+</FilesMatch>
+
+RewriteEngine On
+
+RewriteRule ^(lib|routes)(/|$) - [F,L,NC]
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+RewriteRule ^ index.php [L]
