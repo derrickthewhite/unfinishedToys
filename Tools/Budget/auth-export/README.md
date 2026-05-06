@@ -4,6 +4,7 @@ This folder contains a standalone export of the SRP-based account creation and l
 
 Included pieces:
 - `sql/001_auth_schema.mysql.sql`: minimal MySQL schema for authentication only.
+- `sql/002_budget_schema.mysql.sql`: per-user budget JSON storage table.
 - `api/`: auth-only PHP API with SRP signup, signin, signout, and current-user endpoints.
 - `js/`: browser-side SRP client, auth API wrapper, and a small demo UI controller.
 - `index.html`: minimal page for account creation and login.
@@ -47,6 +48,8 @@ There is no separate long-lived SRP server secret to configure. The SRP server s
 - `POST /auth/signout`
 - `GET /auth/me`
 - `GET /auth/test`
+- `GET /budget/data`
+- `POST /budget/data`
 
 ## Notes
 

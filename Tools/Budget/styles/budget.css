@@ -1,0 +1,153 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f9f9f9;
+    color: #333;
+    font-size: 22px;
+}
+
+body.app-loading #display {
+    visibility: hidden;
+}
+
+button {
+    padding: 6px 10px;
+    margin: 4px;
+    background-color: #444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 22px;
+}
+
+button:hover {
+    background-color: #666;
+}
+
+#display {
+    max-width: 1000px;
+    margin: auto;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.app-toolbar {
+    max-width: 1000px;
+    margin: 0 auto 12px;
+    text-align: right;
+}
+
+.section-header {
+    font-size: 1.4em;
+    font-weight: bold;
+    padding: 10px;
+    color: black;
+    margin-top: 20px;
+    border-radius: 4px;
+}
+
+.income-header {
+    background-color: #aec6cf;
+}
+
+.category-header {
+    background-color: #fadadd;
+    position: relative;
+    left: 3%;
+    width: 94%;
+}
+
+.expenses-total-header {
+    background-color: #d7bde2;
+}
+
+.month-header {
+    background-color: #fffacd;
+}
+
+.month {
+    background-color: #b0eacd;
+}
+
+.month-title-header {
+    background-color: #b0eacd;
+    text-align: center;
+    font-size: 1.6em;
+}
+
+.total-header {
+    background-color: #ffdab9;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="color"] {
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.entryName {
+    width: 40%;
+    display: inline-block;
+}
+
+.entryAmount {
+    width: 25%;
+    display: inline-block;
+    text-align: right;
+}
+
+.totalDiv {
+    border-top: 1px solid black;
+    padding: 5px;
+    font-weight: bold;
+}
+
+.category-body {
+    border: 2px solid black;
+    padding: 5px;
+    position: relative;
+    left: 20px;
+}
+
+.buttonsSpan {
+    display: inline-block;
+    text-align: right;
+    width: 30%;
+}
+
+.monthName {
+    display: inline-block;
+    width: 68%;
+}
+
+.headerName {
+    display: inline-block;
+    width: 26%;
+}
+
+.catHeaderName {
+    display: inline-block;
+    width: 25%;
+}
+
+.new-cat-button {
+    margin: 15px 0 0;
+    width: auto;
+    color: black;
+}
+
+.headerAmount {
+    display: inline-block;
+    width: 42%;
+    font-size: 0.9em;
+}
+
+.budgetAmountEntry {
+    width: 90px;
+    margin: 0;
+}

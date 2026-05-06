@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Budget Sign Up</title>
+    <link rel="stylesheet" href="styles/auth.css">
+</head>
+<body>
+    <main class="auth-shell">
+        <section class="auth-card">
+            <div class="auth-banner signup-banner">
+                <p class="eyebrow">Budget</p>
+                <h1>Create an account for synced budgets.</h1>
+                <p>Sign-up uses the existing SRP flow, so plain passwords never go into the database.</p>
+            </div>
+            <div class="auth-grid single-form-grid">
+                <section class="form-panel wide-panel">
+                    <h2>Sign Up</h2>
+                    <form id="signup-form" class="auth-form">
+                        <label for="signup-username">Username</label>
+                        <input id="signup-username" type="text" autocomplete="username" maxlength="40">
+
+                        <label for="signup-password">Password</label>
+                        <input id="signup-password" type="password" autocomplete="new-password">
+
+                        <label for="signup-invite-key">Invite Key</label>
+                        <input id="signup-invite-key" type="password" autocomplete="off">
+
+                        <div class="button-row">
+                            <button type="submit">Create Account</button>
+                            <a class="text-button" href="index.html">Back to Sign In</a>
+                        </div>
+                        <div id="signup-status" class="status" aria-live="polite"></div>
+                    </form>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="js/signup-page.js"></script>
+</body>
+</html>

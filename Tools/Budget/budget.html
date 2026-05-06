@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Budget</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.1/knockout-latest.js" integrity="sha512-2AL/VEauKkZqQU9BHgnv48OhXcJPx9vdzxN1JrKDVc4FPU/MEE/BZ6d9l0mP7VmvLsjtYwqiYQpDskK9dG8KBA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="styles/budget.css">
+</head>
+<body class="app-loading">
+<div class="app-toolbar">
+    <button id="signout-button" type="button">Sign out</button>
+</div>
+<div id="display">
+    <div data-bind="with: currentMonth">
+        <div class="section-header month-title-header">
+            <span class="monthName">
+                <!-- ko ifnot: editName -->
+                    <span data-bind="text: name"></span>
+                <!-- /ko -->
+                <!-- ko if: editName -->
+                    <input data-bind="value: name">
+                <!-- /ko -->
+            </span>
+            <span class="buttonsSpan">
+                <button data-bind="click: toggleEditName">
+                    <span data-bind="text: editName() ? 'save' : 'edit'"></span>
+                </button>
+                <button data-bind="click: $parent.deleteMonth">delete</button>
+            </span>
+        </div>
+        <div class="section-header income-header">
+            <span class="headerName">Net Income</span>
+            <span class="headerAmount">
+                <span data-bind="text: $root.formatDollars(totalIncome())"></span> /
+                <!-- ko ifnot: editIncome -->
+                <span data-bind="text: $root.formatDollars(expectedIncome())"></span>
+                <!-- /ko -->
+                <!-- ko if: editIncome -->
+                <input class="budgetAmountEntry" type="number" data-bind="value: expectedIncome">
+                <!-- /ko -->
+                (<span data-bind="text: $root.formatPercent(totalIncome() / expectedIncome(), true)"></span>)
+            </span>
+            <span class="buttonsSpan">
+                <button data-bind="click: toggleEditIncome">
+                    <span data-bind="text: editIncome() ? 'save' : 'edit'"></span>
+                </button>
+                <button data-bind="click: toggleIncomeCollapsed">
+                    <span data-bind="text: incomeCollapsed() ? 'show' : 'hide'"></span>
+                </button>
+            </span>
+        </div>
+        <!-- ko ifnot: incomeCollapsed -->
+        <div class="category-body">
+            <div data-bind="foreach: income">
+                <div>
+                    <!-- ko if: edit -->
+                        <input class="entryName" type="text" data-bind="value: name">
+                        <input class="entryAmount" type="number" data-bind="value: amount">
+                    <!-- /ko -->
+                    <!-- ko ifnot: edit -->
+                        <span class="entryName" data-bind="text: name"></span>
+                        <span class="entryAmount" data-bind="text: $root.formatDollars(amount())"></span>
+                    <!-- /ko -->
+                    <span class="buttonsSpan">
+                        <button data-bind="click: toggleEdit">
+                            <span data-bind="text: edit() ? 'save' : 'edit'"></span>
+                        </button>
+                        <button data-bind="click: $parent.deleteIncome">delete</button>
+                    </span>
+                </div>
+            </div>
+            <div><button data-bind="click: newIncome">New Income</button></div>
+            <div class="totalDiv">
+                <span class="entryName">Total Income:</span>
+                <span class="entryAmount" data-bind="text: $root.formatDollars(totalIncome())"></span>
+            </div>
+        </div>
+        <!-- /ko -->
+
+        <div class="section-header expenses-total-header">
+            <span class="headerName">Expenses</span>
+
+            <span class="headerAmount">
+                <span data-bind="text: $root.formatDollars(totalExpense())"></span> /
+                <!-- ko ifnot: editExpectedExpense -->
+                <span data-bind="text: $root.formatDollars(expectedExpenses())"></span>
+                <!-- /ko -->
+                <!-- ko if: editExpectedExpense -->
+                <input class="budgetAmountEntry" type="number" data-bind="value: expectedExpenses">
+                <!-- /ko -->
+                (<span data-bind="text: $root.formatPercent(totalExpense() / expectedExpenses(), true)"></span>)
+            </span>
+            <span class="buttonsSpan">
+                <button data-bind="click: toggleEditExpenses">
+                    <span data-bind="text: editExpectedExpense() ? 'save' : 'edit'"></span>
+                </button>
+            </span>
+        </div>
+
+        <div data-bind="foreach: expenses">
+            <div class="section-header category-header" data-bind="style: { backgroundColor: customColor }">
+                <span class="catHeaderName">
+                    <!-- ko ifnot: editName -->
+                        <span data-bind="text: name"></span>
+                    <!-- /ko -->
+                    <!-- ko if: editName -->
+                        <input data-bind="value: name">
+                        <input type="color" data-bind="value: customColor">
+                        <button data-bind="click: $parent.moveExpenseUp">^</button>
+                        <button data-bind="click: $parent.moveExpenseDown">v</button>
+                    <!-- /ko -->
+                </span>
+                <span class="headerAmount">
+                    <span data-bind="text: $root.formatDollars(total())"></span> /
+                    <!-- ko ifnot: editName -->
+                    <span data-bind="text: $root.formatDollars(expected())"></span>
+                    <!-- /ko -->
+                    <!-- ko if: editName -->
+                    <input class="budgetAmountEntry" type="number" data-bind="value: expected, event: { focus: clearExpected }">
+                    <!-- /ko -->
+                    (<span data-bind="text: $root.formatPercent(total() / expected(), true)"></span>)
+                </span>
+                <span class="buttonsSpan">
+                    <button data-bind="click: toggleEditName">
+                        <span data-bind="text: editName() ? 'save' : 'edit'"></span>
+                    </button>
+                    <button data-bind="click: $parent.deleteCategory">delete</button>
+                    <button data-bind="click: toggleCollapsed">
+                        <span data-bind="text: collapsed() ? 'show' : 'hide'"></span>
+                    </button>
+                </span>
+            </div>
+            <!-- ko ifnot: collapsed -->
+            <div class="category-body">
+                <div data-bind="foreach: entries">
+                    <div>
+                        <!-- ko if: edit -->
+                            <input class="entryName" type="text" data-bind="value: name">
+                            <input class="entryAmount" type="number" data-bind="value: amount, event: { focus: clearZero }">
+                        <!-- /ko -->
+                        <!-- ko ifnot: edit -->
+                            <span class="entryName" data-bind="text: name"></span>
+                            <span class="entryAmount" data-bind="text: $root.formatDollars(amount())"></span>
+                        <!-- /ko -->
+                        <span class="buttonsSpan">
+                            <button data-bind="click: toggleEdit">
+                                <span data-bind="text: edit() ? 'save' : 'edit'"></span>
+                            </button>
+                            <button data-bind="click: $parent.deleteEntry">delete</button>
+                        </span>
+                    </div>
+                </div>
+                <div><button data-bind="click: newExpense">New Expense</button></div>
+
+                <div class="totalDiv">
+                    <span class="entryName" data-bind="text: 'total ' + name()"></span>
+                    <span class="entryAmount" data-bind="text: $root.formatDollars(total())"></span>
+                </div>
+            </div>
+            <!-- /ko -->
+        </div>
+        <div><button class="category-header new-cat-button" data-bind="click: newCategory">New Category</button></div>
+        <div class="total-header section-header">
+            Total (<span data-bind="text: $root.formatDollars(totalIncome() - totalExpense())"></span>)
+        </div>
+    </div>
+    <div class="section-header month-header">
+        <span class="monthName">months</span>
+
+        <span class="buttonsSpan">
+            <button data-bind="click: toggleMonthsCollapsed">
+                <span data-bind="text: monthsCollapsed() ? 'show' : 'hide'"></span>
+            </button>
+        </span>
+
+    </div>
+    <!-- ko ifnot: monthsCollapsed -->
+        <div data-bind="foreach: months">
+            <div><button class="month" data-bind="text: name, click: $parent.currentMonth"></button></div>
+        </div>
+        <div><button data-bind="click: addMonth">+ Add Month</button></div>
+        <div><button data-bind="click: copyMonth">Copy Month</button></div>
+    <!-- /ko -->
+    <div>
+        <button data-bind="click: undo">Undo</button>
+        <button data-bind="click: redo">Redo</button>
+    </div>
+
+</div>
+<script type="module" src="js/budget-page.js"></script>
+</body>
+</html>

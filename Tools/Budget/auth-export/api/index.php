@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/http.php';
 require_once __DIR__ . '/routes/auth.php';
+require_once __DIR__ . '/routes/budget.php';
 
 handle_cors_and_json_headers();
 
@@ -18,6 +19,10 @@ try {
 
     if ($segments[0] === 'auth') {
         handle_auth_route($method, $segments);
+    }
+
+    if ($segments[0] === 'budget') {
+        handle_budget_route($method, $segments);
     }
 
     error_response('Not found.', 404);
