@@ -335,11 +335,13 @@ function onload() {
 		background-color: #FFDAB9;
 	}
 
-    /* Entries and inputs */
-    input[type="text"], input[type="number"] {
-        padding: 6px;
+	input:not([type]), input[type="text"], input[type="number"], input[type="color"] {
+		padding: 2px 6px;
         border: 1px solid #ccc;
         border-radius: 4px;
+		box-sizing: border-box;
+		font-size: 30px;
+		line-height: 1;
     }
 
     button {
@@ -394,8 +396,9 @@ function onload() {
 	.category-body{
 		border: 2px solid black;
 		padding: 5px;
-		position: relative;
-		left: 20px;
+		box-sizing: border-box;
+		margin-left: 20px;
+		margin-right: 20px;
 	}
 	.buttonsSpan {
 		display: inline-block;
@@ -426,8 +429,13 @@ function onload() {
 		font-size: .9em;
 	}
 	.budgetAmountEntry{
-		width:90px;
+		width:110px;
 		margin:0px;
+	}
+	.budgetColorInput {
+		width: 64px;
+		padding-left: 2px;
+		padding-right: 2px;
 	}
 </style>
 </head>
@@ -440,7 +448,7 @@ function onload() {
 					<span data-bind=" text: name"></span>
 				<!-- /ko -->
 				<!-- ko if: editName -->
-					<input data-bind="if:editName, value:name"></input>
+					<input class="entryName" type="text" data-bind="if:editName, value:name"></input>
 				<!-- /ko -->
 			</span>
 			<span class="buttonsSpan">
@@ -527,8 +535,8 @@ function onload() {
 						<span data-bind=" text: name"></span>
 					<!-- /ko -->
 					<!-- ko if: editName -->
-						<input data-bind="if:editName, value:name"></input>
-						<input type = "color" data-bind="value:customColor"></type>
+						<input class="entryName" type="text" data-bind="if:editName, value:name"></input>
+						<input class="budgetColorInput" type = "color" data-bind="value:customColor"></type>
 						<button data-bind= "click:$parent.moveExpenseUp">^</button>
 						<button data-bind= "click:$parent.moveExpenseDown">v</button>
 					<!-- /ko -->

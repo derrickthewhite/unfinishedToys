@@ -82,12 +82,16 @@ button:hover {
     background-color: #ffdab9;
 }
 
+input:not([type]),
 input[type="text"],
 input[type="number"],
 input[type="color"] {
-    padding: 6px;
+    padding: 2px 6px;
     border: 1px solid #ccc;
     border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 30px;
+    line-height: 1;
 }
 
 .entryName {
@@ -110,8 +114,9 @@ input[type="color"] {
 .category-body {
     border: 2px solid black;
     padding: 5px;
-    position: relative;
-    left: 20px;
+    box-sizing: border-box;
+    margin-left: 20px;
+    margin-right: 20px;
 }
 
 .buttonsSpan {
@@ -148,6 +153,17 @@ input[type="color"] {
 }
 
 .budgetAmountEntry {
-    width: 90px;
+    width: 110px;
     margin: 0;
+}
+
+.budgetColorInput {
+    width: 64px;
+    padding-left: 2px;
+    padding-right: 2px;
+}
+
+.app-toolbar-bottom {
+    margin: 16px 20px 0;
+    padding-bottom: 16px;
 }

@@ -8,9 +8,6 @@
     <link rel="stylesheet" href="styles/budget.css">
 </head>
 <body class="app-loading">
-<div class="app-toolbar">
-    <button id="signout-button" type="button">Sign out</button>
-</div>
 <div id="display">
     <div data-bind="with: currentMonth">
         <div class="section-header month-title-header">
@@ -19,7 +16,7 @@
                     <span data-bind="text: name"></span>
                 <!-- /ko -->
                 <!-- ko if: editName -->
-                    <input data-bind="value: name">
+                    <input class="entryName" type="text" data-bind="value: name">
                 <!-- /ko -->
             </span>
             <span class="buttonsSpan">
@@ -105,8 +102,8 @@
                         <span data-bind="text: name"></span>
                     <!-- /ko -->
                     <!-- ko if: editName -->
-                        <input data-bind="value: name">
-                        <input type="color" data-bind="value: customColor">
+                        <input class="entryName" type="text" data-bind="value: name">
+                        <input class="budgetColorInput" type="color" data-bind="value: customColor">
                         <button data-bind="click: $parent.moveExpenseUp">^</button>
                         <button data-bind="click: $parent.moveExpenseDown">v</button>
                     <!-- /ko -->
@@ -185,6 +182,9 @@
     <div>
         <button data-bind="click: undo">Undo</button>
         <button data-bind="click: redo">Redo</button>
+    </div>
+    <div class="app-toolbar app-toolbar-bottom">
+        <button id="signout-button" type="button">Sign out</button>
     </div>
 
 </div>
