@@ -30,6 +30,23 @@
                         </div>
                         <div id="signin-status" class="status" aria-live="polite"></div>
                     </form>
+
+                    <details class="danger-panel" id="overwrite-panel">
+                        <summary>Replace DB budget with this browser's local budget</summary>
+                        <p>This will sign in, then overwrite the account's saved database budget using whatever is currently stored in this browser's local storage.</p>
+                        <form id="overwrite-form" class="auth-form overwrite-form">
+                            <label for="overwrite-confirm-text">Type OVERWRITE to unlock this action</label>
+                            <input id="overwrite-confirm-text" type="text" autocomplete="off" spellcheck="false">
+
+                            <label class="checkbox-row" for="overwrite-confirm-checkbox">
+                                <input id="overwrite-confirm-checkbox" type="checkbox">
+                                <span>I understand this replaces the database copy with the local browser copy.</span>
+                            </label>
+
+                            <button id="overwrite-button" type="submit" class="danger-button" disabled>Overwrite DB With Local Budget</button>
+                            <div id="overwrite-status" class="status" aria-live="polite"></div>
+                        </form>
+                    </details>
                 </section>
 
                 <aside class="info-panel">
