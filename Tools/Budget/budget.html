@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Budget</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.1/knockout-latest.js" integrity="sha512-2AL/VEauKkZqQU9BHgnv48OhXcJPx9vdzxN1JrKDVc4FPU/MEE/BZ6d9l0mP7VmvLsjtYwqiYQpDskK9dG8KBA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <link rel="stylesheet" href="styles/budget.css">
@@ -102,7 +101,7 @@
                         <span data-bind="text: name"></span>
                     <!-- /ko -->
                     <!-- ko if: editName -->
-                        <input class="entryName" type="text" data-bind="value: name">
+                        <input class="entryName" type="text" data-bind="value: name" style="width: 100%">
                         <input class="budgetColorInput" type="color" data-bind="value: customColor">
                         <button data-bind="click: $parent.moveExpenseUp">^</button>
                         <button data-bind="click: $parent.moveExpenseDown">v</button>

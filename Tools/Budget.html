@@ -535,7 +535,7 @@ function onload() {
 						<span data-bind=" text: name"></span>
 					<!-- /ko -->
 					<!-- ko if: editName -->
-						<input class="entryName" type="text" data-bind="if:editName, value:name"></input>
+						<input class="entryName" type="text" data-bind="if:editName, value:name" style="width: 100%;"></input>
 						<input class="budgetColorInput" type = "color" data-bind="value:customColor"></type>
 						<button data-bind= "click:$parent.moveExpenseUp">^</button>
 						<button data-bind= "click:$parent.moveExpenseDown">v</button>
