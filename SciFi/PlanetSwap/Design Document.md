@@ -161,13 +161,20 @@ Each infrastructure takes a single unit of population to operate it. Its level i
 ## Clarifications Needed
 
 - Define how race stats are derived from planet stats.
+-- They are identical, and should probably be run by reference rather than copy
 - Define the game time unit used for turns so food, growth, transport, and production rates share the same scale.
+-- everything is 1 year, at least for now
 - Define the full population lifecycle: aging, conversion from children to adult roles, death, and reassignment between roles.
+-- population doesn't age, at least to start. Non-farmers replace themselves. We may eventually change this for say culture workers. Children are turned into other types by educators. 1 Educator can tun 1 of another other population into a different popuation (often but not alway children)
 - Clarify whether infrastructure level affects build cost only, output only, staffing only, or some combination of all three.
+--the multiplier affects output. the costs are a progression of ever more exotic elements. staffing is constant. so you always have one population working the facility, but the rarer and more expensive the components the better it builds.
 - Clarify the difference between transports, freighters, and shuttles, especially for intra-planet vs. interplanetary logistics.
 - Define what "1 labor" from factories means mechanically: build points, worker-equivalents, or a trade good.
+-- "labor" is a good used to build things. Its the "output" of a factory, though labor from a specific factory is only used to build stuff that factory can build. An automated factory building other automated factories, given sufficient mined resources, will built one in three years with 2 labor left over. 
 - Define what rare and ultra rare resources actually do in the economy beyond infrastructure upgrades and parts bundling.
+--That's basically their role. Some space infrastructure (including all ships) will require them to be built at all 
 - Decide whether ecology penalties apply immediately on colonization, after population thresholds, or only when local farming / ranching exists.
+--Ecology penalties come in the following forms
 - Decide what minimum playable slice is needed before combat and diplomacy are added, so scope stays controlled.
 
 	
