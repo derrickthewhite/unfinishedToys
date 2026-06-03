@@ -6,8 +6,9 @@
     "format-json": "tools/format-json.js"
   },
   "scripts": {
+    "clean-hordes-svg": "node Fantasy/HordesOfTheThings/clean-svg.js",
     "format": "node tools/format-json.js",
-    "test": "node --test SciFi/MathAsteroids/math-problem-manager.test.js"
+    "test": "node --test SciFi/MathAsteroids/math-problem-manager.test.js Fantasy/HordesOfTheThings/clean-svg.test.js Fantasy/HordesOfTheThings/prototype-geometry.test.js Fantasy/HordesOfTheThings/prototype-rules.test.js Fantasy/HordesOfTheThings/prototype-history.test.js"
   },
   "author": "",
   "license": "MIT"

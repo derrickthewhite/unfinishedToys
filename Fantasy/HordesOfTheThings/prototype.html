@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hordes of the Things Prototype</title>
+    <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+    <div class="app-shell">
+        <header class="game-bar">
+            <div class="bar-group mode-group">
+                <button id="editModeButton" class="mode-button is-active" type="button">Edit Mode</button>
+                <button id="gameModeButton" class="mode-button" type="button">Game Mode</button>
+            </div>
+            <div class="bar-group turn-group">
+                <label>
+                    Side
+                    <select id="activeSideSelect">
+                        <option value="blue">Blue</option>
+                        <option value="red">Red</option>
+                    </select>
+                </label>
+                <label>
+                    Moves
+                    <input id="remainingMovesInput" type="number" min="0" max="9" step="1" value="4">
+                </label>
+                <label>
+                    Phase
+                    <select id="phaseSelect">
+                        <option value="move">Move</option>
+                        <option value="form-up">Form Up</option>
+                        <option value="shooting">Shooting</option>
+                        <option value="melee">Melee</option>
+                    </select>
+                </label>
+            </div>
+            <div class="bar-group loss-group">
+                <span id="blueLosses" class="loss-pill" title="No losses.">Blue lost: 0</span>
+                <span id="redLosses" class="loss-pill" title="No losses.">Red lost: 0</span>
+            </div>
+            <div class="bar-group edit-group">
+                <label>
+                    New Unit
+                    <select id="newUnitTypeSelect"></select>
+                </label>
+                <label>
+                    Side
+                    <select id="placementSideSelect">
+                        <option value="blue">Blue</option>
+                        <option value="red">Red</option>
+                    </select>
+                </label>
+                <button id="placeUnitButton" type="button">Place Unit</button>
+            </div>
+            <div class="bar-group action-group">
+                <button id="finishMoveButton" type="button">Finish Move</button>
+                <button id="endMovePhaseButton" type="button">End Move Phase</button>
+                <button id="stepMoveButton" type="button">Step</button>
+                <button id="cancelMoveButton" type="button">Cancel Move</button>
+                <label id="snapLabel">
+                    <input id="snapCheckbox" type="checkbox" checked>
+                    Snap
+                </label>
+                <label id="formUpPreviewLabel">
+                    <input id="formUpPreviewCheckbox" type="checkbox">
+                    Form-Up Preview
+                </label>
+                <label id="cornerRotationLabel">
+                    <input id="cornerRotationCheckbox" type="checkbox">
+                    Corner Rotation
+                </label>
+                <label id="rangedAreaLabel">
+                    <input id="rangedAreaCheckbox" type="checkbox">
+                    Ranged Area
+                </label>
+                <button id="resolveShootingButton" type="button" hidden>Resolve Shooting</button>
+                <button id="undoMoveButton" type="button">Undo</button>
+                <button id="acknowledgedButton" type="button" hidden>Acknowledged</button>
+            </div>
+            <div class="bar-group utility-group">
+                <button id="storageButton" class="icon-button" type="button" aria-label="Open save and load dialog">&#9881;</button>
+            </div>
+            <div class="bar-group status-group">
+                <div id="statusText">Edit mode: place, drag, marquee-select, or rotate units.</div>
+                <div id="selectionText">No units selected.</div>
+            </div>
+        </header>
+        <main class="board-shell">
+            <div class="board-stage">
+                <canvas id="boardCanvas"></canvas>
+            </div>
+            <aside id="selectionPanel" class="selection-panel is-empty" aria-live="polite">
+                <div class="selection-panel-header">
+                    <div id="selectionPanelEyebrow" class="selection-panel-eyebrow">Selection</div>
+                    <h2 id="selectionPanelTitle">No unit selected</h2>
+                </div>
+                <p id="selectionPanelHint" class="selection-panel-hint">Select a single unit to inspect its stats.</p>
+                <dl id="selectionPanelStats" class="selection-stats" hidden></dl>
+            </aside>
+        </main>
+        <footer class="help-bar">
+            <span>Left drag: interact or marquee select</span>
+            <span>Right drag: pan</span>
+            <span>Wheel: zoom at cursor</span>
+            <span>Shift+click or Shift+drag: add to selection</span>
+            <span>N: toggle snapping</span>
+            <span>P: toggle form-up preview</span>
+            <span>R: toggle corner rotation</span>
+            <span>S: step current single-unit move</span>
+        </footer>
+    </div>
+    <div id="storageModal" class="modal-shell" hidden>
+        <div id="storageBackdrop" class="modal-backdrop"></div>
+        <section class="modal-panel" aria-labelledby="storageTitle" aria-modal="true" role="dialog">
+            <header class="modal-header">
+                <div>
+                    <h2 id="storageTitle">Saved Games</h2>
+                    <p>Store the current board in local storage and reload any saved position.</p>
+                </div>
+                <button id="closeStorageButton" class="icon-button" type="button" aria-label="Close save and load dialog">Close</button>
+            </header>
+            <div class="modal-save-row">
+                <label>
+                    Save Name
+                    <input id="storageNameInput" type="text" maxlength="60" placeholder="Campaign turn 3">
+                </label>
+                <button id="saveStorageButton" type="button">Save Current</button>
+            </div>
+            <div id="storageList" class="storage-list"></div>
+        </section>
+    </div>
+    <script src="prototype-data.js"></script>
+    <script src="prototype-geometry.js"></script>
+    <script src="prototype-rules.js"></script>
+    <script src="prototype-history.js"></script>
+    <script src="prototype-app.js"></script>
+    <script src="prototype.js"></script>
+</body>
+</html>
