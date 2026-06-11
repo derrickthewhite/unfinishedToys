@@ -352,6 +352,23 @@
             });
         }
 
+        snapProjectedUnits(projectedUnits, unitIds) {
+            if (!this.state.snapEnabled) {
+                return projectedUnits;
+            }
+            const movingIdSet = new Set(unitIds);
+            const stationaryUnits = this.state.units.filter((unit) => !movingIdSet.has(unit.id));
+            const snapOffset = geometry.findFriendlySnapOffset(projectedUnits, stationaryUnits);
+            if (!snapOffset) {
+                return projectedUnits;
+            }
+            return projectedUnits.map((unit) => ({
+                ...unit,
+                x: unit.x + snapOffset.x,
+                y: unit.y + snapOffset.y
+            }));
+        }
+
         bindCanvas() {
             this.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
             this.canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
@@ -515,6 +532,7 @@
                     }
                     this.state.draft.allowSingleRotationFormationEscape = false;
                     this.state.interaction.type = analysis.type === 'single' ? 'move-single' : analysis.type === 'rank' ? 'move-rank' : 'move-file';
+                    this.state.interaction.rankAnalysis = analysis.type === 'rank' ? analysis : null;
                     this.state.interaction.dragBase = geometry.snapshotPositions(this.state.selectedIds, this.state.units);
                     this.state.interaction.draftIds = [...this.state.selectedIds];
                     this.state.interaction.anchorWorld = world;
@@ -555,6 +573,7 @@
             if (handleHit.kind === 'rank-left' || handleHit.kind === 'rank-right') {
                 pivot = handleHit.pivot;
                 this.state.interaction.type = 'rotate-rank';
+                this.state.interaction.rankAnalysis = this.state.selectionAnalysis;
                 this.state.interaction.forwardRotationSign = handleHit.forwardRotationSign || 1;
                 this.state.interaction.suppressClick = true;
                 if (this.state.draft) {
@@ -578,6 +597,30 @@
             if (this.state.mode === 'edit') {
                 this.state.interaction.editSnapshot = this.createEditSnapshot();
             }
+        }
+
+        applyProjectedRankUnits(interaction, projectedUnits, snapBeforeResolve) {
+            const originUnits = interaction.draftIds
+                .map((unitId) => interaction.dragBase[unitId])
+                .filter(Boolean)
+                .map((unit) => ({ ...unit }));
+            let nextUnits = projectedUnits;
+            if (snapBeforeResolve) {
+                nextUnits = this.snapProjectedUnits(nextUnits, interaction.draftIds);
+            }
+            const resolved = rules.resolveAngledRankMoveContact(
+                originUnits,
+                nextUnits,
+                this.state.units,
+                this.state.activeSide,
+                this.state.terrain
+            );
+            const appliedUnits = resolved ? resolved.units : nextUnits;
+            interaction.preserveRankFormation = Boolean(resolved && resolved.unitIds && resolved.unitIds.length > 0);
+            appliedUnits.forEach((projectedUnit) => {
+                const unit = this.getUnitById(projectedUnit.id);
+                Object.assign(unit, projectedUnit);
+            });
         }
 
         onPointerMove(event) {
@@ -637,19 +680,25 @@
             }
 
             if (interaction.type === 'move-rank') {
-                const analysis = this.state.selectionAnalysis;
+                const analysis = interaction.rankAnalysis || this.state.selectionAnalysis;
                 const delta = geometry.subtract(world, interaction.anchorWorld);
                 const allowedDistance = Math.max(0, geometry.dot(delta, analysis.forward));
                 const moveDelta = geometry.scaleVector(analysis.forward, allowedDistance);
-                interaction.draftIds.forEach((unitId) => {
+                const projectedUnits = interaction.draftIds.map((unitId) => {
                     const base = interaction.dragBase[unitId];
-                    const unit = this.getUnitById(unitId);
-                    unit.x = base.x + moveDelta.x;
-                    unit.y = base.y + moveDelta.y;
+                    return {
+                        ...base,
+                        x: base.x + moveDelta.x,
+                        y: base.y + moveDelta.y
+                    };
                 });
-                this.snapSelection(interaction.draftIds);
+                this.applyProjectedRankUnits(interaction, projectedUnits, true);
                 this.evaluateDraft();
-                this.updateSelectionAnalysis();
+                if (interaction.preserveRankFormation) {
+                    this.state.selectionAnalysis = interaction.rankAnalysis;
+                } else {
+                    this.updateSelectionAnalysis();
+                }
                 this.requestRender();
                 return;
             }
@@ -714,21 +763,37 @@
             }
 
             if (interaction.type === 'rotate-rank') {
+                const analysis = interaction.rankAnalysis || this.state.selectionAnalysis;
                 const currentAngle = geometry.angleBetween(interaction.pivot, world);
                 const rawRotationDelta = geometry.normalizeAngle(currentAngle - interaction.anchorAngle);
                 const rotationDelta = (interaction.forwardRotationSign || 1) > 0
                     ? Math.max(0, rawRotationDelta)
                     : Math.min(0, rawRotationDelta);
-                interaction.draftIds.forEach((unitId) => {
+                const projectedUnits = interaction.draftIds.map((unitId) => {
                     const base = interaction.dragBase[unitId];
-                    const unit = this.getUnitById(unitId);
                     const frontLeft = geometry.rotatePoint({ x: base.x, y: base.y }, interaction.pivot, rotationDelta);
-                    unit.x = frontLeft.x;
-                    unit.y = frontLeft.y;
-                    unit.rotation = geometry.normalizeAngle(base.rotation + rotationDelta);
+                    return {
+                        ...base,
+                        x: frontLeft.x,
+                        y: frontLeft.y,
+                        rotation: geometry.normalizeAngle(base.rotation + rotationDelta)
+                    };
                 });
+                if (analysis.type === 'rank') {
+                    this.applyProjectedRankUnits(interaction, projectedUnits, false);
+                } else {
+                    projectedUnits.forEach((projectedUnit) => {
+                        const unit = this.getUnitById(projectedUnit.id);
+                        Object.assign(unit, projectedUnit);
+                    });
+                    this.snapSelection(interaction.draftIds);
+                }
                 this.evaluateDraft();
-                this.updateSelectionAnalysis();
+                if (interaction.preserveRankFormation) {
+                    this.state.selectionAnalysis = interaction.rankAnalysis;
+                } else {
+                    this.updateSelectionAnalysis();
+                }
                 this.requestRender();
             }
         }
@@ -753,6 +818,10 @@
                 this.recordEditSnapshot(interaction.editSnapshot);
             } else if (interaction.type === 'move-rank' || interaction.type === 'move-file' || interaction.type === 'rotate-rank') {
                 this.commitDraftStep();
+            }
+            if (interaction.preserveRankFormation) {
+                this.updateSelectionAnalysis();
+                this.syncUiFromState();
             }
             if (this.canvas.hasPointerCapture(event.pointerId)) {
                 this.canvas.releasePointerCapture(event.pointerId);

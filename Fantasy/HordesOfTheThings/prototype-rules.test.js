@@ -324,6 +324,166 @@ test('file movement does not report self-overlap when units remain in legal cont
     assert.equal(result.invalidIds.size, 0);
 });
 
+test('movement-time angled rank contact shifts the still-moving element orthogonally to clear blockers', () => {
+    const originUnits = [
+        {
+            id: 'b1',
+            type: 'Blade',
+            side: 'blue',
+            width: 40,
+            depth: 20,
+            x: 80,
+            y: 140,
+            rotation: 0,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b2',
+            type: 'Blade',
+            side: 'blue',
+            width: 40,
+            depth: 20,
+            x: 120,
+            y: 140,
+            rotation: 0,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        }
+    ];
+    const projectedUnits = [
+        { ...originUnits[0], x: 80, y: 260 },
+        { ...originUnits[1], x: 120, y: 260 }
+    ];
+    const enemyUnits = [
+        {
+            id: 'r1',
+            type: 'Blade',
+            side: 'red',
+            width: 40,
+            depth: 20,
+            x: 100,
+            y: 220,
+            rotation: Math.PI / 4,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'r2',
+            type: 'Blade',
+            side: 'red',
+            width: 40,
+            depth: 20,
+            x: 128.2842712474619,
+            y: 248.2842712474619,
+            rotation: Math.PI / 4,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        }
+    ];
+
+    const result = rules.resolveAngledRankMoveContact(
+        originUnits,
+        projectedUnits,
+        [...projectedUnits, ...enemyUnits],
+        'blue',
+        { roads: [], features: [] }
+    );
+    const movingBlue = result.units.find((unit) => unit.id === 'b1');
+    const formedBlue = result.units.find((unit) => unit.id === 'b2');
+    const shift = geometry.subtract({ x: movingBlue.x, y: movingBlue.y }, { x: projectedUnits[0].x, y: projectedUnits[0].y });
+    const forward = geometry.getForwardVector(projectedUnits[0].rotation);
+    const right = geometry.getRightVector(projectedUnits[0].rotation);
+
+    assert.deepEqual(result.unitIds, ['b2']);
+    assert.ok(Math.abs(geometry.dot(shift, forward)) < 0.01);
+    assert.ok(Math.abs(geometry.dot(shift, right)) > 0.01);
+    assert.equal(geometry.polygonsOverlap(geometry.getUnitCorners(movingBlue), geometry.getUnitCorners(formedBlue)), false);
+    enemyUnits.forEach((enemyUnit) => {
+        assert.equal(geometry.polygonsOverlap(geometry.getUnitCorners(movingBlue), geometry.getUnitCorners(enemyUnit)), false);
+    });
+});
+
+test('movement-time angled rank contact can shove a chain of neighboring units away from the formed unit', () => {
+    const originUnits = [
+        {
+            id: 'b1',
+            type: 'Blade',
+            side: 'blue',
+            width: 40,
+            depth: 20,
+            x: 80,
+            y: 120,
+            rotation: 0,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b2',
+            type: 'Blade',
+            side: 'blue',
+            width: 40,
+            depth: 20,
+            x: 120,
+            y: 120,
+            rotation: 0,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b3',
+            type: 'Blade',
+            side: 'blue',
+            width: 40,
+            depth: 20,
+            x: 160,
+            y: 120,
+            rotation: 0,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        }
+    ];
+    const projectedUnits = [
+        { ...originUnits[0], x: 80, y: 240 },
+        { ...originUnits[1], x: 120, y: 240 },
+        { ...originUnits[2], x: 160, y: 240 }
+    ];
+    const enemyUnits = [
+        {
+            id: 'r1',
+            type: 'Blade',
+            side: 'red',
+            width: 40,
+            depth: 20,
+            x: 140,
+            y: 200,
+            rotation: Math.PI / 4,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'r2',
+            type: 'Blade',
+            side: 'red',
+            width: 40,
+            depth: 20,
+            x: 168.2842712474619,
+            y: 228.2842712474619,
+            rotation: Math.PI / 4,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        }
+    ];
+
+    const result = rules.resolveAngledRankMoveContact(
+        originUnits,
+        projectedUnits,
+        [...projectedUnits, ...enemyUnits],
+        'blue',
+        { roads: [], features: [] }
+    );
+    const firstBlue = result.units.find((unit) => unit.id === 'b1');
+    const secondBlue = result.units.find((unit) => unit.id === 'b2');
+    const formedBlue = result.units.find((unit) => unit.id === 'b3');
+
+    assert.deepEqual(result.unitIds, ['b3']);
+    assert.ok(firstBlue.x < projectedUnits[0].x);
+    assert.ok(secondBlue.x < projectedUnits[1].x);
+    assert.equal(geometry.polygonsOverlap(geometry.getUnitCorners(firstBlue), geometry.getUnitCorners(secondBlue)), false);
+    assert.equal(geometry.polygonsOverlap(geometry.getUnitCorners(secondBlue), geometry.getUnitCorners(formedBlue)), false);
+});
+
 test('rank wheel pivot stays on the outermost unit even if that unit is slightly skewed', () => {
     const blade = {
         id: 'unit-1',
@@ -631,6 +791,100 @@ test('automatic form up triggers from a single close front corner even when the 
 
     assert.deepEqual(result.movedUnitIds, ['b1']);
     assert.equal(formedBlue.rotation, Math.PI / 2);
+});
+
+test('automatic form up only moves the angled elements that can individually reach contact', () => {
+    const blueLead = {
+        id: 'b1',
+        type: 'Blade',
+        side: 'blue',
+        width: 40,
+        depth: 20,
+        x: 120,
+        y: 180,
+        rotation: -3 * Math.PI / 4,
+        moves: { road: 100, good: 50, bad: 50, water: 25 }
+    };
+    const blueWing = {
+        id: 'b2',
+        type: 'Blade',
+        side: 'blue',
+        width: 40,
+        depth: 20,
+        x: 148.2842712474619,
+        y: 151.7157287525381,
+        rotation: -3 * Math.PI / 4,
+        moves: { road: 100, good: 50, bad: 50, water: 25 }
+    };
+    const red = {
+        id: 'r1',
+        type: 'Blade',
+        side: 'red',
+        width: 40,
+        depth: 20,
+        x: 180,
+        y: 200,
+        rotation: -Math.PI,
+        moves: { road: 100, good: 50, bad: 50, water: 25 }
+    };
+
+    const result = rules.resolveAutomaticFormUp([blueLead, blueWing, red], 'blue', data.createDefaultTerrain());
+    const formedLead = result.units.find((unit) => unit.id === 'b1');
+    const formedWing = result.units.find((unit) => unit.id === 'b2');
+
+    assert.deepEqual(result.movedUnitIds, ['b1']);
+    assert.equal(formedLead.rotation, Math.PI / 2);
+    assert.equal(geometry.sameFootprint(formedWing, blueWing), true);
+});
+
+test('automatic form up slides a non-qualifying angled neighbor sideways to avoid overlap', () => {
+    const blueLead = {
+        id: 'b1',
+        type: 'Blade',
+        side: 'blue',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 140,
+        rotation: -3 * Math.PI / 4,
+        moves: { road: 100, good: 50, bad: 50, water: 25 }
+    };
+    const blueWing = {
+        id: 'b2',
+        type: 'Blade',
+        side: 'blue',
+        width: 40,
+        depth: 20,
+        x: 71.7157287525381,
+        y: 111.7157287525381,
+        rotation: -3 * Math.PI / 4,
+        moves: { road: 100, good: 50, bad: 50, water: 25 }
+    };
+    const red = {
+        id: 'r1',
+        type: 'Blade',
+        side: 'red',
+        width: 40,
+        depth: 20,
+        x: 120,
+        y: 120,
+        rotation: Math.PI / 2,
+        moves: { road: 100, good: 50, bad: 50, water: 25 }
+    };
+
+    const result = rules.resolveAutomaticFormUp([blueLead, blueWing, red], 'blue', data.createDefaultTerrain());
+    const formedLead = result.units.find((unit) => unit.id === 'b1');
+    const formedWing = result.units.find((unit) => unit.id === 'b2');
+    const wingDelta = geometry.subtract({ x: formedWing.x, y: formedWing.y }, { x: blueWing.x, y: blueWing.y });
+    const wingForward = geometry.getForwardVector(blueWing.rotation);
+    const wingRight = geometry.getRightVector(blueWing.rotation);
+
+    assert.deepEqual(result.movedUnitIds.sort(), ['b1', 'b2']);
+    assert.equal(formedLead.rotation, Math.PI);
+    assert.equal(formedWing.rotation, blueWing.rotation);
+    assert.ok(Math.abs(geometry.dot(wingDelta, wingForward)) < 0.1);
+    assert.ok(Math.abs(geometry.dot(wingDelta, wingRight)) > 0.1);
+    assert.equal(geometry.polygonsOverlap(geometry.getUnitCorners(formedLead), geometry.getUnitCorners(formedWing)), false);
 });
 
 test('automatic form up keeps mixed-depth front-aligned units in one formation group', () => {

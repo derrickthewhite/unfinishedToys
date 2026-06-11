@@ -26,6 +26,14 @@ function createBlade(id, x, y) {
     };
 }
 
+function createRankPair(leftId, rightId, x, y, rotation, side) {
+    const right = geometry.getRightVector(rotation);
+    return [
+        { ...createBlade(leftId, x, y), rotation, side: side || 'blue' },
+        { ...createBlade(rightId, x + (right.x * 40), y + (right.y * 40)), rotation, side: side || 'blue' }
+    ];
+}
+
 function createStorage() {
     const store = new Map();
     return {
@@ -211,6 +219,123 @@ test('rank wheeling only allows forward rotation', () => {
     const forwardWorld = geometry.rotatePoint(handle.position, handle.pivot, allowedDelta);
     app.onPointerMove({ pointerId: 1, clientX: forwardWorld.x, clientY: forwardWorld.y });
     assert.ok(Math.abs(app.state.units[0].rotation - baseRotation) > 0.05);
+});
+
+test('move-rank keeps an angled contact element formed up while the other element keeps moving forward', () => {
+    const blueUnits = createRankPair('b1', 'b2', 100, 200, 0);
+    const redUnits = createRankPair('r1', 'r2', 100, 100, Math.PI / 4, 'red');
+    const app = createAppHarness({
+        state: {
+            units: [...blueUnits, ...redUnits],
+            terrain: { roads: [], features: [] },
+            selectedIds: ['b1', 'b2'],
+            snapEnabled: false
+        }
+    });
+    app.updateSelectionAnalysis();
+
+    app.state.draft = {
+        unitIds: ['b1', 'b2'],
+        initialOrigin: geometry.snapshotPositions(['b1', 'b2'], app.state.units),
+        validationOrigin: geometry.snapshotPositions(['b1', 'b2'], app.state.units),
+        origin: geometry.snapshotPositions(['b1', 'b2'], app.state.units),
+        history: [],
+        invalidIds: new Set(),
+        reasonById: new Map(),
+        allowSingleRotationFormationEscape: false
+    };
+
+    const analysis = app.state.selectionAnalysis;
+    app.state.interaction = {
+        type: 'move-rank',
+        pointerId: 1,
+        startClientX: 0,
+        startClientY: 0,
+        moved: false,
+        dragBase: geometry.snapshotPositions(['b1', 'b2'], app.state.units),
+        draftIds: ['b1', 'b2'],
+        anchorWorld: { x: 0, y: 0 },
+        rankAnalysis: analysis
+    };
+
+    const firstWorld = geometry.scaleVector(analysis.forward, 100);
+    app.onPointerMove({ pointerId: 1, clientX: firstWorld.x, clientY: firstWorld.y });
+    const firstSnapshot = geometry.snapshotPositions(['b1', 'b2'], app.state.units);
+
+    assert.ok(Math.abs(app.getUnitById('b1').rotation + (3 * Math.PI / 4)) < 0.01);
+    assert.ok(Math.abs(app.getUnitById('b2').rotation) < 0.01);
+    assert.equal(app.state.selectionAnalysis.type, 'rank');
+    assert.equal(app.state.selectionAnalysis.invalid, false);
+
+    const secondWorld = geometry.scaleVector(analysis.forward, 140);
+    app.onPointerMove({ pointerId: 1, clientX: secondWorld.x, clientY: secondWorld.y });
+
+    assert.equal(geometry.sameFootprint(firstSnapshot.b1, app.getUnitById('b1')), true);
+    assert.equal(geometry.sameFootprint(firstSnapshot.b2, app.getUnitById('b2')), false);
+
+    app.onPointerUp({ pointerId: 1, clientX: secondWorld.x, clientY: secondWorld.y });
+    assert.equal(app.state.selectionAnalysis.type, 'invalid');
+    assert.equal(app.state.selectionAnalysis.invalid, true);
+});
+
+test('rotate-rank keeps an angled contact element formed up while the other element keeps wheeling', () => {
+    const blueUnits = createRankPair('u1', 'u2', 240, 260, 0);
+    const redUnits = createRankPair('e1', 'e2', 220, 200, Math.PI / 4, 'red');
+    const app = createAppHarness({
+        state: {
+            units: [...blueUnits, ...redUnits],
+            terrain: { roads: [], features: [] },
+            selectedIds: ['u1', 'u2'],
+            snapEnabled: false
+        }
+    });
+    app.updateSelectionAnalysis();
+
+    app.state.draft = {
+        unitIds: ['u1', 'u2'],
+        initialOrigin: geometry.snapshotPositions(['u1', 'u2'], app.state.units),
+        validationOrigin: geometry.snapshotPositions(['u1', 'u2'], app.state.units),
+        origin: geometry.snapshotPositions(['u1', 'u2'], app.state.units),
+        history: [],
+        invalidIds: new Set(),
+        reasonById: new Map(),
+        allowSingleRotationFormationEscape: false
+    };
+
+    const handle = app.getSelectionHandles().find((entry) => entry.kind === 'rank-left');
+    const initialSnapshot = geometry.snapshotPositions(['u1', 'u2'], app.state.units);
+    app.state.interaction = {
+        type: 'rotate-rank',
+        pointerId: 1,
+        startClientX: 0,
+        startClientY: 0,
+        moved: false,
+        dragBase: initialSnapshot,
+        pivot: handle.pivot,
+        anchorAngle: geometry.angleBetween(handle.pivot, handle.position),
+        draftIds: ['u1', 'u2'],
+        forwardRotationSign: handle.forwardRotationSign,
+        rankAnalysis: app.state.selectionAnalysis
+    };
+
+    const firstWorld = geometry.rotatePoint(handle.position, handle.pivot, handle.forwardRotationSign > 0 ? 0.75 : -0.75);
+    app.onPointerMove({ pointerId: 1, clientX: firstWorld.x, clientY: firstWorld.y });
+    const firstSnapshot = geometry.snapshotPositions(['u1', 'u2'], app.state.units);
+
+    assert.ok(Math.abs(app.getUnitById('u1').rotation + (Math.PI / 4)) < 0.01);
+    assert.ok(Math.abs(app.getUnitById('u2').rotation - 0.75) < 0.01);
+    assert.equal(app.state.selectionAnalysis.type, 'rank');
+    assert.equal(app.state.selectionAnalysis.invalid, false);
+
+    const secondWorld = geometry.rotatePoint(handle.position, handle.pivot, handle.forwardRotationSign > 0 ? 0.95 : -0.95);
+    app.onPointerMove({ pointerId: 1, clientX: secondWorld.x, clientY: secondWorld.y });
+
+    assert.equal(geometry.sameFootprint(firstSnapshot.u1, app.getUnitById('u1')), true);
+    assert.equal(geometry.sameFootprint(firstSnapshot.u2, app.getUnitById('u2')), false);
+
+    app.onPointerUp({ pointerId: 1, clientX: secondWorld.x, clientY: secondWorld.y });
+    assert.equal(app.state.selectionAnalysis.type, 'invalid');
+    assert.equal(app.state.selectionAnalysis.invalid, true);
 });
 
 test('reverseSelection keeps a rank front-aligned even with mixed depths', () => {
