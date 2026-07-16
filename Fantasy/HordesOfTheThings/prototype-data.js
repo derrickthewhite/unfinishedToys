@@ -109,12 +109,13 @@
     function createDefaultUnits(allocateUnitId) {
         const units = [];
 
-        function pushUnit(type, side, x, y, rotation) {
+        function pushUnit(type, side, faction, x, y, rotation) {
             const template = UNIT_TYPES[type];
             units.push({
                 id: allocateUnitId(),
                 type,
                 side,
+				faction,
                 width: UNIT_WIDTH,
                 depth: template.depth,
                 x,
@@ -130,18 +131,18 @@
             });
         }
 
-        pushUnit('Blade', 'blue', 140, 520, 0);
-        pushUnit('Spear', 'blue', 180, 520, 0);
-        pushUnit('Shooter', 'blue', 220, 520, 0);
-        pushUnit('Riders', 'blue', 260, 520, 0);
-        pushUnit('Warband', 'blue', 120, 475, 0);
-        pushUnit('Horde', 'blue', 120, 435, 0);
+        pushUnit('Blade', 'blue', "Panda", 140, 520, 0);
+        pushUnit('Spear', 'blue', "Panda", 180, 520, 0);
+        pushUnit('Shooter', 'blue', "Panda", 220, 520, 0);
+        pushUnit('Riders', 'blue', "Panda", 260, 520, 0);
+        pushUnit('Warband', 'blue', "Panda", 120, 475, 0);
+        pushUnit('Horde', 'blue', "Panda", 120, 435, 0);
 
-        pushUnit('Knights', 'red', 420, 90, Math.PI);
-        pushUnit('Riders', 'red', 460, 90, Math.PI);
-        pushUnit('Hero', 'red', 500, 90, Math.PI);
-        pushUnit('Blade', 'red', 480, 115, Math.PI);
-        pushUnit('Horde', 'red', 480, 155, Math.PI);
+        pushUnit('Knights', 'red', "Undead", 420, 90, Math.PI);
+        pushUnit('Riders', 'red', "Undead", 460, 90, Math.PI);
+        pushUnit('Hero', 'red', "Undead", 500, 90, Math.PI);
+        pushUnit('Blade', 'red', "Undead", 480, 115, Math.PI);
+        pushUnit('Horde', 'red', "Undead", 480, 155, Math.PI);
         return units;
     }
 

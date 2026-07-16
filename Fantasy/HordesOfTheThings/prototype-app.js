@@ -11,6 +11,20 @@
     root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory);
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history) {
     const STORAGE_KEY = 'hordes-of-the-things-saves';
+	const PANDA_UNIT_ASSET_PATHS = Object.freeze({
+		Blade: 'assets/panda/Blade.svg',
+		Hero: 'assets/panda/Hero.svg',
+		Knights: 'assets/panda/Knights.svg',
+		Shooter: 'assets/panda/Shooter.svg',
+		Spear: 'assets/panda/Spear.svg',
+	});
+	const UNDEAD_UNIT_ASSET_PATHS = Object.freeze({
+		Blade: 'assets/undead/Blade.svg',
+		Horde: 'assets/undead/Horde.svg',
+		Riders: 'assets/undead/Riders.svg',
+		Spear: 'assets/undead/Spear.svg',
+		Warband: 'assets/undead/Warband.svg',
+	});
     const UNIT_ASSET_PATHS = Object.freeze({
         Blade: 'assets/Blade.svg',
         Spear: 'assets/Spear.svg',
@@ -2585,7 +2599,22 @@
         }
 
         getUnitAssetPath(unit) {
-            return UNIT_ASSET_PATHS[unit.type] || null;
+            if (!unit || !unit.type) {
+                return null;
+            }
+            const type = unit.type;
+            // Prefer faction-specific asset sets when available
+            if (unit.faction) {
+                const faction = String(unit.faction).toLowerCase();
+                if (faction === 'panda' && PANDA_UNIT_ASSET_PATHS[type]) {
+                    return PANDA_UNIT_ASSET_PATHS[type];
+                }
+                if (faction === 'undead' && UNDEAD_UNIT_ASSET_PATHS[type]) {
+                    return UNDEAD_UNIT_ASSET_PATHS[type];
+                }
+            }
+            // Fallback to generic asset path
+            return UNIT_ASSET_PATHS[type] || null;
         }
 
         getUnitAsset(unit) {
