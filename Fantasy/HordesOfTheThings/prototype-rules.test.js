@@ -9,6 +9,26 @@ function cloneUnit(unit) {
     return JSON.parse(JSON.stringify(unit));
 }
 
+function createUnit(type, side, x, y, rotation) {
+    const template = data.UNIT_TYPES[type];
+    return {
+        id: `${type}-${side}-${x}-${y}`,
+        type,
+        side,
+        width: data.UNIT_WIDTH,
+        depth: template.depth,
+        x,
+        y,
+        rotation,
+        troopClass: template.troopClass,
+        moves: data.convertMovesToMm(template.moves),
+        strength: { ...template.strength },
+        movement: { ...(template.movement || {}) },
+        combat: { ...(template.combat || {}) },
+        ranged: data.convertRangedToMm(template.ranged)
+    };
+}
+
 test('movement allowance uses the worst terrain rather than always min-by-value', () => {
     const rider = {
         moves: { road: 125, good: 125, bad: 50, water: 25 }
@@ -251,6 +271,7 @@ test('step checkpoints do not reset total movement allowance', () => {
 test('default unit movement values are converted from paces to mm', () => {
     const units = data.createDefaultUnits(() => 'unit');
     const blade = units[0];
+    const artillery = units.find((unit) => unit.type === 'Artillery');
     const hero = data.UNIT_TYPES.Hero;
     const riders = data.UNIT_TYPES.Riders;
     const terrain = data.createDefaultTerrain();
@@ -258,6 +279,12 @@ test('default unit movement values are converted from paces to mm', () => {
     assert.equal(blade.moves.road, 100);
     assert.equal(blade.moves.good, 50);
     assert.equal(blade.moves.water, 25);
+    assert.ok(artillery);
+    assert.equal(artillery.value, 3);
+    assert.equal(artillery.depth, 40);
+    assert.deepEqual(artillery.moves, { road: 75, good: 50, bad: 0, water: 25 });
+    assert.deepEqual(artillery.strength, { infantry: 4, mounted: 4 });
+    assert.deepEqual(artillery.ranged, { phase: 'shooting', range: 125, width: 120, requiresOwnTurn: true, requiresStationary: true });
     assert.equal(hero.depth, 40);
     assert.equal(hero.troopClass, 'mounted');
     assert.equal(riders.troopClass, 'mounted');
@@ -989,6 +1016,86 @@ test('shooters can target enemies whose nearest side lies inside the shooting bo
     assert.equal(rules.isValidShootingAttack(shooter, target, [shooter, target], data.createDefaultTerrain()), true);
 });
 
+test('artillery can shoot while stationary but not after moving', () => {
+    const artillery = {
+        id: 'a1',
+        type: 'Artillery',
+        side: 'blue',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 40,
+        x: 100,
+        y: 220,
+        rotation: 0,
+        movedThisTurn: false,
+        ranged: { phase: 'shooting', range: 125, width: 120, requiresOwnTurn: true, requiresStationary: true },
+        moves: { road: 75, good: 50, bad: 0, water: 25 },
+        strength: { infantry: 4, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const target = {
+        id: 't1',
+        type: 'Blade',
+        side: 'red',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 100,
+        rotation: Math.PI,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 3 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const units = [artillery, target];
+    const terrain = { roads: [], features: [] };
+
+    assert.equal(rules.isValidShootingAttack(artillery, target, units, terrain, 'blue'), true);
+    assert.deepEqual(rules.getValidShootingTargets(artillery, units, terrain, 'blue'), ['t1']);
+
+    artillery.movedThisTurn = true;
+
+    assert.equal(rules.canUnitShoot(artillery, 'blue'), false);
+    assert.equal(rules.isValidShootingAttack(artillery, target, units, terrain, 'blue'), false);
+    assert.deepEqual(rules.getValidShootingTargets(artillery, units, terrain, 'blue'), []);
+    assert.equal(rules.resolveShooting(units, { a1: 't1' }, terrain, () => 6, 'blue').results.length, 0);
+});
+
+test('shooters can shoot after moving', () => {
+    const shooter = {
+        id: 's1',
+        type: 'Shooter',
+        side: 'blue',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 220,
+        rotation: 0,
+        movedThisTurn: true,
+        ranged: { phase: 'shooting', range: 50, width: 120, requiresOwnTurn: false, requiresStationary: false },
+        moves: { road: 100, good: 75, bad: 75, water: 25 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const target = {
+        id: 't1',
+        type: 'Blade',
+        side: 'red',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 170,
+        rotation: Math.PI,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 3 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+
+    assert.equal(rules.isValidShootingAttack(shooter, target, [shooter, target], { roads: [], features: [] }, 'blue'), true);
+});
+
 test('shooters with enemy front contact cannot make ranged attacks', () => {
     const shooter = {
         id: 's1',
@@ -1402,6 +1509,29 @@ test('resolveShooting does not make the shooting attacker lose the exchange', ()
     assert.equal(result.units.find((unit) => unit.id === 's1').y, 220);
 });
 
+test('artillery is destroyed on a minor melee loss', () => {
+    const winner = {
+        type: 'Blade',
+        troopClass: 'infantry'
+    };
+    const artillery = {
+        type: 'Artillery',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 40,
+        x: 100,
+        y: 220,
+        rotation: 0
+    };
+
+    const resolution = rules.getMinorLossResolution(winner, artillery, 'melee', { roads: [], features: [] });
+
+    assert.deepEqual(resolution, {
+        outcome: 'destroy',
+        destructionRule: 'Artillery is destroyed when it loses melee.'
+    });
+});
+
 test('detectMeleeCombats finds front-to-front enemy contacts', () => {
     const blue = {
         id: 'b1',
@@ -1718,4 +1848,150 @@ test('resolveMelee applies overlap modifier for an idle enemy on the fighter fla
     assert.ok(combat);
     const blueModifiers = combat.leftPrimaryId === 'b1' ? combat.leftModifiers : combat.rightModifiers;
     assert.equal(blueModifiers.some((modifier) => modifier.id === 'overlapped' && modifier.value === -1), true);
+});
+
+test('new unit templates use the requested stats and special profiles', () => {
+    assert.deepEqual(data.UNIT_TYPES.Beasts, {
+        value: 2,
+        depth: 30,
+        troopClass: 'mounted',
+        moves: { road: 400, good: 400, bad: 400, water: 100 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    });
+    assert.equal(data.UNIT_TYPES.Flyers.moves.good, 1200);
+    assert.equal(data.UNIT_TYPES.Flyers.depth, 20);
+    assert.equal(data.UNIT_TYPES.Flyers.movement.ignoresTerrain, true);
+    assert.equal(data.UNIT_TYPES.Behemoth.value, 4);
+    assert.deepEqual(data.UNIT_TYPES.Behemoth.strength, { infantry: 4, mounted: 5 });
+    assert.deepEqual(data.UNIT_TYPES['Heavy-Spear'].strength, { infantry: 5, mounted: 5 });
+    assert.deepEqual(data.UNIT_TYPES['Heavy-Warband'].strength, { infantry: 4, mounted: 4 });
+});
+
+test('heavy spear and heavy warband inherit combat loss rules without stacking', () => {
+    const heavySpear = createUnit('Heavy-Spear', 'blue', 100, 220, 0);
+    const adjacentHeavySpear = createUnit('Heavy-Spear', 'blue', 140, 220, 0);
+    const heavyWarband = createUnit('Heavy-Warband', 'red', 180, 220, Math.PI);
+    const melee = rules.detectMeleeCombats([heavySpear, adjacentHeavySpear, heavyWarband]);
+    const heavySpearCombatants = melee.combatants.filter((combatant) => combatant.type === 'Heavy-Spear');
+
+    assert.equal(heavySpearCombatants.every((combatant) => combatant.unitIds.length === 1), true);
+    assert.equal(rules.getMinorLossResolution(heavyWarband, heavySpear, 'melee', { roads: [], features: [] }).outcome, 'destroy');
+    assert.equal(rules.getMinorLossResolution(createUnit('Knights', 'red', 0, 0, 0), heavySpear, 'melee', { roads: [], features: [] }).outcome, 'destroy');
+});
+
+test('Beasts ignore bad-going combat penalties and lose melee to mounted troops', () => {
+    const beasts = createUnit('Beasts', 'blue', 100, 220, 0);
+    const terrain = { roads: [], features: [{ kind: 'swamp', cx: 100, cy: 220, rx: 30, ry: 30, wobble: 0 }] };
+    const modifiers = rules.getCombatModifiers({ phase: 'melee', role: 'attacker', unit: beasts, opponent: createUnit('Blade', 'red', 140, 220, Math.PI), terrain });
+
+    assert.equal(modifiers.some((modifier) => modifier.id === 'bad-going'), false);
+    assert.equal(rules.getMinorLossResolution(createUnit('Knights', 'red', 140, 220, Math.PI), beasts, 'melee', terrain).outcome, 'destroy');
+    assert.equal(rules.getMinorLossResolution(createUnit('Knights', 'red', 140, 220, Math.PI), beasts, 'shooting', terrain).outcome, 'recoil');
+});
+
+test('unengaged Flyers ignore terrain and all unit collisions during movement', () => {
+    const flyer = createUnit('Flyers', 'blue', 100, 220, 0);
+    const blocker = createUnit('Blade', 'red', 100, 150, Math.PI);
+    const origin = { [flyer.id]: cloneUnit(flyer) };
+    flyer.y = 70;
+    const terrain = { roads: [], features: [{ kind: 'impassable', cx: 100, cy: 140, rx: 45, ry: 60, wobble: 0 }] };
+
+    const flyerMove = rules.validateDraftState({ unitIds: [flyer.id], origin, history: [] }, [flyer, blocker], terrain);
+    const blade = createUnit('Blade', 'blue', 60, 220, 0);
+    const stationaryFlyer = createUnit('Flyers', 'red', 100, 220, Math.PI);
+    const bladeOrigin = { [blade.id]: cloneUnit(blade) };
+    blade.x = 100;
+    const bladeMove = rules.validateDraftState({ unitIds: [blade.id], origin: bladeOrigin, history: [] }, [blade, stationaryFlyer], { roads: [], features: [] });
+
+    assert.equal(flyerMove.invalidIds.size, 0);
+    assert.equal(bladeMove.invalidIds.size, 0);
+});
+
+test('engaged Flyers must withdraw 20 mm before continuing their move', () => {
+    const flyer = createUnit('Flyers', 'blue', 100, 220, 0);
+    const enemy = createUnit('Blade', 'red', 140, 220, Math.PI);
+    const origin = { [flyer.id]: cloneUnit(flyer) };
+    flyer.y = 190;
+    const forwardMove = rules.validateDraftState({ unitIds: [flyer.id], origin, validationOrigin: origin, history: [] }, [flyer, enemy], { roads: [], features: [] });
+
+    flyer.y = 250;
+    const withdrawal = cloneUnit(flyer);
+    const backwardMove = rules.validateDraftState({ unitIds: [flyer.id], origin, validationOrigin: origin, history: [] }, [flyer, enemy], { roads: [], features: [] });
+    flyer.y = 240;
+    const continuedMove = rules.validateDraftState({
+        unitIds: [flyer.id],
+        origin: { [flyer.id]: withdrawal },
+        validationOrigin: origin,
+        history: [{ [flyer.id]: withdrawal }]
+    }, [flyer, enemy], { roads: [], features: [] });
+
+    assert.equal(forwardMove.reasonById.get(flyer.id), 'An engaged Flyer must first move 20 mm backward.');
+    assert.equal(backwardMove.invalidIds.size, 0);
+    assert.equal(continuedMove.invalidIds.size, 0);
+});
+
+test('Flyers recoil then flee 600 paces after losing shooting or melee', () => {
+    const terrain = { roads: [], features: [] };
+    const artillery = createUnit('Artillery', 'blue', 100, 220, 0);
+    const shootingFlyer = createUnit('Flyers', 'red', 100, 170, Math.PI);
+    const shootingRolls = [1, 1];
+    const shooting = rules.resolveShooting(
+        [artillery, shootingFlyer],
+        { [artillery.id]: shootingFlyer.id },
+        terrain,
+        () => shootingRolls.shift(),
+        'blue'
+    );
+    const meleeFlyer = createUnit('Flyers', 'blue', 100, 220, 0);
+    const blade = createUnit('Blade', 'red', 140, 220, Math.PI);
+    const meleeRolls = [1, 1];
+    const melee = rules.resolveMelee([meleeFlyer, blade], terrain, () => meleeRolls.shift());
+
+    assert.equal(shooting.results[0].outcome, 'flee');
+    assert.equal(shooting.units.find((unit) => unit.id === shootingFlyer.id).y, 0);
+    assert.equal(melee.results[0].outcome, 'flee');
+    assert.equal(melee.units.find((unit) => unit.id === meleeFlyer.id).y, 390);
+});
+
+test('Behemoths flee from Artillery by the shallowest legal heading', () => {
+    const behemoth = createUnit('Behemoth', 'blue', 100, 220, 0);
+    const direct = rules.resolveFlee(behemoth.id, [behemoth], { roads: [], features: [] });
+    const detourTerrain = {
+        roads: [],
+        features: [{ kind: 'water', cx: 100, cy: 330, rx: 25, ry: 25, wobble: 0 }]
+    };
+    const detour = rules.resolveFlee(behemoth.id, [behemoth], detourTerrain);
+    const blockedTerrain = {
+        roads: [],
+        features: [{ kind: 'water', cx: 100, cy: 300, rx: 1000, ry: 1000, wobble: 0 }]
+    };
+    const blocked = rules.resolveFlee(behemoth.id, [behemoth], blockedTerrain);
+
+    assert.equal(direct.units[0].y, 370);
+    assert.notEqual(detour.units[0].x, 100);
+    assert.deepEqual(blocked.destroyedIds, [behemoth.id]);
+});
+
+test('Behemoth flee does not treat a road as safe over forbidden terrain', () => {
+    const behemoth = createUnit('Behemoth', 'blue', 100, 220, 0);
+    const terrain = {
+        roads: [{ orientation: 'vertical', position: 100, width: 40 }],
+        features: [{ kind: 'water', cx: 100, cy: 330, rx: 25, ry: 25, wobble: 0 }]
+    };
+    const result = rules.resolveFlee(behemoth.id, [behemoth], terrain);
+
+    assert.notEqual(result.units[0].x, 100);
+});
+
+test('Behemoths flee only when Artillery wins the combat', () => {
+    const terrain = { roads: [], features: [] };
+    const behemoth = createUnit('Behemoth', 'blue', 100, 220, 0);
+    const artillery = createUnit('Artillery', 'red', 140, 220, Math.PI);
+    const rolls = [1, 2];
+    const melee = rules.resolveMelee([behemoth, artillery], terrain, () => rolls.shift());
+
+    assert.equal(melee.results[0].outcome, 'flee');
+    assert.equal(melee.units.find((unit) => unit.id === behemoth.id).y, 410);
+    assert.equal(rules.getMinorLossResolution(createUnit('Blade', 'red', 140, 220, Math.PI), behemoth, 'melee', terrain).outcome, 'recoil');
 });

@@ -26,6 +26,26 @@ function createBlade(id, x, y) {
     };
 }
 
+function createArtillery(id, x, y, side = 'blue') {
+    return {
+        id,
+        type: 'Artillery',
+        side,
+        width: 40,
+        depth: 40,
+        x,
+        y,
+        rotation: 0,
+        movedThisTurn: false,
+        troopClass: 'infantry',
+        moves: { road: 75, good: 50, bad: 0, water: 25 },
+        ranged: { phase: 'shooting', range: 125, width: 120, requiresOwnTurn: true, requiresStationary: true },
+        value: 3,
+        strength: { infantry: 4, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+}
+
 function createRankPair(leftId, rightId, x, y, rotation, side) {
     const right = geometry.getRightVector(rotation);
     return [
@@ -968,6 +988,126 @@ test('handleShootingClick does not select a shooter with enemy front contact', (
     assert.deepEqual(app.state.shooting.validTargetIds, []);
     assert.deepEqual(app.state.selectedIds, []);
     assert.equal(app.lastStatus, 'Shooter cannot shoot while engaged in melee.');
+});
+
+test('movement flags persist through shooting and reset for the incoming side', () => {
+    const blueArtillery = createArtillery('blue-artillery', 100, 220);
+    const redArtillery = createArtillery('red-artillery', 160, 220, 'red');
+    blueArtillery.movedThisTurn = true;
+    redArtillery.movedThisTurn = true;
+    const app = createAppHarness({
+        state: {
+            phase: 'form-up',
+            units: [blueArtillery, redArtillery]
+        }
+    });
+    app.rollDie = () => 4;
+
+    app.setPhase('shooting');
+
+    assert.equal(blueArtillery.movedThisTurn, true);
+    assert.equal(redArtillery.movedThisTurn, true);
+
+    app.advanceToNextTurn();
+
+    assert.equal(app.state.activeSide, 'red');
+    assert.equal(blueArtillery.movedThisTurn, true);
+    assert.equal(redArtillery.movedThisTurn, false);
+});
+
+test('handleShootingClick rejects moved and inactive artillery', () => {
+    const artillery = createArtillery('a1', 100, 220);
+    const target = { ...createBlade('t1', 100, 100), side: 'red', rotation: Math.PI };
+    artillery.movedThisTurn = true;
+    const app = createAppHarness({
+        state: {
+            phase: 'shooting',
+            units: [artillery, target],
+            terrain: { roads: [], features: [] }
+        }
+    });
+
+    app.handleShootingClick(artillery);
+
+    assert.equal(app.state.shooting.focusedAttackerId, null);
+    assert.equal(app.lastStatus, 'Artillery cannot shoot after moving this turn.');
+
+    artillery.movedThisTurn = false;
+    artillery.side = 'red';
+    app.handleShootingClick(artillery);
+
+    assert.equal(app.state.shooting.focusedAttackerId, null);
+    assert.equal(app.lastStatus, 'Only the active side can declare shooting attacks.');
+});
+
+test('handleShootingClick selects stationary artillery on its own turn', () => {
+    const artillery = createArtillery('a1', 100, 220);
+    const target = { ...createBlade('t1', 100, 100), side: 'red', rotation: Math.PI };
+    const app = createAppHarness({
+        state: {
+            phase: 'shooting',
+            units: [artillery, target],
+            terrain: { roads: [], features: [] }
+        }
+    });
+
+    app.handleShootingClick(artillery);
+
+    assert.equal(app.state.shooting.focusedAttackerId, 'a1');
+    assert.deepEqual(app.state.shooting.validTargetIds, ['t1']);
+    assert.equal(app.lastStatus, 'Artillery selected for shooting.');
+});
+
+test('handleShootingClick allows shooters to fire on the opposing side turn', () => {
+    const shooter = {
+        ...createBlade('s1', 100, 220),
+        type: 'Shooter',
+        depth: 20,
+        ranged: { phase: 'shooting', range: 50, width: 120 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const target = { ...createBlade('t1', 100, 170), side: 'red', rotation: Math.PI };
+    const app = createAppHarness({
+        state: {
+            activeSide: 'red',
+            phase: 'shooting',
+            units: [shooter, target],
+            terrain: { roads: [], features: [] }
+        }
+    });
+
+    app.handleShootingClick(shooter);
+
+    assert.equal(app.state.shooting.focusedAttackerId, 's1');
+    assert.deepEqual(app.state.shooting.validTargetIds, ['t1']);
+    assert.equal(app.lastStatus, 'Shooter selected for shooting.');
+});
+
+test('needsShootingDeclaration identifies eligible undeclared shooters', () => {
+    const shooter = {
+        ...createBlade('s1', 100, 220),
+        type: 'Shooter',
+        ranged: { phase: 'shooting', range: 50, width: 120 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const target = { ...createBlade('t1', 100, 170), side: 'red', rotation: Math.PI };
+    const app = createAppHarness({
+        state: {
+            phase: 'shooting',
+            units: [shooter, target],
+            terrain: { roads: [], features: [] },
+            shooting: { focusedAttackerId: null, validTargetIds: [], attacksByAttacker: {} }
+        }
+    });
+
+    assert.equal(app.needsShootingDeclaration(shooter), true);
+
+    app.state.shooting.attacksByAttacker.s1 = 't1';
+
+    assert.equal(app.needsShootingDeclaration(shooter), false);
+    assert.equal(app.needsShootingDeclaration(target), false);
 });
 
 test('buildCombatResolution keeps destroyed units as ghosts for aftermath display', () => {

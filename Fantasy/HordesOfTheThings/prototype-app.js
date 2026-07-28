@@ -17,6 +17,7 @@
 		Knights: 'assets/panda/Knights.svg',
 		Shooter: 'assets/panda/Shooter.svg',
 		Spear: 'assets/panda/Spear.svg',
+		Artillery: 'assets/panda/Artillery.svg'
 	});
 	const UNDEAD_UNIT_ASSET_PATHS = Object.freeze({
 		Blade: 'assets/undead/Blade.svg',
@@ -879,7 +880,9 @@
                 moves: data.convertMovesToMm(template.moves),
                 value: template.value,
                 ranged: data.convertRangedToMm(template.ranged),
-                strength: { ...template.strength }
+                strength: { ...template.strength },
+                movement: { ...(template.movement || {}) },
+                combat: { ...(template.combat || {}) }
             };
             this.state.units.push(unit);
             this.state.placingUnit = false;
@@ -1506,7 +1509,6 @@
         setPhase(phase) {
             if (this.state.phase !== phase) {
                 this.state.phase = phase;
-                this.resetMovedFlags();
                 if (phase === 'shooting') {
                     this.initializeShootingPhase();
                 } else {
@@ -1550,9 +1552,8 @@
         }
 
         hasAnyShootingAttacks() {
-            return this.state.units.some((unit) => unit.side === this.state.activeSide
-                && rules.isRangedUnit(unit)
-                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain).length > 0);
+            return this.state.units.some((unit) => rules.isRangedUnit(unit)
+                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activeSide).length > 0);
         }
 
         advanceToNextTurn() {
@@ -1563,6 +1564,7 @@
             this.state.selectedIds = [];
             this.state.activeSide = this.state.activeSide === 'blue' ? 'red' : 'blue';
             this.state.remainingMoves = this.rollDie();
+            this.resetMovedFlags(this.state.activeSide);
             this.setPhase('move');
             this.updateSelectionAnalysis();
             this.syncUiFromState();
@@ -1603,6 +1605,16 @@
             return new Set(Object.values(attacks));
         }
 
+        needsShootingDeclaration(unit) {
+            if (this.state.mode !== 'game' || this.state.phase !== 'shooting' || this.state.combatResolution) {
+                return false;
+            }
+            const attacks = this.state.shooting?.attacksByAttacker || {};
+            return rules.canUnitShoot(unit, this.state.activeSide)
+                && !attacks[unit.id]
+                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activeSide).length > 0;
+        }
+
         isUnitShootingParticipant(unit) {
             if (this.state.mode !== 'game' || this.state.phase !== 'shooting') {
                 return false;
@@ -1611,10 +1623,10 @@
                 return this.state.combatResolution.participantIds.has(unit.id);
             }
             const attacks = this.state.shooting?.attacksByAttacker || {};
-            const isAttacker = rules.isRangedUnit(unit) && Boolean(attacks[unit.id]);
+            const isAttacker = rules.canUnitShoot(unit, this.state.activeSide) && Boolean(attacks[unit.id]);
             const isTarget = Object.values(attacks).includes(unit.id);
             const isPendingTarget = (this.state.shooting?.validTargetIds || []).includes(unit.id);
-            const canStillShoot = rules.isRangedUnit(unit) && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain).length > 0;
+            const canStillShoot = this.needsShootingDeclaration(unit);
             return isAttacker || isTarget || isPendingTarget || canStillShoot;
         }
 
@@ -1660,7 +1672,20 @@
                 return;
             }
             if (rules.isRangedUnit(unit)) {
-                const validTargetIds = rules.getValidShootingTargets(unit, this.state.units, this.state.terrain);
+                if (unit.ranged.requiresOwnTurn && unit.side !== this.state.activeSide) {
+                    this.updateStatus('Only the active side can declare shooting attacks.');
+                    return;
+                }
+                if (!rules.canUnitShoot(unit, this.state.activeSide)) {
+                    shooting.focusedAttackerId = null;
+                    shooting.validTargetIds = [];
+                    this.state.selectedIds = [];
+                    this.syncUiFromState();
+                    this.requestRender();
+                    this.updateStatus(`${unit.type} cannot shoot after moving this turn.`);
+                    return;
+                }
+                const validTargetIds = rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activeSide);
                 if (validTargetIds.length === 0) {
                     shooting.focusedAttackerId = null;
                     shooting.validTargetIds = [];
@@ -1819,7 +1844,13 @@
             }
             const shooting = this.getShootingState();
             const snapshot = geometry.snapshotPositions(this.state.units.map((unit) => unit.id), this.state.units);
-            const result = rules.resolveShooting(this.state.units, shooting.attacksByAttacker, this.state.terrain, () => this.rollDie());
+            const result = rules.resolveShooting(
+                this.state.units,
+                shooting.attacksByAttacker,
+                this.state.terrain,
+                () => this.rollDie(),
+                this.state.activeSide
+            );
             this.state.units = result.units;
             this.recordLosses(result.destroyedUnits);
             this.state.combatResolution = this.buildCombatResolution(snapshot, result, 'shooting');
@@ -1879,6 +1910,12 @@
             const result = rules.resolveAutomaticFormUp(this.state.units, this.state.activeSide, this.state.terrain);
 
             this.state.units = result.units;
+            const movedUnitIds = new Set(result.movedUnitIds);
+            this.state.units.forEach((unit) => {
+                if (movedUnitIds.has(unit.id)) {
+                    unit.movedThisTurn = true;
+                }
+            });
             if (result.movedUnitIds.length === 0) {
                 this.state.formUp = null;
                 this.setPhase('shooting');
@@ -2383,6 +2420,7 @@
                     selected: isSelected,
                     invalid: isDraftInvalid || (isSelected && invalidSelection),
                     highlighted: this.state.mode === 'game' && this.state.phase === 'shooting' && validTargetIds.has(unit.id),
+                    needsShootingDeclaration: this.needsShootingDeclaration(unit),
                     ghost: false
                 });
             });
@@ -2585,11 +2623,11 @@
             ctx.fill();
             ctx.shadowBlur = 0;
             const drewAsset = this.drawUnitAsset(ctx, unit);
-            ctx.lineWidth = (options.selected ? 4 : 2) / this.state.camera.scale;
+            ctx.lineWidth = (options.selected || options.needsShootingDeclaration ? 4 : 2) / this.state.camera.scale;
             if (options.ghost) {
                 ctx.setLineDash([6 / this.state.camera.scale, 4 / this.state.camera.scale]);
             }
-            ctx.strokeStyle = options.invalid ? '#d01111' : options.highlighted ? '#d7ac37' : colors.stroke;
+            ctx.strokeStyle = options.invalid ? '#d01111' : (options.needsShootingDeclaration || options.highlighted) ? '#d7ac37' : colors.stroke;
             ctx.stroke();
             if (!drewAsset) {
                 this.drawUnitArrow(ctx, unit);

@@ -118,9 +118,15 @@
         const validationOrigin = draft.validationOrigin || draft.initialOrigin || draft.origin;
         const selectedUnits = draft.unitIds.map((unitId) => units.find((unit) => unit.id === unitId)).filter(Boolean);
         const otherUnits = units.filter((unit) => !draft.unitIds.includes(unit.id));
+        const startingUnits = units.map((unit) => validationOrigin[unit.id] || unit);
+        const startingMelee = detectMeleeCombats(startingUnits);
+        const engagedFlyerIds = new Set(startingUnits
+            .filter((unit) => unit.movement?.ignoresUnitsWhenUnengaged && startingMelee.participantIds.has(unit.id))
+            .map((unit) => unit.id));
         const worstSeverityById = new Map();
         const travelById = new Map();
         const pathCollisionExemptions = new Map();
+        const flyerWithdrawalReached = new Set();
         const stationaryIds = new Set(selectedUnits
             .filter((unit) => geometry.sameFootprint(pathOrigin[unit.id], unit))
             .map((unit) => unit.id));
@@ -145,20 +151,50 @@
             travelById.set(unit.id, [0, 0, 0, 0]);
         });
 
+        (draft.history || []).forEach((snapshot) => {
+            engagedFlyerIds.forEach((unitId) => {
+                const checkpoint = snapshot[unitId];
+                const origin = validationOrigin[unitId];
+                if (!checkpoint || !origin) {
+                    return;
+                }
+                const displacement = geometry.subtract(geometry.getUnitCenter(checkpoint), geometry.getUnitCenter(origin));
+                const rearwardDistance = -geometry.dot(displacement, geometry.getForwardVector(origin.rotation));
+                const flyer = startingUnits.find((unit) => unit.id === unitId);
+                if (rearwardDistance >= flyer.movement.disengageDistance) {
+                    flyerWithdrawalReached.add(unitId);
+                }
+            });
+        });
+
         for (let step = 0; step <= data.PATH_SAMPLES; step += 1) {
             const t = step / data.PATH_SAMPLES;
             const currentSamples = buildSampleMap(selectedUnits, pathOrigin, t, stationaryIds);
             const currentTravelSamples = buildSampleMap(selectedUnits, validationOrigin, t, stationaryIds);
             selectedUnits.forEach((unit) => {
                 const sample = currentSamples.get(unit.id);
-                const sampleTerrain = sampleUnitTerrain(sample, terrain);
+                const ignoresTerrain = Boolean(unit.movement?.ignoresTerrain);
+                const sampleTerrain = ignoresTerrain ? new Set(['good']) : sampleUnitTerrain(sample, terrain);
                 const severity = severityFromTerrain(sampleTerrain);
                 worstSeverityById.set(unit.id, combineMoveSeverity(worstSeverityById.get(unit.id), severity));
-                if (severity === TERRAIN_SEVERITY.impassable) {
+                if (!ignoresTerrain && severity === TERRAIN_SEVERITY.impassable) {
                     setInvalid(invalidIds, reasonById, unit.id, 'Path enters impassable terrain.');
+                }
+                if (engagedFlyerIds.has(unit.id)) {
+                    const originCenter = geometry.getUnitCenter(validationOrigin[unit.id]);
+                    const displacement = geometry.subtract(geometry.getUnitCenter(sample), originCenter);
+                    const rearwardDistance = -geometry.dot(displacement, geometry.getForwardVector(validationOrigin[unit.id].rotation));
+                    if (rearwardDistance >= unit.movement.disengageDistance) {
+                        flyerWithdrawalReached.add(unit.id);
+                    }
                 }
                 otherUnits.forEach((otherUnit) => {
                     if (t < 1 && pathCollisionExemptions.get(unit.id)?.has(otherUnit.id)) {
+                        return;
+                    }
+                    const unitIsUnengagedFlyer = unit.movement?.ignoresUnitsWhenUnengaged && !engagedFlyerIds.has(unit.id);
+                    const otherIsUnengagedFlyer = otherUnit.movement?.ignoresUnitsWhenUnengaged && !engagedFlyerIds.has(otherUnit.id);
+                    if (unitIsUnengagedFlyer || otherIsUnengagedFlyer) {
                         return;
                     }
                     if (geometry.polygonsOverlap(geometry.getUnitCorners(sample), geometry.getUnitCorners(otherUnit))) {
@@ -198,6 +234,13 @@
 
         for (let index = 0; index < selectedUnits.length; index += 1) {
             for (let inner = index + 1; inner < selectedUnits.length; inner += 1) {
+                const left = selectedUnits[index];
+                const right = selectedUnits[inner];
+                const leftIsUnengagedFlyer = left.movement?.ignoresUnitsWhenUnengaged && !engagedFlyerIds.has(left.id);
+                const rightIsUnengagedFlyer = right.movement?.ignoresUnitsWhenUnengaged && !engagedFlyerIds.has(right.id);
+                if (leftIsUnengagedFlyer || rightIsUnengagedFlyer) {
+                    continue;
+                }
                 if (geometry.polygonsOverlap(geometry.getUnitCorners(selectedUnits[index]), geometry.getUnitCorners(selectedUnits[inner]))) {
                     setInvalid(invalidIds, reasonById, selectedUnits[index].id, 'Formation overlaps itself.');
                     setInvalid(invalidIds, reasonById, selectedUnits[inner].id, 'Formation overlaps itself.');
@@ -219,6 +262,11 @@
         }
 
         selectedUnits.forEach((unit) => {
+            if (engagedFlyerIds.has(unit.id) && !flyerWithdrawalReached.has(unit.id)) {
+                invalidIds.add(unit.id);
+                reasonById.set(unit.id, 'An engaged Flyer must first move 20 mm backward.');
+                return;
+            }
             if (invalidIds.has(unit.id)) {
                 return;
             }
@@ -318,6 +366,16 @@
 
     function isRangedUnit(unit) {
         return Boolean(unit && unit.ranged && unit.ranged.phase === 'shooting');
+    }
+
+    function canUnitShoot(unit, activeSide) {
+        if (!isRangedUnit(unit)) {
+            return false;
+        }
+        if (unit.ranged.requiresOwnTurn && activeSide && unit.side !== activeSide) {
+            return false;
+        }
+        return !unit.ranged.requiresStationary || !unit.movedThisTurn;
     }
 
     function getRangedArea(unit) {
@@ -587,8 +645,8 @@
         });
     }
 
-    function isValidShootingAttack(attacker, target, units, terrain) {
-        if (!attacker || !target || attacker.side === target.side || !isRangedUnit(attacker)) {
+    function isValidShootingAttack(attacker, target, units, terrain, activeSide) {
+        if (!attacker || !target || attacker.side === target.side || !canUnitShoot(attacker, activeSide)) {
             return false;
         }
         if (isUnitEngagedForShooting(attacker, units)) {
@@ -601,13 +659,13 @@
         return sightLines.some((line) => !isSightLineBlocked(line.start, line.end, attacker, target, units, terrain));
     }
 
-    function getValidShootingTargets(attacker, units, terrain) {
-        if (!isRangedUnit(attacker)) {
+    function getValidShootingTargets(attacker, units, terrain, activeSide) {
+        if (!canUnitShoot(attacker, activeSide)) {
             return [];
         }
         return units
             .filter((unit) => unit.side !== attacker.side)
-            .filter((unit) => isValidShootingAttack(attacker, unit, units, terrain))
+            .filter((unit) => isValidShootingAttack(attacker, unit, units, terrain, activeSide))
             .map((unit) => unit.id);
     }
 
@@ -683,8 +741,22 @@
 
     function getMinorLossResolution(winner, loser, phase, terrain) {
         const loserInBadGoing = isUnitInBadGoing(loser, terrain);
+        const loserIsSpear = loser.type === 'Spear' || loser.type === 'Heavy-Spear';
+        const winnerIsWarband = winner.type === 'Warband' || winner.type === 'Heavy-Warband';
+        if (loser.type === 'Flyers') {
+            return { outcome: 'flee', destructionRule: null };
+        }
+        if (loser.type === 'Behemoth' && winner.type === 'Artillery') {
+            return { outcome: 'flee', destructionRule: null };
+        }
         if (loser.type === 'Hero') {
             return { outcome: 'recoil', destructionRule: null };
+        }
+        if (loser.type === 'Beasts' && phase === 'melee' && winner.troopClass === 'mounted') {
+            return { outcome: 'destroy', destructionRule: 'Mounted troops destroy Beasts when the Beasts lose melee.' };
+        }
+        if (loser.type === 'Artillery' && phase === 'melee') {
+            return { outcome: 'destroy', destructionRule: 'Artillery is destroyed when it loses melee.' };
         }
         if (loser.type === 'Shooter') {
             if (phase === 'shooting') {
@@ -708,8 +780,8 @@
             }
             return { outcome: 'recoil', destructionRule: null };
         }
-        if (loser.type === 'Spear' || loser.type === 'Blade' || loser.type === 'Horde') {
-            if (winner.type === 'Warband') {
+        if (loserIsSpear || loser.type === 'Blade' || loser.type === 'Horde') {
+            if (winnerIsWarband) {
                 return { outcome: 'destroy', destructionRule: 'Warbands destroy Spears, Blades, and Hordes on a minor win.' };
             }
             if (winner.type === 'Knights' && !loserInBadGoing) {
@@ -726,6 +798,7 @@
             moves: unit.moves ? { ...unit.moves } : undefined,
             strength: unit.strength ? { ...unit.strength } : undefined,
             ranged: unit.ranged ? { ...unit.ranged } : null,
+            movement: unit.movement ? { ...unit.movement } : {},
             combat: unit.combat ? { ...unit.combat } : {}
         };
     }
@@ -833,13 +906,103 @@
         };
     }
 
-    function resolveShooting(units, declarations, terrain, rollDie) {
+    function translateUnit(unit, direction, distance) {
+        return {
+            ...unit,
+            x: unit.x + (direction.x * distance),
+            y: unit.y + (direction.y * distance)
+        };
+    }
+
+    function isUnitInForbiddenBehemothFleeTerrain(unit, terrain) {
+        const corners = geometry.getUnitCorners(unit);
+        const center = geometry.getUnitCenter(unit);
+        const frontMid = geometry.midpoint(corners.frontLeft, corners.frontRight);
+        const backMid = geometry.midpoint(corners.backLeft, corners.backRight);
+        const samplePoints = [corners.frontLeft, corners.frontRight, corners.backLeft, corners.backRight, center, frontMid, backMid];
+        return terrain.features.some((feature) => (feature.kind === 'forest'
+            || feature.kind === 'swamp'
+            || feature.kind === 'water'
+            || feature.kind === 'impassable')
+            && samplePoints.some((point) => geometry.pointInBlob(point, feature)));
+    }
+
+    function getBehemothFleeBlockReason(candidate, units, terrain, fleeingUnitId) {
+        if (isUnitInForbiddenBehemothFleeTerrain(candidate, terrain)) {
+            return 'flee path enters forbidden terrain';
+        }
+        const enemyBlocker = units.find((unit) => unit.id !== fleeingUnitId
+            && unit.side !== candidate.side
+            && geometry.polygonsOverlap(geometry.getUnitCorners(candidate), geometry.getUnitCorners(unit)));
+        if (enemyBlocker) {
+            return `flee path is blocked by ${enemyBlocker.side} ${enemyBlocker.type} ${enemyBlocker.id}`;
+        }
+        return null;
+    }
+
+    function canBehemothFleeAlong(unit, direction, units, terrain) {
+        const fleeDistance = data.pacesToMm(600);
+        for (let step = 1; step <= data.PATH_SAMPLES; step += 1) {
+            const candidate = translateUnit(unit, direction, fleeDistance * (step / data.PATH_SAMPLES));
+            if (getBehemothFleeBlockReason(candidate, units, terrain, unit.id)) {
+                return false;
+            }
+        }
+        const finalUnit = translateUnit(unit, direction, fleeDistance);
+        return !units.some((otherUnit) => otherUnit.id !== unit.id
+            && otherUnit.side === unit.side
+            && geometry.polygonsOverlap(geometry.getUnitCorners(finalUnit), geometry.getUnitCorners(otherUnit)));
+    }
+
+    function resolveFlee(unitId, units, terrain) {
+        const unit = units.find((entry) => entry.id === unitId) || null;
+        if (!unit) {
+            return { units, destroyedIds: [], destructionReasons: {} };
+        }
+        const fleeDistance = data.pacesToMm(600);
+        const backward = geometry.scaleVector(geometry.getForwardVector(unit.rotation), -1);
+        if (unit.type === 'Flyers') {
+            const fledUnit = translateUnit(unit, backward, fleeDistance);
+            return {
+                units: units.map((entry) => entry.id === unitId ? fledUnit : entry),
+                destroyedIds: [],
+                destructionReasons: {}
+            };
+        }
+        if (unit.type !== 'Behemoth') {
+            return { units, destroyedIds: [], destructionReasons: {} };
+        }
+        const backwardAngle = Math.atan2(backward.y, backward.x);
+        for (let degrees = 0; degrees <= 90; degrees += 1) {
+            const offsets = degrees === 0 ? [0] : [-degrees, degrees];
+            for (const offset of offsets) {
+                const angle = backwardAngle + (offset * (Math.PI / 180));
+                const direction = { x: Math.cos(angle), y: Math.sin(angle) };
+                if (!canBehemothFleeAlong(unit, direction, units, terrain)) {
+                    continue;
+                }
+                const fledUnit = translateUnit(unit, direction, fleeDistance);
+                return {
+                    units: units.map((entry) => entry.id === unitId ? fledUnit : entry),
+                    destroyedIds: [],
+                    destructionReasons: {}
+                };
+            }
+        }
+        return {
+            units,
+            destroyedIds: [unitId],
+            destructionReasons: { [unitId]: 'Behemoth flee requires a turn greater than 90 degrees.' }
+        };
+    }
+
+    function resolveShooting(units, declarations, terrain, rollDie, activeSide) {
         const baseUnits = units.map(cloneUnit);
         const attacksByTarget = new Map();
         Object.entries(declarations || {}).forEach(([attackerId, targetId]) => {
             const attacker = baseUnits.find((unit) => unit.id === attackerId);
             const target = baseUnits.find((unit) => unit.id === targetId);
-            if (!attacker || !target || !isValidShootingAttack(attacker, target, baseUnits, terrain)) {
+            if (!attacker || !target || !isValidShootingAttack(attacker, target, baseUnits, terrain, activeSide)) {
                 return;
             }
             if (!attacksByTarget.has(targetId)) {
@@ -930,13 +1093,14 @@
                 destroyedIds.add(result.loserId);
                 return;
             }
-            if (result.outcome === 'recoil') {
-                recoils.push(result.loserId);
+            if (result.outcome === 'recoil' || result.outcome === 'flee') {
+                recoils.push({ unitId: result.loserId, flee: result.outcome === 'flee' });
             }
         });
 
         let mutableUnits = units.map(cloneUnit).filter((unit) => !destroyedIds.has(unit.id));
-        recoils.forEach((unitId) => {
+        recoils.forEach((entry) => {
+            const unitId = entry.unitId;
             if (destroyedIds.has(unitId)) {
                 return;
             }
@@ -953,6 +1117,22 @@
                 return;
             }
             mutableUnits = recoil.units;
+            if (!entry.flee) {
+                return;
+            }
+            const flee = resolveFlee(unitId, mutableUnits, terrain);
+            if (flee.destroyedIds.length > 0) {
+                flee.destroyedIds.forEach((destroyedId) => {
+                    recoilDestructions.push({
+                        unitId: destroyedId,
+                        reason: flee.destructionReasons[destroyedId] || 'flee destruction reason unavailable'
+                    });
+                });
+                flee.destroyedIds.forEach((destroyedId) => destroyedIds.add(destroyedId));
+                mutableUnits = mutableUnits.filter((unit) => !destroyedIds.has(unit.id));
+                return;
+            }
+            mutableUnits = flee.units;
         });
 
         const destroyedUnits = units.filter((unit) => destroyedIds.has(unit.id)).map(cloneUnit);
@@ -1532,8 +1712,12 @@
                 loserCombatant.unitIds.forEach((unitId) => destroyedIds.add(unitId));
                 return;
             }
-            if (result.outcome === 'recoil') {
-                recoilQueue.push({ combatant: loserCombatant, targetRotation: result.recoilRotation });
+            if (result.outcome === 'recoil' || result.outcome === 'flee') {
+                recoilQueue.push({
+                    combatant: loserCombatant,
+                    targetRotation: result.recoilRotation,
+                    flee: result.outcome === 'flee'
+                });
             }
         });
 
@@ -1555,6 +1739,22 @@
                 return;
             }
             mutableUnits = recoil.units;
+            if (!entry.flee) {
+                return;
+            }
+            const flee = resolveFlee(entry.combatant.primaryUnit.id, mutableUnits, terrain);
+            if (flee.destroyedIds.length > 0) {
+                flee.destroyedIds.forEach((unitId) => {
+                    recoilDestructions.push({
+                        unitId,
+                        reason: flee.destructionReasons[unitId] || 'flee destruction reason unavailable'
+                    });
+                });
+                flee.destroyedIds.forEach((unitId) => destroyedIds.add(unitId));
+                mutableUnits = mutableUnits.filter((unit) => !destroyedIds.has(unit.id));
+                return;
+            }
+            mutableUnits = flee.units;
         });
 
         const destroyedUnits = mutableStartingUnits.filter((unit) => destroyedIds.has(unit.id)).map(cloneUnit);
@@ -2253,6 +2453,7 @@
         movementAllowanceForSeverity,
         resolveAngledRankMoveContact,
         isRangedUnit,
+        canUnitShoot,
         getRangedArea,
         getNearestTargetSide,
         isTargetInRangedArea,
@@ -2263,6 +2464,7 @@
         getExtraShooterPenalty,
         getMinorLossResolution,
         resolveRecoil,
+        resolveFlee,
         resolveShooting,
         resolveMelee,
         describeSelection,

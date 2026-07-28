@@ -43,7 +43,9 @@
     const UNIT_TYPES = {
         Blade: { value: 2, depth: 20, troopClass: 'infantry', moves: { road: 400, good: 200, bad: 200, water: 100 }, strength: { infantry: 5, mounted: 3 }, combat: { ignoresBadGoingPenalty: false } },
         Spear: { value: 2, depth: 20, troopClass: 'infantry', moves: { road: 400, good: 200, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 4 }, combat: { ignoresBadGoingPenalty: false } },
+        'Heavy-Spear': { value: 3, depth: 30, troopClass: 'infantry', moves: { road: 400, good: 200, bad: 200, water: 100 }, strength: { infantry: 5, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } },
         Warband: { value: 2, depth: 20, troopClass: 'infantry', moves: { road: 400, good: 200, bad: 200, water: 100 }, strength: { infantry: 3, mounted: 3 }, combat: { ignoresBadGoingPenalty: true } },
+        'Heavy-Warband': { value: 3, depth: 30, troopClass: 'infantry', moves: { road: 400, good: 200, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 4 }, combat: { ignoresBadGoingPenalty: true } },
         Shooter: {
             value: 2,
             depth: 20,
@@ -53,10 +55,22 @@
             ranged: { phase: 'shooting', range: SHOOTING_RANGE_PACES, width: SHOOTING_BOX_WIDTH },
             combat: { ignoresBadGoingPenalty: true }
         },
+        Artillery: {
+            value: 3,
+            depth: 40,
+            troopClass: 'infantry',
+            moves: { road: 300, good: 200, bad: 0, water: 100 },
+            strength: { infantry: 4, mounted: 4 },
+            ranged: { phase: 'shooting', range: 500, width: SHOOTING_BOX_WIDTH, requiresOwnTurn: true, requiresStationary: true },
+            combat: { ignoresBadGoingPenalty: false }
+        },
         Horde: { value: 1, depth: 40, troopClass: 'infantry', moves: { road: 400, good: 200, bad: 200, water: 100 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false } },
         Knights: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 400, good: 400, bad: 200, water: 100 }, strength: { infantry: 3, mounted: 4 }, combat: { ignoresBadGoingPenalty: false } },
         Riders: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 500, good: 500, bad: 200, water: 100 }, strength: { infantry: 3, mounted: 3 }, combat: { ignoresBadGoingPenalty: false } },
-        Hero: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 500, good: 500, bad: 200, water: 100 }, strength: { infantry: 5, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } }
+        Hero: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 500, good: 500, bad: 200, water: 100 }, strength: { infantry: 5, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } },
+        Beasts: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 400, good: 400, bad: 400, water: 100 }, strength: { infantry: 3, mounted: 4 }, combat: { ignoresBadGoingPenalty: true } },
+        Flyers: { value: 2, depth: 20, troopClass: 'mounted', moves: { road: 1200, good: 1200, bad: 1200, water: 1200 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false }, movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 } },
+        Behemoth: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 400, good: 300, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } }
     };
     function pacesToMm(paces) {
         return paces * MM_PER_PACE;
@@ -78,7 +92,9 @@
         return {
             phase: ranged.phase,
             range: pacesToMm(ranged.range),
-            width: ranged.width
+            width: ranged.width,
+            requiresOwnTurn: Boolean(ranged.requiresOwnTurn),
+            requiresStationary: Boolean(ranged.requiresStationary)
         };
     }
 
@@ -125,6 +141,7 @@
                 troopClass: template.troopClass,
                 moves: convertMovesToMm(template.moves),
                 ranged: convertRangedToMm(template.ranged),
+                movement: { ...(template.movement || {}) },
                 value: template.value,
                 strength: { ...template.strength },
                 combat: { ...(template.combat || {}) }
@@ -137,6 +154,7 @@
         pushUnit('Riders', 'blue', "Panda", 260, 520, 0);
         pushUnit('Warband', 'blue', "Panda", 120, 475, 0);
         pushUnit('Horde', 'blue', "Panda", 120, 435, 0);
+        pushUnit('Artillery', 'blue', "Panda", 180, 435, 0);
 
         pushUnit('Knights', 'red', "Undead", 420, 90, Math.PI);
         pushUnit('Riders', 'red', "Undead", 460, 90, Math.PI);

@@ -18,17 +18,20 @@ Hordes of the Things is a tabletop wargame. Measurements and rules below are giv
 
 ## Terrain
 - By default the map is good going.
-- Terrain features include: roads, water, hills, bad going (obstructs), bad going (non-obstructing), impassable (obstructs), impassable (non-obstructing).
-- Roads are long and thin; other features may take arbitrary shapes.
-- Features (other than hills) are defined by position, shape, and type.
-- Hills have a crest marked as a point or a line.
-- A unit with any part of it on a terrain feature is considered to be "in" that feature.
+- Implemented terrain types are road, good going, forest, swamp, water, and impassable terrain. Roads are long, thin strips; the other implemented features may use arbitrary blob shapes.
+- Forest and swamp are both bad going and rough terrain. They have identical movement, combat, and line-of-sight effects.
+- A unit samples its corners, center, and front and rear midpoints to determine the terrain it occupies. For movement, the path is sampled and the relevant terrain allowance applies to the whole move.
+- Any road sample takes precedence over every other sampled terrain type, including water and impassable terrain, so the unit uses its road movement allowance for that move.
+- Impassable terrain cannot be entered or occupied. Water can be entered using the unit's water movement allowance.
+- Hills, hill crests, and separate obstructing versus non-obstructing variants are not yet implemented in terrain data or rules.
 
 ## Movement
 - Each round a player receives a number of moves equal to the roll of a 1d6.
 - When moving an individual unit, it may rotate and translate freely as long as the distance any corner moves is less than or equal to the move distance through the worst terrain it traverses.
+- Road, good-going, bad-going, and water movement allowances come from the unit's type. Forest and swamp use the bad-going allowance; an impassable path is illegal. Road precedence applies when any sampled point of the move is on a road.
 - A single unit that starts in legal edge contact with a friendly formation may rotate out through that starting contact, but it still must end clear of all collisions.
 - Units may not move through each other or through impassable terrain
+- Flyers ignore all terrain during movement, including water and impassable terrain. An unengaged Flyer is non-blocking: it and other units may cross or end overlapping each other. A Flyer that begins in melee instead follows normal collision rules and must first move at least 20 mm generally backward, measured along its starting facing, before continuing the same move; lateral movement is allowed during that withdrawal.
 - Formation rules:
   - A "formation" (units on the same side whose sides are neatly stacked) may move forward together as a single move.
   - "Rank formations" (units whose fronts form a line) may wheel about their front-right or front-left corner.
@@ -40,6 +43,7 @@ Hordes of the Things is a tabletop wargame. Measurements and rules below are giv
 - Forming up: after normal moves, units that can reach an enemy by moving the configured form-up distance or less may form up (maintaining formation); a single front corner getting close enough is sufficient to trigger the form-up check, even when the final alignment requires rotation.
 - Default form-up still prefers the usual face-to-face result, but a unit approaching from the side may instead finish with its front facing the enemy side if both of its starting front corners are at or just barely past the enemy front line from the enemy's point of view.
 - Recoil: moving backwards equal to unit depth (a combat result).
+- A recoil destroys the original recoiling unit if its destination enters water or impassable terrain, in addition to the existing unit-contact obstructions.
 - Retreat: moving backwards a specified amount; limited maneuver is allowed.
 
 ## Starting Unit Types
@@ -49,28 +53,41 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Blade | Infantry | 2 | 20 mm | 400 | 200 | 200 | 100 | +5 | +3 |
 | Spear | Infantry | 2 | 20 mm | 400 | 200 | 200 | 100 | +4 | +4 |
+| Heavy-Spear | Infantry | 3 | 30 mm | 400 | 200 | 200 | 100 | +5 | +5 |
 | Warband | Infantry | 2 | 20 mm | 400 | 200 | 200 | 100 | +3 | +3 |
+| Heavy-Warband | Infantry | 3 | 30 mm | 400 | 200 | 200 | 100 | +4 | +4 |
 | Shooter | Infantry | 2 | 20 mm | 400 | 300 | 300 | 100 | +3 | +4 |
+| Artillery | Infantry | 3 | 40 mm | 300 | 200 | 0 | 100 | +4 | +4 |
 | Horde | Infantry | 1 | 40 mm | 400 | 200 | 200 | 100 | +2 | +2 |
 | Knights | Mounted | 2 | 30 mm | 400 | 400 | 200 | 100 | +3 | +4 |
 | Riders | Mounted | 2 | 30 mm | 500 | 500 | 200 | 100 | +3 | +3 |
 | Hero | Mounted | 4 | 40 mm | 500 | 500 | 200 | 100 | +5 | +5 |
+| Beasts | Mounted | 2 | 30 mm | 400 | 400 | 400 | 100 | +3 | +4 |
+| Flyers | Mounted | 2 | 20 mm | 1200 | 1200 | 1200 | 1200 | +2 | +2 |
+| Behemoth | Mounted | 4 | 40 mm | 400 | 300 | 200 | 100 | +4 | +5 |
 
 ## Combat
-- Only ranged units with a ranged profile and no current enemy front contact participate in the shooting phase. Right now that means Shooters that are not already tied down by an enemy on their front, but the data model now supports additional ranged troop types later.
-- Shooters fire only in the `shooting` phase. Their current firing area is a 200-pace deep box, 120 mm wide, projected from the front edge of the base.
+- Only ranged units with a ranged profile and no current enemy front contact participate in the shooting phase.
+- Shooters fire only in the `shooting` phase. Their current firing area is a 200-pace deep box, 120 mm wide, projected from the front edge of the base. Artillery fires only during its own shooting phase, only if it did not move that turn, and uses a 500-pace deep, 120 mm-wide firing box.
 - If the `Ranged Area` checkbox is enabled during shooting, each ranged unit's firing box is drawn on the map as a thin outline.
 - Shooting line of sight is checked from the shooter's front edge to the nearest side of the target. Impassable terrain, other units, and rough ground block shots. Rough ground only allows sight through the first 50 paces when the line begins or ends inside that rough ground. Hill-crest blocking is still deferred until hill crests are modeled in terrain data.
+- Forest and swamp are rough terrain for shooting line of sight. A shot may travel through up to 50 paces of rough terrain at the shooter's end when the shooter is in bad going, and independently up to 50 paces at the target's end when the target is in bad going; rough terrain farther from both endpoints blocks the shot. Impassable terrain blocks every shooting line that crosses it, while water and roads do not block line of sight.
 - Shooting declarations are made before resolution. Clicking a ranged unit that is not tied down by enemy front contact highlights it and its valid targets; clicking a valid enemy target assigns that shot and draws a red arched arrow.
 - Shooting currently resolves once per defender. If several shooters target the same enemy, the strongest single shooter supplies the attack strength and extra shooters apply only the defender penalty: 2 shooters gives the defender `-1`; 3 or more gives `-2`.
 - A unit doing the shooting does not suffer a loss result for losing a ranged exchange during the shooting phase; it can still be destroyed or recoiled when it is the target of enemy shooting.
 - `Resolve Shooting` resolves all declared shots, applies destruction or recoil, removes destroyed units from the board, records their point values in the loss bar, and advances to melee.
 - Combat modifiers are now structured as composable rule fragments so later melee modifiers can be added without rewriting the resolver.
+- Forest and swamp are bad going for combat. A unit in bad going takes `-2` unless its type ignores the bad-going penalty; Warbands, Heavy-Warbands, Shooters, and Beasts ignore it. A mounted attacker also takes `-2` when fighting an opponent in bad going, unless it is already receiving the same `-2` bad-going penalty.
+- Riders and Knights that lose in bad going are destroyed rather than recoiling. Knights also lose their minor-win destruction effect against Spears, Blades, and Hordes when the losing unit is in bad going.
+- Beasts are destroyed when they lose a melee combat against mounted troops.
+- Artillery is destroyed if it loses a melee combat, even on a minor loss that would normally cause a recoil.
+- Flyers that lose a battle first recoil normally, then flee 600 paces straight backward. Their flee movement ignores terrain and units; the normal rule that a shooting attacker does not lose its declared shooting exchange still applies.
+- A Behemoth that loses to Artillery in shooting or melee first recoils normally, then flees 600 paces. It selects the shallowest direction from straight backward that avoids enemies, bad going, water, and impassable terrain; it may pass through friends but cannot finish overlapping one. It is destroyed if every legal path requires more than a 90-degree turn from straight backward.
 - Minor-loss outcomes currently follow the requested type table. Recoils move a unit backward by its own depth, may push a directly lined-up friendly rear element, and destroy the original recoiling unit if the recoil path would run into water, impassable terrain, rear or side enemy contact, or an obstructing unit. When recoil destroys a unit, the combat log prints the specific reason.
 - The top bar now tracks total points lost by each side. Hovering the loss readout shows the list of destroyed units and their values.
 - Melee is auto-detected in the `melee` phase. Every enemy pair whose fronts touch forms a combat, and front-to-rear contact also counts as a combat. If two otherwise idle enemy combatants are only touching side-to-side, they are also pulled into melee instead of being ignored.
 - When a combatant is engaged in exactly one melee and does not already have enemy contact on its own front, it turns to face that opponent as combat starts by anchoring the turn on the shared contact edge rather than spinning around its center. This makes side-contact and other one-on-one non-frontal engagements resolve as facing combats while keeping the fight tied to the original contact line.
-- Spears and Warbands can stack when two same-side, same-type elements share a facing and one element's front is flush against the other's side. Stacked pairs fight as one combatant and gain `+1` in melee.
+- Spears and Warbands can stack when two same-side, same-type elements share a facing and one element's front is flush against the other's side. Stacked pairs fight as one combatant and gain `+1` in melee. Heavy-Spears and Heavy-Warbands use their corresponding base type's combat behavior but cannot stack.
 - Melee-only penalties currently implemented are `-1` for flank attack, `-1` for rear attack when the rear attacker is not frontally engaged elsewhere, and overlap penalties from idle enemy elements that are touching the fighter's left or right flank without being in melee themselves.
 - `Resolve Melee` resolves every detected melee at once, applies destruction or recoil, records losses, and shows the same ghosted aftermath review used for shooting.
 
