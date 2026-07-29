@@ -9,12 +9,12 @@ function cloneUnit(unit) {
     return JSON.parse(JSON.stringify(unit));
 }
 
-function createUnit(type, side, x, y, rotation) {
+function createUnit(type, playerId, x, y, rotation) {
     const template = data.UNIT_TYPES[type];
     return {
-        id: `${type}-${side}-${x}-${y}`,
+        id: `${type}-${playerId}-${x}-${y}`,
         type,
-        side,
+        playerId,
         width: data.UNIT_WIDTH,
         depth: template.depth,
         x,
@@ -295,14 +295,14 @@ test('default unit movement values are converted from paces to mm', () => {
     assert.equal(terrain.roads[0].width, 20);
 });
 
-test('default seeded units include blue riders and do not overlap with updated depths', () => {
+test('default seeded units include player one riders and do not overlap with updated depths', () => {
     const units = data.createDefaultUnits((() => {
         let id = 0;
         return () => `unit-${id += 1}`;
     })());
-    const blueRiders = units.find((unit) => unit.side === 'blue' && unit.type === 'Riders');
+    const playerOneRiders = units.find((unit) => unit.playerId === 'player-1' && unit.type === 'Riders');
 
-    assert.ok(blueRiders);
+    assert.ok(playerOneRiders);
 
     for (let index = 0; index < units.length; index += 1) {
         for (let inner = index + 1; inner < units.length; inner += 1) {

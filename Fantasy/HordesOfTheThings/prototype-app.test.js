@@ -77,7 +77,11 @@ function createAppHarness(overrides) {
     const capturedPointers = new Set();
     app.state = {
         mode: 'game',
-        activeSide: 'blue',
+        players: {
+            'player-1': { ...data.DEFAULT_PLAYERS['player-1'] },
+            'player-2': { ...data.DEFAULT_PLAYERS['player-2'] }
+        },
+        activePlayerId: 'player-1',
         remainingMoves: 1,
         phase: 'move',
         units: [],
@@ -94,7 +98,7 @@ function createAppHarness(overrides) {
         showFormUpPreview: false,
         singleRotationMode: 'center',
         showRangedArea: false,
-        losses: { blue: [], red: [] },
+        losses: { 'player-1': [], 'player-2': [] },
         editHistory: [],
         marquee: null,
         interaction: null,
@@ -522,14 +526,14 @@ test('keyboard shortcuts toggle snap and rotation modes and step a single draft'
 
 test('collectGhostUnits includes future form-up positions when preview is enabled in move phase', () => {
     const blue = createBlade('b1', 140, 280);
-    blue.side = 'blue';
+    blue.playerId = 'player-1';
     blue.rotation = Math.PI / 2;
-    const red = { ...createBlade('r1', 190, 310), side: 'red', rotation: Math.PI };
+    const red = { ...createBlade('r1', 190, 310), playerId: 'player-2', rotation: Math.PI };
     const app = createAppHarness({
         state: {
             mode: 'game',
             phase: 'move',
-            activeSide: 'blue',
+            activePlayerId: 'player-1',
             showFormUpPreview: true,
             units: [blue, red]
         }
@@ -923,10 +927,10 @@ test('loadGame restores saved state from local storage', () => {
         const app = createAppHarness();
         app.loadGame('save-1');
 
-        assert.equal(app.state.activeSide, 'red');
+        assert.equal(app.state.activePlayerId, 'player-2');
         assert.equal(app.state.phase, 'shooting');
         assert.equal(app.state.units[0].id, 'unit-4');
-        assert.equal(app.state.losses.red[0].type, 'Horde');
+        assert.equal(app.state.losses['player-2'][0].type, 'Horde');
         assert.equal(app.state.snapEnabled, false);
         assert.equal(app.state.showFormUpPreview, true);
         assert.equal(app.state.singleRotationMode, 'front-corner');
@@ -1010,7 +1014,7 @@ test('movement flags persist through shooting and reset for the incoming side', 
 
     app.advanceToNextTurn();
 
-    assert.equal(app.state.activeSide, 'red');
+    assert.equal(app.state.activePlayerId, 'player-2');
     assert.equal(blueArtillery.movedThisTurn, true);
     assert.equal(redArtillery.movedThisTurn, false);
 });
@@ -1273,15 +1277,15 @@ test('logCombatResults includes modifiers, rolls, and outcome details', () => {
     }
 
     const detailLog = calls.find((entry) => entry[0] === 'log')[1];
-    assert.ok(detailLog.includes('blue Shooter u1, blue Shooter u3 vs red Blade u2'));
-    assert.ok(detailLog.includes('blue roll 4'));
-    assert.ok(detailLog.includes('blue modifiers multiple-shooters -1'));
-    assert.ok(detailLog.includes('red roll 2'));
-    assert.ok(detailLog.includes('red modifiers bad-going -2'));
+    assert.ok(detailLog.includes('Blue Shooter u1, Blue Shooter u3 vs Red Blade u2'));
+    assert.ok(detailLog.includes('Blue roll 4'));
+    assert.ok(detailLog.includes('Blue modifiers multiple-shooters -1'));
+    assert.ok(detailLog.includes('Red roll 2'));
+    assert.ok(detailLog.includes('Red modifiers bad-going -2'));
     assert.ok(detailLog.includes('totals 7 vs 3'));
-    assert.ok(detailLog.includes('result destroy (red Blade u2)'));
+    assert.ok(detailLog.includes('result destroy (Red Blade u2)'));
     assert.ok(detailLog.includes('rule Double total destroys the loser.'));
     const recoilLog = calls.filter((entry) => entry[0] === 'log').map((entry) => entry[1]).find((entry) => entry.includes('recoil destruction:'));
-    assert.ok(recoilLog.includes('red Blade u2'));
+    assert.ok(recoilLog.includes('Red Blade u2'));
     assert.ok(recoilLog.includes('reason recoil path enters water'));
 });

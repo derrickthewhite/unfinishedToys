@@ -105,8 +105,9 @@
                 mode: 'edit',
                 placingUnit: false,
                 placementType: 'Blade',
-                placementSide: 'blue',
-                activeSide: 'blue',
+                players: this.createDefaultPlayers(),
+                placementPlayerId: 'player-1',
+                activePlayerId: 'player-1',
                 remainingMoves: 4,
                 phase: 'move',
                 terrain: data.createDefaultTerrain(),
@@ -123,7 +124,7 @@
                 showFormUpPreview: false,
                 singleRotationMode: 'center',
                 showRangedArea: false,
-                losses: { blue: [], red: [] },
+                losses: { 'player-1': [], 'player-2': [] },
                 editHistory: [],
                 marquee: null,
                 interaction: null,
@@ -144,6 +145,35 @@
             return id;
         }
 
+        createDefaultPlayers() {
+            return Object.fromEntries(data.PLAYER_IDS.map((playerId) => [playerId, { ...data.DEFAULT_PLAYERS[playerId] }]));
+        }
+
+        getUnitPlayerId(unit) {
+            if (unit?.playerId) {
+                return unit.playerId;
+            }
+            return unit?.side === 'red' ? 'player-2' : unit?.side === 'blue' ? 'player-1' : null;
+        }
+
+        getPlayer(playerId) {
+            const normalizedPlayerId = playerId === 'red' ? 'player-2' : playerId === 'blue' ? 'player-1' : playerId;
+            return this.state.players?.[normalizedPlayerId] || data.DEFAULT_PLAYERS[normalizedPlayerId] || null;
+        }
+
+        getPlayerColors(playerId) {
+            const colorId = this.getPlayer(playerId)?.colorId || 'blue';
+            return data.PLAYER_COLORS[colorId] || data.PLAYER_COLORS.blue;
+        }
+
+        getPlayerLabel(playerId) {
+            return this.getPlayerColors(playerId).label;
+        }
+
+        getOpponentPlayerId(playerId) {
+            return data.PLAYER_IDS.find((candidate) => candidate !== playerId) || null;
+        }
+
         bindUi() {
             this.populateUnitTypes();
             window.addEventListener('resize', () => this.resizeCanvas());
@@ -151,8 +181,8 @@
             this.ui.editModeButton.addEventListener('click', () => this.setMode('edit'));
             this.ui.gameModeButton.addEventListener('click', () => this.setMode('game'));
             this.ui.activeSideSelect.addEventListener('change', () => {
-                this.state.activeSide = this.ui.activeSideSelect.value;
-                this.resetMovedFlags(this.state.activeSide);
+                this.state.activePlayerId = this.ui.activeSideSelect.value;
+                this.resetMovedFlags(this.state.activePlayerId);
                 this.cancelDraft(false);
                 this.updateSelectionAnalysis();
                 this.updateStatus(this.state.mode === 'edit' ? 'Edit mode: active side updated.' : 'Game mode: active side updated.');
@@ -173,7 +203,7 @@
                 this.state.placementType = this.ui.newUnitTypeSelect.value;
             });
             this.ui.placementSideSelect.addEventListener('change', () => {
-                this.state.placementSide = this.ui.placementSideSelect.value;
+                this.state.placementPlayerId = this.ui.placementSideSelect.value;
             });
             this.ui.placeUnitButton.addEventListener('click', () => {
                 this.state.placingUnit = !this.state.placingUnit;
@@ -419,7 +449,7 @@
             if (mode === 'game') {
                 this.state.selectedIds = this.state.selectedIds.filter((unitId) => {
                     const unit = this.getUnitById(unitId);
-                    return unit && unit.side === this.state.activeSide;
+                    return unit && this.getUnitPlayerId(unit) === this.state.activePlayerId;
                 });
                 this.updateSelectionAnalysis();
                 this.updateStatus('Game mode: select units on the active side and draft a move.');
@@ -627,7 +657,7 @@
                 originUnits,
                 nextUnits,
                 this.state.units,
-                this.state.activeSide,
+                this.state.activePlayerId,
                 this.state.terrain
             );
             const appliedUnits = resolved ? resolved.units : nextUnits;
@@ -856,7 +886,7 @@
                 return;
             }
             if (unitHit) {
-                if (this.state.mode === 'game' && unitHit.side !== this.state.activeSide) {
+                if (this.state.mode === 'game' && this.getUnitPlayerId(unitHit) !== this.state.activePlayerId) {
                     this.updateStatus('Only the active side can be selected in game mode.');
                     return;
                 }
@@ -870,19 +900,17 @@
             const unit = {
                 id: this.allocateUnitId(),
                 type: this.state.placementType,
-                side: this.state.placementSide,
-                width: data.UNIT_WIDTH,
-                depth: template.depth,
-                x: world.x - data.UNIT_WIDTH / 2,
-                y: world.y + template.depth / 2,
-                rotation: this.state.placementSide === 'blue' ? 0 : Math.PI,
-                troopClass: template.troopClass,
-                moves: data.convertMovesToMm(template.moves),
-                value: template.value,
-                ranged: data.convertRangedToMm(template.ranged),
-                strength: { ...template.strength },
-                movement: { ...(template.movement || {}) },
-                combat: { ...(template.combat || {}) }
+                ...data.createUnit(
+                    this.state.placementType,
+                    this.state.placementPlayerId,
+                    this.getPlayer(this.state.placementPlayerId).faction,
+                    {
+                        x: world.x - data.UNIT_WIDTH / 2,
+                        y: world.y + template.depth / 2,
+                        rotation: this.state.placementPlayerId === 'player-1' ? 0 : Math.PI
+                    },
+                    () => this.allocateUnitId()
+                )
             };
             this.state.units.push(unit);
             this.state.placingUnit = false;
@@ -924,7 +952,7 @@
             const rect = geometry.normalizeRect(marquee.start, marquee.end);
             const hitIds = this.state.units
                 .filter((unit) => geometry.polygonInsideRect(geometry.getUnitCorners(unit), rect))
-                .filter((unit) => this.state.mode === 'edit' || unit.side === this.state.activeSide)
+                .filter((unit) => this.state.mode === 'edit' || this.getUnitPlayerId(unit) === this.state.activePlayerId)
                 .map((unit) => unit.id);
             if (marquee.additive) {
                 const nextIds = [...this.state.selectedIds];
@@ -1325,7 +1353,7 @@
                 return false;
             }
             const selectedUnits = unitIds.map((unitId) => this.getUnitById(unitId)).filter(Boolean);
-            if (selectedUnits.length === 0 || selectedUnits.some((unit) => unit.side !== this.state.activeSide)) {
+            if (selectedUnits.length === 0 || selectedUnits.some((unit) => this.getUnitPlayerId(unit) !== this.state.activePlayerId)) {
                 this.updateStatus('Only units on the active side can draft a move.');
                 return false;
             }
@@ -1498,9 +1526,9 @@
             this.beginFormUpPhase();
         }
 
-        resetMovedFlags(side) {
+        resetMovedFlags(playerId) {
             this.state.units.forEach((unit) => {
-                if (!side || unit.side === side) {
+            if (!playerId || this.getUnitPlayerId(unit) === playerId) {
                     unit.movedThisTurn = false;
                 }
             });
@@ -1553,7 +1581,7 @@
 
         hasAnyShootingAttacks() {
             return this.state.units.some((unit) => rules.isRangedUnit(unit)
-                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activeSide).length > 0);
+                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activePlayerId).length > 0);
         }
 
         advanceToNextTurn() {
@@ -1562,13 +1590,13 @@
             this.state.melee = null;
             this.state.combatResolution = null;
             this.state.selectedIds = [];
-            this.state.activeSide = this.state.activeSide === 'blue' ? 'red' : 'blue';
+            this.state.activePlayerId = this.getOpponentPlayerId(this.state.activePlayerId);
             this.state.remainingMoves = this.rollDie();
-            this.resetMovedFlags(this.state.activeSide);
+            this.resetMovedFlags(this.state.activePlayerId);
             this.setPhase('move');
             this.updateSelectionAnalysis();
             this.syncUiFromState();
-            this.updateStatus(`Turn passes to ${this.state.activeSide}. ${this.state.remainingMoves} moves available.`);
+            this.updateStatus(`Turn passes to ${this.getPlayerLabel(this.state.activePlayerId)}. ${this.state.remainingMoves} moves available.`);
         }
 
         maybeAutoAdvanceCombatPhase() {
@@ -1610,9 +1638,9 @@
                 return false;
             }
             const attacks = this.state.shooting?.attacksByAttacker || {};
-            return rules.canUnitShoot(unit, this.state.activeSide)
+            return rules.canUnitShoot(unit, this.state.activePlayerId)
                 && !attacks[unit.id]
-                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activeSide).length > 0;
+                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activePlayerId).length > 0;
         }
 
         isUnitShootingParticipant(unit) {
@@ -1623,7 +1651,7 @@
                 return this.state.combatResolution.participantIds.has(unit.id);
             }
             const attacks = this.state.shooting?.attacksByAttacker || {};
-            const isAttacker = rules.canUnitShoot(unit, this.state.activeSide) && Boolean(attacks[unit.id]);
+            const isAttacker = rules.canUnitShoot(unit, this.state.activePlayerId) && Boolean(attacks[unit.id]);
             const isTarget = Object.values(attacks).includes(unit.id);
             const isPendingTarget = (this.state.shooting?.validTargetIds || []).includes(unit.id);
             const canStillShoot = this.needsShootingDeclaration(unit);
@@ -1672,11 +1700,11 @@
                 return;
             }
             if (rules.isRangedUnit(unit)) {
-                if (unit.ranged.requiresOwnTurn && unit.side !== this.state.activeSide) {
+                if (unit.ranged.requiresOwnTurn && this.getUnitPlayerId(unit) !== this.state.activePlayerId) {
                     this.updateStatus('Only the active side can declare shooting attacks.');
                     return;
                 }
-                if (!rules.canUnitShoot(unit, this.state.activeSide)) {
+                if (!rules.canUnitShoot(unit, this.state.activePlayerId)) {
                     shooting.focusedAttackerId = null;
                     shooting.validTargetIds = [];
                     this.state.selectedIds = [];
@@ -1685,7 +1713,7 @@
                     this.updateStatus(`${unit.type} cannot shoot after moving this turn.`);
                     return;
                 }
-                const validTargetIds = rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activeSide);
+                const validTargetIds = rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activePlayerId);
                 if (validTargetIds.length === 0) {
                     shooting.focusedAttackerId = null;
                     shooting.validTargetIds = [];
@@ -1716,7 +1744,7 @@
 
         recordLosses(destroyedUnits) {
             destroyedUnits.forEach((unit) => {
-                this.state.losses[unit.side].push({ id: unit.id, type: unit.type, value: unit.value });
+                this.state.losses[this.getUnitPlayerId(unit)].push({ id: unit.id, type: unit.type, value: unit.value });
             });
         }
 
@@ -1805,14 +1833,14 @@
 
         getCombatSideLabel(result, unitId) {
             const unit = this.getCombatUnit(result, unitId);
-            return unit?.side || 'unknown';
+            return unit ? this.getPlayerLabel(this.getUnitPlayerId(unit)) : 'unknown';
         }
 
         describeCombatUnits(result, unitIds) {
             return unitIds
                 .map((unitId) => this.getCombatUnit(result, unitId))
                 .filter(Boolean)
-                .map((unit) => `${unit.side} ${unit.type} ${unit.id}`)
+                .map((unit) => `${this.getPlayerLabel(this.getUnitPlayerId(unit))} ${unit.type} ${unit.id}`)
                 .join(', ');
         }
 
@@ -1849,7 +1877,7 @@
                 shooting.attacksByAttacker,
                 this.state.terrain,
                 () => this.rollDie(),
-                this.state.activeSide
+                this.state.activePlayerId
             );
             this.state.units = result.units;
             this.recordLosses(result.destroyedUnits);
@@ -1896,7 +1924,7 @@
             if (this.state.mode !== 'game' || this.state.phase !== 'move' || !this.state.showFormUpPreview) {
                 return null;
             }
-            const result = rules.resolveAutomaticFormUp(this.state.units, this.state.activeSide, this.state.terrain);
+            const result = rules.resolveAutomaticFormUp(this.state.units, this.state.activePlayerId, this.state.terrain);
             if (!result || result.movedUnitIds.length === 0) {
                 return null;
             }
@@ -1904,10 +1932,10 @@
         }
 
         beginFormUpPhase() {
-            const activeUnits = this.state.units.filter((unit) => unit.side === this.state.activeSide);
+            const activeUnits = this.state.units.filter((unit) => this.getUnitPlayerId(unit) === this.state.activePlayerId);
             const activeIds = activeUnits.map((unit) => unit.id);
             const ghostSnapshot = geometry.snapshotPositions(activeIds, this.state.units);
-            const result = rules.resolveAutomaticFormUp(this.state.units, this.state.activeSide, this.state.terrain);
+            const result = rules.resolveAutomaticFormUp(this.state.units, this.state.activePlayerId, this.state.terrain);
 
             this.state.units = result.units;
             const movedUnitIds = new Set(result.movedUnitIds);
@@ -1970,7 +1998,8 @@
                 savedAt: new Date().toISOString(),
                 snapshot: {
                     mode: this.state.mode,
-                    activeSide: this.state.activeSide,
+                    players: JSON.parse(JSON.stringify(this.state.players)),
+                    activePlayerId: this.state.activePlayerId,
                     remainingMoves: this.state.remainingMoves,
                     phase: this.state.phase,
                     units: this.state.units.map((unit) => ({
@@ -2015,6 +2044,26 @@
             return maxNumericId + 1;
         }
 
+        normalizeSavedUnit(unit) {
+            const playerId = unit.playerId || (unit.side === 'red' ? 'player-2' : 'player-1');
+            const { side, ...normalized } = unit;
+            return {
+                ...normalized,
+                playerId,
+                moves: unit.moves ? { ...unit.moves } : undefined,
+                strength: unit.strength ? { ...unit.strength } : undefined,
+                ranged: unit.ranged ? { ...unit.ranged } : null,
+                combat: unit.combat ? { ...unit.combat } : {}
+            };
+        }
+
+        normalizeSavedLosses(losses) {
+            return {
+                'player-1': losses?.['player-1'] || losses?.blue || [],
+                'player-2': losses?.['player-2'] || losses?.red || []
+            };
+        }
+
         loadGame(recordId) {
             const record = this.getStorageRecords().find((entry) => entry.id === recordId);
             if (!record) {
@@ -2024,18 +2073,16 @@
             }
             const snapshot = record.snapshot || {};
             this.state.mode = snapshot.mode || 'game';
-            this.state.activeSide = snapshot.activeSide || 'blue';
+            this.state.players = data.PLAYER_IDS.reduce((players, playerId) => {
+                players[playerId] = { ...data.DEFAULT_PLAYERS[playerId], ...(snapshot.players?.[playerId] || {}) };
+                return players;
+            }, {});
+            this.state.activePlayerId = snapshot.activePlayerId || (snapshot.activeSide === 'red' ? 'player-2' : 'player-1');
             this.state.remainingMoves = Number.isFinite(snapshot.remainingMoves) ? snapshot.remainingMoves : 0;
             this.state.phase = snapshot.phase || 'move';
             this.state.terrain = snapshot.terrain || data.createDefaultTerrain();
-            this.state.units = Array.isArray(snapshot.units) ? snapshot.units.map((unit) => ({
-                ...unit,
-                moves: unit.moves ? { ...unit.moves } : undefined,
-                strength: unit.strength ? { ...unit.strength } : undefined,
-                ranged: unit.ranged ? { ...unit.ranged } : null,
-                combat: unit.combat ? { ...unit.combat } : {}
-            })) : [];
-            this.state.losses = snapshot.losses || { blue: [], red: [] };
+            this.state.units = Array.isArray(snapshot.units) ? snapshot.units.map((unit) => this.normalizeSavedUnit(unit)) : [];
+            this.state.losses = this.normalizeSavedLosses(snapshot.losses);
             this.state.snapEnabled = snapshot.snapEnabled !== false;
             this.state.showFormUpPreview = Boolean(snapshot.showFormUpPreview);
             this.state.singleRotationMode = snapshot.singleRotationMode === 'front-corner' ? 'front-corner' : 'center';
@@ -2096,9 +2143,14 @@
                 const details = document.createElement('div');
                 details.className = 'storage-details';
                 const snapshot = record.snapshot || {};
-                const lossPoints = ((snapshot.losses?.blue || []).reduce((sum, unit) => sum + unit.value, 0))
-                    + ((snapshot.losses?.red || []).reduce((sum, unit) => sum + unit.value, 0));
-                details.textContent = `${new Date(record.savedAt).toLocaleString()} | ${snapshot.phase || 'move'} | ${snapshot.activeSide || 'blue'} to act | ${lossPoints} points destroyed`;
+                const lossPoints = Object.values(this.normalizeSavedLosses(snapshot.losses))
+                    .flat()
+                    .reduce((sum, unit) => sum + unit.value, 0);
+                const activePlayerId = snapshot.activePlayerId || (snapshot.activeSide === 'red' ? 'player-2' : 'player-1');
+                const players = snapshot.players || data.DEFAULT_PLAYERS;
+                const colorId = players[activePlayerId]?.colorId || data.DEFAULT_PLAYERS[activePlayerId].colorId;
+                const activeLabel = data.PLAYER_COLORS[colorId].label;
+                details.textContent = `${new Date(record.savedAt).toLocaleString()} | ${snapshot.phase || 'move'} | ${activeLabel} to act | ${lossPoints} points destroyed`;
                 meta.append(name, details);
 
                 const actions = document.createElement('div');
@@ -2123,7 +2175,7 @@
             this.renderStorageList();
             this.ui.storageModal.hidden = false;
             if (!this.ui.storageNameInput.value.trim()) {
-                this.ui.storageNameInput.value = `${this.state.activeSide}-${this.state.phase}`;
+                this.ui.storageNameInput.value = `${this.getPlayerLabel(this.state.activePlayerId)}-${this.state.phase}`;
             }
             this.ui.storageNameInput.focus();
             this.ui.storageNameInput.select();
@@ -2221,7 +2273,7 @@
                 ? `${this.formatPaces(unit.ranged.range)} range, ${unit.ranged.width}mm frontage`
                 : 'None';
             return [
-                { label: 'Side', value: unit.side },
+                { label: 'Player', value: this.getPlayerLabel(this.getUnitPlayerId(unit)) },
                 { label: 'Class', value: unit.troopClass },
                 { label: 'AP', value: String(unit.value) },
                 { label: 'Strength', value: `Infantry ${unit.strength.infantry}, Mounted ${unit.strength.mounted}` },
@@ -2246,7 +2298,7 @@
             this.ui.selectionPanel.classList.toggle('is-empty', !unit);
 
             if (this.ui.selectionPanelEyebrow) {
-                this.ui.selectionPanelEyebrow.textContent = unit ? unit.side + ' unit' : 'Selection';
+                this.ui.selectionPanelEyebrow.textContent = unit ? this.getPlayerLabel(this.getUnitPlayerId(unit)) + ' unit' : 'Selection';
             }
             if (this.ui.selectionPanelTitle) {
                 this.ui.selectionPanelTitle.textContent = unit ? unit.type : 'No unit selected';
@@ -2272,11 +2324,11 @@
             this.ui.gameModeButton.classList.toggle('is-active', this.state.mode === 'game');
             this.ui.editGroup.hidden = this.state.mode !== 'edit';
             this.ui.actionGroup.hidden = false;
-            this.ui.activeSideSelect.value = this.state.activeSide;
+            this.ui.activeSideSelect.value = this.state.activePlayerId;
             this.ui.remainingMovesInput.value = String(this.state.remainingMoves);
             this.ui.phaseSelect.value = this.state.phase;
             this.ui.newUnitTypeSelect.value = this.state.placementType;
-            this.ui.placementSideSelect.value = this.state.placementSide;
+            this.ui.placementSideSelect.value = this.state.placementPlayerId;
             this.ui.placeUnitButton.textContent = this.state.placingUnit ? 'Cancel Placement' : 'Place Unit';
             this.ui.placeUnitButton.disabled = this.state.mode !== 'edit';
             this.ui.newUnitTypeSelect.disabled = this.state.mode !== 'edit';
@@ -2318,12 +2370,12 @@
             this.ui.undoMoveButton.disabled = this.state.mode === 'edit' ? this.state.editHistory.length === 0 : !this.state.draft;
             this.ui.acknowledgedButton.disabled = this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution);
             this.ui.storageModal.hidden = !this.state.storageModalOpen;
-            const blueLosses = this.getLossSummary('blue');
-            const redLosses = this.getLossSummary('red');
-            this.ui.blueLosses.textContent = `Blue lost: ${blueLosses.points}`;
-            this.ui.blueLosses.title = blueLosses.title;
-            this.ui.redLosses.textContent = `Red lost: ${redLosses.points}`;
-            this.ui.redLosses.title = redLosses.title;
+            const playerOneLosses = this.getLossSummary('player-1');
+            const playerTwoLosses = this.getLossSummary('player-2');
+            this.ui.blueLosses.textContent = `${this.getPlayerLabel('player-1')} lost: ${playerOneLosses.points}`;
+            this.ui.blueLosses.title = playerOneLosses.title;
+            this.ui.redLosses.textContent = `${this.getPlayerLabel('player-2')} lost: ${playerTwoLosses.points}`;
+            this.ui.redLosses.title = playerTwoLosses.title;
             this.ui.statusText.textContent = this.state.status;
             this.renderSelectionInfo();
         }
@@ -2610,7 +2662,7 @@
 
         drawUnitBase(ctx, unit, options) {
             const corners = geometry.getUnitCorners(unit);
-            const colors = data.COLORS[unit.side];
+            const colors = this.getPlayerColors(this.getUnitPlayerId(unit));
             ctx.save();
             if (options.ghost) {
                 ctx.globalAlpha = 0.35;
@@ -2717,7 +2769,7 @@
 
         drawUnitText(ctx, unit) {
             const center = geometry.getUnitCenter(unit);
-            const displayRotation = unit.side === 'blue' ? unit.rotation : geometry.normalizeAngle(unit.rotation + Math.PI);
+            const displayRotation = this.getUnitPlayerId(unit) === 'player-1' ? unit.rotation : geometry.normalizeAngle(unit.rotation + Math.PI);
             ctx.save();
             ctx.translate(center.x, center.y);
             ctx.rotate(displayRotation);

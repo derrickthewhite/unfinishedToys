@@ -16,6 +16,20 @@
         impassable: 4
     };
 
+    function normalizePlayerId(playerId) {
+        if (playerId === 'blue') {
+            return 'player-1';
+        }
+        if (playerId === 'red') {
+            return 'player-2';
+        }
+        return playerId;
+    }
+
+    function getPlayerId(unit) {
+        return normalizePlayerId(unit.playerId || unit.side || null);
+    }
+
     function getRankPivot(unit, forward, right, side) {
         const corners = geometry.cornersToPoints(geometry.getUnitCorners(unit)).map((point) => ({
             point,
@@ -48,9 +62,9 @@
                 right: geometry.getRightVector(units[0].rotation)
             };
         }
-        const side = units[0].side;
-        if (units.some((unit) => unit.side !== side)) {
-            return { type: 'invalid', invalid: true, reason: 'Selection mixes sides.' };
+        const playerId = getPlayerId(units[0]);
+        if (units.some((unit) => getPlayerId(unit) !== playerId)) {
+            return { type: 'invalid', invalid: true, reason: 'Selection mixes players.' };
         }
         const baseRotation = units[0].rotation;
         if (units.some((unit) => Math.abs(geometry.normalizeAngle(unit.rotation - baseRotation)) > 0.12)) {
@@ -368,11 +382,11 @@
         return Boolean(unit && unit.ranged && unit.ranged.phase === 'shooting');
     }
 
-    function canUnitShoot(unit, activeSide) {
+    function canUnitShoot(unit, activePlayerId) {
         if (!isRangedUnit(unit)) {
             return false;
         }
-        if (unit.ranged.requiresOwnTurn && activeSide && unit.side !== activeSide) {
+        if (unit.ranged.requiresOwnTurn && activePlayerId && getPlayerId(unit) !== normalizePlayerId(activePlayerId)) {
             return false;
         }
         return !unit.ranged.requiresStationary || !unit.movedThisTurn;
@@ -480,7 +494,7 @@
     }
 
     function isTargetInRangedArea(attacker, target) {
-        if (!isRangedUnit(attacker) || attacker.side === target.side) {
+        if (!isRangedUnit(attacker) || getPlayerId(attacker) === getPlayerId(target)) {
             return false;
         }
         const nearestSide = getNearestTargetSide(attacker, target);
@@ -638,15 +652,15 @@
             return false;
         }
         return units.some((otherUnit) => {
-            if (!otherUnit || otherUnit.id === unit.id || otherUnit.side === unit.side) {
+            if (!otherUnit || otherUnit.id === unit.id || getPlayerId(otherUnit) === getPlayerId(unit)) {
                 return false;
             }
             return hasAnyFrontContact(unit, otherUnit);
         });
     }
 
-    function isValidShootingAttack(attacker, target, units, terrain, activeSide) {
-        if (!attacker || !target || attacker.side === target.side || !canUnitShoot(attacker, activeSide)) {
+    function isValidShootingAttack(attacker, target, units, terrain, activePlayerId) {
+        if (!attacker || !target || getPlayerId(attacker) === getPlayerId(target) || !canUnitShoot(attacker, activePlayerId)) {
             return false;
         }
         if (isUnitEngagedForShooting(attacker, units)) {
@@ -659,13 +673,13 @@
         return sightLines.some((line) => !isSightLineBlocked(line.start, line.end, attacker, target, units, terrain));
     }
 
-    function getValidShootingTargets(attacker, units, terrain, activeSide) {
-        if (!canUnitShoot(attacker, activeSide)) {
+    function getValidShootingTargets(attacker, units, terrain, activePlayerId) {
+        if (!canUnitShoot(attacker, activePlayerId)) {
             return [];
         }
         return units
-            .filter((unit) => unit.side !== attacker.side)
-            .filter((unit) => isValidShootingAttack(attacker, unit, units, terrain, activeSide))
+            .filter((unit) => getPlayerId(unit) !== getPlayerId(attacker))
+            .filter((unit) => isValidShootingAttack(attacker, unit, units, terrain, activePlayerId))
             .map((unit) => unit.id);
     }
 
@@ -725,7 +739,7 @@
                 modifiers.push({ id: 'rear-attacked', value: -1 });
             }
             if (context.combatant && context.opponentCombatant && context.combatants && context.fightingCombatantIds) {
-                const idleEnemyCombatants = context.combatants.filter((combatant) => combatant.side === context.opponentCombatant.side);
+                const idleEnemyCombatants = context.combatants.filter((combatant) => combatant.playerId === context.opponentCombatant.playerId);
                 const overlapCount = countOverlapsOnCombatant(context.combatant, idleEnemyCombatants, context.fightingCombatantIds);
                 if (overlapCount > 0) {
                     modifiers.push({ id: 'overlapped', value: -overlapCount });
@@ -809,7 +823,7 @@
         const forward = geometry.getForwardVector(unit.rotation);
         const right = geometry.getRightVector(unit.rotation);
         return units.find((otherUnit) => {
-            if (excludedIds.has(otherUnit.id) || otherUnit.side !== unit.side) {
+            if (excludedIds.has(otherUnit.id) || getPlayerId(otherUnit) !== getPlayerId(unit)) {
                 return false;
             }
             if (Math.abs(geometry.normalizeAngle(otherUnit.rotation - unit.rotation)) > 0.12) {
@@ -825,7 +839,7 @@
 
     function hasRearOrSideEnemyContact(unit, units) {
         return units.some((otherUnit) => {
-            if (otherUnit.side === unit.side || otherUnit.id === unit.id) {
+            if (getPlayerId(otherUnit) === getPlayerId(unit) || otherUnit.id === unit.id) {
                 return false;
             }
             const touchedSides = new Set();
@@ -851,7 +865,7 @@
         }
         const blockingUnit = units.find((otherUnit) => !movingIds.has(otherUnit.id) && geometry.polygonsOverlap(geometry.getUnitCorners(unit), geometry.getUnitCorners(otherUnit)));
         if (blockingUnit) {
-            return `recoil path is blocked by ${blockingUnit.side} ${blockingUnit.type} ${blockingUnit.id}`;
+            return `recoil path is blocked by ${getPlayerId(blockingUnit)} ${blockingUnit.type} ${blockingUnit.id}`;
         }
         return null;
     }
@@ -932,10 +946,10 @@
             return 'flee path enters forbidden terrain';
         }
         const enemyBlocker = units.find((unit) => unit.id !== fleeingUnitId
-            && unit.side !== candidate.side
+            && getPlayerId(unit) !== getPlayerId(candidate)
             && geometry.polygonsOverlap(geometry.getUnitCorners(candidate), geometry.getUnitCorners(unit)));
         if (enemyBlocker) {
-            return `flee path is blocked by ${enemyBlocker.side} ${enemyBlocker.type} ${enemyBlocker.id}`;
+            return `flee path is blocked by ${getPlayerId(enemyBlocker)} ${enemyBlocker.type} ${enemyBlocker.id}`;
         }
         return null;
     }
@@ -950,7 +964,7 @@
         }
         const finalUnit = translateUnit(unit, direction, fleeDistance);
         return !units.some((otherUnit) => otherUnit.id !== unit.id
-            && otherUnit.side === unit.side
+            && getPlayerId(otherUnit) === getPlayerId(unit)
             && geometry.polygonsOverlap(geometry.getUnitCorners(finalUnit), geometry.getUnitCorners(otherUnit)));
     }
 
@@ -996,13 +1010,13 @@
         };
     }
 
-    function resolveShooting(units, declarations, terrain, rollDie, activeSide) {
+    function resolveShooting(units, declarations, terrain, rollDie, activePlayerId) {
         const baseUnits = units.map(cloneUnit);
         const attacksByTarget = new Map();
         Object.entries(declarations || {}).forEach(([attackerId, targetId]) => {
             const attacker = baseUnits.find((unit) => unit.id === attackerId);
             const target = baseUnits.find((unit) => unit.id === targetId);
-            if (!attacker || !target || !isValidShootingAttack(attacker, target, baseUnits, terrain, activeSide)) {
+            if (!attacker || !target || !isValidShootingAttack(attacker, target, baseUnits, terrain, activePlayerId)) {
                 return;
             }
             if (!attacksByTarget.has(targetId)) {
@@ -1198,7 +1212,7 @@
             for (let inner = index + 1; inner < units.length; inner += 1) {
                 const left = units[index];
                 const right = units[inner];
-                if (left.side !== right.side || left.type !== right.type || !isStackEligible(left) || !areSameFacing(left, right)) {
+                if (getPlayerId(left) !== getPlayerId(right) || left.type !== right.type || !isStackEligible(left) || !areSameFacing(left, right)) {
                     continue;
                 }
                 if (sharesFormationContact(left, right)) {
@@ -1228,7 +1242,7 @@
                 unitIds: [...unitIds],
                 units: members,
                 primaryUnit,
-                side: primaryUnit.side,
+                playerId: getPlayerId(primaryUnit),
                 type: primaryUnit.type
             };
         });
@@ -1361,7 +1375,7 @@
             for (let inner = index + 1; inner < combatants.length; inner += 1) {
                 const leftCombatant = combatants[index];
                 const rightCombatant = combatants[inner];
-                if (leftCombatant.side === rightCombatant.side) {
+                if (leftCombatant.playerId === rightCombatant.playerId) {
                     continue;
                 }
                 const contact = collectCombatantContact(leftCombatant, rightCombatant);
@@ -1376,7 +1390,7 @@
             for (let inner = index + 1; inner < combatants.length; inner += 1) {
                 const leftCombatant = combatants[index];
                 const rightCombatant = combatants[inner];
-                if (leftCombatant.side === rightCombatant.side) {
+                if (leftCombatant.playerId === rightCombatant.playerId) {
                     continue;
                 }
                 if (engagedCombatantIds.has(leftCombatant.id) || engagedCombatantIds.has(rightCombatant.id)) {
@@ -1785,9 +1799,10 @@
         return `${units.length} selected, ${typeLabel}.`;
     }
 
-    function resolveAutomaticFormUp(units, activeSide, terrain) {
+    function resolveAutomaticFormUp(units, activePlayerId, terrain) {
+        const normalizedActivePlayerId = normalizePlayerId(activePlayerId);
         const mutableUnits = units.map((unit) => ({ ...unit }));
-        const activeUnits = mutableUnits.filter((unit) => unit.side === activeSide);
+        const activeUnits = mutableUnits.filter((unit) => getPlayerId(unit) === normalizedActivePlayerId);
         const groups = buildFormationGroups(activeUnits);
         const movedUnitIds = [];
 
@@ -1795,7 +1810,7 @@
             const groupUnits = groupIds
                 .map((unitId) => mutableUnits.find((unit) => unit.id === unitId))
                 .filter(Boolean);
-            const best = findBestFormUpCandidate(groupUnits, mutableUnits, activeSide, terrain);
+            const best = findBestFormUpCandidate(groupUnits, mutableUnits, normalizedActivePlayerId, terrain);
             if (!best) {
                 return;
             }
@@ -1850,7 +1865,7 @@
     }
 
     function sharesFormationContact(left, right) {
-        if (left.side !== right.side) {
+        if (getPlayerId(left) !== getPlayerId(right)) {
             return false;
         }
         if (Math.abs(geometry.normalizeAngle(left.rotation - right.rotation)) > 0.12) {
@@ -2073,13 +2088,14 @@
         };
     }
 
-    function resolveAngledRankMoveContact(originUnits, projectedUnits, allUnits, activeSide, terrain) {
+    function resolveAngledRankMoveContact(originUnits, projectedUnits, allUnits, activePlayerId, terrain) {
         if (!originUnits || !projectedUnits || projectedUnits.length === 0) {
             return null;
         }
+        const normalizedActivePlayerId = normalizePlayerId(activePlayerId);
         const projectedIds = new Set(projectedUnits.map((unit) => unit.id));
         const otherUnits = allUnits.filter((unit) => !projectedIds.has(unit.id));
-        const enemyUnits = otherUnits.filter((unit) => unit.side !== activeSide);
+        const enemyUnits = otherUnits.filter((unit) => getPlayerId(unit) !== normalizedActivePlayerId);
         const originById = new Map(originUnits.map((unit) => [unit.id, unit]));
         const orderedIds = getRankOrderIds(originUnits, originUnits[0].rotation);
         const collisionInfos = projectedUnits
@@ -2338,11 +2354,11 @@
         };
     }
 
-    function findBestFormUpCandidate(groupUnits, allUnits, activeSide, terrain) {
+    function findBestFormUpCandidate(groupUnits, allUnits, activePlayerId, terrain) {
         if (groupUnits.length === 0) {
             return null;
         }
-        const enemyUnits = allUnits.filter((unit) => unit.side !== activeSide);
+        const enemyUnits = allUnits.filter((unit) => getPlayerId(unit) !== activePlayerId);
         const otherUnits = allUnits.filter((unit) => !groupUnits.some((groupUnit) => groupUnit.id === unit.id));
         let best = null;
 

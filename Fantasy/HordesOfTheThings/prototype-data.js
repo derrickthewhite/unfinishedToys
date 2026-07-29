@@ -27,18 +27,30 @@
     const SHOOTING_BOX_WIDTH = 120;
     const ROUGH_LOS_ALLOWANCE_PACES = 50;
 
-    const COLORS = {
+    const PLAYER_IDS = Object.freeze(['player-1', 'player-2']);
+
+    const PLAYER_COLORS = Object.freeze({
         blue: {
+            label: 'Blue',
             fill: '#5f8ecf',
             stroke: '#20456f',
             glow: 'rgba(56, 95, 154, 0.28)'
         },
         red: {
+            label: 'Red',
             fill: '#cf665d',
             stroke: '#752924',
             glow: 'rgba(174, 62, 53, 0.26)'
         }
-    };
+    });
+
+    const DEFAULT_PLAYERS = Object.freeze({
+        'player-1': { id: 'player-1', colorId: 'blue', faction: 'Panda' },
+        'player-2': { id: 'player-2', colorId: 'red', faction: 'Undead' }
+    });
+
+    // Retained until all rendering consumers use player color configuration.
+    const COLORS = PLAYER_COLORS;
 
     const UNIT_TYPES = {
         Blade: { value: 2, depth: 20, troopClass: 'infantry', moves: { road: 400, good: 200, bad: 200, water: 100 }, strength: { infantry: 5, mounted: 3 }, combat: { ignoresBadGoingPenalty: false } },
@@ -122,45 +134,53 @@
         };
     }
 
+    function createUnit(type, playerId, faction, pose, allocateUnitId) {
+        const template = UNIT_TYPES[type];
+        if (!template) {
+            throw new Error('Unknown unit type: ' + type);
+        }
+        return {
+            id: allocateUnitId(),
+            type,
+            playerId,
+            faction,
+            width: UNIT_WIDTH,
+            depth: template.depth,
+            x: pose.x,
+            y: pose.y,
+            rotation: pose.rotation,
+            movedThisTurn: false,
+            troopClass: template.troopClass,
+            moves: convertMovesToMm(template.moves),
+            ranged: convertRangedToMm(template.ranged),
+            movement: { ...(template.movement || {}) },
+            value: template.value,
+            strength: { ...template.strength },
+            combat: { ...(template.combat || {}) }
+        };
+    }
+
     function createDefaultUnits(allocateUnitId) {
         const units = [];
 
-        function pushUnit(type, side, faction, x, y, rotation) {
-            const template = UNIT_TYPES[type];
-            units.push({
-                id: allocateUnitId(),
-                type,
-                side,
-				faction,
-                width: UNIT_WIDTH,
-                depth: template.depth,
-                x,
-                y,
-                rotation,
-                movedThisTurn: false,
-                troopClass: template.troopClass,
-                moves: convertMovesToMm(template.moves),
-                ranged: convertRangedToMm(template.ranged),
-                movement: { ...(template.movement || {}) },
-                value: template.value,
-                strength: { ...template.strength },
-                combat: { ...(template.combat || {}) }
-            });
+        function pushUnit(type, playerId, x, y, rotation) {
+            const player = DEFAULT_PLAYERS[playerId];
+            units.push(createUnit(type, playerId, player.faction, { x, y, rotation }, allocateUnitId));
         }
 
-        pushUnit('Blade', 'blue', "Panda", 140, 520, 0);
-        pushUnit('Spear', 'blue', "Panda", 180, 520, 0);
-        pushUnit('Shooter', 'blue', "Panda", 220, 520, 0);
-        pushUnit('Riders', 'blue', "Panda", 260, 520, 0);
-        pushUnit('Warband', 'blue', "Panda", 120, 475, 0);
-        pushUnit('Horde', 'blue', "Panda", 120, 435, 0);
-        pushUnit('Artillery', 'blue', "Panda", 180, 435, 0);
+        pushUnit('Blade', 'player-1', 140, 520, 0);
+        pushUnit('Spear', 'player-1', 180, 520, 0);
+        pushUnit('Shooter', 'player-1', 220, 520, 0);
+        pushUnit('Riders', 'player-1', 260, 520, 0);
+        pushUnit('Warband', 'player-1', 120, 475, 0);
+        pushUnit('Horde', 'player-1', 120, 435, 0);
+        pushUnit('Artillery', 'player-1', 180, 435, 0);
 
-        pushUnit('Knights', 'red', "Undead", 420, 90, Math.PI);
-        pushUnit('Riders', 'red', "Undead", 460, 90, Math.PI);
-        pushUnit('Hero', 'red', "Undead", 500, 90, Math.PI);
-        pushUnit('Blade', 'red', "Undead", 480, 115, Math.PI);
-        pushUnit('Horde', 'red', "Undead", 480, 155, Math.PI);
+        pushUnit('Knights', 'player-2', 420, 90, Math.PI);
+        pushUnit('Riders', 'player-2', 460, 90, Math.PI);
+        pushUnit('Hero', 'player-2', 500, 90, Math.PI);
+        pushUnit('Blade', 'player-2', 480, 115, Math.PI);
+        pushUnit('Horde', 'player-2', 480, 155, Math.PI);
         return units;
     }
 
@@ -186,12 +206,16 @@
         SHOOTING_RANGE_PACES,
         SHOOTING_BOX_WIDTH,
         ROUGH_LOS_ALLOWANCE_PACES,
+        PLAYER_IDS,
+        PLAYER_COLORS,
+        DEFAULT_PLAYERS,
         COLORS,
         UNIT_TYPES,
         TERRAIN_STYLE,
         pacesToMm,
         convertMovesToMm,
         convertRangedToMm,
+        createUnit,
         createDefaultTerrain,
         createDefaultUnits
     };
