@@ -108,6 +108,23 @@ function createAppHarness(overrides) {
     Object.assign(app.state, overrides?.state || {});
     app.ui = {
         storageNameInput: { value: '' },
+        deploymentCanvas: {
+            setPointerCapture() {},
+            hasPointerCapture() { return false; },
+            releasePointerCapture() {},
+            getBoundingClientRect() {
+                return { left: 0, top: 0, width: 600, height: 600 };
+            },
+            clientWidth: 600,
+            clientHeight: 600,
+            width: 600,
+            height: 600
+        },
+        deploymentTray: { innerHTML: '', querySelectorAll: () => [] },
+        deploymentActivePlayer: { textContent: '' },
+        deploymentProgress: { textContent: '' },
+        deploymentStatus: { textContent: '' },
+        finishDeploymentButton: { disabled: false },
         ...overrides?.ui
     };
     app.canvas = {
@@ -133,6 +150,7 @@ function createAppHarness(overrides) {
         app.lastStatus = message;
     };
     app.evaluateDraft = () => {};
+    app.renderUnitDeployment = () => {};
     app.renderStorageList = () => {
         app.storageRendered = true;
     };
@@ -233,6 +251,7 @@ test('unit asset lookup includes generic artwork for the remaining unit types', 
     ['Heavy-Spear', 'Heavy-Warband', 'Beasts', 'Flyers', 'Behemoth'].forEach((type) => {
         assert.equal(app.getUnitAssetPath({ type, faction: 'Panda' }), `assets/${type}.svg`);
     });
+    assert.equal(app.getUnitAssetPath({ type: 'Artillery', faction: 'Undead' }), 'assets/Artillery.svg');
 });
 
 test('terrain setup rolls a defender and creates a bounded editable terrain target', () => {
@@ -799,6 +818,26 @@ test('zoomAt can reach the increased maximum zoom level', () => {
     assert.equal(app.state.camera.scale, 6);
 });
 
+test('setup cameras preserve the cursor world point through zoom and pan independently', () => {
+    const app = createAppHarness({ state: { setupCameras: {} } });
+    const canvas = {
+        getBoundingClientRect() { return { left: 20, top: 40, width: 600, height: 600 }; }
+    };
+    const event = { clientX: 470, clientY: 340, deltaY: -1 };
+    const before = app.setupScreenToWorld(event, 'deployment', canvas);
+
+    app.zoomSetupAt(event, 'deployment', canvas);
+    const after = app.setupScreenToWorld(event, 'deployment', canvas);
+
+    assert.ok(Math.abs(before.x - after.x) < 0.001);
+    assert.ok(Math.abs(before.y - after.y) < 0.001);
+    assert.equal(app.getSetupCamera('terrain').scale, 1);
+
+    const camera = app.getSetupCamera('deployment');
+    app.panSetupCamera({ cameraStartX: camera.x, cameraStartY: camera.y, startClientX: 470, startClientY: 340 }, { clientX: 580, clientY: 340 }, 'deployment');
+    assert.ok(camera.x < before.x);
+});
+
 test('renderSelectionInfo shows single-unit details in the side panel', () => {
     const unit = createBlade('u1', 100, 220);
     const app = createAppHarness({
@@ -1063,6 +1102,26 @@ test('saveCurrentGame stores named snapshots in local storage', () => {
     }
 });
 
+test('saveCurrentGame does not save while guided setup is active', () => {
+    const previousWindow = global.window;
+    const storage = createStorage();
+    global.window = { localStorage: storage };
+
+    try {
+        const app = createAppHarness({
+            state: { setupStage: 'army-builder' },
+            ui: { storageNameInput: { value: 'setup slot' } }
+        });
+
+        app.saveCurrentGame();
+
+        assert.equal(storage.getItem('hordes-of-the-things-saves'), null);
+        assert.equal(app.lastStatus, 'Saving is available once deployment has begun the game.');
+    } finally {
+        global.window = previousWindow;
+    }
+});
+
 test('loadGame restores saved state from local storage', () => {
     const previousWindow = global.window;
     const storage = createStorage();
@@ -1089,9 +1148,10 @@ test('loadGame restores saved state from local storage', () => {
     global.window = { localStorage: storage };
 
     try {
-        const app = createAppHarness();
+        const app = createAppHarness({ state: { setupStage: 'terrain-placement' } });
         app.loadGame('save-1');
 
+        assert.equal(app.state.setupStage, 'game');
         assert.equal(app.state.activePlayerId, 'player-2');
         assert.equal(app.state.phase, 'shooting');
         assert.equal(app.state.units[0].id, 'unit-4');
@@ -1453,4 +1513,194 @@ test('logCombatResults includes modifiers, rolls, and outcome details', () => {
     const recoilLog = calls.filter((entry) => entry[0] === 'log').map((entry) => entry[1]).find((entry) => entry.includes('recoil destruction:'));
     assert.ok(recoilLog.includes('Red Blade u2'));
     assert.ok(recoilLog.includes('reason recoil path enters water'));
+});
+
+test('unit deployment initialization uses defender-first order and quarter assignments', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'terrain-placement',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 2);
+    app.adjustArmyUnit('player-2', 'Spear', 2);
+    const terrain = app.initializeTerrainPlacement(() => 0);
+    app.initializeUnitDeployment();
+
+    const deployment = app.getDeploymentSetup();
+    assert.equal(deployment.activePlayerId, terrain.defenderPlayerId);
+    assert.equal(deployment.zoneByPlayerId[terrain.defenderPlayerId], 'bottom');
+    assert.equal(deployment.zoneByPlayerId[app.getOpponentPlayerId(terrain.defenderPlayerId)], 'top');
+});
+
+test('deployment creates units from tray drafts and enforces defender then attacker order', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    app.adjustArmyUnit('player-2', 'Spear', 1);
+    const deployment = app.initializeUnitDeployment();
+
+    const defenderDraftId = deployment.tray.find((entry) => entry.playerId === 'player-1').draftId;
+    app.selectDeploymentTrayUnit(defenderDraftId);
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 300, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 300, clientY: 550 });
+
+    assert.equal(app.state.units.length, 1);
+    assert.equal(app.state.units[0].playerId, 'player-1');
+    assert.equal(app.state.units[0].type, 'Blade');
+    assert.equal(app.canFinishDeploymentTurn(), true);
+
+    app.finishDeploymentTurn();
+    assert.equal(deployment.activePlayerId, 'player-2');
+    assert.equal(app.canFinishDeploymentTurn(), false);
+});
+
+test('deployment rejects invalid zone placement and rotated footprint outside quarter', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    app.initializeUnitDeployment();
+    const draftId = app.getDeploymentSetup().tray[0].draftId;
+
+    app.selectDeploymentTrayUnit(draftId);
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 300, clientY: 300 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 300, clientY: 300 });
+    assert.equal(app.state.units.length, 0);
+
+    const rotated = data.createUnit('Blade', 'player-1', 'Panda', {
+        x: 280,
+        y: 430,
+        rotation: Math.PI / 2
+    }, () => 'rotated-1');
+    assert.equal(app.isUnitPlacementInZone(rotated, 'player-1'), false);
+});
+
+test('deployment rejects overlap and restores moved unit position on invalid move', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 2);
+    app.initializeUnitDeployment();
+    const trayIds = app.getDeploymentSetup().tray.map((entry) => entry.draftId);
+
+    app.selectDeploymentTrayUnit(trayIds[0]);
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.selectDeploymentTrayUnit(trayIds[1]);
+    app.onDeploymentPointerDown({ pointerId: 2, clientX: 340, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 2, clientX: 340, clientY: 550 });
+
+    const [first, second] = app.state.units;
+    const originalSecond = { x: second.x, y: second.y };
+    app.onDeploymentPointerDown({ pointerId: 3, clientX: second.x, clientY: second.y });
+    app.onDeploymentPointerMove({ pointerId: 3, clientX: first.x, clientY: first.y });
+    app.onDeploymentPointerUp({ pointerId: 3, clientX: first.x, clientY: first.y });
+
+    assert.equal(Math.round(second.x), Math.round(originalSecond.x));
+    assert.equal(Math.round(second.y), Math.round(originalSecond.y));
+});
+
+test('deployment snaps tray units and releases capture after blank canvas clicks', () => {
+    const capturedPointers = new Set();
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        },
+        ui: {
+            deploymentCanvas: {
+                setPointerCapture(pointerId) { capturedPointers.add(pointerId); },
+                hasPointerCapture(pointerId) { return capturedPointers.has(pointerId); },
+                releasePointerCapture(pointerId) { capturedPointers.delete(pointerId); },
+                getBoundingClientRect() { return { left: 0, top: 0, width: 600, height: 600 }; },
+                clientWidth: 600,
+                clientHeight: 600,
+                width: 600,
+                height: 600
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 2);
+    app.initializeUnitDeployment();
+    const [firstDraftId, secondDraftId] = app.getDeploymentSetup().tray.map((entry) => entry.draftId);
+
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 100, clientY: 400 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 100, clientY: 400 });
+    assert.equal(capturedPointers.size, 0);
+
+    app.selectDeploymentTrayUnit(firstDraftId);
+    app.onDeploymentPointerDown({ pointerId: 2, clientX: 260, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 2, clientX: 260, clientY: 550 });
+    app.selectDeploymentTrayUnit(secondDraftId);
+    app.onDeploymentPointerDown({ pointerId: 3, clientX: 304, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 3, clientX: 304, clientY: 550 });
+
+    assert.equal(app.state.units.length, 2);
+    assert.equal(Math.round(app.state.units[1].x), Math.round(app.state.units[0].x + app.state.units[0].width));
+});
+
+test('deployment handoff enters game mode with defender as active player and rolled moves', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    app.adjustArmyUnit('player-2', 'Spear', 1);
+    app.initializeUnitDeployment();
+    app.rollDie = () => 5;
+
+    let defenderDraftId = app.getDeploymentSetup().tray.find((entry) => entry.playerId === 'player-1').draftId;
+    app.selectDeploymentTrayUnit(defenderDraftId);
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 300, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 300, clientY: 550 });
+    app.finishDeploymentTurn();
+
+    const attackerDraftId = app.getDeploymentSetup().tray.find((entry) => entry.playerId === 'player-2').draftId;
+    app.selectDeploymentTrayUnit(attackerDraftId);
+    app.onDeploymentPointerDown({ pointerId: 2, clientX: 300, clientY: 70 });
+    app.onDeploymentPointerUp({ pointerId: 2, clientX: 300, clientY: 70 });
+    app.finishDeploymentTurn();
+
+    assert.equal(app.state.setupStage, 'game');
+    assert.equal(app.state.mode, 'game');
+    assert.equal(app.state.activePlayerId, 'player-1');
+    assert.equal(app.state.phase, 'move');
+    assert.equal(app.state.remainingMoves, 5);
+    assert.deepEqual(app.state.losses, { 'player-1': [], 'player-2': [] });
 });

@@ -40,6 +40,15 @@ Army confirmation now initializes the terrain stage instead of a placeholder.
 - Blob draw and hit-test geometry both honor rotation, so terrain visuals and `getTerrainTypeAt` agree.
 - Confirming only becomes available once the placed count matches the target. Its confirmation locks terrain and advances to `unit-deployment`.
 
+### Completed: Sequential Unit Deployment
+
+- Terrain confirmation initializes a dedicated deployment canvas and tray from the accepted army drafts.
+- The defender deploys all units in the bottom quarter first; the attacker then deploys all units in the top quarter.
+- Every deployment and reposition checks every rotated base corner against the assigned quarter and rejects polygon overlap with all deployed units.
+- Deployed units are created through `data.createUnit`, retaining player ID, faction, and configured rendering color.
+- The active player cannot finish until every drafted unit is legally deployed. After attacker confirmation, the setup transitions to game mode with the defender taking the first move roll.
+- Deployment input is isolated in `prototype-unit-deployment.js`; the main battle-board pointer handlers remain unchanged while battle-board refactoring is paused.
+
 ### Verified
 
 Run this from the repository root:
@@ -48,7 +57,7 @@ Run this from the repository root:
 node --test *.test.js
 ```
 
-The focused application suite has 38 passing tests, including terrain defender assignment, count bounds, offer refresh, and terrain-to-deployment confirmation. The full `node --test *.test.js` suite has 104 passing tests.
+The focused application suite has 52 passing tests, including deployment snapping, pointer-release handling, setup-camera pan/zoom, save guards, and setup-skipping game loads. The full `node --test *.test.js` suite has 118 passing tests.
 
 ## Core Model
 
@@ -76,18 +85,17 @@ Do not use `attacker` or `defender` as permanent player identifiers. They determ
 
 ## Remaining Work
 
-### 1. Build Sequential Deployment
+### 1. Resume Battle-Board Refactoring After Deployment Is Testable
 
-Primary files: `prototype.html`, `prototype.css`, `prototype-app.js`, `prototype-geometry.js`
+The canvas event-registration boundary remains in `prototype-board-input.js`. The complete battle-board interaction slice now lives in `prototype-board-interaction.js`: camera conversion, pan/zoom, pointer down/move/up, placement, selection, marquee selection, handles, rotations, reversals, rank/file conversion, and movement/edit draft bookkeeping. Its method bodies were moved out of `prototype-app.js` as one unit.
 
-- Create selected units with `data.createUnit`, initially shown in an off-board deployment tray.
-- Defender deploys first, then confirms. Attacker deploys afterward.
-- Shade the active player's legal quarter on the canvas.
-- A drop is valid only if every rotated unit corner lies within the player's assigned zone and it does not overlap another deployed unit.
-- Invalid drops return the unit to the tray with a clear status message.
-- Let players reposition legal deployed units before confirmation.
-- Disable Finish until every unit for the active deployment player is validly deployed.
-- After attacker confirmation, switch to `setupStage: 'game'`, initialize losses and turn state, roll the configured first player's movement count, and use existing game behavior.
+Recommended extraction order:
+
+1. Extract board rendering as a separate slice: render scheduling, board/terrain/unit drawing, overlays, ghosts, selection handles, and asset drawing/loading. Keep setup-canvas rendering separate because its module already depends on the shared board draw methods.
+2. Extract game-flow and combat orchestration: draft lifecycle, move completion, form-up, shooting/melee phase state, turn advancement, and combat-resolution display state.
+3. Revisit persistence after deployment is complete so saves preserve deployment progress and setup state, then keep the persistence module as the sole save/load implementation.
+
+For every slice, use `apply_patch` for both source deletion and destination addition so the editor's AI change set matches Git's working-tree change set. Validate with the focused application tests before any adjacent refactor.
 
 ### 2. Persistence, Documentation, and Tests
 
@@ -107,6 +115,17 @@ Primary files: `prototype-app.js`, `Design.md`, `prototype-app.test.js`, `protot
   - setup-to-game handoff
   - setup save/load resumption
 - Run `node --test *.test.js` after each completed slice.
+
+## Planned Game Extensions
+
+- Add reserve deployment for units such as Hordes and future Lurkers: these units begin off-board or are removed from the board, then enter during play using the deployment tray and placement validation as shared foundations.
+- Expand the presentation palette with additional player colors while preserving player IDs as ownership keys.
+- Add a check to make sure that 
+- Add automatic army deployment: group like units into formations, favor bad-going units near or toward appropriate terrain, group fast movers, and, when attacking, align likely favorable matchups where practical.
+- Add further armies once their artwork is available.
+- Add an optional game-start mode that limits each faction to an allowed unit roster.
+- Add more unit types.
+- Move the cheating-oriented Edit Mode behind an extra-click modal or settings control.
 
 ## Future Terrain Investigations
 

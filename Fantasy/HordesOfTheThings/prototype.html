@@ -78,9 +78,6 @@
                 <button id="undoMoveButton" type="button">Undo</button>
                 <button id="acknowledgedButton" type="button" hidden>Acknowledged</button>
             </div>
-            <div class="bar-group utility-group">
-                <button id="storageButton" class="icon-button" type="button" aria-label="Open save and load dialog">&#9881;</button>
-            </div>
             <div class="bar-group status-group">
                 <div id="statusText">Edit mode: place, drag, marquee-select, or rotate units.</div>
                 <div id="selectionText">No units selected.</div>
@@ -99,6 +96,9 @@
                 <dl id="selectionPanelStats" class="selection-stats" hidden></dl>
             </aside>
         </main>
+        <div class="global-utility">
+            <button id="storageButton" class="icon-button" type="button" aria-label="Open save and load dialog">&#9881;</button>
+        </div>
         <main id="setupShell" class="setup-shell" hidden>
             <section id="armyBuilder" class="army-builder" aria-labelledby="armyBuilderTitle">
                 <header class="setup-header">
@@ -130,10 +130,25 @@
                     </aside>
                 </div>
             </section>
-            <section id="setupPending" class="setup-pending" hidden aria-live="polite">
-                <p class="setup-kicker">Battle Setup · 2 of 3</p>
-                <h1>Terrain Confirmed</h1>
-                <p id="setupPendingText">Unit deployment will be implemented next.</p>
+            <section id="deploymentScreen" class="deployment-screen" hidden aria-labelledby="deploymentTitle" aria-live="polite">
+                <header class="setup-header">
+                    <p class="setup-kicker">Battle Setup · 3 of 3</p>
+                    <h1 id="deploymentTitle">Deploy the Armies</h1>
+                    <p id="deploymentStatus">Deploy units to your assigned quarter. All corners must be inside your zone and no units may overlap.</p>
+                </header>
+                <div class="deployment-layout">
+                    <div class="deployment-board-stage"><canvas id="deploymentCanvas"></canvas></div>
+                    <aside class="deployment-controls">
+                        <p id="deploymentActivePlayer" class="deployment-active-player"></p>
+                        <p id="deploymentProgress" class="deployment-progress"></p>
+                        <label class="deployment-snap-control">
+                            <input id="deploymentSnapCheckbox" type="checkbox" checked>
+                            Snap deployed units
+                        </label>
+                        <div id="deploymentTray" class="deployment-tray"></div>
+                        <button id="finishDeploymentButton" class="setup-primary-action" type="button" disabled>Finish Deployment</button>
+                    </aside>
+                </div>
             </section>
         </main>
         <footer class="help-bar">
@@ -186,6 +201,13 @@
     <script src="prototype-geometry.js"></script>
     <script src="prototype-rules.js"></script>
     <script src="prototype-history.js"></script>
+    <script src="prototype-terrain-placement.js"></script>
+    <script src="prototype-army-builder.js"></script>
+    <script src="prototype-persistence.js"></script>
+    <script src="prototype-board-input.js"></script>
+    <script src="prototype-board-interaction.js"></script>
+    <script src="prototype-setup-camera.js"></script>
+    <script src="prototype-unit-deployment.js"></script>
     <script src="prototype-app.js"></script>
     <script src="prototype.js"></script>
 </body>
