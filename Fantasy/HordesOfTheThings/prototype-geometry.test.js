@@ -52,3 +52,10 @@ test('findFriendlySnapOffset snaps colliding friendly units to nearest corner co
 
     assert.deepEqual(offset, { x: 4, y: -3 });
 });
+
+test('pointInBlob respects the feature rotation', () => {
+    const feature = { cx: 100, cy: 100, rx: 50, ry: 20, wobble: 0, rotation: Math.PI / 2 };
+
+    assert.equal(geometry.pointInBlob({ x: 100, y: 140 }, feature), true);
+    assert.equal(geometry.pointInBlob({ x: 140, y: 100 }, feature), false);
+});

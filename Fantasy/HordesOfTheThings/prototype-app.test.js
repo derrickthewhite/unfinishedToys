@@ -154,6 +154,171 @@ function createAppHarness(overrides) {
     return app;
 }
 
+test('new games begin with empty 24 AP army drafts instead of a seeded battle', () => {
+    const app = Object.create(HordesPrototype.prototype);
+    app.nextUnitId = 1;
+    app.state = app.createInitialState();
+
+    assert.equal(app.state.setupStage, 'army-builder');
+    assert.deepEqual(app.state.units, []);
+    assert.deepEqual(app.state.terrain, { roads: [], features: [] });
+    assert.deepEqual(app.getArmyDraft('player-1').counts, {});
+    assert.deepEqual(app.getArmyDraft('player-2').counts, {});
+});
+
+test('army drafts require exactly 24 AP for both players before terrain placement', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'army-builder',
+            setup: { armies: Object.create(HordesPrototype.prototype).createArmyDrafts(), confirmation: null }
+        }
+    });
+
+    app.adjustArmyUnit('player-1', 'Blade', 12);
+    assert.equal(app.getArmyValue('player-1'), data.ARMY_POINT_TARGET);
+    assert.equal(app.canAcceptArmies(), false);
+
+    app.adjustArmyUnit('player-2', 'Blade', 12);
+    assert.equal(app.canAcceptArmies(), true);
+    app.openArmyConfirmation();
+    assert.equal(app.state.setup.confirmation, 'armies');
+
+    app.confirmSetupStage();
+    assert.equal(app.state.setupStage, 'terrain-placement');
+    assert.equal(app.state.setup.confirmation, null);
+});
+
+test('army builder updates player color and faction without changing player identity', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'army-builder',
+            setup: { armies: Object.create(HordesPrototype.prototype).createArmyDrafts(), confirmation: null }
+        }
+    });
+
+    app.updateArmyPlayer('player-1', 'colorId', 'green');
+    app.updateArmyPlayer('player-1', 'faction', 'Undead');
+
+    assert.equal(app.state.players['player-1'].id, 'player-1');
+    assert.equal(app.state.players['player-1'].colorId, 'green');
+    assert.equal(app.state.players['player-1'].faction, 'Undead');
+});
+
+test('army builder random actions create an exact army and can clear it', () => {
+    const app = createAppHarness({
+        state: { setupStage: 'army-builder', setup: { armies: Object.create(HordesPrototype.prototype).createArmyDrafts(), confirmation: null } }
+    });
+
+    app.chooseRandomArmy('player-1', () => 0);
+    assert.equal(app.getArmyValue('player-1'), data.ARMY_POINT_TARGET);
+
+    app.randomizeArmyPresentation('player-1', () => 0.99);
+    assert.equal(app.state.players['player-1'].colorId, 'gold');
+    assert.equal(app.state.players['player-1'].faction, 'Undead');
+
+    app.clearArmy('player-1');
+    assert.equal(app.getArmyValue('player-1'), 0);
+});
+
+test('terrain offer descriptions include shape and size labels, with a road exception', () => {
+    const app = createAppHarness();
+
+    assert.equal(app.getTerrainOfferDescription({ kind: 'forest', shape: 'oval', sizeMultiplier: 1.5 }), 'Oval · Large');
+    assert.equal(app.getTerrainOfferDescription({ kind: 'road' }), 'Road · full board');
+});
+
+test('unit asset lookup includes generic artwork for the remaining unit types', () => {
+    const app = createAppHarness();
+
+    ['Heavy-Spear', 'Heavy-Warband', 'Beasts', 'Flyers', 'Behemoth'].forEach((type) => {
+        assert.equal(app.getUnitAssetPath({ type, faction: 'Panda' }), `assets/${type}.svg`);
+    });
+});
+
+test('terrain setup rolls a defender and creates a bounded editable terrain target', () => {
+    const app = createAppHarness({
+        state: { setup: { armies: {}, confirmation: null } }
+    });
+
+    const terrain = app.initializeTerrainPlacement(() => 0.99);
+    assert.equal(terrain.defenderPlayerId, 'player-2');
+    assert.equal(terrain.terrainCount, 8);
+    assert.equal(terrain.offers.length, 3);
+
+    app.setTerrainCount(99);
+    assert.equal(terrain.terrainCount, data.TERRAIN_COUNT_MAX);
+});
+
+test('placing terrain refreshes offers and confirmation transitions to unit deployment', () => {
+    const app = createAppHarness({
+        state: { setupStage: 'terrain-placement', setup: { armies: {}, confirmation: null } }
+    });
+    const terrain = app.initializeTerrainPlacement(() => 0);
+    terrain.terrainCount = 1;
+    terrain.offers = [data.createTerrainOffer('forest', 'forest-1', () => 0)];
+
+    app.placeTerrainOffer('forest-1');
+    assert.equal(app.state.terrain.features.length, 1);
+    assert.equal(terrain.offers.length, 3);
+    assert.equal(app.isTerrainReady(), true);
+
+    app.openTerrainConfirmation();
+    assert.equal(app.state.setup.confirmation, 'terrain');
+    app.confirmSetupStage();
+    assert.equal(app.state.setupStage, 'unit-deployment');
+});
+
+test('terrain offers include a named shape and one of the prescribed size tiers', () => {
+    const offer = data.createTerrainOffer('forest', 'forest-1', () => 0.99);
+
+    assert.equal(data.TERRAIN_SHAPES.includes(offer.shape), true);
+    assert.equal(data.TERRAIN_SIZE_MULTIPLIERS.includes(offer.sizeMultiplier), true);
+    assert.equal(offer.sizeMultiplier, 1.5);
+});
+
+test('terrain movement allows a feature center to rest on the board edge', () => {
+    const app = createAppHarness({
+        state: { setupStage: 'terrain-placement', setup: { armies: {}, confirmation: null } }
+    });
+    const terrain = app.initializeTerrainPlacement(() => 0);
+    const feature = data.createTerrainOffer('forest', 'forest-1', () => 0);
+    app.state.terrain.features.push(feature);
+    terrain.selectedTerrainId = feature.id;
+
+    app.state.terrainInteraction = {
+        pointerId: 1,
+        pieceId: feature.id,
+        start: { x: 300, y: 300 },
+        base: { ...feature }
+    };
+    app.terrainScreenToWorld = () => ({ x: 0, y: 0 });
+    app.renderTerrainPlacement = () => {};
+    app.onTerrainPointerMove({ pointerId: 1 });
+
+    assert.equal(feature.cx, 0);
+    assert.equal(feature.cy, 0);
+});
+
+test('random terrain placement retries overlaps and fills the requested terrain count', () => {
+    const app = createAppHarness({
+        state: { setupStage: 'terrain-placement', setup: { armies: {}, confirmation: null } }
+    });
+    const terrain = app.initializeTerrainPlacement(() => 0.5);
+    terrain.terrainCount = 2;
+    const candidates = [
+        { id: 'one', kind: 'forest', shape: 'circle', cx: 100, cy: 100, rx: 30, ry: 30, wobble: 0, rotation: 0 },
+        { id: 'overlap', kind: 'forest', shape: 'circle', cx: 100, cy: 100, rx: 30, ry: 30, wobble: 0, rotation: 0 },
+        { id: 'two', kind: 'forest', shape: 'circle', cx: 400, cy: 400, rx: 30, ry: 30, wobble: 0, rotation: 0 }
+    ];
+    app.createRandomTerrainPiece = () => candidates.shift();
+
+    app.autoPlaceTerrain();
+
+    assert.equal(app.state.terrain.features.length, 2);
+    assert.equal(app.terrainPiecesOverlap(app.state.terrain.features[0], app.state.terrain.features[1]), false);
+    assert.equal(app.isTerrainReady(), true);
+});
+
 test('left wheeling bubble stays outside the rank and mirrors the right bubble rotation', () => {
     const units = [
         createBlade('u1', 100, 220),

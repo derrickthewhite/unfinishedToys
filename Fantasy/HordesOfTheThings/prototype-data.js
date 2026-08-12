@@ -28,6 +28,12 @@
     const ROUGH_LOS_ALLOWANCE_PACES = 50;
 
     const PLAYER_IDS = Object.freeze(['player-1', 'player-2']);
+    const ARMY_POINT_TARGET = 24;
+    const FACTIONS = Object.freeze(['Panda', 'Undead']);
+    const TERRAIN_OFFER_KINDS = Object.freeze(['forest', 'swamp', 'water', 'impassable', 'road']);
+    const TERRAIN_COUNT_MAX = 8;
+    const TERRAIN_SHAPES = Object.freeze(['blob', 'kidney', 'circle', 'half-circle', 'square', 'rectangle', 'oval', 'fat-l', 'horseshoe', 'cross', 'lightbulb']);
+    const TERRAIN_SIZE_MULTIPLIERS = Object.freeze([0.25, 0.5, 1, 1.5]);
 
     const PLAYER_COLORS = Object.freeze({
         blue: {
@@ -41,6 +47,18 @@
             fill: '#cf665d',
             stroke: '#752924',
             glow: 'rgba(174, 62, 53, 0.26)'
+        },
+        green: {
+            label: 'Green',
+            fill: '#6f9d62',
+            stroke: '#315b38',
+            glow: 'rgba(70, 126, 76, 0.28)'
+        },
+        gold: {
+            label: 'Gold',
+            fill: '#c9a650',
+            stroke: '#72531d',
+            glow: 'rgba(181, 139, 38, 0.28)'
         }
     });
 
@@ -119,6 +137,35 @@
         water: { fill: '#5e92b2', label: 'Water' },
         impassable: { fill: '#595661', label: 'Impassable' }
     };
+
+    function createTerrainOffer(kind, id, random = Math.random) {
+        if (!TERRAIN_OFFER_KINDS.includes(kind)) {
+            throw new Error('Unknown terrain offer kind: ' + kind);
+        }
+        if (kind === 'road') {
+            return {
+                id,
+                kind,
+                orientation: random() < 0.5 ? 'horizontal' : 'vertical',
+                position: BOARD_SIZE / 2,
+                width: 20,
+                fill: '#d7c28f'
+            };
+        }
+        const sizeMultiplier = TERRAIN_SIZE_MULTIPLIERS[Math.floor(random() * TERRAIN_SIZE_MULTIPLIERS.length)];
+        return {
+            id,
+            kind,
+            cx: BOARD_SIZE / 2,
+            cy: BOARD_SIZE / 2,
+            shape: TERRAIN_SHAPES[Math.floor(random() * TERRAIN_SHAPES.length)],
+            sizeMultiplier,
+            rx: (48 + Math.round(random() * 24)) * sizeMultiplier,
+            ry: (42 + Math.round(random() * 20)) * sizeMultiplier,
+            wobble: 0.16 + (random() * 0.12),
+            rotation: 0
+        };
+    }
 
     function createDefaultTerrain() {
         return {
@@ -206,12 +253,19 @@
         SHOOTING_RANGE_PACES,
         SHOOTING_BOX_WIDTH,
         ROUGH_LOS_ALLOWANCE_PACES,
+        ARMY_POINT_TARGET,
+        FACTIONS,
+        TERRAIN_OFFER_KINDS,
+        TERRAIN_COUNT_MAX,
+        TERRAIN_SHAPES,
+        TERRAIN_SIZE_MULTIPLIERS,
         PLAYER_IDS,
         PLAYER_COLORS,
         DEFAULT_PLAYERS,
         COLORS,
         UNIT_TYPES,
         TERRAIN_STYLE,
+        createTerrainOffer,
         pacesToMm,
         convertMovesToMm,
         convertRangedToMm,

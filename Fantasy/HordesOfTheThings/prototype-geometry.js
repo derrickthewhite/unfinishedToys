@@ -233,28 +233,84 @@
         return { left, top, right, bottom, width: right - left, height: bottom - top };
     }
 
+    function getTerrainFeaturePoints(feature, pointCount = 48) {
+        const rotation = feature.rotation || 0;
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        const shape = feature.shape || 'blob';
+        const points = [];
+        const addPoint = (localX, localY) => points.push({
+            x: feature.cx + (localX * cos) - (localY * sin),
+            y: feature.cy + (localX * sin) + (localY * cos)
+        });
+        if (shape === 'fat-l') {
+            [[-1, -1], [-0.2, -1], [-0.2, 0.2], [1, 0.2], [1, 1], [-1, 1]].forEach(([x, y]) => addPoint(x * feature.rx, y * feature.ry));
+            return points;
+        }
+        if (shape === 'cross') {
+            [[-0.35, -1], [0.35, -1], [0.35, -0.35], [1, -0.35], [1, 0.35], [0.35, 0.35], [0.35, 1], [-0.35, 1], [-0.35, 0.35], [-1, 0.35], [-1, -0.35], [-0.35, -0.35]].forEach(([x, y]) => addPoint(x * feature.rx, y * feature.ry));
+            return points;
+        }
+        if (shape === 'horseshoe') {
+            [[-1, -1], [1, -1], [1, 0.55], [0.55, 1], [0.28, 0.58], [0.28, -0.48], [-0.28, -0.48], [-0.28, 0.58], [-0.55, 1], [-1, 0.55]].forEach(([x, y]) => addPoint(x * feature.rx, y * feature.ry));
+            return points;
+        }
+        for (let index = 0; index < pointCount; index += 1) {
+            const theta = (index / pointCount) * Math.PI * 2;
+            let x = Math.cos(theta);
+            let y = Math.sin(theta);
+            if (shape === 'blob') {
+                const wobble = 1 + Math.sin(theta * 3) * (feature.wobble || 0) + Math.cos(theta * 5) * (feature.wobble || 0) * 0.45;
+                x *= wobble;
+                y *= wobble;
+            } else if (shape === 'kidney') {
+                x = Math.cos(theta) * (0.78 + (0.3 * Math.sin(theta)));
+            } else if (shape === 'half-circle') {
+                y = Math.max(-0.45, y);
+            } else if (shape === 'square') {
+                const scale = 1 / Math.max(Math.abs(x), Math.abs(y));
+                x *= scale;
+                y *= scale;
+            } else if (shape === 'rectangle') {
+                const scale = 1 / Math.max(Math.abs(x), Math.abs(y));
+                x *= scale * 1.7;
+                y *= scale * 0.38;
+            } else if (shape === 'oval') {
+                x *= 1.45;
+                y *= 0.68;
+            } else if (shape === 'lightbulb') {
+                const top = Math.max(0, -y);
+                x *= 0.64 + (top * 0.48);
+                y = y < 0 ? y * 1.12 : y * 0.58 + 0.22;
+            }
+            addPoint(x * feature.rx, y * feature.ry);
+        }
+        return points;
+    }
+
     function pointInBlob(point, feature) {
-        const dx = (point.x - feature.cx) / feature.rx;
-        const dy = (point.y - feature.cy) / feature.ry;
-        const theta = Math.atan2(dy, dx);
-        const radius = 1 + Math.sin(theta * 3) * feature.wobble + Math.cos(theta * 5) * feature.wobble * 0.45;
-        return (dx * dx) + (dy * dy) <= radius * radius;
+        const points = getTerrainFeaturePoints(feature);
+        let inside = false;
+        for (let index = 0, previous = points.length - 1; index < points.length; previous = index, index += 1) {
+            const current = points[index];
+            const prior = points[previous];
+            if (((current.y > point.y) !== (prior.y > point.y))
+                && point.x < ((prior.x - current.x) * (point.y - current.y)) / ((prior.y - current.y) + Number.EPSILON) + current.x) {
+                inside = !inside;
+            }
+        }
+        return inside;
     }
 
     function drawBlob(ctx, feature) {
-        const points = 24;
-        for (let index = 0; index <= points; index += 1) {
-            const ratio = index / points;
-            const theta = ratio * Math.PI * 2;
-            const wobble = 1 + Math.sin(theta * 3) * feature.wobble + Math.cos(theta * 5) * feature.wobble * 0.45;
-            const x = feature.cx + Math.cos(theta) * feature.rx * wobble;
-            const y = feature.cy + Math.sin(theta) * feature.ry * wobble;
+        const points = getTerrainFeaturePoints(feature);
+        points.forEach((point, index) => {
             if (index === 0) {
-                ctx.moveTo(x, y);
+                ctx.moveTo(point.x, point.y);
             } else {
-                ctx.lineTo(x, y);
+                ctx.lineTo(point.x, point.y);
             }
-        }
+        });
         ctx.closePath();
     }
 
@@ -439,6 +495,7 @@
         polygonsOverlap,
         normalizeRect,
         pointInBlob,
+        getTerrainFeaturePoints,
         drawBlob,
         snapshotPositions,
         restoreSnapshot,

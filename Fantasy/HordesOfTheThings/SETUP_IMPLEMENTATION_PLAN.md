@@ -18,6 +18,28 @@ The application no longer treats display colors as gameplay identities.
 
 The compatibility helpers in `prototype-rules.js` and `prototype-app.js` intentionally accept legacy `side: 'blue'` and `side: 'red'` fixture/save data during this migration. New production state should use `playerId`.
 
+### Completed: Army Builder
+
+New games now begin at `setupStage: 'army-builder'` with an empty board and two independent player-ID-keyed army drafts.
+
+- `ARMY_POINT_TARGET` is 24 and supported factions are exported from `prototype-data.js`.
+- Player color choices now include Blue, Red, Green, and Gold. Color remains a presentation property only.
+- The responsive builder has one column per player, faction-specific unit previews, AP values, decrement/increment controls, and live `value / 24 AP` totals.
+- The Accept button only enables when both forces total exactly 24 AP.
+- Accepting opens a setup confirmation modal. Confirming advances to the explicit `terrain-placement` handoff state; no terrain behavior is claimed or simulated yet.
+- Existing board/game controls are hidden during active setup stages.
+
+### Completed: Terrain Placement
+
+Army confirmation now initializes the terrain stage instead of a placeholder.
+
+- A `2d4` roll determines the editable terrain target, constrained to 0 through 8.
+- The defender is chosen by a coin flip and stored as `setup.terrain.defenderPlayerId`; display color remains separate from that temporary role.
+- Three random offers are generated from forest, swamp, water, impassable terrain, and road. Selecting an offer adds it to the board and refreshes all three offers.
+- Placed terrain can be selected and dragged on the dedicated setup canvas. Blob terrain rotates in 45-degree increments; roads switch between horizontal and vertical.
+- Blob draw and hit-test geometry both honor rotation, so terrain visuals and `getTerrainTypeAt` agree.
+- Confirming only becomes available once the placed count matches the target. Its confirmation locks terrain and advances to `unit-deployment`.
+
 ### Verified
 
 Run this from the repository root:
@@ -26,7 +48,7 @@ Run this from the repository root:
 node --test *.test.js
 ```
 
-At the handoff point, all 98 discovered tests pass.
+The focused application suite has 38 passing tests, including terrain defender assignment, count bounds, offer refresh, and terrain-to-deployment confirmation. The full `node --test *.test.js` suite has 104 passing tests.
 
 ## Core Model
 
@@ -54,64 +76,7 @@ Do not use `attacker` or `defender` as permanent player identifiers. They determ
 
 ## Remaining Work
 
-### 1. Add Setup Data and Terrain Factories
-
-Primary files: `prototype-data.js`, `prototype-geometry.js`, `prototype-rules.js`
-
-- Add constants for the 24-AP target, supported factions, offered terrain kinds, and deployment zones.
-- Add terrain-candidate factories for forest, swamp, water, impassable terrain, and roads.
-- Setup starts with `{ roads: [], features: [] }` and no units.
-- Add rotation support to blob terrain in geometry drawing and containment checks.
-- Preserve current road behavior by rotating roads in 90-degree increments between horizontal and vertical representations.
-- Ensure rendered terrain and `getTerrainTypeAt` agree after movement and rotation.
-
-### 2. Add Setup State and Pure Validation
-
-Primary file: `prototype-app.js`
-
-Add a top-level `setupStage`:
-
-```text
-army-builder -> terrain-placement -> unit-deployment -> game
-```
-
-Add serializable setup state for:
-
-- both army drafts: color, faction, per-type count, total value
-- defender player ID
-- terrain count, three offered pieces, placed terrain, and selected terrain
-- current deployment player and top/bottom zone assignment
-- undeployed unit IDs and deployment validation
-
-Implement focused helpers for army total/value validity, `2d4`, defender coin flip, terrain offer refresh, terrain completion, footprint containment in a deployment zone, overlap checks, and deployment completion.
-
-Keep the existing movement/shooting/melee state model for `setupStage === 'game'`. Clear selection, drafts, and edit history when crossing setup stages.
-
-### 3. Build the Army Builder
-
-Primary files: `prototype.html`, `prototype.css`, `prototype-app.js`
-
-- Add two player columns, not Blue/Red identity columns.
-- Each column needs color selection, faction selection, all unit types, preview image, AP value, count decrement/increment controls, and `current / 24` total.
-- Style totals distinctly when under, exact, and over the target.
-- Disable the Accept action unless both totals are exactly 24.
-- Confirm army acceptance with the generic setup confirmation modal.
-- Render faction-specific previews using the existing `getUnitAssetPath` logic and preserve generic fallback.
-- Use a responsive two-column desktop layout that becomes a one-column layout on narrow screens.
-
-### 4. Build Terrain Placement and Confirmation
-
-Primary files: `prototype.html`, `prototype.css`, `prototype-app.js`
-
-- Add one generic confirmation modal, separate from save/load.
-- Escape and backdrop dismissal must cancel the confirmation without changing state.
-- After army confirmation, coin-flip and announce the defender using player color/faction labels.
-- Display blank board, editable terrain count, placement progress, and three generated offers.
-- Selecting an offer places it and immediately creates three fresh offers.
-- The defender may select, move, and rotate placed terrain before confirming the completed board.
-- Add setup-specific canvas pointer routing and visual selection/rotation controls. Do not invoke normal unit movement, selection, or combat behavior during this stage.
-
-### 5. Build Sequential Deployment
+### 1. Build Sequential Deployment
 
 Primary files: `prototype.html`, `prototype.css`, `prototype-app.js`, `prototype-geometry.js`
 
@@ -124,7 +89,7 @@ Primary files: `prototype.html`, `prototype.css`, `prototype-app.js`, `prototype
 - Disable Finish until every unit for the active deployment player is validly deployed.
 - After attacker confirmation, switch to `setupStage: 'game'`, initialize losses and turn state, roll the configured first player's movement count, and use existing game behavior.
 
-### 6. Persistence, Documentation, and Tests
+### 2. Persistence, Documentation, and Tests
 
 Primary files: `prototype-app.js`, `Design.md`, `prototype-app.test.js`, `prototype-geometry.test.js`, `prototype-rules.test.js`
 
@@ -142,6 +107,13 @@ Primary files: `prototype-app.js`, `Design.md`, `prototype-app.test.js`, `protot
   - setup-to-game handoff
   - setup save/load resumption
 - Run `node --test *.test.js` after each completed slice.
+
+## Future Terrain Investigations
+
+- Make generated terrain shapes feel more organic while preserving consistent draw and hit-test geometry.
+- Make terrain configuration customizable: migrate from hard-coded paths toward terrain assets, then add a modal for adjusting random offer weights and adding or removing available terrain features.
+- Analyze crooked and forked roads against the current road sampling and movement calculations before adding either shape. The present rule model assumes one full-board horizontal or vertical strip, so routes and junctions need deliberate geometry/rules support.
+- Add rivers as a distinct terrain feature, including movement, crossing, and whether roads/bridges alter their precedence.
 
 ## Important Existing Extension Points
 

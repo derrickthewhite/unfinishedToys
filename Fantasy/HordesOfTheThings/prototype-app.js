@@ -34,7 +34,12 @@
         Horde: 'assets/Horde.svg',
         Knights: 'assets/Knights.svg',
         Riders: 'assets/Riders.svg',
-        Hero: 'assets/Hero.svg'
+        Hero: 'assets/Hero.svg',
+        'Heavy-Spear': 'assets/Heavy-Spear.svg',
+        'Heavy-Warband': 'assets/Heavy-Warband.svg',
+        Beasts: 'assets/Beasts.svg',
+        Flyers: 'assets/Flyers.svg',
+        Behemoth: 'assets/Behemoth.svg'
     });
 
     class HordesPrototype {
@@ -42,6 +47,7 @@
             this.canvas = document.getElementById('boardCanvas');
             this.ctx = this.canvas.getContext('2d');
             this.ui = this.captureUi();
+            this.terrainCtx = this.ui.terrainCanvas.getContext('2d');
             this.unitAssetCache = new Map();
             this.nextUnitId = 1;
             this.state = this.createInitialState();
@@ -60,6 +66,29 @@
                 turnGroup: document.querySelector('.turn-group'),
                 editGroup: document.querySelector('.edit-group'),
                 actionGroup: document.querySelector('.action-group'),
+                gameBar: document.querySelector('.game-bar'),
+                boardShell: document.querySelector('.board-shell'),
+                helpBar: document.querySelector('.help-bar'),
+                setupShell: document.getElementById('setupShell'),
+                armyBuilder: document.getElementById('armyBuilder'),
+                armyColumns: document.getElementById('armyColumns'),
+                acceptArmiesButton: document.getElementById('acceptArmiesButton'),
+                setupPending: document.getElementById('setupPending'),
+                setupPendingText: document.getElementById('setupPendingText'),
+                terrainPlacement: document.getElementById('terrainPlacement'),
+                terrainCanvas: document.getElementById('terrainCanvas'),
+                terrainCountInput: document.getElementById('terrainCountInput'),
+                terrainProgress: document.getElementById('terrainProgress'),
+                terrainDefender: document.getElementById('terrainDefender'),
+                terrainOffers: document.getElementById('terrainOffers'),
+                autoPlaceTerrainButton: document.getElementById('autoPlaceTerrainButton'),
+                confirmTerrainButton: document.getElementById('confirmTerrainButton'),
+                confirmationModal: document.getElementById('confirmationModal'),
+                confirmationBackdrop: document.getElementById('confirmationBackdrop'),
+                confirmationTitle: document.getElementById('confirmationTitle'),
+                confirmationText: document.getElementById('confirmationText'),
+                cancelConfirmationButton: document.getElementById('cancelConfirmationButton'),
+                confirmSetupButton: document.getElementById('confirmSetupButton'),
                 activeSideSelect: document.getElementById('activeSideSelect'),
                 remainingMovesInput: document.getElementById('remainingMovesInput'),
                 phaseSelect: document.getElementById('phaseSelect'),
@@ -102,6 +131,11 @@
 
         createInitialState() {
             return {
+                setupStage: 'army-builder',
+                setup: {
+                    armies: this.createArmyDrafts(),
+                    confirmation: null
+                },
                 mode: 'edit',
                 placingUnit: false,
                 placementType: 'Blade',
@@ -110,8 +144,8 @@
                 activePlayerId: 'player-1',
                 remainingMoves: 4,
                 phase: 'move',
-                terrain: data.createDefaultTerrain(),
-                units: data.createDefaultUnits(() => this.allocateUnitId()),
+                terrain: { roads: [], features: [] },
+                units: [],
                 selectedIds: [],
                 selectionAnalysis: { type: 'none', invalid: false, reason: '' },
                 draft: null,
@@ -135,7 +169,7 @@
                     minScale: 0.6,
                     maxScale: 10
                 },
-                status: 'Edit mode: place, drag, marquee-select, or rotate units.'
+                status: 'Build both 24 AP armies to begin setup.'
             };
         }
 
@@ -147,6 +181,296 @@
 
         createDefaultPlayers() {
             return Object.fromEntries(data.PLAYER_IDS.map((playerId) => [playerId, { ...data.DEFAULT_PLAYERS[playerId] }]));
+        }
+
+        createArmyDrafts() {
+            return Object.fromEntries(data.PLAYER_IDS.map((playerId) => [playerId, { counts: {} }]));
+        }
+
+        rollTerrainCount(random = Math.random) {
+            return 2 + Math.floor(random() * 4) + Math.floor(random() * 4);
+        }
+
+        createTerrainSetup(random = Math.random) {
+            return {
+                defenderPlayerId: null,
+                terrainCount: this.rollTerrainCount(random),
+                offers: [],
+                selectedTerrainId: null,
+                nextTerrainId: 1
+            };
+        }
+
+        getTerrainSetup() {
+            return this.state.setup?.terrain || null;
+        }
+
+        createTerrainOffers(random = Math.random) {
+            const terrain = this.getTerrainSetup();
+            if (!terrain) {
+                return [];
+            }
+            const weightedKinds = ['road', 'road', 'forest', 'swamp', 'water', 'impassable', 'forest'];
+            terrain.offers = Array.from({ length: 3 }, (_, index) => {
+                const kind = weightedKinds[Math.floor(random() * weightedKinds.length)];
+                const offer = data.createTerrainOffer(kind, `terrain-${terrain.nextTerrainId}`, random);
+                terrain.nextTerrainId += 1;
+                return offer;
+            });
+            return terrain.offers;
+        }
+
+        initializeTerrainPlacement(random = Math.random) {
+            const terrain = this.createTerrainSetup(random);
+            terrain.defenderPlayerId = random() < 0.5 ? 'player-1' : 'player-2';
+            this.state.setup.terrain = terrain;
+            this.state.terrain = { roads: [], features: [] };
+            this.createTerrainOffers(random);
+            return terrain;
+        }
+
+        getPlacedTerrainCount() {
+            return this.state.terrain.roads.length + this.state.terrain.features.length;
+        }
+
+        isTerrainReady() {
+            const terrain = this.getTerrainSetup();
+            return Boolean(terrain) && this.getPlacedTerrainCount() === terrain.terrainCount;
+        }
+
+        setTerrainCount(value) {
+            const terrain = this.getTerrainSetup();
+            if (!terrain) {
+                return;
+            }
+            terrain.terrainCount = geometry.clamp(Math.round(Number(value) || 0), 0, data.TERRAIN_COUNT_MAX);
+            if (this.getPlacedTerrainCount() > terrain.terrainCount) {
+                terrain.terrainCount = this.getPlacedTerrainCount();
+            }
+            this.syncUiFromState();
+        }
+
+        placeTerrainOffer(offerId) {
+            const terrain = this.getTerrainSetup();
+            if (!terrain || this.getPlacedTerrainCount() >= terrain.terrainCount) {
+                return;
+            }
+            const offerIndex = terrain.offers.findIndex((offer) => offer.id === offerId);
+            if (offerIndex < 0) {
+                return;
+            }
+            const offer = terrain.offers[offerIndex];
+            const placed = { ...offer };
+            if (placed.kind === 'road') {
+                this.state.terrain.roads.push(placed);
+            } else {
+                this.state.terrain.features.push(placed);
+            }
+            terrain.selectedTerrainId = placed.id;
+            this.createTerrainOffers();
+            this.updateStatus(`${data.TERRAIN_STYLE[placed.kind].label} placed. Drag it on the board or rotate the selection.`);
+        }
+
+        terrainPiecesOverlap(left, right) {
+            if (left.kind === 'road' && right.kind === 'road') {
+                return true;
+            }
+            const road = left.kind === 'road' ? left : right.kind === 'road' ? right : null;
+            const feature = road === left ? right : road === right ? left : null;
+            if (road) {
+                const points = geometry.getTerrainFeaturePoints(feature);
+                return points.some((point) => (
+                    road.orientation === 'horizontal'
+                        ? Math.abs(point.y - road.position) <= road.width / 2
+                        : Math.abs(point.x - road.position) <= road.width / 2
+                )) || geometry.pointInBlob(
+                    road.orientation === 'horizontal'
+                        ? { x: feature.cx, y: road.position }
+                        : { x: road.position, y: feature.cy },
+                    feature
+                );
+            }
+            const leftPoints = geometry.getTerrainFeaturePoints(left);
+            const rightPoints = geometry.getTerrainFeaturePoints(right);
+            return leftPoints.some((point) => geometry.pointInBlob(point, right))
+                || rightPoints.some((point) => geometry.pointInBlob(point, left))
+                || geometry.pointInBlob({ x: left.cx, y: left.cy }, right)
+                || geometry.pointInBlob({ x: right.cx, y: right.cy }, left);
+        }
+
+        canPlaceTerrainPiece(piece) {
+            return ![...this.state.terrain.roads, ...this.state.terrain.features]
+                .some((placed) => this.terrainPiecesOverlap(piece, placed));
+        }
+
+        createRandomTerrainPiece(random = Math.random) {
+            const terrain = this.getTerrainSetup();
+            const weightedKinds = ['road', 'road', 'forest', 'swamp', 'water', 'impassable', 'forest'];
+            const kind = weightedKinds[Math.floor(random() * weightedKinds.length)];
+            const piece = data.createTerrainOffer(kind, `terrain-${terrain.nextTerrainId}`, random);
+            terrain.nextTerrainId += 1;
+            if (piece.kind === 'road') {
+                piece.position = random() * data.BOARD_SIZE;
+            } else {
+                piece.cx = random() * data.BOARD_SIZE;
+                piece.cy = random() * data.BOARD_SIZE;
+                piece.rotation = random() * Math.PI * 2;
+            }
+            return piece;
+        }
+
+        autoPlaceTerrain(random = Math.random) {
+            const terrain = this.getTerrainSetup();
+            if (!terrain) {
+                return;
+            }
+            let placedCount = 0;
+            const attemptLimit = 160;
+            while (this.getPlacedTerrainCount() < terrain.terrainCount) {
+                let piece = null;
+                for (let attempt = 0; attempt < attemptLimit; attempt += 1) {
+                    const candidate = this.createRandomTerrainPiece(random);
+                    if (this.canPlaceTerrainPiece(candidate)) {
+                        piece = candidate;
+                        break;
+                    }
+                }
+                if (!piece) {
+                    break;
+                }
+                if (piece.kind === 'road') {
+                    this.state.terrain.roads.push(piece);
+                } else {
+                    this.state.terrain.features.push(piece);
+                }
+                terrain.selectedTerrainId = piece.id;
+                placedCount += 1;
+            }
+            this.createTerrainOffers(random);
+            this.updateStatus(placedCount > 0
+                ? `Placed ${placedCount} random terrain piece${placedCount === 1 ? '' : 's'} without overlap.`
+                : 'No additional non-overlapping terrain positions were available.');
+        }
+
+        getTerrainPieceById(id) {
+            return this.state.terrain.roads.find((piece) => piece.id === id)
+                || this.state.terrain.features.find((piece) => piece.id === id)
+                || null;
+        }
+
+        pickTerrainPiece(point) {
+            const feature = [...this.state.terrain.features].reverse().find((entry) => geometry.pointInBlob(point, entry));
+            if (feature) {
+                return feature;
+            }
+            return [...this.state.terrain.roads].reverse().find((road) => (
+                road.orientation === 'horizontal'
+                    ? Math.abs(point.y - road.position) <= road.width / 2
+                    : Math.abs(point.x - road.position) <= road.width / 2
+            )) || null;
+        }
+
+        isSetupActive() {
+            return Boolean(this.state.setupStage && this.state.setupStage !== 'game');
+        }
+
+        getArmyDraft(playerId) {
+            return this.state.setup?.armies?.[playerId] || { counts: {} };
+        }
+
+        getArmyValue(playerId) {
+            const counts = this.getArmyDraft(playerId).counts;
+            return Object.entries(counts).reduce((total, [type, count]) => total + ((data.UNIT_TYPES[type]?.value || 0) * count), 0);
+        }
+
+        isArmyValid(playerId) {
+            return this.getArmyValue(playerId) === data.ARMY_POINT_TARGET;
+        }
+
+        canAcceptArmies() {
+            return data.PLAYER_IDS.every((playerId) => this.isArmyValid(playerId));
+        }
+
+        adjustArmyUnit(playerId, type, delta) {
+            const draft = this.getArmyDraft(playerId);
+            const current = draft.counts[type] || 0;
+            const next = Math.max(0, current + delta);
+            if (next === current) {
+                return;
+            }
+            draft.counts[type] = next;
+            this.syncUiFromState();
+        }
+
+        updateArmyPlayer(playerId, property, value) {
+            if (property !== 'colorId' && property !== 'faction') {
+                return;
+            }
+            this.state.players[playerId][property] = value;
+            this.syncUiFromState();
+        }
+
+        chooseRandomArmy(playerId, random = Math.random) {
+            const counts = this.getArmyDraft(playerId).counts;
+            Object.keys(counts).forEach((type) => delete counts[type]);
+            let remaining = data.ARMY_POINT_TARGET;
+            const templates = Object.entries(data.UNIT_TYPES);
+            while (remaining > 0) {
+                const eligible = templates.filter(([, unit]) => unit.value <= remaining);
+                const [type, unit] = eligible[Math.floor(random() * eligible.length)];
+                counts[type] = (counts[type] || 0) + 1;
+                remaining -= unit.value;
+            }
+            this.updateStatus(`Player ${data.PLAYER_IDS.indexOf(playerId) + 1} received a random 24 AP army.`);
+        }
+
+        randomizeArmyPresentation(playerId, random = Math.random) {
+            const colorIds = Object.keys(data.PLAYER_COLORS);
+            this.state.players[playerId].colorId = colorIds[Math.floor(random() * colorIds.length)];
+            this.state.players[playerId].faction = data.FACTIONS[Math.floor(random() * data.FACTIONS.length)];
+            this.syncUiFromState();
+        }
+
+        clearArmy(playerId) {
+            this.getArmyDraft(playerId).counts = {};
+            this.updateStatus(`Player ${data.PLAYER_IDS.indexOf(playerId) + 1}'s army was cleared.`);
+        }
+
+        openArmyConfirmation() {
+            if (!this.canAcceptArmies()) {
+                return;
+            }
+            this.state.setup.confirmation = 'armies';
+            this.syncUiFromState();
+        }
+
+        closeSetupConfirmation() {
+            this.state.setup.confirmation = null;
+            this.syncUiFromState();
+        }
+
+        confirmSetupStage() {
+            if (this.state.setup.confirmation !== 'armies' || !this.canAcceptArmies()) {
+                if (this.state.setup.confirmation !== 'terrain' || !this.isTerrainReady()) {
+                    return;
+                }
+                this.state.setup.confirmation = null;
+                this.state.setupStage = 'unit-deployment';
+                this.updateStatus('Terrain confirmed. Unit deployment is next.');
+                return;
+            }
+            this.state.setup.confirmation = null;
+            this.initializeTerrainPlacement();
+            this.state.setupStage = 'terrain-placement';
+            this.updateStatus(`${this.getPlayerLabel(this.getTerrainSetup().defenderPlayerId)} is the defender and places terrain first.`);
+        }
+
+        openTerrainConfirmation() {
+            if (!this.isTerrainReady()) {
+                return;
+            }
+            this.state.setup.confirmation = 'terrain';
+            this.syncUiFromState();
         }
 
         getUnitPlayerId(unit) {
@@ -180,6 +504,13 @@
             window.addEventListener('keydown', (event) => this.onKeyDown(event));
             this.ui.editModeButton.addEventListener('click', () => this.setMode('edit'));
             this.ui.gameModeButton.addEventListener('click', () => this.setMode('game'));
+            this.ui.acceptArmiesButton.addEventListener('click', () => this.openArmyConfirmation());
+            this.ui.cancelConfirmationButton.addEventListener('click', () => this.closeSetupConfirmation());
+            this.ui.confirmationBackdrop.addEventListener('click', () => this.closeSetupConfirmation());
+            this.ui.confirmSetupButton.addEventListener('click', () => this.confirmSetupStage());
+            this.ui.terrainCountInput.addEventListener('change', () => this.setTerrainCount(this.ui.terrainCountInput.value));
+            this.ui.autoPlaceTerrainButton.addEventListener('click', () => this.autoPlaceTerrain());
+            this.ui.confirmTerrainButton.addEventListener('click', () => this.openTerrainConfirmation());
             this.ui.activeSideSelect.addEventListener('change', () => {
                 this.state.activePlayerId = this.ui.activeSideSelect.value;
                 this.resetMovedFlags(this.state.activePlayerId);
@@ -255,6 +586,11 @@
 
         onKeyDown(event) {
             if (this.isTypingTarget(event.target)) {
+                return;
+            }
+            if (event.key === 'Escape' && this.state.setup?.confirmation) {
+                event.preventDefault();
+                this.closeSetupConfirmation();
                 return;
             }
             if (event.key === 'Escape' && this.state.storageModalOpen) {
@@ -425,6 +761,133 @@
                 const factor = event.deltaY > 0 ? 0.9 : 1.1;
                 this.zoomAt(event.offsetX, event.offsetY, factor);
             }, { passive: false });
+            this.ui.terrainCanvas.addEventListener('pointerdown', (event) => this.onTerrainPointerDown(event));
+            this.ui.terrainCanvas.addEventListener('pointermove', (event) => this.onTerrainPointerMove(event));
+            this.ui.terrainCanvas.addEventListener('pointerup', (event) => this.onTerrainPointerUp(event));
+            this.ui.terrainCanvas.addEventListener('pointerleave', (event) => this.onTerrainPointerUp(event));
+        }
+
+        terrainScreenToWorld(event) {
+            const rect = this.ui.terrainCanvas.getBoundingClientRect();
+            return {
+                x: geometry.clamp(((event.clientX - rect.left) / rect.width) * data.BOARD_SIZE, 0, data.BOARD_SIZE),
+                y: geometry.clamp(((event.clientY - rect.top) / rect.height) * data.BOARD_SIZE, 0, data.BOARD_SIZE)
+            };
+        }
+
+        onTerrainPointerDown(event) {
+            if (this.state.setupStage !== 'terrain-placement') {
+                return;
+            }
+            const point = this.terrainScreenToWorld(event);
+            const rotationPiece = this.getTerrainRotationHandleHit(point);
+            if (rotationPiece) {
+                this.getTerrainSetup().selectedTerrainId = rotationPiece.id;
+                this.ui.terrainCanvas.setPointerCapture(event.pointerId);
+                this.state.terrainInteraction = {
+                    type: 'rotate',
+                    pointerId: event.pointerId,
+                    pieceId: rotationPiece.id,
+                    center: this.getTerrainPieceCenter(rotationPiece),
+                    startAngle: geometry.angleBetween(this.getTerrainPieceCenter(rotationPiece), point),
+                    base: { ...rotationPiece }
+                };
+                this.renderTerrainPlacement();
+                return;
+            }
+            const piece = this.pickTerrainPiece(point);
+            this.ui.terrainCanvas.setPointerCapture(event.pointerId);
+            if (!piece) {
+                this.getTerrainSetup().selectedTerrainId = null;
+                this.renderTerrainPlacement();
+                return;
+            }
+            this.getTerrainSetup().selectedTerrainId = piece.id;
+            this.state.terrainInteraction = {
+                pointerId: event.pointerId,
+                pieceId: piece.id,
+                start: point,
+                base: { ...piece }
+            };
+            this.renderTerrainPlacement();
+        }
+
+        onTerrainPointerMove(event) {
+            const interaction = this.state.terrainInteraction;
+            if (!interaction || interaction.pointerId !== event.pointerId) {
+                return;
+            }
+            const piece = this.getTerrainPieceById(interaction.pieceId);
+            if (!piece) {
+                return;
+            }
+            const point = this.terrainScreenToWorld(event);
+            if (interaction.type === 'rotate') {
+                const currentAngle = geometry.angleBetween(interaction.center, point);
+                const delta = geometry.normalizeAngle(currentAngle - interaction.startAngle);
+                if (piece.kind === 'road') {
+                    const rotation = geometry.normalizeAngle((interaction.base.orientation === 'horizontal' ? 0 : Math.PI / 2) + delta);
+                    piece.orientation = Math.abs(Math.cos(rotation)) >= Math.abs(Math.sin(rotation)) ? 'horizontal' : 'vertical';
+                } else {
+                    piece.rotation = geometry.normalizeAngle((interaction.base.rotation || 0) + delta);
+                }
+                this.renderTerrainPlacement();
+                return;
+            }
+            const delta = geometry.subtract(point, interaction.start);
+            if (piece.kind === 'road') {
+                piece.position = geometry.clamp(
+                    interaction.base.position + (piece.orientation === 'horizontal' ? delta.y : delta.x),
+                    0,
+                    data.BOARD_SIZE
+                );
+            } else {
+                piece.cx = geometry.clamp(interaction.base.cx + delta.x, 0, data.BOARD_SIZE);
+                piece.cy = geometry.clamp(interaction.base.cy + delta.y, 0, data.BOARD_SIZE);
+            }
+            this.renderTerrainPlacement();
+        }
+
+        onTerrainPointerUp(event) {
+            const interaction = this.state.terrainInteraction;
+            if (!interaction || interaction.pointerId !== event.pointerId) {
+                return;
+            }
+            if (this.ui.terrainCanvas.hasPointerCapture(event.pointerId)) {
+                this.ui.terrainCanvas.releasePointerCapture(event.pointerId);
+            }
+            this.state.terrainInteraction = null;
+            this.updateStatus(interaction.type === 'rotate' ? 'Terrain rotation updated.' : 'Terrain position updated.');
+        }
+
+        getTerrainPieceCenter(piece) {
+            if (piece.kind !== 'road') {
+                return { x: piece.cx, y: piece.cy };
+            }
+            return piece.orientation === 'horizontal'
+                ? { x: data.BOARD_SIZE / 2, y: piece.position }
+                : { x: piece.position, y: data.BOARD_SIZE / 2 };
+        }
+
+        getTerrainRotationHandle(piece) {
+            const center = this.getTerrainPieceCenter(piece);
+            if (piece.kind === 'road') {
+                return piece.orientation === 'horizontal'
+                    ? { x: center.x, y: center.y - 34 }
+                    : { x: center.x + 34, y: center.y };
+            }
+            const distance = Math.max(piece.rx, piece.ry) + 28;
+            const rotation = piece.rotation || 0;
+            return {
+                x: center.x + (Math.sin(rotation) * distance),
+                y: center.y - (Math.cos(rotation) * distance)
+            };
+        }
+
+        getTerrainRotationHandleHit(point) {
+            const terrain = this.getTerrainSetup();
+            const selected = this.getTerrainPieceById(terrain?.selectedTerrainId);
+            return selected && geometry.distance(point, this.getTerrainRotationHandle(selected)) <= 16 ? selected : null;
         }
 
         populateUnitTypes() {
@@ -2319,7 +2782,239 @@
             }
         }
 
+        renderArmyBuilder() {
+            if (!this.ui.armyColumns) {
+                return;
+            }
+            this.ui.armyColumns.innerHTML = data.PLAYER_IDS.map((playerId, playerIndex) => {
+                const player = this.getPlayer(playerId);
+                const colors = this.getPlayerColors(playerId);
+                const value = this.getArmyValue(playerId);
+                const valueClass = value === data.ARMY_POINT_TARGET ? 'is-exact' : (value > data.ARMY_POINT_TARGET ? 'is-over' : 'is-under');
+                const colorOptions = Object.entries(data.PLAYER_COLORS).map(([colorId, color]) => (
+                    `<option value="${colorId}"${colorId === player.colorId ? ' selected' : ''}>${color.label}</option>`
+                )).join('');
+                const factionOptions = data.FACTIONS.map((faction) => (
+                    `<option value="${faction}"${faction === player.faction ? ' selected' : ''}>${faction}</option>`
+                )).join('');
+                const rows = Object.entries(data.UNIT_TYPES).map(([type, unit]) => {
+                    const count = this.getArmyDraft(playerId).counts[type] || 0;
+                    const assetPath = this.getUnitAssetPath({ type, faction: player.faction });
+                    return `
+                        <div class="army-unit-row">
+                            <img class="army-unit-preview" src="${assetPath}" alt="${player.faction} ${type}">
+                            <div>
+                                <div class="army-unit-name">${type}</div>
+                                <div class="army-unit-cost">${unit.value} AP</div>
+                            </div>
+                            <div class="army-count-control" aria-label="${type} count">
+                                <button type="button" data-army-action="decrement" data-player-id="${playerId}" data-unit-type="${type}" aria-label="Remove ${type}">−</button>
+                                <output class="army-count">${count}</output>
+                                <button type="button" data-army-action="increment" data-player-id="${playerId}" data-unit-type="${type}" aria-label="Add ${type}">+</button>
+                            </div>
+                        </div>`;
+                }).join('');
+                return `
+                    <section class="army-player" style="--player-fill: ${colors.fill}; --player-stroke: ${colors.stroke};" aria-labelledby="armyPlayerTitle${playerIndex}">
+                        <header class="army-player-header">
+                            <div class="army-player-heading">
+                                <h2 id="armyPlayerTitle${playerIndex}">Player ${playerIndex + 1}</h2>
+                                <output class="army-total ${valueClass}">${value} / ${data.ARMY_POINT_TARGET} AP</output>
+                            </div>
+                            <div class="army-player-options">
+                                <label>Color
+                                    <select data-player-setting="colorId" data-player-id="${playerId}">${colorOptions}</select>
+                                </label>
+                                <label>Faction
+                                    <select data-player-setting="faction" data-player-id="${playerId}">${factionOptions}</select>
+                                </label>
+                            </div>
+                        </header>
+                        <div class="army-unit-list">${rows}</div>
+                        <footer class="army-builder-actions">
+                            <button type="button" data-army-builder-action="random-army" data-player-id="${playerId}">Random Army</button>
+                            <button type="button" data-army-builder-action="random-presentation" data-player-id="${playerId}">Random Color + Faction</button>
+                            <button type="button" data-army-builder-action="clear" data-player-id="${playerId}">Clear Army</button>
+                        </footer>
+                    </section>`;
+            }).join('');
+
+            this.ui.armyColumns.querySelectorAll('[data-army-action]').forEach((button) => {
+                button.addEventListener('click', () => this.adjustArmyUnit(
+                    button.dataset.playerId,
+                    button.dataset.unitType,
+                    button.dataset.armyAction === 'increment' ? 1 : -1
+                ));
+            });
+            this.ui.armyColumns.querySelectorAll('[data-player-setting]').forEach((select) => {
+                select.addEventListener('change', () => this.updateArmyPlayer(
+                    select.dataset.playerId,
+                    select.dataset.playerSetting,
+                    select.value
+                ));
+            });
+            this.ui.armyColumns.querySelectorAll('[data-army-builder-action]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const playerId = button.dataset.playerId;
+                    if (button.dataset.armyBuilderAction === 'random-army') this.chooseRandomArmy(playerId);
+                    if (button.dataset.armyBuilderAction === 'random-presentation') this.randomizeArmyPresentation(playerId);
+                    if (button.dataset.armyBuilderAction === 'clear') this.clearArmy(playerId);
+                });
+            });
+        }
+
+        renderTerrainPlacement() {
+            const terrain = this.getTerrainSetup();
+            if (!terrain || !this.ui.terrainCanvas) {
+                return;
+            }
+            const canvas = this.ui.terrainCanvas;
+            const size = Math.max(1, Math.round(Math.min(canvas.clientWidth, canvas.clientHeight) * window.devicePixelRatio));
+            if (canvas.width !== size || canvas.height !== size) {
+                canvas.width = size;
+                canvas.height = size;
+            }
+            const ctx = this.terrainCtx;
+            const scale = canvas.width / data.BOARD_SIZE;
+            ctx.setTransform(scale, 0, 0, scale, 0, 0);
+            this.drawBoard(ctx);
+            this.drawTerrain(ctx);
+            const selected = this.getTerrainPieceById(terrain.selectedTerrainId);
+            if (selected) {
+                ctx.save();
+                ctx.strokeStyle = '#f6dc73';
+                ctx.lineWidth = 3 / scale;
+                if (selected.kind === 'road') {
+                    if (selected.orientation === 'horizontal') {
+                        ctx.strokeRect(0, selected.position - selected.width / 2, data.BOARD_SIZE, selected.width);
+                    } else {
+                        ctx.strokeRect(selected.position - selected.width / 2, 0, selected.width, data.BOARD_SIZE);
+                    }
+                } else {
+                    ctx.beginPath();
+                    geometry.drawBlob(ctx, selected);
+                    ctx.stroke();
+                }
+                ctx.restore();
+                const handle = this.getTerrainRotationHandle(selected);
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(handle.x, handle.y, 11, 0, Math.PI * 2);
+                ctx.fillStyle = '#f6dc73';
+                ctx.strokeStyle = '#554420';
+                ctx.lineWidth = 2 / scale;
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(handle.x, handle.y, 5.8, Math.PI * 0.2, Math.PI * 1.35, false);
+                ctx.strokeStyle = '#7e6420';
+                ctx.lineWidth = 1.6 / scale;
+                ctx.stroke();
+                const arrowTip = {
+                    x: handle.x + (Math.cos(Math.PI * 0.2) * 5.8),
+                    y: handle.y + (Math.sin(Math.PI * 0.2) * 5.8)
+                };
+                this.drawArrowHead(ctx, arrowTip, -0.45);
+                ctx.restore();
+            }
+            this.ui.terrainCountInput.value = String(terrain.terrainCount);
+            this.ui.terrainProgress.textContent = `${this.getPlacedTerrainCount()} / ${terrain.terrainCount} placed`;
+            this.ui.terrainDefender.textContent = `${this.getPlayerLabel(terrain.defenderPlayerId)} is the defender. Place the agreed terrain, then confirm the board.`;
+            this.ui.autoPlaceTerrainButton.disabled = this.isTerrainReady();
+            this.ui.confirmTerrainButton.disabled = !this.isTerrainReady();
+            this.ui.terrainOffers.innerHTML = terrain.offers.map((offer) => (`
+                <button type="button" class="terrain-offer" data-terrain-offer="${offer.id}"${this.getPlacedTerrainCount() >= terrain.terrainCount ? ' disabled' : ''}>
+                    <canvas class="terrain-offer-preview" width="200" height="200" data-terrain-preview="${offer.id}" aria-hidden="true"></canvas>
+                    <span>${data.TERRAIN_STYLE[offer.kind].label}</span>
+                    <span class="terrain-offer-description">${this.getTerrainOfferDescription(offer)}</span>
+                </button>
+            `)).join('');
+            this.ui.terrainOffers.querySelectorAll('[data-terrain-preview]').forEach((canvas) => {
+                const offer = terrain.offers.find((entry) => entry.id === canvas.dataset.terrainPreview);
+                if (offer) {
+                    this.drawTerrainOfferPreview(canvas, offer);
+                }
+            });
+            this.ui.terrainOffers.querySelectorAll('[data-terrain-offer]').forEach((button) => {
+                button.addEventListener('click', () => this.placeTerrainOffer(button.dataset.terrainOffer));
+            });
+        }
+
+        getTerrainOfferDescription(offer) {
+            if (offer.kind === 'road') {
+                return 'Road · full board';
+            }
+            const shapeNames = {
+                blob: 'Blob',
+                kidney: 'Kidney bean',
+                circle: 'Circle',
+                'half-circle': 'Half-circle',
+                square: 'Square',
+                rectangle: 'Long thin rectangle',
+                oval: 'Oval',
+                'fat-l': 'Fat L-shape',
+                horseshoe: 'Horseshoe',
+                cross: 'Fat stubby cross',
+                lightbulb: 'Lightbulb'
+            };
+            const sizeNames = { 0.25: 'Tiny', 0.5: 'Small', 1: 'Medium', 1.5: 'Large' };
+            return `${shapeNames[offer.shape] || 'Blob'} · ${sizeNames[offer.sizeMultiplier] || 'Medium'}`;
+        }
+
+        drawTerrainOfferPreview(canvas, offer) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = data.TERRAIN_STYLE.good.fill;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(100, 100);
+            ctx.scale(1.2, 1.2);
+            ctx.translate(-100, -100);
+            if (offer.kind === 'road') {
+                ctx.fillStyle = offer.fill || data.TERRAIN_STYLE.road.fill;
+                if (offer.orientation === 'horizontal') {
+                    ctx.fillRect(0, 90, canvas.width, 20);
+                } else {
+                    ctx.fillRect(90, 0, 20, canvas.height);
+                }
+            } else {
+                const preview = { ...offer, cx: 100, cy: 100 };
+                ctx.fillStyle = data.TERRAIN_STYLE[offer.kind].fill;
+                ctx.beginPath();
+                geometry.drawBlob(ctx, preview);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(26, 24, 21, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         syncUiFromState() {
+            const setupActive = this.isSetupActive();
+            if (this.ui.gameBar) this.ui.gameBar.hidden = setupActive;
+            if (this.ui.boardShell) this.ui.boardShell.hidden = setupActive;
+            if (this.ui.helpBar) this.ui.helpBar.hidden = setupActive;
+            if (this.ui.setupShell) this.ui.setupShell.hidden = !setupActive;
+            if (this.ui.armyBuilder) this.ui.armyBuilder.hidden = this.state.setupStage !== 'army-builder';
+            if (this.ui.terrainPlacement) this.ui.terrainPlacement.hidden = this.state.setupStage !== 'terrain-placement';
+            if (this.ui.setupPending) this.ui.setupPending.hidden = this.state.setupStage !== 'unit-deployment';
+            if (this.ui.confirmationModal) this.ui.confirmationModal.hidden = !this.state.setup?.confirmation;
+            if (this.ui.confirmationTitle) this.ui.confirmationTitle.textContent = this.state.setup?.confirmation === 'terrain' ? 'Confirm Terrain' : 'Confirm Armies';
+            if (this.ui.confirmationText) this.ui.confirmationText.textContent = this.state.setup?.confirmation === 'terrain'
+                ? 'The terrain board will be locked and the game will proceed to unit deployment.'
+                : 'Both 24 AP armies will be locked and terrain placement will begin.';
+            if (this.ui.confirmSetupButton) this.ui.confirmSetupButton.textContent = this.state.setup?.confirmation === 'terrain' ? 'Begin Deployment' : 'Continue';
+            if (this.state.setupStage === 'army-builder') {
+                this.renderArmyBuilder();
+                if (this.ui.acceptArmiesButton) this.ui.acceptArmiesButton.disabled = !this.canAcceptArmies();
+            }
+            if (this.state.setupStage === 'terrain-placement' && this.ui.setupPendingText) {
+                this.renderTerrainPlacement();
+            }
+            if (this.state.setupStage === 'unit-deployment' && this.ui.setupPendingText) {
+                this.ui.setupPendingText.textContent = 'The terrain is locked. Sequential unit deployment is the next setup stage.';
+            }
             this.ui.editModeButton.classList.toggle('is-active', this.state.mode === 'edit');
             this.ui.gameModeButton.classList.toggle('is-active', this.state.mode === 'game');
             this.ui.editGroup.hidden = this.state.mode !== 'edit';

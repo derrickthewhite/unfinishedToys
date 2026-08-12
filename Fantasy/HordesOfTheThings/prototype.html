@@ -99,6 +99,43 @@
                 <dl id="selectionPanelStats" class="selection-stats" hidden></dl>
             </aside>
         </main>
+        <main id="setupShell" class="setup-shell" hidden>
+            <section id="armyBuilder" class="army-builder" aria-labelledby="armyBuilderTitle">
+                <header class="setup-header">
+                    <p class="setup-kicker">Battle Setup · 1 of 3</p>
+                    <h1 id="armyBuilderTitle">Build the Armies</h1>
+                    <p>Choose each player's color, faction, and force. Both armies must total 24 AP.</p>
+                </header>
+                <div id="armyColumns" class="army-columns"></div>
+                <footer class="setup-actions">
+                    <button id="acceptArmiesButton" class="setup-primary-action" type="button" disabled>Accept Armies</button>
+                </footer>
+            </section>
+            <section id="terrainPlacement" class="terrain-placement" hidden aria-labelledby="terrainPlacementTitle">
+                <header class="setup-header">
+                    <p class="setup-kicker">Battle Setup · 2 of 3</p>
+                    <h1 id="terrainPlacementTitle">Place the Terrain</h1>
+                    <p id="terrainDefender"></p>
+                </header>
+                <div class="terrain-layout">
+                    <div class="terrain-board-stage"><canvas id="terrainCanvas"></canvas></div>
+                    <aside class="terrain-controls">
+                        <label>Terrain pieces
+                            <input id="terrainCountInput" type="number" min="0" max="8" step="1">
+                        </label>
+                        <p id="terrainProgress" class="terrain-progress"></p>
+                        <div id="terrainOffers" class="terrain-offers"></div>
+                        <button id="autoPlaceTerrainButton" type="button">Place Randomly</button>
+                        <button id="confirmTerrainButton" class="setup-primary-action" type="button" disabled>Confirm Terrain</button>
+                    </aside>
+                </div>
+            </section>
+            <section id="setupPending" class="setup-pending" hidden aria-live="polite">
+                <p class="setup-kicker">Battle Setup · 2 of 3</p>
+                <h1>Terrain Confirmed</h1>
+                <p id="setupPendingText">Unit deployment will be implemented next.</p>
+            </section>
+        </main>
         <footer class="help-bar">
             <span>Left drag: interact or marquee select</span>
             <span>Right drag: pan</span>
@@ -109,6 +146,21 @@
             <span>R: toggle corner rotation</span>
             <span>S: step current single-unit move</span>
         </footer>
+    </div>
+    <div id="confirmationModal" class="modal-shell" hidden>
+        <div id="confirmationBackdrop" class="modal-backdrop"></div>
+        <section class="modal-panel confirmation-panel" aria-labelledby="confirmationTitle" aria-modal="true" role="dialog">
+            <header class="modal-header">
+                <div>
+                    <h2 id="confirmationTitle">Confirm Armies</h2>
+                    <p id="confirmationText"></p>
+                </div>
+            </header>
+            <div class="confirmation-actions">
+                <button id="cancelConfirmationButton" type="button">Keep Editing</button>
+                <button id="confirmSetupButton" class="setup-primary-action" type="button">Continue</button>
+            </div>
+        </section>
     </div>
     <div id="storageModal" class="modal-shell" hidden>
         <div id="storageBackdrop" class="modal-backdrop"></div>
