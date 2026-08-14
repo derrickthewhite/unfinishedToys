@@ -1,0 +1,119 @@
+Hey, I'm going to build a game in html and JS
+
+Its about teams of low-tech warriors killing monsters
+Its about the team using technology rather than about heroes or wizards
+	for example, nets, ballistas, pits, pikes, and bonfires
+battlefields will be reasonably large and feature a fair amount of terrain
+
+the html and js style should follow the following principles:
+	the dom should be modified rather than rewritten in js each time
+	js should use clear individual functions, but not leverage class functionality
+	psudo classes are good though
+	The main screen is a massive canvas, with status boxes detailing objects of interest off to the side
+
+The central battlefield is not all on the screen at once 
+	You can zoom in and out with the wheel or with buttons at the top bar
+	You can move where the battlefield is focused by putting your mouse near the edge of the screen and it will travel that direction
+	You can pause the action and restart it with the spacebar. 
+	You can control the speed of the action with buttons on the top bar
+
+The battlefield is only one of several control screens, but it is where the player will spend the most time
+	Other large screens
+		Main Menu (html)
+		World Map with locations of missions (canvas, similar to battlefield)
+		Shopping
+		Inventory
+
+Each Unit tracks the following stats:
+	Name
+	Display Image
+	Controller
+	Skill
+	Agility
+	Strength
+	Perception
+	Will
+	Toughness
+	Size
+	Technical
+	Move (Base Move)
+	Training
+	Inventory
+	Current Weapon
+	Attacks
+	Defenses
+	Armor
+	Wounds
+	Location
+	Destination
+	Facing
+	Posture
+	Statuses
+
+Unit stats Explained
+	Skill: a Number. represents basic combat skill
+	Agility: A Number. represents agility
+	Strength: A Number. represents strength of the creature (default human is 10)
+	Perception: A number. how good they are at spotting things
+	Will: A number. How good they are at doing scary or hard things
+	Toughness. A number. How likely they are to pull through bodily harm
+	Size: A number. Humans are 0. used to calculate wounds (bigger things are harder to hurt)
+	Technical: A number. How good they are at doing technical things
+	Move: A number. Calculated from Inventory, Strength, and Base Move
+	Base Move: A number. How fast they can move without any stuff.
+	Training: A array of skills they are trained in. This includes Defense types and Weapon types. 
+	Inventory: all the things the character is carrying. This includes Weapons and armor, which help calcuate things about the character
+	Current Weapon:
+		Weapon: The weapon in inventory
+		Time till available: time until its available. If this is 0, its available. 
+	Attacks are derrived from current weapon, plus some are always equipped.Each Attack tracks the following: 
+		Damage Type: (Stab, Slash, Crush, Burn, None)
+		Weapon Type: (polearm, sword, club, crossbow, bow, emplacement, bite, trample, javalin and others)
+		Damage: A number
+		Injury: A number
+		Attack Modifier: a number
+		Skill: calculated from character skill, skill modifier, training, statuses, posture, and wounds
+		Reach: a number or "none"
+		Range: a number of "none"
+		Time: The time required to complete an attack (ms)
+		Requires Ammo: boolean
+		Area: (none, circle(with radius), Cone (with length and width))
+		Ignored Defenses: (defenses ignored)
+		Effects: effects that happen to characters hit by the attack
+	Defenses are derrived from current weapon, plus some are always equipped:	
+		Defense Type: (Block, Parry, Dodge, Evade)
+		Defense Modifier: a number 
+		Defense Skill: (calcuated from either skill and training or from agility(for dodge), and statuses, posture, and wounds)
+	Armor is calcuated from inventory. 
+		Each Damage Type has its own armor profile
+		Armor is stored as an array of pairs of numbers
+			The first number (attack Value) is the highest number the armor applies to
+			The second number (armor value) is the armor applied at that number or lower
+		Armor should be displayed as a graph, with bars going lower and lower as the first number gets higher
+	Wounds: A number. 0 is perfectly fine, 10 is very dead, 6 is a wound that could knock you out of the fight
+
+Attack Calculation: 
+	Attacker takes weapon skill - 3d6
+	defender chooses best defense for that attack and rolls defense skill - 3d6
+	Defender number is subtracted from attacker number to get the attack value
+	The armor value for the appropriate damage type and attack value is selected (the lowest first number higher than the attack value)
+	damage is 1d4 - armor + damage - size. If the resulting value is positive, add the injury value. 
+	The unit gets a wound of that size. If it already has a wound of that size they combine to create a wound 1 larger. all effects of gaining a wound are applied again
+
+When gaining a wound: 
+	X shock: x penalty to skill, technical, and Perception the next turn
+	X impairment: x penalty to skill technical and perception until fight is over
+	roll vs Toughness-x: roll toughness -3d6 + x. if the number is negative suffer the effect
+	knocked down: posture becomes lying down
+	stunned: gain the stunned effect
+	0: -1 to skill and technical next turn
+	2: -2 to skill and technical next turn 
+	4: -3 to skill and technical next turn. Roll vs Toughness +0 to gain -2 impairment 
+	6: -4 to skill and technical next turn. roll vs. Toughness +0 to gain -4 impairment. Toughness +0 to gain knocked down. Toughness +0 to gain stunned. Toughness +0 or gain Slowed
+	8: (all of #6) roll vs toughness to gain -6 impairment. Roll vs Toughness to gain Unconsious
+	10: (all of #8) die
+
+Effects:
+	Stunned: cannot act. Roll Toughness once per turn (second?) to undo
+	Slowed: Agility decreased by 4. Move halved
+		

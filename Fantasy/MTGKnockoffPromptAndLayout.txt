@@ -1,0 +1,58 @@
+I'm building a card game in html and js
+
+The game state should always be represented in json so it can be moved around. 
+
+Its a two player game. 
+Each player has a hand, battlefield, treasury, Library, graveyard, and health
+All cards have a type and a value (and a placeholder name)
+The value is expressed as a combination of number of factions. for example 3 Dragon and 2 Any
+	 The exact factions will differ from instance to instance of the game
+	 The exception is the "Any" faction, which allows any faction
+Different Types of Cards have different Stats
+	Creature cards have an attack, a defense, tribes, and attributes. They also track damage
+	Action cards have results
+	Effect cards have a modifier
+	Building cards have a modifier, a starting health, and a health
+	Resource cards have a faction
+More on Card stats
+	results change the game state. Results include
+		chosen card fitting condition is destroyed
+		chosen card fitting condition is returned to hand
+		chosen card fitting description goes from graveyard to battlefield
+		chosen card fitting description goes from graveyard to hand
+		player draws [x] card
+		player discards [x] cards they choose
+		player discards chosen card fitting description
+		player gains [X] life
+		player looses [X] life
+		player gains [X] energy of type [Y]
+		chosen building gains [X] life
+		chosen card on battlefield fitting description takes [X] damage
+		all cards fitting desciption 
+		all creatures take [X] damage
+	attributes
+		lifelink: (when the creature does damage its player gains that much life)
+		deathtouch: (when the creature does damage to a creature the effected creature dies)
+		firstStrike: (the creature does damage in the first strike phase)
+		Trample: (excess damage beyond that needed to kill its blockers it done to its target)
+		Flying: (can only be blocked by other creatures with flying or reach)
+		Reach: (can block creatures with flying)
+		Shadow: (can only be blocked by other creatures with shadow or mystic)
+		Mystic: (can block creatures with shadow)
+		Unstoppable X: (can only be blocked by creatures with attack X or higher)
+		immortal: (does not die from damage, deathtouch, or destruction)
+		Vigilance: (does not tap when attacking)
+		Attack Trigger: (has result when attacking)
+		Block Trigger: (has result when blocking)
+		Tap Trigger: (may tap to make result happen)
+		Enter Trigger: (has result when entering)
+		Death Trigger: (has result when going from battlefield to graveyard)
+		Turn Start Trigger: (has result when turn starts)
+	default factions
+		Rat, Ox, Rooster, Ram, Rabbit, Pig, Dragon, Serpent, Horse, Dog, Monkey, 
+	Modifiers
+		give all creatures fitting description an attribute
+		give all creatures fitting description 
+		Turn Start Trigger: (has result when turn starts)
+Game Phases:
+	Draw->Cast->Attack->Block

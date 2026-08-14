@@ -2,7 +2,7 @@ const ISSUE_NAME_GROUPS = {
   1: ['Apple', 'Banana', 'Cherry', 'Date', 'Elderberry', 'Fig', 'Grape', 'Honeydew', 'Kiwi', 'Lemon', 'Mango', 'Nectarine', 'Orange', 'Papaya', 'Quince', 'Raspberry', 'Strawberry', 'Tangerine', 'Ugli', 'Vanilla'],
   2: ['Artichoke', 'Beet', 'Carrot', 'Daikon', 'Eggplant', 'Fennel', 'Garlic', 'Horseradish', 'Kale', 'Leek', 'Mushroom', 'Okra', 'Parsnip', 'Radish', 'Scallion', 'Turnip', 'UplandCress', 'Wasabi', 'Yam', 'Zucchini'],
   3: ['Brie', 'Cheddar', 'Comte', 'Danzón', 'Edam', 'Feta', 'Gouda', 'Halloumi', 'Idiazabal', 'Jarlsberg', 'Kashkaval', 'Limburger', 'Mascarpone', 'Nabulsi', 'Oka', 'Paneer', 'QuesoBlanco', 'Rocquefort', 'Sbrinz', 'Taleggio'],
-  4: ['BakedZiti', 'ChickenParmesan', 'EggplantParmigiana', 'FettuccineAlfredo', 'GnocchiPuttanesca', 'Lasagna', 'LinguineVongole', 'MushroomRisotto', 'OrecchietteAllaRomana', 'PappardelleAlCinghiale', 'PenneArrabbiata', 'RavioliAlForno', 'SpaghettiCarbonara', 'TagliatelleAlfredo', 'TortelliniInBrodo', 'VealSaltimbocca', 'VesuvioPasta', 'WildMushroomPappardelle', 'ZitiAlForno', 'Cannelloni']
+  4: ['Ziti', 'ChickenParmesan', 'Parmigiana', 'FettuccineAlfredo', 'Gnocchi', 'Lasagna', 'Linguine', 'Vongole', 'Risotto', 'Orecchiette', 'Pappardelle', 'Penne', 'Ravioli', 'Spaghetti', 'Tagliatelle', 'Tortellini', 'Saltimbocca', 'VesuvioPasta', 'Pappardelle', 'Cannelloni']
 };
 
 function createNamePool(modeCount) {
