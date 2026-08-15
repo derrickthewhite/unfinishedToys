@@ -49,6 +49,30 @@ Army confirmation now initializes the terrain stage instead of a placeholder.
 - The active player cannot finish until every drafted unit is legally deployed. After attacker confirmation, the setup transitions to game mode with the defender taking the first move roll.
 - Deployment input is isolated in `prototype-unit-deployment.js`; the main battle-board pointer handlers remain unchanged while battle-board refactoring is paused.
 
+### Completed: Battle-Board Rendering Extraction
+
+Board canvas drawing now lives in `prototype-board-render.js`.
+
+- Render scheduling, board/terrain/unit layers, shooting and combat overlays, ghosts, selection-handle drawing, and unit asset lookup/loading moved as one mixin.
+- Setup-canvas renderers still call shared `drawTerrain` / `getUnitAssetPath` through the installed prototype methods.
+- `resizeCanvas` / `syncCanvasResolution` and DOM sync (`syncUiFromState`, `renderSelectionInfo`) remain in `prototype-app.js`.
+
+### Completed: Game-Flow And Combat Orchestration Extraction
+
+Turn and combat orchestration now lives in `prototype-game-flow.js`.
+
+- Move completion, form-up, shooting/melee phase state, turn advancement, combat resolution bookkeeping, and draft/selection analysis moved as one mixin.
+- App shell, setup helpers, player identity helpers, and DOM sync remain in `prototype-app.js`.
+- Interaction draft primitives remain in `prototype-board-interaction.js`.
+
+### Completed: Persistence Module (In-Game)
+
+Save/load lives in `prototype-persistence.js` as the sole implementation.
+
+- In-game snapshots include players, active player, phase/moves, units, terrain, losses, and UI toggles.
+- Legacy Blue/Red unit `side` values and loss maps normalize to `player-1` / `player-2` on load.
+- Guided setup still cannot be saved mid-progress; that remains open under Remaining Work §2.
+
 ### Verified
 
 Run this from the repository root:
@@ -91,29 +115,95 @@ The canvas event-registration boundary remains in `prototype-board-input.js`. Th
 
 Recommended extraction order:
 
-1. Extract board rendering as a separate slice: render scheduling, board/terrain/unit drawing, overlays, ghosts, selection handles, and asset drawing/loading. Keep setup-canvas rendering separate because its module already depends on the shared board draw methods.
-2. Extract game-flow and combat orchestration: draft lifecycle, move completion, form-up, shooting/melee phase state, turn advancement, and combat-resolution display state.
-3. Revisit persistence after deployment is complete so saves preserve deployment progress and setup state, then keep the persistence module as the sole save/load implementation.
+1. ~~Extract board rendering into `prototype-board-render.js`.~~ **Done** — checklist retained below as the completed contract.
+2. ~~Extract game-flow and combat orchestration into `prototype-game-flow.js`.~~ **Done** — checklist retained below as the completed contract.
+3. ~~Revisit persistence so the persistence module is the sole save/load implementation for in-game state.~~ **Done for in-game saves** — mid-setup save/resume is still open (see §2).
 
 For every slice, use `apply_patch` for both source deletion and destination addition so the editor's AI change set matches Git's working-tree change set. Validate with the focused application tests before any adjacent refactor.
 
+#### Game-flow extraction checklist
+
+New module: `prototype-game-flow.js`, installed like the other mixins. Depends on `prototype-geometry.js` and `prototype-rules.js`.
+
+**Move these methods as one unit** (bodies leave `prototype-app.js`):
+
+- Move / draft completion: `stepSingleDraft`, `finishDraft`, `endMovePhase`, `evaluateDraft`, `updateSelectionAnalysis`
+- Turn / phase orchestration: `resetMovedFlags`, `setPhase`, `advanceToNextTurn`, `maybeAutoAdvanceCombatPhase`, `acknowledgePhase`
+- Form-up: `getFormUpPreview`, `beginFormUpPhase`
+- Shooting state: `initializeShootingPhase`, `getShootingState`, `hasAnyShootingAttacks`, `getDeclaredTargetIds`, `needsShootingDeclaration`, `isUnitShootingParticipant`, `handleShootingClick`, `resolveShootingPhase`
+- Melee state: `initializeMeleePhase`, `getMeleeState`, `isUnitMeleeParticipant`, `isUnitCombatParticipant`, `resolveMeleePhase`
+- Combat resolution bookkeeping: `rollDie`, `recordLosses`, `buildCombatResolution`, `logCombatResults`, `getCombatUnit`, `getCombatSideLabel`, `describeCombatUnits`, `describeCombatantById`, `formatCombatModifiers`, `getLossSummary`, `hasUnitMovedThisTurn`
+
+**Keep in `prototype-app.js`:**
+
+- App shell: constructor, `captureUi`, `bindUi`, `onKeyDown`, `setMode`, canvas sizing
+- Setup confirmation helpers and player identity helpers
+- Shared lookups: `getUnitById`, `getSelectedUnits`
+- DOM sync / selection panel: `updateStatus`, `renderSelectionInfo`, `syncUiFromState`, `getSelectedUnitDetails`, `formatPaces`, `getSingleSelectedUnit`
+- Interaction draft primitives already in `prototype-board-interaction.js` (`ensureDraft`, `commitDraftStep`, `cancelDraft`, edit undo)
+
+**Leave behind and call through `this` (do not drag into the game-flow module):**
+
+- Player helpers: `getUnitPlayerId`, `getPlayerLabel`, `getOpponentPlayerId`
+- Interaction: `cancelDraft`
+- Render helpers: `hasUnitMoved`, `requestRender`
+- App glue: `syncUiFromState`, `updateStatus`, `getUnitById`, `getSelectedUnits`
+
+**Wiring:**
+
+- `require('./prototype-game-flow.js')` + factory arg + `gameFlow.install(HordesPrototype)` in `prototype-app.js`
+- `<script src="prototype-game-flow.js"></script>` in `prototype.html` before `prototype-app.js`
+- Run `node --test *.test.js` after the slice
+
+#### Board-render extraction checklist
+
+New module: `prototype-board-render.js`, installed like the other mixins. Depends on `prototype-data.js`, `prototype-geometry.js`, and `prototype-rules.js`.
+
+**Move these methods as one unit** (bodies leave `prototype-app.js`):
+
+- Scheduling / main pass: `requestRender`, `render`
+- Board layers: `drawBoard`, `drawTerrain`, `drawUnits`, `drawGhostUnits`, `drawMarquee`
+- Overlays: `drawShootingOverlays`, `drawShootingArrow`, `drawCombatResolutionOverlays`
+- Ghost helpers that only exist to feed drawing: `collectGhostUnits`, `hasUnitMoved`
+- Unit drawing / assets: `drawUnitBase`, `getUnitAssetPath`, `getUnitAsset`, `drawUnitAsset`, `drawUnitArrow`, `drawUnitText`
+- Handles: `drawSelectionHandles`, `drawRotateHandle`, `drawReverseHandle`, `drawConvertHandle`, `drawArrowHead`
+- Asset path constants currently at the top of `prototype-app.js`: `PANDA_UNIT_ASSET_PATHS`, `UNDEAD_UNIT_ASSET_PATHS`, `UNIT_ASSET_PATHS`
+
+**Keep in `prototype-app.js`:**
+
+- `resizeCanvas` and `syncCanvasResolution` (canvas lifecycle / DPR sizing; `render` continues to call `this.syncCanvasResolution`)
+- `renderSelectionInfo` and `syncUiFromState` (DOM UI, not canvas)
+- Setup-canvas renderers (`renderTerrainPlacement`, `renderUnitDeployment`, offer previews) — they stay in their modules and keep calling shared `drawTerrain` / `getUnitAssetPath` via the mixin
+- Constructor fields `unitAssetCache` and `renderQueued`
+
+**Leave behind and call through `this` (do not drag into the render module):**
+
+- Player helpers: `getPlayerColors`, `getUnitPlayerId`
+- Interaction: `getSelectionHandles`
+- Game/combat predicates used while drawing: `needsShootingDeclaration`, `isUnitCombatParticipant`, `getShootingState`, `getFormUpPreview`, `getUnitById`
+
+**Wiring:**
+
+- `require('./prototype-board-render.js')` + factory arg + `boardRender.install(HordesPrototype)` in `prototype-app.js`
+- `<script src="prototype-board-render.js"></script>` in `prototype.html` before `prototype-app.js`
+- Run `node --test *.test.js` after the slice
+
 ### 2. Persistence, Documentation, and Tests
 
-Primary files: `prototype-app.js`, `Design.md`, `prototype-app.test.js`, `prototype-geometry.test.js`, `prototype-rules.test.js`
+Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`
 
-- Persist player configuration, `setupStage`, setup drafts, terrain/deployment progress, units, terrain, losses, and game state.
-- Preserve legacy Blue/Red save migration.
-- Update `Design.md` after the workflow is implemented; do not use it as this implementation handoff document.
-- Add focused tests for:
-  - color/role/player-ID separation
-  - legacy save migration
-  - exact-24 army validation
-  - terrain offer refresh and completion
-  - rotated terrain geometry/rules
-  - strict deployment zones, including rotated footprints
-  - defender-before-attacker order
-  - setup-to-game handoff
-  - setup save/load resumption
+**Done:**
+
+- Persistence lives only in `prototype-persistence.js` (save/load/list/delete + legacy Blue/Red unit and loss normalization).
+- In-game saves store players, active player, moves/phase, units, terrain, losses, and UI toggles.
+- Saves are intentionally blocked while guided setup is active; loading a game forces `setupStage: 'game'` and clears setup drafts.
+- Focused tests cover army validation, terrain/deployment flow, deployment zones/order/handoff, setup-skipping loads, and the setup save guard.
+
+**Still open:**
+
+- Persist and resume mid-setup: `setupStage`, army drafts, terrain/deployment progress.
+- Update `Design.md` for the guided setup workflow (it still describes seeded blue/red battles).
+- Add focused tests for setup save/load resumption once that behavior exists.
 - Run `node --test *.test.js` after each completed slice.
 
 ## Planned Game Extensions
@@ -137,7 +227,9 @@ Primary files: `prototype-app.js`, `Design.md`, `prototype-app.test.js`, `protot
 ## Important Existing Extension Points
 
 - `prototype-data.js`: player palette/defaults, unit template data, `createUnit`, default terrain/unit factories.
-- `prototype-app.js`: `createInitialState`, `captureUi`, `bindUi`, pointer handlers, `syncUiFromState`, `render`, `drawTerrain`, `drawUnits`, save/load normalization.
+- `prototype-app.js`: `createInitialState`, `captureUi`, `bindUi`, player helpers, DOM `syncUiFromState`.
+- `prototype-board-render.js`: battle-board render scheduling, terrain/unit/overlay/handle drawing, asset lookup/loading.
+- `prototype-game-flow.js`: move completion, form-up, shooting/melee phases, turn advancement, combat resolution state.
 - `prototype-geometry.js`: `pointInBlob`, `drawBlob`, `getUnitCorners`, polygon overlap helpers.
 - `prototype-rules.js`: `getTerrainTypeAt`, movement terrain sampling, player-ID ownership comparisons, shooting, form-up, melee.
 
