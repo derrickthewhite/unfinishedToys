@@ -69,6 +69,7 @@
                 deploymentSnapCheckbox: document.getElementById('deploymentSnapCheckbox'),
                 deploymentTray: document.getElementById('deploymentTray'),
                 autoDeployButton: document.getElementById('autoDeployButton'),
+                returnToTrayButton: document.getElementById('returnToTrayButton'),
                 finishDeploymentButton: document.getElementById('finishDeploymentButton'),
                 confirmationModal: document.getElementById('confirmationModal'),
                 confirmationBackdrop: document.getElementById('confirmationBackdrop'),
@@ -342,6 +343,13 @@
             if (event.key === 'Escape' && this.state.storageModalOpen) {
                 event.preventDefault();
                 this.closeStorageModal();
+                return;
+            }
+            if ((event.key === 'Delete' || event.key === 'Backspace') && this.state.setupStage === 'unit-deployment') {
+                if (!this.state.storageModalOpen && !this.state.setup?.confirmation) {
+                    event.preventDefault();
+                    this.returnSelectedUnitsToTray();
+                }
                 return;
             }
             if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {

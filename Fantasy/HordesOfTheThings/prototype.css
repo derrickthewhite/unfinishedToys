@@ -445,6 +445,8 @@ button:disabled {
     padding: 0.35rem;
     border: 5px solid transparent;
     border-radius: 2px;
+    touch-action: none;
+    user-select: none;
     background: linear-gradient(180deg, color-mix(in srgb, var(--player-fill) 24%, #fff9ee), color-mix(in srgb, var(--player-fill) 10%, #e2d6c5));
 }
 
@@ -468,6 +470,7 @@ button:disabled {
     width: 100%;
     height: 100%;
     object-fit: contain;
+    pointer-events: none;
 }
 
 .deployment-tray-name {

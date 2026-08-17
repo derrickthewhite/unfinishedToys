@@ -107,7 +107,8 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 ### Guided Setup And Auto Deploy
 - Each army must total exactly 24 AP. Both players choose a presentation color and faction independently of ownership IDs (`player-1` / `player-2`).
 - After armies are accepted, a coin flip chooses the temporary defender. The defender places terrain, then deploys in the bottom quarter; the attacker deploys afterward in the top quarter.
-- Deployment requires every base corner to stay in the assigned quarter with no overlaps.
+- Deployment requires every base corner to stay on the 600 mm board and in the assigned quarter, with no overlaps.
+- During deployment, the active player can Shift-click or marquee-select their units, drag them, and use rotate/reverse handles. Rank/file convert is not available. Units can be returned to the tray with Delete/Backspace, the Return to Tray button, or by dragging them onto the tray. Tray units can be clicked then placed, or dragged onto the board.
 - **Auto Deploy** places only the active player's remaining tray units, then leaves them editable:
   - Same-type blocks prefer ranks up to about four wide, sharing one front line (not center-aligned). Line troops spread laterally across the zone and avoid stacking in files; only flyers, fast movers, and artillery may sit behind, and even they also consider flank/mid placements.
   - Bad-going-tolerant troops (including Shooters and Warbands) bias toward forest/swamp; other troops avoid bad going underfoot. Auto Deploy samples a frontage-wide corridor about 180 mm ahead so good-going troops do not sit in front of forest, swamp, water, or impassable terrain.

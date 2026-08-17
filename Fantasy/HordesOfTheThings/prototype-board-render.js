@@ -49,6 +49,14 @@
             this.renderQueued = true;
             window.requestAnimationFrame(() => {
                 this.renderQueued = false;
+                if (this.state.setupStage === 'unit-deployment') {
+                    this.renderUnitDeployment();
+                    return;
+                }
+                if (this.state.setupStage === 'terrain-placement') {
+                    this.renderTerrainPlacement();
+                    return;
+                }
                 this.render();
             });
         }

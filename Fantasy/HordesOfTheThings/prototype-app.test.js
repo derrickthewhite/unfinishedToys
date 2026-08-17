@@ -125,6 +125,8 @@ function createAppHarness(overrides) {
         deploymentProgress: { textContent: '' },
         deploymentStatus: { textContent: '' },
         finishDeploymentButton: { disabled: false },
+        returnToTrayButton: { disabled: true },
+        autoDeployButton: { disabled: false },
         ...overrides?.ui
     };
     app.canvas = {
@@ -1768,6 +1770,11 @@ test('deployment rejects invalid zone placement and rotated footprint outside qu
     app.onDeploymentPointerUp({ pointerId: 1, clientX: 300, clientY: 300 });
     assert.equal(app.state.units.length, 0);
 
+    app.selectDeploymentTrayUnit(draftId);
+    app.onDeploymentPointerDown({ pointerId: 2, clientX: 10, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 2, clientX: 10, clientY: 550 });
+    assert.equal(app.state.units.length, 0);
+
     const rotated = data.createUnit('Blade', 'player-1', 'Panda', {
         x: 280,
         y: 430,
@@ -1806,6 +1813,116 @@ test('deployment rejects overlap and restores moved unit position on invalid mov
 
     assert.equal(Math.round(second.x), Math.round(originalSecond.x));
     assert.equal(Math.round(second.y), Math.round(originalSecond.y));
+});
+
+test('deployment shift-click and marquee select only the active player, without convert handles', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 2);
+    app.initializeUnitDeployment();
+    const trayIds = app.getDeploymentSetup().tray.map((entry) => entry.draftId);
+
+    app.selectDeploymentTrayUnit(trayIds[0]);
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.selectDeploymentTrayUnit(trayIds[1]);
+    app.onDeploymentPointerDown({ pointerId: 2, clientX: 340, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 2, clientX: 340, clientY: 550 });
+
+    const [first, second] = app.state.units;
+    assert.deepEqual(app.state.selectedIds, [second.id]);
+
+    app.onDeploymentPointerDown({ pointerId: 3, clientX: first.x + 8, clientY: first.y + 4, shiftKey: true });
+    app.onDeploymentPointerUp({ pointerId: 3, clientX: first.x + 8, clientY: first.y + 4, shiftKey: true });
+    assert.equal(app.state.selectedIds.includes(first.id), true);
+    assert.equal(app.state.selectedIds.includes(second.id), true);
+
+    app.clearSelection();
+    app.onDeploymentPointerDown({ pointerId: 4, clientX: 200, clientY: 500 });
+    app.onDeploymentPointerMove({ pointerId: 4, clientX: 400, clientY: 590 });
+    app.onDeploymentPointerUp({ pointerId: 4, clientX: 400, clientY: 590 });
+    assert.equal(app.state.selectedIds.includes(first.id), true);
+    assert.equal(app.state.selectedIds.includes(second.id), true);
+    assert.equal(app.getSelectionHandles().some((handle) => handle.kind === 'formation-convert'), false);
+
+    app.state.selectedIds = [first.id];
+    app.updateSelectionAnalysis();
+    const singleHandles = app.getSelectionHandles();
+    assert.ok(singleHandles.some((handle) => handle.kind === 'single-rotate'));
+    assert.ok(singleHandles.some((handle) => handle.kind === 'single-reverse'));
+    assert.equal(singleHandles.some((handle) => handle.kind === 'formation-convert'), false);
+});
+
+test('deployment returns selected units to the tray and can place by dragging from the tray', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 2);
+    app.initializeUnitDeployment();
+    const trayIds = app.getDeploymentSetup().tray.map((entry) => entry.draftId);
+
+    app.selectDeploymentTrayUnit(trayIds[0]);
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.selectDeploymentTrayUnit(trayIds[1]);
+    app.onDeploymentPointerDown({ pointerId: 2, clientX: 340, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 2, clientX: 340, clientY: 550 });
+
+    const [first, second] = app.state.units;
+    const firstDraftId = first.draftId;
+    app.state.selectedIds = [first.id, second.id];
+    assert.equal(app.returnSelectedUnitsToTray(), 2);
+    assert.equal(app.state.units.length, 0);
+    assert.equal(app.getDeploymentSetup().tray.filter((entry) => entry.playerId === 'player-1').length, 2);
+    assert.ok(app.getDeploymentSetup().tray.some((entry) => entry.draftId === firstDraftId));
+    assert.equal(app.canFinishDeploymentTurn(), false);
+
+    const trayButton = {
+        setPointerCapture() {},
+        hasPointerCapture() { return false; },
+        releasePointerCapture() {},
+        classList: { toggle() {} }
+    };
+    app.onDeploymentTrayPointerDown({
+        pointerId: 3,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+        preventDefault() {},
+        currentTarget: trayButton
+    }, firstDraftId);
+    app.onDeploymentPointerUp({ pointerId: 3, clientX: 20, clientY: 20 });
+    assert.equal(app.state.units.length, 0);
+    assert.equal(app.getDeploymentSetup().selectedTrayId, firstDraftId);
+
+    app.onDeploymentTrayPointerDown({
+        pointerId: 4,
+        button: 0,
+        clientX: 20,
+        clientY: 20,
+        preventDefault() {},
+        currentTarget: trayButton
+    }, firstDraftId);
+    app.onDeploymentPointerMove({ pointerId: 4, clientX: 300, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 4, clientX: 300, clientY: 550 });
+    assert.equal(app.state.units.length, 1);
+    assert.equal(app.state.units[0].draftId, firstDraftId);
+    assert.equal(app.state.selectedIds[0], app.state.units[0].id);
 });
 
 test('deployment snaps tray units and releases capture after blank canvas clicks', () => {

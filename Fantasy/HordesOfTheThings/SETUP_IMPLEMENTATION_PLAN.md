@@ -44,10 +44,11 @@ Army confirmation now initializes the terrain stage instead of a placeholder.
 
 - Terrain confirmation initializes a dedicated deployment canvas and tray from the accepted army drafts.
 - The defender deploys all units in the bottom quarter first; the attacker then deploys all units in the top quarter.
-- Every deployment and reposition checks every rotated base corner against the assigned quarter and rejects polygon overlap with all deployed units.
+- Every deployment and reposition checks every rotated base corner against the 600 mm board and the assigned quarter, and rejects polygon overlap with all deployed units.
+- The active player can Shift-click or marquee-select their own units, drag them, and use rotate/reverse handles. Convert handles are hidden. Returning units to the tray works from Delete/Backspace, a Return to Tray button, or dragging a selection onto the tray; tray entries can be clicked then placed or dragged onto the board.
 - Deployed units are created through `data.createUnit`, retaining player ID, faction, and configured rendering color.
 - The active player cannot finish until every drafted unit is legally deployed. After attacker confirmation, the setup transitions to game mode with the defender taking the first move roll.
-- Deployment input is isolated in `prototype-unit-deployment.js`; the main battle-board pointer handlers remain unchanged while battle-board refactoring is paused.
+- Deployment canvas pointer events reuse battle-board pan, marquee, drag, rotate, and reverse through a temporary canvas/camera swap. Tray placement, legality restore, and return-to-tray stay in `prototype-unit-deployment.js`.
 
 ### Completed: Battle-Board Rendering Extraction
 
@@ -94,7 +95,7 @@ Run this from the repository root:
 node --test *.test.js
 ```
 
-The focused application suite has 61 passing tests, including deployment snapping, Auto Deploy, pointer-release handling, setup-camera pan/zoom, and setup save/load resumption. The full `node --test *.test.js` suite has 127 passing tests.
+The focused application suite includes deployment snapping, Auto Deploy, Shift/marquee selection, return-to-tray, tray drag-and-drop, pointer-release handling, setup-camera pan/zoom, and setup save/load resumption. The full `node --test *.test.js` suite has 129 passing tests.
 
 ## Core Model
 
@@ -117,7 +118,7 @@ Do not use `attacker` or `defender` as permanent player identifiers. They determ
 - Terrain count defaults to the result of `2d4`, then may be edited from 0 through 8.
 - Terrain offers include forest, swamp, water, impassable terrain, and roads.
 - The defender places terrain, then deploys all units before the attacker.
-- Deployment zones are strict: all corners of a base must remain in the assigned top or bottom quarter of the board.
+- Deployment zones are strict: all corners of a base must remain on the 600 mm board and in the assigned top or bottom quarter.
 - Which player gets top/bottom deployment is a player-ID assignment, independent of color and defender role.
 
 ## Remaining Work

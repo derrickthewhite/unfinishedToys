@@ -57,15 +57,28 @@
             if (selectedUnits.length === 0) {
                 return false;
             }
-            if (this.state.mode === 'edit') {
-                this.recordEditSnapshot(this.createEditSnapshot());
+            if (this.state.mode === 'edit' || this.state.setupStage === 'unit-deployment') {
+                const deploymentNudge = this.state.setupStage === 'unit-deployment';
+                const nudgeSnapshot = deploymentNudge
+                    ? geometry.snapshotPositions(this.state.selectedIds, this.state.units)
+                    : null;
+                if (!deploymentNudge) {
+                    this.recordEditSnapshot(this.createEditSnapshot());
+                }
                 selectedUnits.forEach((unit) => {
                     unit.x += delta.x;
                     unit.y += delta.y;
                 });
+                if (deploymentNudge && typeof this.areDeploymentUnitsLegal === 'function'
+                    && !this.areDeploymentUnitsLegal(selectedUnits)) {
+                    geometry.restoreSnapshot(nudgeSnapshot, this.state.units);
+                    this.updateStatus('Invalid move: deployed units must stay on the board, inside the assigned quarter, and cannot overlap.');
+                    this.requestRender();
+                    return true;
+                }
                 this.updateSelectionAnalysis();
                 this.requestRender();
-                this.updateStatus('Selection nudged.');
+                this.updateStatus(deploymentNudge ? 'Deployment position updated.' : 'Selection nudged.');
                 return true;
             }
             if (this.state.phase !== 'move') {
@@ -170,7 +183,13 @@
             }
 
             const handleHit = this.getHandleHit(world);
-            const unitHit = this.pickUnit(world);
+            let unitHit = this.pickUnit(world);
+            if (this.state.setupStage === 'unit-deployment') {
+                const activePlayerId = this.getDeploymentSetup()?.activePlayerId;
+                if (unitHit && this.getUnitPlayerId(unitHit) !== activePlayerId) {
+                    unitHit = null;
+                }
+            }
             this.state.interaction = {
                 type: 'click',
                 pointerId: event.pointerId,
@@ -205,7 +224,7 @@
 
             const isSelectedUnit = unitHit && this.state.selectedIds.includes(unitHit.id);
 
-            if (this.state.mode === 'game' && this.state.phase === 'move' && isSelectedUnit) {
+            if (this.state.setupStage !== 'unit-deployment' && this.state.mode === 'game' && this.state.phase === 'move' && isSelectedUnit) {
                 const analysis = this.state.selectionAnalysis;
                 if (analysis.type === 'single' || analysis.type === 'rank' || (analysis.type === 'file' && analysis.leadId === unitHit.id)) {
                     if (!this.ensureDraft(this.state.selectedIds)) {
@@ -221,14 +240,16 @@
                 }
             }
 
-            if (this.state.mode === 'edit' && isSelectedUnit) {
+            if (isSelectedUnit && (this.state.mode === 'edit' || this.state.setupStage === 'unit-deployment')) {
                 const draftIds = [...this.state.selectedIds];
                 this.state.interaction.type = 'move-edit';
                 this.state.interaction.dragBase = geometry.snapshotPositions(draftIds, this.state.units);
                 this.state.interaction.draftIds = draftIds;
                 this.state.interaction.anchorWorld = world;
                 this.state.interaction.suppressClick = true;
-                this.state.interaction.editSnapshot = this.createEditSnapshot();
+                if (this.state.setupStage !== 'unit-deployment') {
+                    this.state.interaction.editSnapshot = this.createEditSnapshot();
+                }
                 return;
             }
 
@@ -246,7 +267,7 @@
             if (selectionIds.length === 0) {
                 return;
             }
-            if (this.state.mode === 'game' && !this.ensureDraft(selectionIds)) {
+            if (this.state.mode === 'game' && this.state.setupStage !== 'unit-deployment' && !this.ensureDraft(selectionIds)) {
                 return;
             }
             const positions = geometry.snapshotPositions(selectionIds, this.state.units);
@@ -275,7 +296,7 @@
             this.state.interaction.anchorAngle = geometry.angleBetween(pivot, world);
             this.state.interaction.pivot = pivot;
             this.state.interaction.draftIds = selectionIds;
-            if (this.state.mode === 'edit') {
+            if (this.state.mode === 'edit' && this.state.setupStage !== 'unit-deployment') {
                 this.state.interaction.editSnapshot = this.createEditSnapshot();
             }
         }
@@ -495,7 +516,7 @@
                 }
             } else if (!interaction.moved && !interaction.suppressClick) {
                 this.handleClick(world, interaction);
-            } else if (this.state.mode === 'edit' && interaction.editSnapshot && (interaction.type === 'move-edit' || interaction.type === 'rotate-single' || interaction.type === 'rotate-rank')) {
+            } else if (this.state.mode === 'edit' && this.state.setupStage !== 'unit-deployment' && interaction.editSnapshot && (interaction.type === 'move-edit' || interaction.type === 'rotate-single' || interaction.type === 'rotate-rank')) {
                 this.recordEditSnapshot(interaction.editSnapshot);
             } else if (interaction.type === 'move-rank' || interaction.type === 'move-file' || interaction.type === 'rotate-rank') {
                 this.commitDraftStep();
@@ -522,7 +543,10 @@
                 return;
             }
             if (unitHit) {
-                if (this.state.mode === 'game' && this.getUnitPlayerId(unitHit) !== this.state.activePlayerId) {
+                if (this.state.setupStage === 'unit-deployment' && this.getUnitPlayerId(unitHit) !== this.getDeploymentSetup()?.activePlayerId) {
+                    return;
+                }
+                if (this.state.mode === 'game' && this.state.setupStage !== 'unit-deployment' && this.getUnitPlayerId(unitHit) !== this.state.activePlayerId) {
                     this.updateStatus('Only the active side can be selected in game mode.');
                     return;
                 }
@@ -588,7 +612,12 @@
             const rect = geometry.normalizeRect(marquee.start, marquee.end);
             const hitIds = this.state.units
                 .filter((unit) => geometry.polygonInsideRect(geometry.getUnitCorners(unit), rect))
-                .filter((unit) => this.state.mode === 'edit' || this.getUnitPlayerId(unit) === this.state.activePlayerId)
+                .filter((unit) => {
+                    if (this.state.setupStage === 'unit-deployment') {
+                        return this.getUnitPlayerId(unit) === this.getDeploymentSetup()?.activePlayerId;
+                    }
+                    return this.state.mode === 'edit' || this.getUnitPlayerId(unit) === this.state.activePlayerId;
+                })
                 .map((unit) => unit.id);
             if (marquee.additive) {
                 const nextIds = [...this.state.selectedIds];
@@ -630,7 +659,7 @@
         }
 
         getSelectionHandles() {
-            if (this.state.mode === 'game' && this.state.phase !== 'move') {
+            if (this.state.mode === 'game' && this.state.phase !== 'move' && this.state.setupStage !== 'unit-deployment') {
                 return [];
             }
             const analysis = this.state.selectionAnalysis;
@@ -662,7 +691,7 @@
                 const convertHandle = this.getFormationConvertHandle(analysis);
                 const leftWheelVector = geometry.subtract(analysis.leftPivot, analysis.rightPivot);
                 const rightWheelVector = geometry.subtract(analysis.rightPivot, analysis.leftPivot);
-                return [{
+                const handles = [{
                     kind: 'rank-left',
                     radius: data.HANDLE_RADIUS,
                     position: geometry.add(analysis.leftHandle, geometry.scaleVector(analysis.leftOutward, 16)),
@@ -676,9 +705,16 @@
                     pivot: analysis.leftPivot,
                     rotation: Math.atan2(analysis.rightOutward.y, analysis.rightOutward.x),
                     forwardRotationSign: Math.sign(geometry.dot({ x: -rightWheelVector.y, y: rightWheelVector.x }, analysis.forward)) || 1
-                }, reverseHandle, convertHandle];
+                }, reverseHandle];
+                if (this.state.setupStage !== 'unit-deployment') {
+                    handles.push(convertHandle);
+                }
+                return handles;
             }
             if (analysis.type === 'file') {
+                if (this.state.setupStage === 'unit-deployment') {
+                    return [this.getFormationReverseHandle(analysis)];
+                }
                 return [this.getFormationReverseHandle(analysis), this.getFormationConvertHandle(analysis)];
             }
             return [];
@@ -733,14 +769,17 @@
             if (selectionIds.length === 0) {
                 return;
             }
-            if (this.state.mode === 'game') {
+            if (this.state.mode === 'game' && this.state.setupStage !== 'unit-deployment') {
                 if (!this.ensureDraft(selectionIds)) {
                     return;
                 }
-            } else {
+            } else if (this.state.setupStage !== 'unit-deployment') {
                 this.recordEditSnapshot(this.createEditSnapshot());
             }
 
+            const reverseSnapshot = this.state.setupStage === 'unit-deployment'
+                ? geometry.snapshotPositions(selectionIds, this.state.units)
+                : null;
             if (analysis.type === 'rank') {
                 const orderedUnits = analysis.orderedIds.map((unitId) => this.getUnitById(unitId)).filter(Boolean);
                 const reversedRotation = geometry.normalizeAngle(orderedUnits[0].rotation + Math.PI);
@@ -760,7 +799,18 @@
                 });
             }
 
-            if (this.state.mode === 'game') {
+            if (reverseSnapshot && typeof this.areDeploymentUnitsLegal === 'function') {
+                const reversedUnits = selectionIds.map((unitId) => this.getUnitById(unitId)).filter(Boolean);
+                if (!this.areDeploymentUnitsLegal(reversedUnits)) {
+                    geometry.restoreSnapshot(reverseSnapshot, this.state.units);
+                    this.updateSelectionAnalysis();
+                    this.syncUiFromState();
+                    this.updateStatus('Invalid reverse: deployed units must stay on the board, inside the assigned quarter, and cannot overlap.');
+                    return;
+                }
+            }
+
+            if (this.state.mode === 'game' && this.state.setupStage !== 'unit-deployment') {
                 this.evaluateDraft();
                 if (analysis.type !== 'single') {
                     this.commitDraftStep();
