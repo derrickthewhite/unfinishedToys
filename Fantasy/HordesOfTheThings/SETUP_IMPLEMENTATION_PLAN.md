@@ -227,11 +227,12 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`,
 - Add an optional game-start mode that limits each faction to an allowed unit roster.
 - Add more unit types.
 - Move the cheating-oriented Edit Mode behind an extra-click modal or settings control.
+- Add a new game button in the gear menu. **Done** — New Game lives on the gear/saved-games modal and resets to empty army drafts.
 
 ## Future Terrain Investigations
 
-- Make generated terrain shapes feel more organic while preserving consistent draw and hit-test geometry.
-- Make terrain configuration customizable: migrate from hard-coded paths toward terrain assets, then add a modal for adjusting random offer weights and adding or removing available terrain features.
+- Make generated terrain shapes feel more organic while preserving consistent draw and hit-test geometry. **Done for now** — blob outlines fillet sharp corners; Tiny/Small offers are 50%/75% of a ~25% larger base size.
+- Make terrain configuration customizable: migrate from hard-coded paths toward terrain assets, then add a modal for adjusting random offer weights and adding or removing available terrain features. **Done for now** — original and waved outlines live in `assets/terrain`; Game Settings toggles which types each shape may appear as. Runtime still waves authored/uploaded outlines.
 - Analyze crooked and forked roads against the current road sampling and movement calculations before adding either shape. The present rule model assumes one full-board horizontal or vertical strip, so routes and junctions need deliberate geometry/rules support.
 - Add rivers as a distinct terrain feature, including movement, crossing, and whether roads/bridges alter their precedence.
 
@@ -243,7 +244,8 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`,
 - `prototype-game-flow.js`: move completion, form-up, shooting/melee phases, turn advancement, combat resolution state.
 - `prototype-unit-deployment.js`: sequential deployment, tray placement validation.
 - `prototype-ai.js`: Auto Deploy grouping, scoring, and placement. First slice of opponent/setup AI.
-- `prototype-geometry.js`: `pointInBlob`, `drawBlob`, `getUnitCorners`, polygon overlap helpers.
+- `prototype-geometry.js`: `pointInBlob`, `drawBlob`, `getTerrainFeaturePoints`, catalog-backed outlines, `applyTerrainOutlineWave` for uploaded blocks, `getUnitCorners`, polygon overlap helpers.
+- `prototype-game-settings.js`: gear-menu New Game, Game Settings modal, local-storage terrain shape/kind availability.
 - `prototype-rules.js`: `getTerrainTypeAt`, movement terrain sampling, player-ID ownership comparisons, shooting, form-up, melee.
 
 ## Constraints

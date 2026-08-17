@@ -31,9 +31,25 @@
     const ARMY_POINT_TARGET = 24;
     const FACTIONS = Object.freeze(['Panda', 'Undead']);
     const TERRAIN_OFFER_KINDS = Object.freeze(['forest', 'swamp', 'water', 'impassable', 'road']);
+    const TERRAIN_FEATURE_KINDS = Object.freeze(['forest', 'swamp', 'water', 'impassable']);
     const TERRAIN_COUNT_MAX = 8;
     const TERRAIN_SHAPES = Object.freeze(['blob', 'kidney', 'circle', 'half-circle', 'square', 'rectangle', 'oval', 'fat-l', 'horseshoe', 'cross', 'lightbulb']);
-    const TERRAIN_SIZE_MULTIPLIERS = Object.freeze([0.25, 0.5, 1, 1.5]);
+    const TERRAIN_SHAPE_LABELS = Object.freeze({
+        blob: 'Blob',
+        kidney: 'Kidney bean',
+        circle: 'Circle',
+        'half-circle': 'Half-circle',
+        square: 'Square',
+        rectangle: 'Long thin rectangle',
+        oval: 'Oval',
+        'fat-l': 'Fat L-shape',
+        horseshoe: 'Horseshoe',
+        cross: 'Fat stubby cross',
+        lightbulb: 'Lightbulb'
+    });
+    const TERRAIN_SIZE_MULTIPLIERS = Object.freeze([0.5, 0.75, 1, 1.5]);
+    const TERRAIN_ASSET_ROOT = 'assets/terrain';
+    const TERRAIN_ASSET_WOBBLE = 0.24;
 
     const PLAYER_COLORS = Object.freeze({
         blue: {
@@ -170,7 +186,7 @@
         impassable: { fill: '#595661', label: 'Impassable' }
     };
 
-    function createTerrainOffer(kind, id, random = Math.random) {
+    function createTerrainOffer(kind, id, random = Math.random, options = {}) {
         if (!TERRAIN_OFFER_KINDS.includes(kind)) {
             throw new Error('Unknown terrain offer kind: ' + kind);
         }
@@ -184,17 +200,19 @@
                 fill: '#d7c28f'
             };
         }
+        const allowedShapes = (options.allowedShapes || []).filter((shape) => TERRAIN_SHAPES.includes(shape));
+        const shapes = allowedShapes.length > 0 ? allowedShapes : TERRAIN_SHAPES;
         const sizeMultiplier = TERRAIN_SIZE_MULTIPLIERS[Math.floor(random() * TERRAIN_SIZE_MULTIPLIERS.length)];
         return {
             id,
             kind,
             cx: BOARD_SIZE / 2,
             cy: BOARD_SIZE / 2,
-            shape: TERRAIN_SHAPES[Math.floor(random() * TERRAIN_SHAPES.length)],
+            shape: shapes[Math.floor(random() * shapes.length)],
             sizeMultiplier,
-            rx: (48 + Math.round(random() * 24)) * sizeMultiplier,
-            ry: (42 + Math.round(random() * 20)) * sizeMultiplier,
-            wobble: 0.16 + (random() * 0.12),
+            rx: (60 + Math.round(random() * 30)) * sizeMultiplier,
+            ry: (53 + Math.round(random() * 25)) * sizeMultiplier,
+            wobble: 0.2 + (random() * 0.14),
             rotation: 0
         };
     }
@@ -288,9 +306,13 @@
         ARMY_POINT_TARGET,
         FACTIONS,
         TERRAIN_OFFER_KINDS,
+        TERRAIN_FEATURE_KINDS,
         TERRAIN_COUNT_MAX,
         TERRAIN_SHAPES,
+        TERRAIN_SHAPE_LABELS,
         TERRAIN_SIZE_MULTIPLIERS,
+        TERRAIN_ASSET_ROOT,
+        TERRAIN_ASSET_WOBBLE,
         PLAYER_IDS,
         PLAYER_COLORS,
         DEFAULT_PLAYERS,

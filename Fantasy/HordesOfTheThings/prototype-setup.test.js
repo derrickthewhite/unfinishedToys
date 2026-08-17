@@ -83,6 +83,8 @@ test('terrain offer descriptions include shape and size labels, with a road exce
     const app = createAppHarness();
 
     assert.equal(app.getTerrainOfferDescription({ kind: 'forest', shape: 'oval', sizeMultiplier: 1.5 }), 'Oval · Large');
+    assert.equal(app.getTerrainOfferDescription({ kind: 'forest', shape: 'square', sizeMultiplier: 0.5 }), 'Square · Tiny');
+    assert.equal(app.getTerrainOfferDescription({ kind: 'forest', shape: 'square', sizeMultiplier: 0.75 }), 'Square · Small');
     assert.equal(app.getTerrainOfferDescription({ kind: 'road' }), 'Road · full board');
 });
 
@@ -168,6 +170,82 @@ test('random terrain placement retries overlaps and fills the requested terrain 
     assert.equal(app.state.terrain.features.length, 2);
     assert.equal(app.terrainPiecesOverlap(app.state.terrain.features[0], app.state.terrain.features[1]), false);
     assert.equal(app.isTerrainReady(), true);
+});
+
+test('game settings persist which terrain types each shape may appear as', () => {
+    const app = createAppHarness();
+    app.settingsStorage = createStorage();
+
+    data.TERRAIN_SHAPES.forEach((shape) => {
+        app.setTerrainShapeKindEnabled(shape, 'forest', shape === 'square');
+    });
+
+    assert.deepEqual(app.getAllowedShapesForKind('forest'), ['square']);
+    const stored = JSON.parse(app.settingsStorage.getItem('hordes-of-the-things-settings'));
+    assert.equal(stored.terrainShapeKinds.square.forest, true);
+    assert.equal(stored.terrainShapeKinds.blob.forest, false);
+});
+
+test('terrain offers skip kinds with no enabled shapes and honor the remaining shape list', () => {
+    const app = createAppHarness({
+        state: { setupStage: 'terrain-placement', setup: { armies: {}, confirmation: null } }
+    });
+    app.settingsStorage = createStorage();
+    data.TERRAIN_SHAPES.forEach((shape) => {
+        data.TERRAIN_FEATURE_KINDS.forEach((kind) => {
+            app.setTerrainShapeKindEnabled(shape, kind, false);
+        });
+    });
+    app.setTerrainShapeKindEnabled('oval', 'swamp', true);
+
+    assert.deepEqual(app.getWeightedTerrainOfferKinds(), ['road', 'road', 'swamp']);
+    const offer = app.createConfiguredTerrainOffer('swamp', 'swamp-1', () => 0);
+    assert.equal(offer.kind, 'swamp');
+    assert.equal(offer.shape, 'oval');
+});
+
+test('new game from the gear menu asks in the confirmation modal before resetting', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            mode: 'game',
+            units: [createBlade('unit-1', 100, 220)],
+            storageModalOpen: true,
+            setup: { armies: {}, confirmation: null, terrain: null, deployment: null }
+        },
+        nextUnitId: 9
+    });
+
+    app.openNewGameConfirmation();
+    assert.equal(app.state.setup.confirmation, 'new-game');
+    assert.equal(app.state.units.length, 1);
+
+    app.closeSetupConfirmation();
+    assert.equal(app.state.setup.confirmation, null);
+    assert.equal(app.state.units.length, 1);
+    assert.equal(app.state.storageModalOpen, true);
+
+    app.openNewGameConfirmation();
+    app.confirmSetupStage();
+    assert.equal(app.state.setupStage, 'army-builder');
+    assert.deepEqual(app.state.units, []);
+    assert.deepEqual(app.state.terrain, { roads: [], features: [] });
+    assert.equal(app.nextUnitId, 1);
+    assert.equal(app.state.storageModalOpen, false);
+    assert.equal(app.state.gameSettingsModalOpen, false);
+    assert.equal(app.state.setup.confirmation, null);
+});
+
+test('game settings open as a separate modal and return to saved games when closed', () => {
+    const app = createAppHarness({ state: { storageModalOpen: true } });
+
+    app.openGameSettingsModal();
+    assert.equal(app.state.storageModalOpen, false);
+    assert.equal(app.state.gameSettingsModalOpen, true);
+
+    app.closeGameSettingsModal();
+    assert.equal(app.state.gameSettingsModalOpen, false);
+    assert.equal(app.state.storageModalOpen, true);
 });
 
 test('deployment tray selection reuses the battle selection panel stats', () => {

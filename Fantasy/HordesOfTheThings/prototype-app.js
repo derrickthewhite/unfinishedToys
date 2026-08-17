@@ -8,6 +8,7 @@
             require('./prototype-terrain-placement.js'),
             require('./prototype-army-builder.js'),
             require('./prototype-persistence.js'),
+            require('./prototype-game-settings.js'),
             require('./prototype-board-input.js'),
             require('./prototype-board-interaction.js'),
             require('./prototype-board-render.js'),
@@ -19,8 +20,8 @@
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesSelectionPanel);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, boardInput, boardInteraction, boardRender, gameFlow, setupCamera, unitDeployment, ai, selectionPanel) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesSelectionPanel);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, setupCamera, unitDeployment, ai, selectionPanel) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -37,6 +38,13 @@
             this.resizeCanvas();
             this.syncUiFromState();
             this.requestRender();
+            if (geometry.loadTerrainCatalog) {
+                geometry.loadTerrainCatalog().then((catalog) => {
+                    if (catalog) {
+                        this.requestRender();
+                    }
+                });
+            }
         }
 
         captureUi() {
@@ -108,6 +116,12 @@
                 storageNameInput: document.getElementById('storageNameInput'),
                 saveStorageButton: document.getElementById('saveStorageButton'),
                 storageList: document.getElementById('storageList'),
+                newGameButton: document.getElementById('newGameButton'),
+                openGameSettingsButton: document.getElementById('openGameSettingsButton'),
+                gameSettingsModal: document.getElementById('gameSettingsModal'),
+                gameSettingsBackdrop: document.getElementById('gameSettingsBackdrop'),
+                closeGameSettingsButton: document.getElementById('closeGameSettingsButton'),
+                terrainSettingsList: document.getElementById('terrainSettingsList'),
                 blueLosses: document.getElementById('blueLosses'),
                 redLosses: document.getElementById('redLosses'),
                 statusText: document.getElementById('statusText'),
@@ -150,6 +164,7 @@
                 melee: null,
                 combatResolution: null,
                 storageModalOpen: false,
+                gameSettingsModalOpen: false,
                 snapEnabled: true,
                 showFormUpPreview: false,
                 singleRotationMode: 'center',
@@ -201,6 +216,10 @@
         }
 
         confirmSetupStage() {
+            if (this.state.setup?.confirmation === 'new-game') {
+                this.startNewGame();
+                return;
+            }
             if (this.state.setup.confirmation !== 'armies' || !this.canAcceptArmies()) {
                 if (this.state.setup.confirmation !== 'terrain' || !this.isTerrainReady()) {
                     return;
@@ -325,6 +344,10 @@
             this.ui.closeStorageButton.addEventListener('click', () => this.closeStorageModal());
             this.ui.storageBackdrop.addEventListener('click', () => this.closeStorageModal());
             this.ui.saveStorageButton.addEventListener('click', () => this.saveCurrentGame());
+            this.ui.newGameButton.addEventListener('click', () => this.openNewGameConfirmation());
+            this.ui.openGameSettingsButton.addEventListener('click', () => this.openGameSettingsModal());
+            this.ui.closeGameSettingsButton.addEventListener('click', () => this.closeGameSettingsModal());
+            this.ui.gameSettingsBackdrop.addEventListener('click', () => this.closeGameSettingsModal());
             this.ui.cancelMoveButton.addEventListener('click', () => this.cancelDraft(true));
             this.ui.acknowledgedButton.addEventListener('click', () => this.acknowledgePhase());
             this.ui.undoMoveButton.addEventListener('click', () => {
@@ -345,13 +368,18 @@
                 this.closeSetupConfirmation();
                 return;
             }
+            if (event.key === 'Escape' && this.state.gameSettingsModalOpen) {
+                event.preventDefault();
+                this.closeGameSettingsModal();
+                return;
+            }
             if (event.key === 'Escape' && this.state.storageModalOpen) {
                 event.preventDefault();
                 this.closeStorageModal();
                 return;
             }
             if ((event.key === 'Delete' || event.key === 'Backspace') && this.state.setupStage === 'unit-deployment') {
-                if (!this.state.storageModalOpen && !this.state.setup?.confirmation) {
+                if (!this.state.storageModalOpen && !this.state.gameSettingsModalOpen && !this.state.setup?.confirmation) {
                     event.preventDefault();
                     this.returnSelectedUnitsToTray();
                 }
@@ -525,12 +553,24 @@
             if (this.ui.terrainPlacement) this.ui.terrainPlacement.hidden = this.state.setupStage !== 'terrain-placement';
             if (this.ui.deploymentScreen) this.ui.deploymentScreen.hidden = this.state.setupStage !== 'unit-deployment';
             this.hostSelectionPanel();
-            if (this.ui.confirmationModal) this.ui.confirmationModal.hidden = !this.state.setup?.confirmation;
-            if (this.ui.confirmationTitle) this.ui.confirmationTitle.textContent = this.state.setup?.confirmation === 'terrain' ? 'Confirm Terrain' : 'Confirm Armies';
-            if (this.ui.confirmationText) this.ui.confirmationText.textContent = this.state.setup?.confirmation === 'terrain'
-                ? 'The terrain board will be locked and the game will proceed to unit deployment.'
-                : 'Both 24 AP armies will be locked and terrain placement will begin.';
-            if (this.ui.confirmSetupButton) this.ui.confirmSetupButton.textContent = this.state.setup?.confirmation === 'terrain' ? 'Begin Deployment' : 'Continue';
+            const confirmation = this.state.setup?.confirmation;
+            if (this.ui.confirmationModal) this.ui.confirmationModal.hidden = !confirmation;
+            if (confirmation === 'new-game') {
+                if (this.ui.confirmationTitle) this.ui.confirmationTitle.textContent = 'Start New Game';
+                if (this.ui.confirmationText) this.ui.confirmationText.textContent = 'Unsaved progress will be lost.';
+                if (this.ui.confirmSetupButton) this.ui.confirmSetupButton.textContent = 'New Game';
+                if (this.ui.cancelConfirmationButton) this.ui.cancelConfirmationButton.textContent = 'Cancel';
+            } else if (confirmation === 'terrain') {
+                if (this.ui.confirmationTitle) this.ui.confirmationTitle.textContent = 'Confirm Terrain';
+                if (this.ui.confirmationText) this.ui.confirmationText.textContent = 'The terrain board will be locked and the game will proceed to unit deployment.';
+                if (this.ui.confirmSetupButton) this.ui.confirmSetupButton.textContent = 'Begin Deployment';
+                if (this.ui.cancelConfirmationButton) this.ui.cancelConfirmationButton.textContent = 'Keep Editing';
+            } else {
+                if (this.ui.confirmationTitle) this.ui.confirmationTitle.textContent = 'Confirm Armies';
+                if (this.ui.confirmationText) this.ui.confirmationText.textContent = 'Both 24 AP armies will be locked and terrain placement will begin.';
+                if (this.ui.confirmSetupButton) this.ui.confirmSetupButton.textContent = 'Continue';
+                if (this.ui.cancelConfirmationButton) this.ui.cancelConfirmationButton.textContent = 'Keep Editing';
+            }
             if (this.state.setupStage === 'army-builder') {
                 this.renderArmyBuilder();
                 if (this.ui.acceptArmiesButton) this.ui.acceptArmiesButton.disabled = !this.canAcceptArmies();
@@ -591,6 +631,7 @@
             this.ui.undoMoveButton.disabled = this.state.mode === 'edit' ? this.state.editHistory.length === 0 : !this.state.draft;
             this.ui.acknowledgedButton.disabled = this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution);
             this.ui.storageModal.hidden = !this.state.storageModalOpen;
+            if (this.ui.gameSettingsModal) this.ui.gameSettingsModal.hidden = !this.state.gameSettingsModalOpen;
             if (this.ui.saveStorageButton) this.ui.saveStorageButton.disabled = false;
             const playerOneLosses = this.getLossSummary('player-1');
             const playerTwoLosses = this.getLossSummary('player-2');
@@ -607,6 +648,7 @@
     terrainPlacement.install(HordesPrototype);
     armyBuilder.install(HordesPrototype);
     persistence.install(HordesPrototype);
+    gameSettings.install(HordesPrototype);
     boardInput.install(HordesPrototype);
     boardInteraction.install(HordesPrototype);
     boardRender.install(HordesPrototype);

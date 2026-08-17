@@ -331,12 +331,16 @@
         openStorageModal() {
             this.state.storageModalOpen = true;
             this.renderStorageList();
-            this.ui.storageModal.hidden = false;
-            if (!this.ui.storageNameInput.value.trim()) {
-                this.ui.storageNameInput.value = this.getDefaultSaveName();
+            if (this.ui.storageModal) {
+                this.ui.storageModal.hidden = false;
             }
-            this.ui.storageNameInput.focus();
-            this.ui.storageNameInput.select();
+            if (this.ui.storageNameInput) {
+                if (!this.ui.storageNameInput.value.trim()) {
+                    this.ui.storageNameInput.value = this.getDefaultSaveName();
+                }
+                this.ui.storageNameInput.focus?.();
+                this.ui.storageNameInput.select?.();
+            }
         }
 
         closeStorageModal(restoreFocus = true) {

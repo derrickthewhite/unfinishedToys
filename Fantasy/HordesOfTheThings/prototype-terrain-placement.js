@@ -30,10 +30,10 @@
                 if (!terrain) {
                     return [];
                 }
-                const weightedKinds = ['road', 'road', 'forest', 'swamp', 'water', 'impassable', 'forest'];
+                const weightedKinds = this.getWeightedTerrainOfferKinds();
                 terrain.offers = Array.from({ length: 3 }, () => {
                     const kind = weightedKinds[Math.floor(random() * weightedKinds.length)];
-                    const offer = data.createTerrainOffer(kind, `terrain-${terrain.nextTerrainId}`, random);
+                    const offer = this.createConfiguredTerrainOffer(kind, `terrain-${terrain.nextTerrainId}`, random);
                     terrain.nextTerrainId += 1;
                     return offer;
                 });
@@ -126,9 +126,9 @@
 
             createRandomTerrainPiece(random = Math.random) {
                 const terrain = this.getTerrainSetup();
-                const weightedKinds = ['road', 'road', 'forest', 'swamp', 'water', 'impassable', 'forest'];
+                const weightedKinds = this.getWeightedTerrainOfferKinds();
                 const kind = weightedKinds[Math.floor(random() * weightedKinds.length)];
-                const piece = data.createTerrainOffer(kind, `terrain-${terrain.nextTerrainId}`, random);
+                const piece = this.createConfiguredTerrainOffer(kind, `terrain-${terrain.nextTerrainId}`, random);
                 terrain.nextTerrainId += 1;
                 if (piece.kind === 'road') {
                     piece.position = random() * data.BOARD_SIZE;
@@ -382,9 +382,8 @@
 
             getTerrainOfferDescription(offer) {
                 if (offer.kind === 'road') return 'Road · full board';
-                const shapeNames = { blob: 'Blob', kidney: 'Kidney bean', circle: 'Circle', 'half-circle': 'Half-circle', square: 'Square', rectangle: 'Long thin rectangle', oval: 'Oval', 'fat-l': 'Fat L-shape', horseshoe: 'Horseshoe', cross: 'Fat stubby cross', lightbulb: 'Lightbulb' };
-                const sizeNames = { 0.25: 'Tiny', 0.5: 'Small', 1: 'Medium', 1.5: 'Large' };
-                return `${shapeNames[offer.shape] || 'Blob'} · ${sizeNames[offer.sizeMultiplier] || 'Medium'}`;
+                const sizeNames = { 0.5: 'Tiny', 0.75: 'Small', 1: 'Medium', 1.5: 'Large' };
+                return `${data.TERRAIN_SHAPE_LABELS[offer.shape] || 'Blob'} · ${sizeNames[offer.sizeMultiplier] || 'Medium'}`;
             },
 
             drawTerrainOfferPreview(canvas, offer) {

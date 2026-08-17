@@ -233,26 +233,174 @@
         return { left, top, right, bottom, width: right - left, height: bottom - top };
     }
 
-    function getTerrainFeaturePoints(feature, pointCount = 48) {
-        const rotation = feature.rotation || 0;
-        const cos = Math.cos(rotation);
-        const sin = Math.sin(rotation);
-        const shape = feature.shape || 'blob';
-        const points = [];
-        const addPoint = (localX, localY) => points.push({
-            x: feature.cx + (localX * cos) - (localY * sin),
-            y: feature.cy + (localX * sin) + (localY * cos)
+    function roundClosedPolygon(points, radius) {
+        if (points.length < 3 || radius <= 0) {
+            return points;
+        }
+        const rounded = [];
+        const count = points.length;
+        for (let index = 0; index < count; index += 1) {
+            const previous = points[(index + count - 1) % count];
+            const current = points[index];
+            const next = points[(index + 1) % count];
+            const toPrevious = subtract(previous, current);
+            const toNext = subtract(next, current);
+            const previousLength = Math.hypot(toPrevious.x, toPrevious.y);
+            const nextLength = Math.hypot(toNext.x, toNext.y);
+            if (previousLength < 0.5 || nextLength < 0.5) {
+                rounded.push(current);
+                continue;
+            }
+            const cut = Math.min(radius, previousLength * 0.42, nextLength * 0.42);
+            if (cut < 1) {
+                rounded.push(current);
+                continue;
+            }
+            const start = add(current, scaleVector(toPrevious, cut / previousLength));
+            const end = add(current, scaleVector(toNext, cut / nextLength));
+            const steps = Math.max(2, Math.round(cut / 8));
+            for (let step = 0; step <= steps; step += 1) {
+                const t = step / steps;
+                const inverse = 1 - t;
+                rounded.push({
+                    x: (inverse * inverse * start.x) + (2 * inverse * t * current.x) + (t * t * end.x),
+                    y: (inverse * inverse * start.y) + (2 * inverse * t * current.y) + (t * t * end.y)
+                });
+            }
+        }
+        return rounded;
+    }
+
+    function polygonSignedArea(points) {
+        let area = 0;
+        for (let index = 0; index < points.length; index += 1) {
+            const current = points[index];
+            const next = points[(index + 1) % points.length];
+            area += (current.x * next.y) - (next.x * current.y);
+        }
+        return area / 2;
+    }
+
+    function subdivideClosedPolygon(points, maxEdge = 8) {
+        if (points.length < 3) {
+            return points;
+        }
+        const subdivided = [];
+        for (let index = 0; index < points.length; index += 1) {
+            const current = points[index];
+            const next = points[(index + 1) % points.length];
+            subdivided.push(current);
+            const span = distance(current, next);
+            const splits = Math.floor(span / maxEdge);
+            for (let step = 1; step < splits; step += 1) {
+                const t = step / splits;
+                subdivided.push({
+                    x: current.x + ((next.x - current.x) * t),
+                    y: current.y + ((next.y - current.y) * t)
+                });
+            }
+        }
+        return subdivided;
+    }
+
+    function waveClosedPolygon(points, amplitude, phase = 0) {
+        if (points.length < 8 || amplitude <= 0) {
+            return points;
+        }
+        const count = points.length;
+        const ccw = polygonSignedArea(points) >= 0;
+        let perimeter = 0;
+        const edgeLengths = [];
+        for (let index = 0; index < count; index += 1) {
+            const length = distance(points[index], points[(index + 1) % count]);
+            edgeLengths.push(length);
+            perimeter += length;
+        }
+        if (perimeter < 1) {
+            return points;
+        }
+        let traveled = 0;
+        return points.map((current, index) => {
+            const previous = points[(index + count - 1) % count];
+            const next = points[(index + 1) % count];
+            const tangent = { x: next.x - previous.x, y: next.y - previous.y };
+            const tangentLength = Math.hypot(tangent.x, tangent.y) || 1;
+            const normal = ccw
+                ? { x: tangent.y / tangentLength, y: -tangent.x / tangentLength }
+                : { x: -tangent.y / tangentLength, y: tangent.x / tangentLength };
+            const t = traveled / perimeter;
+            traveled += edgeLengths[index];
+            const offset = amplitude * (
+                Math.sin((t * Math.PI * 18) + phase)
+                + (0.4 * Math.sin((t * Math.PI * 30) + (phase * 1.7)))
+                + (0.18 * Math.sin((t * Math.PI * 46) + (phase * 0.6)))
+            );
+            return add(current, scaleVector(normal, offset));
         });
+    }
+
+    let terrainCatalog = null;
+    let terrainCatalogResolved = false;
+
+    function setTerrainCatalog(catalog) {
+        terrainCatalog = catalog || null;
+        terrainCatalogResolved = true;
+        return terrainCatalog;
+    }
+
+    function getTerrainCatalog() {
+        tryLoadTerrainCatalogSync();
+        return terrainCatalog;
+    }
+
+    function tryLoadTerrainCatalogSync() {
+        if (terrainCatalogResolved) {
+            return terrainCatalog;
+        }
+        if (typeof require === 'function' && typeof module !== 'undefined' && module.exports) {
+            try {
+                terrainCatalog = require('./assets/terrain/catalog.json');
+            } catch (error) {
+                terrainCatalog = null;
+            }
+        }
+        terrainCatalogResolved = true;
+        return terrainCatalog;
+    }
+
+    function loadTerrainCatalog() {
+        tryLoadTerrainCatalogSync();
+        if (terrainCatalog || typeof fetch !== 'function' || typeof window === 'undefined') {
+            return Promise.resolve(terrainCatalog);
+        }
+        return fetch('assets/terrain/catalog.json')
+            .then((response) => response.ok ? response.json() : null)
+            .then((catalog) => setTerrainCatalog(catalog))
+            .catch(() => setTerrainCatalog(null));
+    }
+
+    function catalogPointsForShape(shape, variant) {
+        const raw = terrainCatalog?.[variant]?.[shape];
+        if (!Array.isArray(raw) || raw.length < 3) {
+            return null;
+        }
+        return raw.map(([x, y]) => ({ x, y }));
+    }
+
+    function getTerrainShapeLocalPoints(shape, pointCount = 48, options = {}) {
+        const points = [];
+        const addPoint = (x, y) => points.push({ x, y });
+        const wobble = options.wobble || 0;
         if (shape === 'fat-l') {
-            [[-1, -1], [-0.2, -1], [-0.2, 0.2], [1, 0.2], [1, 1], [-1, 1]].forEach(([x, y]) => addPoint(x * feature.rx, y * feature.ry));
+            [[-1, -1], [-0.2, -1], [-0.2, 0.2], [1, 0.2], [1, 1], [-1, 1]].forEach(([x, y]) => addPoint(x, y));
             return points;
         }
         if (shape === 'cross') {
-            [[-0.35, -1], [0.35, -1], [0.35, -0.35], [1, -0.35], [1, 0.35], [0.35, 0.35], [0.35, 1], [-0.35, 1], [-0.35, 0.35], [-1, 0.35], [-1, -0.35], [-0.35, -0.35]].forEach(([x, y]) => addPoint(x * feature.rx, y * feature.ry));
+            [[-0.35, -1], [0.35, -1], [0.35, -0.35], [1, -0.35], [1, 0.35], [0.35, 0.35], [0.35, 1], [-0.35, 1], [-0.35, 0.35], [-1, 0.35], [-1, -0.35], [-0.35, -0.35]].forEach(([x, y]) => addPoint(x, y));
             return points;
         }
         if (shape === 'horseshoe') {
-            [[-1, -1], [1, -1], [1, 0.55], [0.55, 1], [0.28, 0.58], [0.28, -0.48], [-0.28, -0.48], [-0.28, 0.58], [-0.55, 1], [-1, 0.55]].forEach(([x, y]) => addPoint(x * feature.rx, y * feature.ry));
+            [[-1, -1], [1, -1], [1, 0.55], [0.55, 1], [0.28, 0.58], [0.28, -0.48], [-0.28, -0.48], [-0.28, 0.58], [-0.55, 1], [-1, 0.55]].forEach(([x, y]) => addPoint(x, y));
             return points;
         }
         for (let index = 0; index < pointCount; index += 1) {
@@ -260,9 +408,9 @@
             let x = Math.cos(theta);
             let y = Math.sin(theta);
             if (shape === 'blob') {
-                const wobble = 1 + Math.sin(theta * 3) * (feature.wobble || 0) + Math.cos(theta * 5) * (feature.wobble || 0) * 0.45;
-                x *= wobble;
-                y *= wobble;
+                const radius = 1 + Math.sin(theta * 3) * wobble + Math.cos(theta * 5) * wobble * 0.45;
+                x *= radius;
+                y *= radius;
             } else if (shape === 'kidney') {
                 x = Math.cos(theta) * (0.78 + (0.3 * Math.sin(theta)));
             } else if (shape === 'half-circle') {
@@ -280,12 +428,47 @@
                 y *= 0.68;
             } else if (shape === 'lightbulb') {
                 const top = Math.max(0, -y);
-                x *= 0.64 + (top * 0.48);
-                y = y < 0 ? y * 1.12 : y * 0.58 + 0.22;
+                x *= 0.50 + (top * 0.62);
+                y = y < 0 ? y * 1.12 : y * 0.82 + 0.18;
             }
-            addPoint(x * feature.rx, y * feature.ry);
+            addPoint(x, y);
         }
         return points;
+    }
+
+    function finishTerrainOutline(feature, points) {
+        const scale = Math.min(feature.rx || 0, feature.ry || 0);
+        const filleted = points.length <= 16
+            ? roundClosedPolygon(points, scale * 0.22)
+            : points;
+        const targetEdge = Math.max(6, (Math.PI * (scale || 40)) / 32);
+        const dense = subdivideClosedPolygon(filleted, targetEdge);
+        const amplitude = scale * (feature.wobble || 0) * 0.12;
+        const phase = (feature.wobble || 0) * 8;
+        return waveClosedPolygon(dense, amplitude, phase);
+    }
+
+    function applyTerrainOutlineWave(feature, points) {
+        return finishTerrainOutline(feature, points);
+    }
+
+    function transformTerrainLocalPoints(feature, localPoints) {
+        const rotation = feature.rotation || 0;
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        return localPoints.map((point) => ({
+            x: feature.cx + (point.x * feature.rx * cos) - (point.y * feature.ry * sin),
+            y: feature.cy + (point.x * feature.rx * sin) + (point.y * feature.ry * cos)
+        }));
+    }
+
+    function getTerrainFeaturePoints(feature, pointCount = 48) {
+        tryLoadTerrainCatalogSync();
+        const shape = feature.shape || 'blob';
+        const localPoints = shape === 'blob'
+            ? getTerrainShapeLocalPoints('blob', pointCount, { wobble: feature.wobble || 0 })
+            : (catalogPointsForShape(shape, 'original') || getTerrainShapeLocalPoints(shape, pointCount));
+        return applyTerrainOutlineWave(feature, transformTerrainLocalPoints(feature, localPoints));
     }
 
     function pointInBlob(point, feature) {
@@ -495,7 +678,12 @@
         polygonsOverlap,
         normalizeRect,
         pointInBlob,
+        getTerrainShapeLocalPoints,
+        applyTerrainOutlineWave,
         getTerrainFeaturePoints,
+        setTerrainCatalog,
+        getTerrainCatalog,
+        loadTerrainCatalog,
         drawBlob,
         snapshotPositions,
         restoreSnapshot,

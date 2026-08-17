@@ -1,7 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const data = require('./prototype-data.js');
 const geometry = require('./prototype-geometry.js');
+const terrainCatalog = require('./assets/terrain/catalog.json');
 
 test('interpolateUnitPose keeps the center fixed during pure rotation', () => {
     const origin = {
@@ -58,4 +60,52 @@ test('pointInBlob respects the feature rotation', () => {
 
     assert.equal(geometry.pointInBlob({ x: 100, y: 140 }, feature), true);
     assert.equal(geometry.pointInBlob({ x: 140, y: 100 }, feature), false);
+});
+
+test('terrain wobble keeps the feature center inside a still-recognizable outline', () => {
+    const feature = { cx: 100, cy: 100, rx: 50, ry: 40, wobble: 0.24, shape: 'square', rotation: 0 };
+
+    assert.equal(geometry.pointInBlob({ x: 100, y: 100 }, feature), true);
+    assert.equal(geometry.pointInBlob({ x: 100, y: 170 }, feature), false);
+});
+
+test('terrain assets store original and waved outlines for every shape', () => {
+    data.TERRAIN_SHAPES.forEach((shape) => {
+        assert.ok((terrainCatalog.original[shape] || []).length >= 3, shape);
+        assert.ok((terrainCatalog.waved[shape] || []).length >= 3, shape);
+    });
+    assert.equal(terrainCatalog.original['fat-l'].length, 6);
+    assert.ok(terrainCatalog.waved['fat-l'].length > terrainCatalog.original['fat-l'].length);
+});
+
+test('applyTerrainOutlineWave remains available for uploaded terrain blocks', () => {
+    const local = geometry.getTerrainShapeLocalPoints('fat-l');
+    const waved = geometry.applyTerrainOutlineWave(
+        { cx: 0, cy: 0, rx: 80, ry: 80, rotation: 0, wobble: 0.24, shape: 'fat-l' },
+        local.map((point) => ({ x: point.x * 80, y: point.y * 80 }))
+    );
+
+    assert.equal(local.length, 6);
+    assert.ok(waved.length > local.length);
+});
+
+test('blob keeps its radial identity wave before the shared edge wave', () => {
+    const blob = geometry.getTerrainShapeLocalPoints('blob', 48, { wobble: 0.24 });
+    const circle = geometry.getTerrainShapeLocalPoints('circle', 48);
+    const blobRadii = blob.map((point) => Math.hypot(point.x, point.y));
+    const circleRadii = circle.map((point) => Math.hypot(point.x, point.y));
+
+    assert.ok(Math.max(...blobRadii) - Math.min(...blobRadii) > 0.15);
+    assert.ok(Math.max(...circleRadii) - Math.min(...circleRadii) < 0.001);
+});
+
+test('lightbulb stem is narrower and longer than the bulb', () => {
+    const points = geometry.getTerrainShapeLocalPoints('lightbulb');
+    const stem = points.filter((point) => point.y > 0.35);
+    const bulb = points.filter((point) => point.y < 0);
+    const stemWidth = Math.max(...stem.map((point) => Math.abs(point.x)));
+    const bulbWidth = Math.max(...bulb.map((point) => Math.abs(point.x)));
+
+    assert.ok(stemWidth < bulbWidth * 0.75);
+    assert.ok(Math.max(...points.map((point) => point.y)) > 0.9);
 });
