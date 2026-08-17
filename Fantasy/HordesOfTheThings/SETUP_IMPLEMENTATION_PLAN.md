@@ -77,7 +77,7 @@ Save/load lives in `prototype-persistence.js` as the sole implementation.
 
 ### Completed: Automatic Army Deployment
 
-Deployment includes an **Auto Deploy** control for the active player's remaining tray. If that army is already fully deployed, the control stays enabled and recalls those units to the tray before placing them again.
+Deployment includes an **Auto Deploy** control for the active player's remaining tray. If that army is already fully deployed, the control stays enabled and recalls those units to the tray before placing them again. Grouping, scoring, and placement live in `prototype-ai.js`.
 
 - Same-type formations prefer side-by-side ranks capped at about four elements. Leftovers pack to minimize formation count, then good-going slowdown, and will not pair units whose good-going speeds differ by 300 or more. Larger formations place first; sister ranks are preferred, and if depth overlap is required the larger body stays in front.
 - Terrain is scored per base: bad-going-tolerant troops (Warbands, Heavy-Warbands, Beasts, Shooters) favor forest/swamp underfoot; other troops keep their whole footprint out. A frontage-wide corridor about 180 mm ahead is sampled so good-going troops avoid forest, swamp, water, and impassable terrain in their approach lane. Forest or swamp ahead of Shooters is treated as mixed.
@@ -204,7 +204,7 @@ New module: `prototype-board-render.js`, installed like the other mixins. Depend
 
 ### 2. Persistence, Documentation, and Tests
 
-Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`
+Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`, `prototype-setup.test.js`, `prototype-ai.test.js`
 
 **Done:**
 
@@ -241,7 +241,8 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`
 - `prototype-app.js`: `createInitialState`, `captureUi`, `bindUi`, player helpers, DOM `syncUiFromState`.
 - `prototype-board-render.js`: battle-board render scheduling, terrain/unit/overlay/handle drawing, asset lookup/loading.
 - `prototype-game-flow.js`: move completion, form-up, shooting/melee phases, turn advancement, combat resolution state.
-- `prototype-unit-deployment.js`: sequential deployment, tray placement validation, Auto Deploy.
+- `prototype-unit-deployment.js`: sequential deployment, tray placement validation.
+- `prototype-ai.js`: Auto Deploy grouping, scoring, and placement. First slice of opponent/setup AI.
 - `prototype-geometry.js`: `pointInBlob`, `drawBlob`, `getUnitCorners`, polygon overlap helpers.
 - `prototype-rules.js`: `getTerrainTypeAt`, movement terrain sampling, player-ID ownership comparisons, shooting, form-up, melee.
 

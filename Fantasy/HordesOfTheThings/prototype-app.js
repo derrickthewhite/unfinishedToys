@@ -14,12 +14,13 @@
             require('./prototype-game-flow.js'),
             require('./prototype-setup-camera.js'),
             require('./prototype-unit-deployment.js'),
+            require('./prototype-ai.js'),
             require('./prototype-selection-panel.js')
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesSelectionPanel);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, boardInput, boardInteraction, boardRender, gameFlow, setupCamera, unitDeployment, selectionPanel) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesSelectionPanel);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, boardInput, boardInteraction, boardRender, gameFlow, setupCamera, unitDeployment, ai, selectionPanel) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -612,6 +613,7 @@
     gameFlow.install(HordesPrototype);
     setupCamera.install(HordesPrototype);
     unitDeployment.install(HordesPrototype);
+    ai.install(HordesPrototype);
     selectionPanel.install(HordesPrototype);
     return { HordesPrototype };
 }));
