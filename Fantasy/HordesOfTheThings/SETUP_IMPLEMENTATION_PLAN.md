@@ -152,8 +152,9 @@ New module: `prototype-game-flow.js`, installed like the other mixins. Depends o
 
 - App shell: constructor, `captureUi`, `bindUi`, `onKeyDown`, `setMode`, canvas sizing
 - Setup confirmation helpers and player identity helpers
-- Shared lookups: `getUnitById`, `getSelectedUnits`
-- DOM sync / selection panel: `updateStatus`, `renderSelectionInfo`, `syncUiFromState`, `getSelectedUnitDetails`, `formatPaces`, `getSingleSelectedUnit`
+- Shared lookups: `getUnitById`, `getSelectedUnits`, `getSingleSelectedUnit`
+- DOM sync: `updateStatus`, `syncUiFromState`
+- Selection panel rendering now lives in `prototype-selection-panel.js`
 - Interaction draft primitives already in `prototype-board-interaction.js` (`ensureDraft`, `commitDraftStep`, `cancelDraft`, edit undo)
 
 **Leave behind and call through `this` (do not drag into the game-flow module):**
@@ -186,7 +187,7 @@ New module: `prototype-board-render.js`, installed like the other mixins. Depend
 **Keep in `prototype-app.js`:**
 
 - `resizeCanvas` and `syncCanvasResolution` (canvas lifecycle / DPR sizing; `render` continues to call `this.syncCanvasResolution`)
-- `renderSelectionInfo` and `syncUiFromState` (DOM UI, not canvas)
+- `renderSelectionInfo` lives in `prototype-selection-panel.js`; `syncUiFromState` remains in `prototype-app.js`
 - Setup-canvas renderers (`renderTerrainPlacement`, `renderUnitDeployment`, offer previews) — they stay in their modules and keep calling shared `drawTerrain` / `getUnitAssetPath` via the mixin
 - Constructor fields `unitAssetCache` and `renderQueued`
 

@@ -401,6 +401,7 @@
                 this.markDeploymentTraySelection(draftId);
                 this.paintUnitDeploymentCanvas();
                 this.syncDeploymentHud();
+                this.renderSelectionInfo();
             },
 
             onDeploymentPointerDown(event) {

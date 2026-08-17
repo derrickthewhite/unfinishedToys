@@ -88,6 +88,9 @@
                 <canvas id="boardCanvas"></canvas>
             </div>
             <aside id="selectionPanel" class="selection-panel is-empty" aria-live="polite">
+                <div id="selectionPanelPortrait" class="selection-panel-portrait" hidden>
+                    <img id="selectionPanelAsset" alt="" aria-hidden="true">
+                </div>
                 <div class="selection-panel-header">
                     <div id="selectionPanelEyebrow" class="selection-panel-eyebrow">Selection</div>
                     <h2 id="selectionPanelTitle">No unit selected</h2>
@@ -138,18 +141,21 @@
                 </header>
                 <div class="deployment-layout">
                     <div class="deployment-board-stage"><canvas id="deploymentCanvas"></canvas></div>
-                    <aside class="deployment-controls">
-                        <p id="deploymentActivePlayer" class="deployment-active-player"></p>
-                        <p id="deploymentProgress" class="deployment-progress"></p>
-                        <label class="deployment-snap-control">
-                            <input id="deploymentSnapCheckbox" type="checkbox" checked>
-                            Snap deployed units
-                        </label>
-                        <div id="deploymentTray" class="deployment-tray"></div>
-                        <button id="returnToTrayButton" type="button" disabled>Return to Tray</button>
-                        <button id="autoDeployButton" type="button">Auto Deploy</button>
-                        <button id="finishDeploymentButton" class="setup-primary-action" type="button" disabled>Finish Deployment</button>
-                    </aside>
+                    <div class="deployment-sidebar">
+                        <aside class="deployment-controls">
+                            <p id="deploymentActivePlayer" class="deployment-active-player"></p>
+                            <p id="deploymentProgress" class="deployment-progress"></p>
+                            <label class="deployment-snap-control">
+                                <input id="deploymentSnapCheckbox" type="checkbox" checked>
+                                Snap deployed units
+                            </label>
+                            <div id="deploymentTray" class="deployment-tray"></div>
+                            <button id="returnToTrayButton" type="button" disabled>Return to Tray</button>
+                            <button id="autoDeployButton" type="button">Auto Deploy</button>
+                            <button id="finishDeploymentButton" class="setup-primary-action" type="button" disabled>Finish Deployment</button>
+                        </aside>
+                        <div id="deploymentSelectionHost" class="deployment-selection-host"></div>
+                    </div>
                 </div>
             </section>
         </main>
@@ -212,6 +218,7 @@
     <script src="prototype-game-flow.js"></script>
     <script src="prototype-setup-camera.js"></script>
     <script src="prototype-unit-deployment.js"></script>
+    <script src="prototype-selection-panel.js"></script>
     <script src="prototype-app.js"></script>
     <script src="prototype.js"></script>
 </body>

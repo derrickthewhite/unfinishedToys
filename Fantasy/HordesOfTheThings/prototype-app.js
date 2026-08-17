@@ -13,12 +13,13 @@
             require('./prototype-board-render.js'),
             require('./prototype-game-flow.js'),
             require('./prototype-setup-camera.js'),
-            require('./prototype-unit-deployment.js')
+            require('./prototype-unit-deployment.js'),
+            require('./prototype-selection-panel.js')
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesSetupCamera, root.HordesUnitDeployment);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, boardInput, boardInteraction, boardRender, gameFlow, setupCamera, unitDeployment) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesSelectionPanel);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, boardInput, boardInteraction, boardRender, gameFlow, setupCamera, unitDeployment, selectionPanel) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -67,6 +68,7 @@
                 deploymentProgress: document.getElementById('deploymentProgress'),
                 deploymentStatus: document.getElementById('deploymentStatus'),
                 deploymentSnapCheckbox: document.getElementById('deploymentSnapCheckbox'),
+                deploymentSelectionHost: document.getElementById('deploymentSelectionHost'),
                 deploymentTray: document.getElementById('deploymentTray'),
                 autoDeployButton: document.getElementById('autoDeployButton'),
                 returnToTrayButton: document.getElementById('returnToTrayButton'),
@@ -110,6 +112,8 @@
                 statusText: document.getElementById('statusText'),
                 selectionText: document.getElementById('selectionText'),
                 selectionPanel: document.getElementById('selectionPanel'),
+                selectionPanelPortrait: document.getElementById('selectionPanelPortrait'),
+                selectionPanelAsset: document.getElementById('selectionPanelAsset'),
                 selectionPanelEyebrow: document.getElementById('selectionPanelEyebrow'),
                 selectionPanelTitle: document.getElementById('selectionPanelTitle'),
                 selectionPanelHint: document.getElementById('selectionPanelHint'),
@@ -506,79 +510,20 @@
             return this.getUnitById(this.state.selectedIds[0]) || null;
         }
 
-        formatPaces(distanceMm) {
-            return Math.round(distanceMm / data.MM_PER_PACE) + 'p';
-        }
-
-        getSelectedUnitDetails(unit) {
-            if (!unit) {
-                return [];
-            }
-            const movement = [
-                `Road ${this.formatPaces(unit.moves.road)}`,
-                `Good ${this.formatPaces(unit.moves.good)}`,
-                `Bad ${this.formatPaces(unit.moves.bad)}`,
-                `Water ${this.formatPaces(unit.moves.water)}`
-            ].join(' / ');
-            const ranged = unit.ranged
-                ? `${this.formatPaces(unit.ranged.range)} range, ${unit.ranged.width}mm frontage`
-                : 'None';
-            return [
-                { label: 'Player', value: this.getPlayerLabel(this.getUnitPlayerId(unit)) },
-                { label: 'Class', value: unit.troopClass },
-                { label: 'AP', value: String(unit.value) },
-                { label: 'Strength', value: `Infantry ${unit.strength.infantry}, Mounted ${unit.strength.mounted}` },
-                { label: 'Move', value: movement },
-                { label: 'Ranged', value: ranged },
-                { label: 'Bad Going', value: unit.combat?.ignoresBadGoingPenalty ? 'Ignores penalty' : 'Normal penalty' }
-            ];
-        }
-
-        renderSelectionInfo() {
-            const selectedUnits = this.getSelectedUnits();
-            if (this.ui.selectionText) {
-                this.ui.selectionText.textContent = rules.describeSelection(this.state.selectionAnalysis, selectedUnits, this.state.draft);
-            }
-
-            if (!this.ui.selectionPanel) {
-                return;
-            }
-
-            const unit = selectedUnits.length === 1 ? selectedUnits[0] : null;
-            const details = this.getSelectedUnitDetails(unit);
-            this.ui.selectionPanel.classList.toggle('is-empty', !unit);
-
-            if (this.ui.selectionPanelEyebrow) {
-                this.ui.selectionPanelEyebrow.textContent = unit ? this.getPlayerLabel(this.getUnitPlayerId(unit)) + ' unit' : 'Selection';
-            }
-            if (this.ui.selectionPanelTitle) {
-                this.ui.selectionPanelTitle.textContent = unit ? unit.type : 'No unit selected';
-            }
-            if (this.ui.selectionPanelHint) {
-                this.ui.selectionPanelHint.textContent = unit
-                    ? `${unit.width}mm frontage, ${unit.depth}mm depth.`
-                    : 'Select a single unit to inspect its stats.';
-            }
-            if (this.ui.selectionPanelStats) {
-                this.ui.selectionPanelStats.hidden = !unit;
-                this.ui.selectionPanelStats.innerHTML = details.map((entry) => (`
-                    <div class="selection-stat">
-                        <dt>${entry.label}</dt>
-                        <dd>${entry.value}</dd>
-                    </div>
-                `)).join('');
-            }
-        }
-
         syncUiFromState() {
             const setupActive = this.isSetupActive();
+            const boardSetup = this.state.setupStage === 'terrain-placement' || this.state.setupStage === 'unit-deployment';
             if (this.ui.gameBar) this.ui.gameBar.hidden = setupActive;
             if (this.ui.boardShell) this.ui.boardShell.hidden = setupActive;
             if (this.ui.helpBar) this.ui.helpBar.hidden = setupActive;
-            if (this.ui.setupShell) this.ui.setupShell.hidden = !setupActive;
+            if (this.ui.setupShell) {
+                this.ui.setupShell.hidden = !setupActive;
+                this.ui.setupShell.classList?.toggle('is-board-setup', boardSetup);
+            }
             if (this.ui.armyBuilder) this.ui.armyBuilder.hidden = this.state.setupStage !== 'army-builder';
             if (this.ui.terrainPlacement) this.ui.terrainPlacement.hidden = this.state.setupStage !== 'terrain-placement';
             if (this.ui.deploymentScreen) this.ui.deploymentScreen.hidden = this.state.setupStage !== 'unit-deployment';
+            this.hostSelectionPanel();
             if (this.ui.confirmationModal) this.ui.confirmationModal.hidden = !this.state.setup?.confirmation;
             if (this.ui.confirmationTitle) this.ui.confirmationTitle.textContent = this.state.setup?.confirmation === 'terrain' ? 'Confirm Terrain' : 'Confirm Armies';
             if (this.ui.confirmationText) this.ui.confirmationText.textContent = this.state.setup?.confirmation === 'terrain'
@@ -667,5 +612,6 @@
     gameFlow.install(HordesPrototype);
     setupCamera.install(HordesPrototype);
     unitDeployment.install(HordesPrototype);
+    selectionPanel.install(HordesPrototype);
     return { HordesPrototype };
 }));

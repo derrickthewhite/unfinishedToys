@@ -122,7 +122,7 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 - Left click selects; clicking a selected single unit unselects it.
 - Dragging on empty space produces an area-selection box.
 - Right drag pans the camera; mouse wheel zooms around the cursor.
-- Selected units are shown with a thicker border.
+- Selected units are shown with a thicker border. The right-hand selection panel shows a single selected unit's artwork and stats during battle and deployment.
 
 ### Edit Mode
 - Edit mode is for scenario setup and debugging geometry.

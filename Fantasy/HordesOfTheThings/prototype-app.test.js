@@ -863,7 +863,9 @@ test('renderSelectionInfo shows single-unit details in the side panel', () => {
             selectionPanelEyebrow: { textContent: '' },
             selectionPanelTitle: { textContent: '' },
             selectionPanelHint: { textContent: '' },
-            selectionPanelStats: { hidden: true, innerHTML: '' }
+            selectionPanelStats: { hidden: true, innerHTML: '' },
+            selectionPanelPortrait: { hidden: true, style: { setProperty() {} } },
+            selectionPanelAsset: { hidden: true, src: '', alt: '', removeAttribute() {} }
         }
     });
     app.ui.selectionPanel.classList.owner = app.ui.selectionPanel;
@@ -881,7 +883,50 @@ test('renderSelectionInfo shows single-unit details in the side panel', () => {
     assert.equal(app.ui.selectionPanelStats.hidden, false);
     assert.match(app.ui.selectionPanelStats.innerHTML, /<dt>Strength<\/dt>/);
     assert.match(app.ui.selectionPanelStats.innerHTML, /Infantry 5, Mounted 3/);
+    assert.equal(app.ui.selectionPanelPortrait.hidden, false);
+    assert.equal(app.ui.selectionPanelAsset.hidden, false);
+    assert.match(app.ui.selectionPanelAsset.src, /Blade\.svg$/);
     assert.deepEqual(app.ui.selectionPanel.toggled, [['is-empty', false]]);
+});
+
+test('deployment tray selection reuses the battle selection panel stats', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        },
+        ui: {
+            selectionPanel: {
+                toggled: [],
+                classList: {
+                    toggle(name, value) {
+                        this.owner.toggled.push([name, value]);
+                    },
+                    owner: null
+                }
+            },
+            selectionPanelEyebrow: { textContent: '' },
+            selectionPanelTitle: { textContent: '' },
+            selectionPanelHint: { textContent: '' },
+            selectionPanelStats: { hidden: true, innerHTML: '' },
+            selectionPanelPortrait: { hidden: true, style: { setProperty() {} } },
+            selectionPanelAsset: { hidden: true, src: '', alt: '', removeAttribute() {} }
+        }
+    });
+    app.ui.selectionPanel.classList.owner = app.ui.selectionPanel;
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    app.initializeUnitDeployment();
+    app.selectDeploymentTrayUnit(app.getDeploymentSetup().tray[0].draftId);
+    app.renderSelectionInfo();
+
+    assert.equal(app.ui.selectionPanelTitle.textContent, 'Blade');
+    assert.equal(app.ui.selectionPanelStats.hidden, false);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /<dt>AP<\/dt>/);
+    assert.match(app.ui.selectionPanelAsset.src, /Blade\.svg$/);
 });
 
 test('handle clicks do not collapse a formation selection to one underlying unit', () => {

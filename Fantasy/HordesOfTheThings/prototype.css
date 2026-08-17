@@ -37,7 +37,25 @@ body {
 .app-shell {
     display: grid;
     grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+        "bar"
+        "main"
+        "help";
     height: 100%;
+}
+
+.game-bar {
+    grid-area: bar;
+}
+
+.board-shell,
+.setup-shell {
+    grid-area: main;
+    min-height: 0;
+}
+
+.help-bar {
+    grid-area: help;
 }
 
 .game-bar,
@@ -79,6 +97,7 @@ body {
     top: 0.7rem;
     right: 1rem;
     z-index: 3;
+    grid-area: bar;
 }
 
 .status-group {
@@ -200,6 +219,23 @@ button:disabled {
 
 .selection-panel.is-empty {
     opacity: 0.88;
+}
+
+.selection-panel-portrait {
+    display: grid;
+    place-items: center;
+    padding: 0.55rem;
+    border: 1px solid color-mix(in srgb, var(--player-stroke, #726a5e) 55%, transparent);
+    border-radius: 0.7rem;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--player-fill, #d7c4a3) 28%, #fff9ee), color-mix(in srgb, var(--player-fill, #d7c4a3) 12%, #e2d6c5));
+}
+
+.selection-panel-portrait img {
+    display: block;
+    width: min(100%, 7.5rem);
+    aspect-ratio: 40 / var(--unit-depth, 20);
+    object-fit: contain;
+    pointer-events: none;
 }
 
 .selection-panel-header h2 {
@@ -355,14 +391,36 @@ button:disabled {
     padding: clamp(1rem, 3vw, 2.5rem);
 }
 
-.army-builder,
-.deployment-screen {
+.setup-shell.is-board-setup {
+    display: grid;
+    overflow: hidden;
+    padding: 0.75rem;
+}
+
+.army-builder {
     width: min(76rem, 100%);
     margin: 0 auto;
 }
 
+.terrain-placement,
+.deployment-screen {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    height: 100%;
+}
+
 .setup-header {
     margin-bottom: 1.25rem;
+}
+
+.setup-shell.is-board-setup .setup-header {
+    margin-bottom: 0.65rem;
+}
+
+.setup-shell.is-board-setup .setup-header h1,
+.setup-shell.is-board-setup .deployment-screen h1 {
+    font-size: 1.45rem;
 }
 
 .setup-kicker {
@@ -389,34 +447,67 @@ button:disabled {
 
 .deployment-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(270px, 320px);
-    gap: 0.9rem;
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) 16.5rem;
+    gap: 0.75rem;
+    min-height: 0;
 }
 
-.deployment-board-stage {
-    border: 1px solid rgba(114, 106, 94, 0.4);
-    border-radius: 0.6rem;
-    background: rgba(255, 249, 239, 0.95);
-    min-height: min(76vh, 46rem);
-    padding: 0.5rem;
+.terrain-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 15rem;
+    gap: 0.75rem;
+    min-height: 0;
 }
 
-#deploymentCanvas {
+.deployment-board-stage,
+.terrain-board-stage {
+    min-width: 0;
+    min-height: 0;
+}
+
+#deploymentCanvas,
+#terrainCanvas {
     width: 100%;
-    aspect-ratio: 1 / 1;
+    height: 100%;
     display: block;
-    border-radius: 0.35rem;
+    border-radius: 1rem;
+    background:
+        radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.4), transparent 24%),
+        linear-gradient(180deg, #c7b08c 0%, #a18f6e 100%);
+    box-shadow: inset 0 0 0 1px rgba(76, 66, 53, 0.35), 0 14px 28px rgba(39, 31, 22, 0.22);
     touch-action: none;
 }
 
-.deployment-controls {
-    display: grid;
+.deployment-sidebar {
+    display: flex;
+    flex-direction: column;
     gap: 0.75rem;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+}
+
+.deployment-controls,
+.terrain-controls {
+    align-self: stretch;
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+    min-height: 0;
+    overflow: auto;
     padding: 0.9rem;
     border: 1px solid rgba(114, 106, 94, 0.35);
-    border-radius: 0.5rem;
+    border-radius: 0.95rem;
     background: rgba(255, 249, 239, 0.94);
+    box-shadow: 0 10px 22px rgba(39, 31, 22, 0.14);
+}
+
+.deployment-selection-host {
+    min-width: 0;
+}
+
+.deployment-selection-host .selection-panel {
+    align-self: stretch;
 }
 
 .deployment-active-player,
@@ -432,13 +523,14 @@ button:disabled {
 
 .deployment-tray {
     display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(5.25rem, 1fr));
     gap: 0.45rem;
     max-height: min(50vh, 26rem);
     overflow: auto;
 }
 
 .deployment-tray-item {
-    width: 5.5rem;
+    width: 100%;
     display: grid;
     justify-items: center;
     gap: 0.35rem;
@@ -487,6 +579,7 @@ button:disabled {
 
 .deployment-empty {
     margin: 0;
+    grid-column: 1 / -1;
 }
 
 .army-columns {
@@ -617,36 +710,6 @@ button:disabled {
     gap: 0.65rem;
 }
 
-.terrain-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 15rem;
-    gap: 1rem;
-    align-items: start;
-}
-
-.terrain-board-stage {
-    min-width: 0;
-}
-
-#terrainCanvas {
-    display: block;
-    width: min(100%, 42rem);
-    aspect-ratio: 1;
-    border-radius: 0.5rem;
-    background: #cab88e;
-    box-shadow: inset 0 0 0 1px rgba(76, 66, 53, 0.35), 0 14px 28px rgba(39, 31, 22, 0.22);
-    touch-action: none;
-}
-
-.terrain-controls {
-    display: grid;
-    gap: 0.8rem;
-    padding: 0.9rem;
-    border: 1px solid rgba(114, 106, 94, 0.35);
-    border-radius: 0.5rem;
-    background: rgba(255, 249, 239, 0.94);
-}
-
 .terrain-controls label {
     display: grid;
     gap: 0.35rem;
@@ -660,14 +723,14 @@ button:disabled {
 
 .terrain-offers {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.55rem;
 }
 
 .terrain-offer {
     width: 100%;
     display: grid;
-    grid-template-rows: 200px auto auto;
+    grid-template-rows: auto auto auto;
     gap: 0.4rem;
     padding: 0.45rem;
     text-align: center;
@@ -676,8 +739,9 @@ button:disabled {
 }
 
 .terrain-offer-preview {
-    width: 200px;
-    height: 200px;
+    width: 100%;
+    aspect-ratio: 1;
+    height: auto;
     max-width: 100%;
     justify-self: center;
     border: 1px solid rgba(114, 106, 94, 0.28);
@@ -709,7 +773,9 @@ button:disabled {
         margin-left: 0;
     }
 
-    .board-shell {
+    .board-shell,
+    .deployment-layout,
+    .terrain-layout {
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -717,12 +783,9 @@ button:disabled {
         order: -1;
     }
 
-    .deployment-layout {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .deployment-board-stage {
-        min-height: 0;
+    .deployment-board-stage,
+    .terrain-board-stage {
+        min-height: min(52vh, 28rem);
     }
 
     .storage-item {
@@ -736,13 +799,5 @@ button:disabled {
     .army-columns,
     .army-player-options {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-    .terrain-layout {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    #terrainCanvas {
-        width: 100%;
     }
 }
