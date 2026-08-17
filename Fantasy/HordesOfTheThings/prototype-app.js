@@ -637,7 +637,7 @@
             this.ui.undoMoveButton.disabled = this.state.mode === 'edit' ? this.state.editHistory.length === 0 : !this.state.draft;
             this.ui.acknowledgedButton.disabled = this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution);
             this.ui.storageModal.hidden = !this.state.storageModalOpen;
-            if (this.ui.saveStorageButton) this.ui.saveStorageButton.disabled = this.isSetupActive();
+            if (this.ui.saveStorageButton) this.ui.saveStorageButton.disabled = false;
             const playerOneLosses = this.getLossSummary('player-1');
             const playerTwoLosses = this.getLossSummary('player-2');
             this.ui.blueLosses.textContent = `${this.getPlayerLabel('player-1')} lost: ${playerOneLosses.points}`;

@@ -1102,21 +1102,40 @@ test('saveCurrentGame stores named snapshots in local storage', () => {
     }
 });
 
-test('saveCurrentGame does not save while guided setup is active', () => {
+test('saveCurrentGame stores guided setup snapshots in local storage', () => {
     const previousWindow = global.window;
     const storage = createStorage();
     global.window = { localStorage: storage };
 
     try {
         const app = createAppHarness({
-            state: { setupStage: 'army-builder' },
-            ui: { storageNameInput: { value: 'setup slot' } }
+            state: {
+                setupStage: 'army-builder',
+                setup: {
+                    armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                    confirmation: 'armies',
+                    terrain: null,
+                    deployment: null
+                }
+            },
+            ui: {
+                storageNameInput: { value: 'setup slot' }
+            }
         });
+        app.adjustArmyUnit('player-1', 'Blade', 12);
+        app.adjustArmyUnit('player-2', 'Spear', 12);
+        app.updateArmyPlayer('player-1', 'faction', 'Undead');
 
         app.saveCurrentGame();
 
-        assert.equal(storage.getItem('hordes-of-the-things-saves'), null);
-        assert.equal(app.lastStatus, 'Saving is available once deployment has begun the game.');
+        const records = JSON.parse(storage.getItem('hordes-of-the-things-saves'));
+        assert.equal(records.length, 1);
+        assert.equal(records[0].name, 'setup slot');
+        assert.equal(records[0].snapshot.setupStage, 'army-builder');
+        assert.equal(records[0].snapshot.setup.confirmation, 'armies');
+        assert.equal(records[0].snapshot.setup.armies['player-1'].counts.Blade, 12);
+        assert.equal(records[0].snapshot.players['player-1'].faction, 'Undead');
+        assert.equal(app.lastStatus, 'Saved game as setup slot.');
     } finally {
         global.window = previousWindow;
     }
@@ -1164,6 +1183,169 @@ test('loadGame restores saved state from local storage', () => {
         assert.ok(app.state.shooting);
         assert.equal(app.state.storageModalOpen, false);
         assert.equal(app.lastStatus, 'Loaded saved game loaded slot.');
+    } finally {
+        global.window = previousWindow;
+    }
+});
+
+test('getDefaultSaveName uses matchup, setup screen, and date', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'terrain-placement',
+            players: {
+                'player-1': { id: 'player-1', colorId: 'green', faction: 'Panda' },
+                'player-2': { id: 'player-2', colorId: 'gold', faction: 'Undead' }
+            }
+        }
+    });
+    const name = app.getDefaultSaveName(new Date('2026-08-17T15:04:00.000Z'));
+    assert.equal(name, 'Green Panda vs Gold Undead · Terrain · 2026-08-17');
+});
+
+test('loadGame restores army-builder setup including confirmation', () => {
+    const previousWindow = global.window;
+    const storage = createStorage();
+    const armies = Object.create(HordesPrototype.prototype).createArmyDrafts();
+    armies['player-1'].counts.Blade = 12;
+    armies['player-2'].counts.Spear = 12;
+    storage.setItem('hordes-of-the-things-saves', JSON.stringify([{
+        id: 'setup-army',
+        name: 'army slot',
+        savedAt: '2026-08-17T15:04:00.000Z',
+        snapshot: {
+            mode: 'edit',
+            setupStage: 'army-builder',
+            setup: {
+                armies,
+                confirmation: 'armies',
+                terrain: null,
+                deployment: null
+            },
+            players: {
+                'player-1': { id: 'player-1', colorId: 'green', faction: 'Undead' },
+                'player-2': { id: 'player-2', colorId: 'gold', faction: 'Panda' }
+            },
+            units: [],
+            terrain: { roads: [], features: [] }
+        }
+    }]));
+    global.window = { localStorage: storage };
+
+    try {
+        const app = createAppHarness({ state: { setupStage: 'game' } });
+        app.loadGame('setup-army');
+
+        assert.equal(app.state.setupStage, 'army-builder');
+        assert.equal(app.state.setup.confirmation, 'armies');
+        assert.equal(app.getArmyDraft('player-1').counts.Blade, 12);
+        assert.equal(app.state.players['player-1'].faction, 'Undead');
+        assert.equal(app.state.players['player-1'].colorId, 'green');
+        assert.equal(app.lastStatus, 'Loaded saved game army slot.');
+    } finally {
+        global.window = previousWindow;
+    }
+});
+
+test('loadGame restores terrain placement progress and confirmation', () => {
+    const previousWindow = global.window;
+    const storage = createStorage();
+    storage.setItem('hordes-of-the-things-saves', JSON.stringify([{
+        id: 'setup-terrain',
+        name: 'terrain slot',
+        savedAt: '2026-08-17T15:04:00.000Z',
+        snapshot: {
+            mode: 'edit',
+            setupStage: 'terrain-placement',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: 'terrain',
+                terrain: {
+                    defenderPlayerId: 'player-2',
+                    terrainCount: 3,
+                    offers: [{ id: 'terrain-4', kind: 'forest', cx: 300, cy: 300, rx: 40, ry: 30, wobble: 0.2, shape: 'blob', sizeMultiplier: 1, rotation: 0 }],
+                    selectedTerrainId: 'terrain-1',
+                    nextTerrainId: 5
+                },
+                deployment: null
+            },
+            players: data.DEFAULT_PLAYERS,
+            units: [],
+            terrain: {
+                roads: [],
+                features: [{ kind: 'forest', id: 'terrain-1', cx: 200, cy: 180, rx: 50, ry: 40, wobble: 0.2 }]
+            }
+        }
+    }]));
+    global.window = { localStorage: storage };
+
+    try {
+        const app = createAppHarness({ state: { setupStage: 'army-builder' } });
+        app.loadGame('setup-terrain');
+
+        assert.equal(app.state.setupStage, 'terrain-placement');
+        assert.equal(app.state.setup.confirmation, 'terrain');
+        assert.equal(app.state.setup.terrain.defenderPlayerId, 'player-2');
+        assert.equal(app.state.setup.terrain.terrainCount, 3);
+        assert.equal(app.state.setup.terrain.offers[0].id, 'terrain-4');
+        assert.equal(app.state.setup.terrain.selectedTerrainId, null);
+        assert.equal(app.state.terrain.features[0].id, 'terrain-1');
+        assert.equal(app.getPlacedTerrainCount(), 1);
+    } finally {
+        global.window = previousWindow;
+    }
+});
+
+test('loadGame restores unit deployment tray and placed units without selection', () => {
+    const previousWindow = global.window;
+    const storage = createStorage();
+    storage.setItem('hordes-of-the-things-saves', JSON.stringify([{
+        id: 'setup-deploy',
+        name: 'deploy slot',
+        savedAt: '2026-08-17T15:04:00.000Z',
+        snapshot: {
+            mode: 'edit',
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1', terrainCount: 0, offers: [], selectedTerrainId: null, nextTerrainId: 1 },
+                deployment: {
+                    defenderPlayerId: 'player-1',
+                    attackerPlayerId: 'player-2',
+                    activePlayerId: 'player-1',
+                    zoneByPlayerId: { 'player-1': 'bottom', 'player-2': 'top' },
+                    tray: [
+                        { draftId: 'player-1-Blade-2', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+                        { draftId: 'player-2-Spear-1', playerId: 'player-2', type: 'Spear', faction: 'Undead' }
+                    ],
+                    selectedTrayId: 'player-1-Blade-2',
+                    selectedUnitId: 'unit-1',
+                    deployedByPlayerId: { 'player-1': ['unit-1'], 'player-2': [] },
+                    interaction: { type: 'move-unit', pointerId: 9 }
+                }
+            },
+            players: data.DEFAULT_PLAYERS,
+            units: [createBlade('unit-1', 280, 520)],
+            terrain: { roads: [], features: [] },
+            nextUnitId: 2
+        }
+    }]));
+    global.window = { localStorage: storage };
+
+    try {
+        const app = createAppHarness({ state: { setupStage: 'terrain-placement' } });
+        app.loadGame('setup-deploy');
+
+        assert.equal(app.state.setupStage, 'unit-deployment');
+        assert.equal(app.state.setup.deployment.activePlayerId, 'player-1');
+        assert.equal(app.state.setup.deployment.tray.length, 2);
+        assert.equal(app.state.setup.deployment.selectedTrayId, null);
+        assert.equal(app.state.setup.deployment.selectedUnitId, null);
+        assert.equal(app.state.setup.deployment.interaction, null);
+        assert.equal(app.state.units[0].id, 'unit-1');
+        assert.equal(app.state.units[0].playerId, 'player-1');
+        assert.equal(app.nextUnitId, 2);
+        assert.deepEqual(app.state.setup.deployment.deployedByPlayerId['player-1'], ['unit-1']);
     } finally {
         global.window = previousWindow;
     }

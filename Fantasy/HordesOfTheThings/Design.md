@@ -114,6 +114,7 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
   - Shooters stay front-line. Artillery prefers the rear. Fast movers and Flyers prefer flanks or rear; Flyers stay in their own formations.
   - Defenders use terrain and formation heuristics. Attackers also use a scored matchup table (`getDeploymentMatchupScore`) to align against the defender's line where practical.
   - Facing stays the default for the quarter; depth prefers mid-zone unless a rear/flank role asks for behind.
+- The gear control and Saved Games modal work during setup and battle. Setup snapshots use the same slot list and restore `setupStage`, army drafts, terrain/deployment progress, and any open confirm-armies or confirm-terrain dialog. Cameras and current selections are not restored. Default setup save names use the matchup, screen, and date.
 
 ### Shared Controls
 - The prototype supports free camera pan and zoom on the canvas.

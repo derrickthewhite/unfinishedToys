@@ -65,13 +65,14 @@ Turn and combat orchestration now lives in `prototype-game-flow.js`.
 - App shell, setup helpers, player identity helpers, and DOM sync remain in `prototype-app.js`.
 - Interaction draft primitives remain in `prototype-board-interaction.js`.
 
-### Completed: Persistence Module (In-Game)
+### Completed: Persistence Module
 
 Save/load lives in `prototype-persistence.js` as the sole implementation.
 
 - In-game snapshots include players, active player, phase/moves, units, terrain, losses, and UI toggles.
-- Legacy Blue/Red unit `side` values and loss maps normalize to `player-1` / `player-2` on load.
-- Guided setup still cannot be saved mid-progress; that remains open under Remaining Work §2.
+- Setup snapshots add `setupStage` plus army drafts, terrain/deployment progress, and confirm-armies / confirm-terrain dialogs. Cameras and current selections are not restored.
+- Legacy Blue/Red unit `side` values and loss maps normalize to `player-1` / `player-2` on load. Saves without `setupStage` still load as in-game battles.
+- The existing gear icon and Saved Games modal are used for both setup and battle.
 
 ### Completed: Automatic Army Deployment
 
@@ -93,7 +94,7 @@ Run this from the repository root:
 node --test *.test.js
 ```
 
-The focused application suite has 57 passing tests, including deployment snapping, Auto Deploy, pointer-release handling, setup-camera pan/zoom, save guards, and setup-skipping game loads. The full `node --test *.test.js` suite has 123 passing tests.
+The focused application suite has 61 passing tests, including deployment snapping, Auto Deploy, pointer-release handling, setup-camera pan/zoom, and setup save/load resumption. The full `node --test *.test.js` suite has 127 passing tests.
 
 ## Core Model
 
@@ -129,7 +130,7 @@ Recommended extraction order:
 
 1. ~~Extract board rendering into `prototype-board-render.js`.~~ **Done** — checklist retained below as the completed contract.
 2. ~~Extract game-flow and combat orchestration into `prototype-game-flow.js`.~~ **Done** — checklist retained below as the completed contract.
-3. ~~Revisit persistence so the persistence module is the sole save/load implementation for in-game state.~~ **Done for in-game saves** — mid-setup save/resume is still open (see §2).
+3. ~~Revisit persistence so the persistence module is the sole save/load implementation.~~ **Done** — in-game and setup snapshots share the same slot list.
 
 For every slice, use `apply_patch` for both source deletion and destination addition so the editor's AI change set matches Git's working-tree change set. Validate with the focused application tests before any adjacent refactor.
 
@@ -207,15 +208,15 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`
 **Done:**
 
 - Persistence lives only in `prototype-persistence.js` (save/load/list/delete + legacy Blue/Red unit and loss normalization).
-- In-game saves store players, active player, moves/phase, units, terrain, losses, and UI toggles.
-- Saves are intentionally blocked while guided setup is active; loading a game forces `setupStage: 'game'` and clears setup drafts.
-- Focused tests cover army validation, terrain/deployment flow, deployment zones/order/handoff, setup-skipping loads, and the setup save guard.
+- In-game and guided-setup saves share the same local-storage slot list and record shape.
+- Setup snapshots store `setupStage`, army drafts, player presentation, terrain/deployment progress, units, terrain, and confirm-armies / confirm-terrain dialogs.
+- Cameras, tray/unit selection, and pointer interaction are not restored.
+- Legacy saves without `setupStage` still load as in-game battles.
+- Focused tests cover army validation, terrain/deployment flow, deployment zones/order/handoff, setup save/load resumption, and legacy game loads.
 
 **Still open:**
 
-- Persist and resume mid-setup: `setupStage`, army drafts, terrain/deployment progress.
-- Update `Design.md` for the guided setup workflow (it still describes seeded blue/red battles).
-- Add focused tests for setup save/load resumption once that behavior exists.
+- Update `Design.md` remaining prototype-scope leftovers if needed.
 - Run `node --test *.test.js` after each completed slice.
 
 ## Planned Game Extensions

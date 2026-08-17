@@ -30,6 +30,111 @@
             return true;
         }
 
+        cloneJson(value, fallback) {
+            if (value === undefined || value === null) {
+                return fallback;
+            }
+            return JSON.parse(JSON.stringify(value));
+        }
+
+        getSetupStageLabel(setupStage) {
+            if (setupStage === 'army-builder') {
+                return 'Army';
+            }
+            if (setupStage === 'terrain-placement') {
+                return 'Terrain';
+            }
+            if (setupStage === 'unit-deployment') {
+                return 'Deploy';
+            }
+            return 'Game';
+        }
+
+        getDefaultSaveName(now = new Date()) {
+            if (this.isSetupActive()) {
+                const playerOne = `${this.getPlayerLabel('player-1')} ${this.getPlayer('player-1')?.faction || ''}`.trim();
+                const playerTwo = `${this.getPlayerLabel('player-2')} ${this.getPlayer('player-2')?.faction || ''}`.trim();
+                const screen = this.getSetupStageLabel(this.state.setupStage);
+                const date = now.toISOString().slice(0, 10);
+                return `${playerOne} vs ${playerTwo} · ${screen} · ${date}`.slice(0, 60);
+            }
+            return `${this.getPlayerLabel(this.state.activePlayerId)}-${this.state.phase}`;
+        }
+
+        cloneSetupState() {
+            const setup = this.state.setup || {};
+            const deployment = setup.deployment
+                ? this.cloneJson({
+                    ...setup.deployment,
+                    interaction: null,
+                    selectedTrayId: null,
+                    selectedUnitId: null
+                }, null)
+                : null;
+            return {
+                armies: this.cloneJson(setup.armies, this.createArmyDrafts()),
+                confirmation: setup.confirmation === 'armies' || setup.confirmation === 'terrain' ? setup.confirmation : null,
+                terrain: this.cloneJson(setup.terrain, null),
+                deployment
+            };
+        }
+
+        normalizeSavedSetup(setup, setupStage) {
+            const source = setup || {};
+            const armies = this.createArmyDrafts();
+            data.PLAYER_IDS.forEach((playerId) => {
+                armies[playerId] = {
+                    counts: { ...(source.armies?.[playerId]?.counts || {}) }
+                };
+            });
+            const confirmation = source.confirmation === 'armies' || source.confirmation === 'terrain'
+                ? source.confirmation
+                : null;
+            if (setupStage === 'game') {
+                return {
+                    armies: this.createArmyDrafts(),
+                    confirmation: null,
+                    terrain: null,
+                    deployment: null
+                };
+            }
+            const deployment = source.deployment
+                ? {
+                    defenderPlayerId: source.deployment.defenderPlayerId || null,
+                    attackerPlayerId: source.deployment.attackerPlayerId || null,
+                    activePlayerId: source.deployment.activePlayerId || source.deployment.defenderPlayerId || 'player-1',
+                    zoneByPlayerId: this.cloneJson(source.deployment.zoneByPlayerId, {}),
+                    tray: Array.isArray(source.deployment.tray) ? this.cloneJson(source.deployment.tray, []) : [],
+                    selectedTrayId: null,
+                    selectedUnitId: null,
+                    deployedByPlayerId: {
+                        'player-1': [...(source.deployment.deployedByPlayerId?.['player-1'] || [])],
+                        'player-2': [...(source.deployment.deployedByPlayerId?.['player-2'] || [])]
+                    },
+                    interaction: null
+                }
+                : null;
+            const terrain = source.terrain
+                ? {
+                    ...this.cloneJson(source.terrain, null),
+                    selectedTerrainId: null
+                }
+                : null;
+            return {
+                armies,
+                confirmation,
+                terrain,
+                deployment
+            };
+        }
+
+        normalizeSetupStage(setupStage) {
+            if (setupStage === 'army-builder' || setupStage === 'terrain-placement' || setupStage === 'unit-deployment' || setupStage === 'game') {
+                return setupStage;
+            }
+            return 'game';
+        }
+
         buildSavePayload(name) {
             return {
                 id: `save-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -37,7 +142,9 @@
                 savedAt: new Date().toISOString(),
                 snapshot: {
                     mode: this.state.mode,
-                    players: JSON.parse(JSON.stringify(this.state.players)),
+                    setupStage: this.normalizeSetupStage(this.state.setupStage),
+                    setup: this.cloneSetupState(),
+                    players: this.cloneJson(this.state.players, this.createDefaultPlayers()),
                     activePlayerId: this.state.activePlayerId,
                     remainingMoves: this.state.remainingMoves,
                     phase: this.state.phase,
@@ -48,8 +155,8 @@
                         ranged: unit.ranged ? { ...unit.ranged } : null,
                         combat: unit.combat ? { ...unit.combat } : {}
                     })),
-                    terrain: JSON.parse(JSON.stringify(this.state.terrain)),
-                    losses: JSON.parse(JSON.stringify(this.state.losses)),
+                    terrain: this.cloneJson(this.state.terrain, { roads: [], features: [] }),
+                    losses: this.cloneJson(this.state.losses, { 'player-1': [], 'player-2': [] }),
                     snapEnabled: this.state.snapEnabled,
                     singleRotationMode: this.state.singleRotationMode,
                     showRangedArea: this.state.showRangedArea,
@@ -60,10 +167,6 @@
         }
 
         saveCurrentGame() {
-            if (this.isSetupActive()) {
-                this.updateStatus('Saving is available once deployment has begun the game.');
-                return;
-            }
             const name = (this.ui.storageNameInput.value || '').trim();
             if (!name) {
                 this.updateStatus('Enter a save name before storing the game.');
@@ -115,14 +218,11 @@
                 return;
             }
             const snapshot = record.snapshot || {};
-            this.state.mode = snapshot.mode || 'game';
-            this.state.setupStage = 'game';
-            this.state.setup = {
-                armies: this.createArmyDrafts(),
-                confirmation: null,
-                terrain: null,
-                deployment: null
-            };
+            const setupStage = this.normalizeSetupStage(snapshot.setupStage);
+            this.state.mode = snapshot.mode || (setupStage === 'game' ? 'game' : 'edit');
+            this.state.setupStage = setupStage;
+            this.state.setup = this.normalizeSavedSetup(snapshot.setup, setupStage);
+            this.state.setupCameras = {};
             this.state.players = data.PLAYER_IDS.reduce((players, playerId) => {
                 players[playerId] = { ...data.DEFAULT_PLAYERS[playerId], ...(snapshot.players?.[playerId] || {}) };
                 return players;
@@ -130,7 +230,7 @@
             this.state.activePlayerId = snapshot.activePlayerId || (snapshot.activeSide === 'red' ? 'player-2' : 'player-1');
             this.state.remainingMoves = Number.isFinite(snapshot.remainingMoves) ? snapshot.remainingMoves : 0;
             this.state.phase = snapshot.phase || 'move';
-            this.state.terrain = snapshot.terrain || data.createDefaultTerrain();
+            this.state.terrain = snapshot.terrain || (setupStage === 'game' ? data.createDefaultTerrain() : { roads: [], features: [] });
             this.state.units = Array.isArray(snapshot.units) ? snapshot.units.map((unit) => this.normalizeSavedUnit(unit)) : [];
             this.state.losses = this.normalizeSavedLosses(snapshot.losses);
             this.state.snapEnabled = snapshot.snapEnabled !== false;
@@ -149,14 +249,14 @@
             this.state.interaction = null;
             this.state.placingUnit = false;
             this.nextUnitId = snapshot.nextUnitId || this.deriveNextUnitId(this.state.units);
-            if (this.state.phase === 'shooting') {
+            if (setupStage === 'game' && this.state.phase === 'shooting') {
                 this.initializeShootingPhase();
             }
-            if (this.state.phase === 'melee') {
+            if (setupStage === 'game' && this.state.phase === 'melee') {
                 this.initializeMeleePhase();
             }
             this.closeStorageModal(false);
-            if (this.maybeAutoAdvanceCombatPhase()) {
+            if (setupStage === 'game' && this.maybeAutoAdvanceCombatPhase()) {
                 return;
             }
             this.updateSelectionAnalysis();
@@ -194,14 +294,21 @@
                 const details = document.createElement('div');
                 details.className = 'storage-details';
                 const snapshot = record.snapshot || {};
-                const lossPoints = Object.values(this.normalizeSavedLosses(snapshot.losses))
-                    .flat()
-                    .reduce((sum, unit) => sum + unit.value, 0);
-                const activePlayerId = snapshot.activePlayerId || (snapshot.activeSide === 'red' ? 'player-2' : 'player-1');
-                const players = snapshot.players || data.DEFAULT_PLAYERS;
-                const colorId = players[activePlayerId]?.colorId || data.DEFAULT_PLAYERS[activePlayerId].colorId;
-                const activeLabel = data.PLAYER_COLORS[colorId].label;
-                details.textContent = `${new Date(record.savedAt).toLocaleString()} | ${snapshot.phase || 'move'} | ${activeLabel} to act | ${lossPoints} points destroyed`;
+                const setupStage = this.normalizeSetupStage(snapshot.setupStage);
+                const timestamp = new Date(record.savedAt).toLocaleString();
+                if (setupStage !== 'game') {
+                    const confirmLabel = snapshot.setup?.confirmation ? ` · confirm ${snapshot.setup.confirmation}` : '';
+                    details.textContent = `${timestamp} | Setup · ${this.getSetupStageLabel(setupStage).toLowerCase()}${confirmLabel}`;
+                } else {
+                    const lossPoints = Object.values(this.normalizeSavedLosses(snapshot.losses))
+                        .flat()
+                        .reduce((sum, unit) => sum + unit.value, 0);
+                    const activePlayerId = snapshot.activePlayerId || (snapshot.activeSide === 'red' ? 'player-2' : 'player-1');
+                    const players = snapshot.players || data.DEFAULT_PLAYERS;
+                    const colorId = players[activePlayerId]?.colorId || data.DEFAULT_PLAYERS[activePlayerId].colorId;
+                    const activeLabel = data.PLAYER_COLORS[colorId].label;
+                    details.textContent = `${timestamp} | ${snapshot.phase || 'move'} | ${activeLabel} to act | ${lossPoints} points destroyed`;
+                }
                 meta.append(name, details);
 
                 const actions = document.createElement('div');
@@ -226,7 +333,7 @@
             this.renderStorageList();
             this.ui.storageModal.hidden = false;
             if (!this.ui.storageNameInput.value.trim()) {
-                this.ui.storageNameInput.value = `${this.getPlayerLabel(this.state.activePlayerId)}-${this.state.phase}`;
+                this.ui.storageNameInput.value = this.getDefaultSaveName();
             }
             this.ui.storageNameInput.focus();
             this.ui.storageNameInput.select();
