@@ -2049,6 +2049,98 @@ test('deployment handoff enters game mode with defender as active player and rol
     assert.deepEqual(app.state.losses, { 'player-1': [], 'player-2': [] });
 });
 
+test('auto deploy groups leftover singles with similar-movement troops', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    const mixed = app.buildAutoDeployFormations([
+        { draftId: 'p1-Blade-1', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Spear-1', playerId: 'player-1', type: 'Spear', faction: 'Panda' },
+        { draftId: 'p1-Horde-1', playerId: 'player-1', type: 'Horde', faction: 'Panda' }
+    ]);
+    assert.equal(mixed.length, 1);
+    assert.equal(mixed[0].entries.length, 3);
+
+    const leftover = app.buildAutoDeployFormations([
+        { draftId: 'p1-Blade-1', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Blade-2', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Blade-3', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Blade-4', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Blade-5', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Spear-1', playerId: 'player-1', type: 'Spear', faction: 'Panda' }
+    ]);
+    assert.equal(leftover.length, 2);
+    const leftoverSizes = leftover.map((formation) => formation.entries.length).sort((left, right) => left - right);
+    assert.deepEqual(leftoverSizes, [2, 4]);
+    const mixedRemainder = leftover.find((formation) => formation.entries.length === 2);
+    assert.ok(mixedRemainder.entries.some((entry) => entry.type === 'Blade'));
+    assert.ok(mixedRemainder.entries.some((entry) => entry.type === 'Spear'));
+
+    const differentMove = app.buildAutoDeployFormations([
+        { draftId: 'p1-Blade-1', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Hero-1', playerId: 'player-1', type: 'Hero', faction: 'Panda' }
+    ]);
+    assert.equal(differentMove.length, 2);
+
+    const closeMove = app.buildAutoDeployFormations([
+        { draftId: 'p1-Blade-1', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Shooter-1', playerId: 'player-1', type: 'Shooter', faction: 'Panda' }
+    ]);
+    assert.equal(closeMove.length, 1);
+    assert.equal(closeMove[0].entries.length, 2);
+
+    const leftoverPartials = app.buildAutoDeployFormations([
+        { draftId: 'p1-Blade-1', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Blade-2', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Blade-3', playerId: 'player-1', type: 'Blade', faction: 'Panda' },
+        { draftId: 'p1-Spear-1', playerId: 'player-1', type: 'Spear', faction: 'Panda' },
+        { draftId: 'p1-Horde-1', playerId: 'player-1', type: 'Horde', faction: 'Panda' }
+    ]);
+    assert.equal(leftoverPartials.length, 2);
+    const leftoverPartialSizes = leftoverPartials.map((formation) => formation.entries.length).sort((left, right) => left - right);
+    assert.deepEqual(leftoverPartialSizes, [2, 3]);
+    const bladePartial = leftoverPartials.find((formation) => formation.entries.length === 3);
+    assert.ok(bladePartial.entries.every((entry) => entry.type === 'Blade'));
+
+    const strike = app.buildAutoDeployFormations([
+        { draftId: 'p1-Warband-1', playerId: 'player-1', type: 'Warband', faction: 'Undead' },
+        { draftId: 'p1-Horde-1', playerId: 'player-1', type: 'Horde', faction: 'Undead' },
+        { draftId: 'p1-Behemoth-1', playerId: 'player-1', type: 'Behemoth', faction: 'Undead' },
+        { draftId: 'p1-Hero-1', playerId: 'player-1', type: 'Hero', faction: 'Undead' }
+    ]);
+    assert.equal(strike.length, 2);
+    const heroAlone = strike.find((formation) => formation.entries.length === 1);
+    assert.equal(heroAlone.entries[0].type, 'Hero');
+    const mixedStrike = strike.find((formation) => formation.entries.length === 3);
+    assert.deepEqual(mixedStrike.entries.map((entry) => entry.type).sort(), ['Behemoth', 'Horde', 'Warband']);
+});
+
+test('auto deploy roles put artillery in front, shooters in bad-going, and behemoths with fast troops', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    assert.equal(app.getAutoDeployRole('Artillery'), 'front');
+    assert.equal(app.getAutoDeployRole('Shooter'), 'bad-going');
+    assert.equal(app.getAutoDeployRole('Behemoth'), 'fast');
+    assert.equal(app.getAutoDeployRole('Beasts'), 'bad-going');
+    assert.equal(app.getAutoDeployRole('Hero'), 'fast');
+    assert.equal(app.getAutoDeployRole('Warband'), 'bad-going');
+});
+
 test('getDeploymentMatchupScore favors likely attacker edges from the scored table', () => {
     assert.ok(data.getDeploymentMatchupScore('Knights', 'Shooter') > data.getDeploymentMatchupScore('Knights', 'Spear'));
     assert.ok(data.getDeploymentMatchupScore('Artillery', 'Behemoth') > 0);
@@ -2117,6 +2209,14 @@ test('auto deploy places the active player tray in legal same-type ranks and lea
     const originalX = moved.x;
     moved.x += 12;
     assert.notEqual(moved.x, originalX);
+    assert.equal(app.ui.autoDeployButton.disabled, false);
+
+    app.autoDeployActiveArmy();
+    const redeployed = app.state.units.filter((unit) => unit.playerId === 'player-1');
+    assert.equal(redeployed.length, 9);
+    assert.equal(app.getDeploymentSetup().tray.filter((entry) => entry.playerId === 'player-1').length, 0);
+    assert.equal(app.ui.autoDeployButton.disabled, false);
+    assert.equal(app.canFinishDeploymentTurn(), true);
 });
 
 test('auto deploy spreads line troops laterally instead of stacking files', () => {

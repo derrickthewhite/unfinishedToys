@@ -77,12 +77,11 @@ Save/load lives in `prototype-persistence.js` as the sole implementation.
 
 ### Completed: Automatic Army Deployment
 
-Deployment includes an **Auto Deploy** control for the active player's remaining tray.
+Deployment includes an **Auto Deploy** control for the active player's remaining tray. If that army is already fully deployed, the control stays enabled and recalls those units to the tray before placing them again.
 
-- Same-type formations prefer side-by-side ranks capped at about four elements, sharing a common front line; leftover same-type units form additional blocks.
-- Line troops spread laterally and are scored against stacking behind friendlies; flyers/fast movers/artillery may use rear depth but also consider mid and flank slots.
-- Medium terrain bias: bad-going-tolerant troops favor forest/swamp (in or behind); other troops avoid sitting in bad going. A frontage-wide corridor about 180 mm ahead is sampled so line troops also avoid forest, swamp, water, and impassable terrain in their approach lane.
-- Shooters are front-line troops. Artillery prefers the rear. Fast movers and Flyers prefer flanks or rear, with Flyers kept in their own formations.
+- Same-type formations prefer side-by-side ranks capped at about four elements. Leftovers pack to minimize formation count, then good-going slowdown, and will not pair units whose good-going speeds differ by 300 or more. Larger formations place first; sister ranks are preferred, and if depth overlap is required the larger body stays in front.
+- Terrain is scored per base: bad-going-tolerant troops (Warbands, Heavy-Warbands, Beasts, Shooters) favor forest/swamp underfoot; other troops keep their whole footprint out. A frontage-wide corridor about 180 mm ahead is sampled so good-going troops avoid forest, swamp, water, and impassable terrain in their approach lane. Forest or swamp ahead of Shooters is treated as mixed.
+- Artillery stays in the fighting line. Fast movers are Knights, Riders, Heroes, and Behemoths. Flyers stay in their own formations.
 - Defenders use terrain and formation heuristics only. Attackers also score placements with `getDeploymentMatchupScore` / `DEPLOYMENT_MATCHUP_BONUSES`.
 - Results stay editable; Finish Deployment is still required.
 - Default facing is unchanged; depth defaults to mid-quarter unless the role asks for behind.
@@ -95,7 +94,7 @@ Run this from the repository root:
 node --test *.test.js
 ```
 
-The focused application suite includes deployment snapping, Auto Deploy, Shift/marquee selection, return-to-tray, tray drag-and-drop, pointer-release handling, setup-camera pan/zoom, and setup save/load resumption. The full `node --test *.test.js` suite has 129 passing tests.
+The focused application suite includes deployment snapping, Auto Deploy, Shift/marquee selection, return-to-tray, tray drag-and-drop, pointer-release handling, setup-camera pan/zoom, and setup save/load resumption. The full `node --test *.test.js` suite has 132 passing tests.
 
 ## Core Model
 
@@ -224,9 +223,6 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`
 ## Planned Game Extensions
 
 - Add reserve deployment for units such as Hordes and future Lurkers: these units begin off-board or are removed from the board, then enter during play using the deployment tray and placement validation as shared foundations.
-- Expand the presentation palette with additional player colors while preserving player IDs as ownership keys.
-- Add a check to make sure that 
-- ~~Add automatic army deployment: group like units into formations, favor bad-going units near or toward appropriate terrain, group fast movers, and, when attacking, align likely favorable matchups where practical.~~ **Done** — see Completed section and Design.md.
 - Add further armies once their artwork is available.
 - Add an optional game-start mode that limits each faction to an allowed unit roster.
 - Add more unit types.

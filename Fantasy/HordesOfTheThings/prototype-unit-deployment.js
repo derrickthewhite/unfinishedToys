@@ -20,6 +20,7 @@
         flyer: 3,
         rear: 4
     });
+    const AUTO_DEPLOY_LEFTOVER_MAX_GOOD_GAP = 300;
 
     function install(Prototype) {
         Object.assign(Prototype.prototype, {
@@ -567,17 +568,11 @@
                 if (type === 'Flyers') {
                     return 'flyer';
                 }
-                if (type === 'Artillery') {
-                    return 'rear';
-                }
-                if (type === 'Shooter') {
-                    return 'front';
-                }
                 const template = data.UNIT_TYPES[type];
                 if (!template) {
                     return 'front';
                 }
-                if (template.troopClass === 'mounted' && template.moves.good >= 400 && type !== 'Beasts' && type !== 'Behemoth') {
+                if (type === 'Behemoth' || (template.troopClass === 'mounted' && template.moves.good >= 400 && type !== 'Beasts')) {
                     return 'fast';
                 }
                 if (template.combat?.ignoresBadGoingPenalty) {
@@ -629,6 +624,183 @@
                 return bounds.midY;
             },
 
+            getAutoDeployMovementKey(type) {
+                if (this.getAutoDeployRole(type) === 'flyer') {
+                    return 'flyer';
+                }
+                const moves = data.UNIT_TYPES[type]?.moves || {};
+                return `${moves.good || 0}:${moves.bad || 0}:${moves.water || 0}`;
+            },
+
+            getAutoDeployGoodPace(type) {
+                return data.UNIT_TYPES[type]?.moves?.good || 0;
+            },
+
+            isAutoDeployLeftoverGroupLegal(entries) {
+                if (entries.length === 0 || entries.length > data.AUTO_DEPLOY_MAX_RANK) {
+                    return false;
+                }
+                const flyerCount = entries.filter((entry) => this.getAutoDeployRole(entry.type) === 'flyer').length;
+                if (flyerCount > 0) {
+                    return flyerCount === entries.length;
+                }
+                const goods = entries.map((entry) => this.getAutoDeployGoodPace(entry.type));
+                return Math.max(...goods) - Math.min(...goods) < AUTO_DEPLOY_LEFTOVER_MAX_GOOD_GAP;
+            },
+
+            getAutoDeployLeftoverSlowdown(entries) {
+                const goods = entries.map((entry) => this.getAutoDeployGoodPace(entry.type));
+                const slowest = Math.min(...goods);
+                return goods.reduce((sum, good) => sum + (good - slowest), 0);
+            },
+
+            getAutoDeployLeftoverClassMix(entries) {
+                const classes = new Set(entries.map((entry) => data.UNIT_TYPES[entry.type]?.troopClass || 'infantry'));
+                return classes.size > 1 ? 1 : 0;
+            },
+
+            compareAutoDeployLeftoverScores(left, right) {
+                for (let index = 0; index < left.length; index += 1) {
+                    if (left[index] !== right[index]) {
+                        return left[index] - right[index];
+                    }
+                }
+                return 0;
+            },
+
+            orderAutoDeployLeftoverGroup(entries) {
+                return [...entries].sort((left, right) => {
+                    const bad = Number(this.unitPrefersBadGoing(right.type)) - Number(this.unitPrefersBadGoing(left.type));
+                    if (bad) {
+                        return bad;
+                    }
+                    const type = left.type.localeCompare(right.type);
+                    if (type) {
+                        return type;
+                    }
+                    return left.draftId.localeCompare(right.draftId);
+                });
+            },
+
+            createAutoDeployFormation(entries) {
+                const typeCounts = new Map();
+                entries.forEach((entry) => {
+                    typeCounts.set(entry.type, (typeCounts.get(entry.type) || 0) + 1);
+                });
+                const primaryType = [...typeCounts.entries()]
+                    .sort((left, right) => (right[1] - left[1]) || left[0].localeCompare(right[0]))[0][0];
+                return {
+                    type: primaryType,
+                    role: this.getAutoDeployRole(primaryType),
+                    prefersBadGoing: entries.some((entry) => this.unitPrefersBadGoing(entry.type)),
+                    entries
+                };
+            },
+
+            sortDeploymentTrayEntries(entries) {
+                return [...entries].sort((left, right) => {
+                    const movement = this.getAutoDeployMovementKey(left.type).localeCompare(this.getAutoDeployMovementKey(right.type));
+                    if (movement) {
+                        return movement;
+                    }
+                    const type = left.type.localeCompare(right.type);
+                    if (type) {
+                        return type;
+                    }
+                    return left.draftId.localeCompare(right.draftId);
+                });
+            },
+
+            packAutoDeployRankChunks(entries) {
+                const chunks = [];
+                let index = 0;
+                while (index < entries.length) {
+                    const remaining = entries.length - index;
+                    let take = Math.min(data.AUTO_DEPLOY_MAX_RANK, remaining);
+                    if (take === data.AUTO_DEPLOY_MAX_RANK && remaining - take === 1) {
+                        take -= 1;
+                    }
+                    chunks.push(entries.slice(index, index + take));
+                    index += take;
+                }
+                return chunks;
+            },
+
+            packAutoDeployLeftoverFormations(remainders) {
+                const formations = [];
+                const flyers = remainders.filter((entry) => this.getAutoDeployRole(entry.type) === 'flyer');
+                const ground = remainders.filter((entry) => this.getAutoDeployRole(entry.type) !== 'flyer');
+                this.packAutoDeployRankChunks(this.sortDeploymentTrayEntries(flyers)).forEach((group) => {
+                    formations.push(this.createAutoDeployFormation(group));
+                });
+                const items = ground;
+                const count = items.length;
+                if (count === 0) {
+                    return formations;
+                }
+                const memo = new Map();
+                const solve = (mask) => {
+                    if (mask === 0) {
+                        return { score: [0, 0, 0, 0, 0], groups: [] };
+                    }
+                    if (memo.has(mask)) {
+                        return memo.get(mask);
+                    }
+                    const indices = [];
+                    for (let index = 0; index < count; index += 1) {
+                        if (mask & (1 << index)) {
+                            indices.push(index);
+                        }
+                    }
+                    const first = indices[0];
+                    const others = indices.slice(1);
+                    let best = null;
+                    const consider = (picked) => {
+                        const entries = picked.map((index) => items[index]);
+                        if (!this.isAutoDeployLeftoverGroupLegal(entries)) {
+                            return;
+                        }
+                        let restMask = mask;
+                        picked.forEach((index) => {
+                            restMask &= ~(1 << index);
+                        });
+                        const rest = solve(restMask);
+                        const candidate = {
+                            score: [
+                                rest.score[0] + 1,
+                                rest.score[1] + this.getAutoDeployLeftoverSlowdown(entries),
+                                rest.score[2] + this.getAutoDeployLeftoverClassMix(entries),
+                                rest.score[3] + (picked.length === 1 ? 1 : 0),
+                                rest.score[4] + new Set(entries.map((entry) => entry.type)).size
+                            ],
+                            groups: [picked, ...rest.groups]
+                        };
+                        if (!best || this.compareAutoDeployLeftoverScores(candidate.score, best.score) < 0) {
+                            best = candidate;
+                        }
+                    };
+                    const chooseOthers = (start, picked) => {
+                        consider(picked);
+                        if (picked.length >= data.AUTO_DEPLOY_MAX_RANK) {
+                            return;
+                        }
+                        for (let index = start; index < others.length; index += 1) {
+                            chooseOthers(index + 1, picked.concat(others[index]));
+                        }
+                    };
+                    chooseOthers(0, [first]);
+                    memo.set(mask, best);
+                    return best;
+                };
+                const packed = solve((1 << count) - 1);
+                packed.groups.forEach((picked) => {
+                    formations.push(this.createAutoDeployFormation(
+                        this.orderAutoDeployLeftoverGroup(picked.map((index) => items[index]))
+                    ));
+                });
+                return formations;
+            },
+
             buildAutoDeployFormations(trayEntries) {
                 const byType = new Map();
                 trayEntries.forEach((entry) => {
@@ -638,17 +810,21 @@
                     byType.get(entry.type).push(entry);
                 });
                 const formations = [];
-                byType.forEach((entries, type) => {
-                    for (let index = 0; index < entries.length; index += data.AUTO_DEPLOY_MAX_RANK) {
-                        formations.push({
-                            type,
-                            role: this.getAutoDeployRole(type),
-                            prefersBadGoing: this.unitPrefersBadGoing(type),
-                            entries: entries.slice(index, index + data.AUTO_DEPLOY_MAX_RANK)
-                        });
+                const remainders = [];
+                byType.forEach((entries) => {
+                    const sorted = this.sortDeploymentTrayEntries(entries);
+                    let index = 0;
+                    while (index + data.AUTO_DEPLOY_MAX_RANK <= sorted.length) {
+                        formations.push(this.createAutoDeployFormation(sorted.slice(index, index + data.AUTO_DEPLOY_MAX_RANK)));
+                        index += data.AUTO_DEPLOY_MAX_RANK;
+                    }
+                    if (index < sorted.length) {
+                        remainders.push(...sorted.slice(index));
                     }
                 });
-                return formations.sort((left, right) => (ROLE_ORDER[left.role] - ROLE_ORDER[right.role])
+                formations.push(...this.packAutoDeployLeftoverFormations(remainders));
+                return formations.sort((left, right) => (right.entries.length - left.entries.length)
+                    || (ROLE_ORDER[left.role] - ROLE_ORDER[right.role])
                     || left.type.localeCompare(right.type)
                     || left.entries[0].draftId.localeCompare(right.entries[0].draftId));
             },
@@ -743,7 +919,7 @@
                 return hits;
             },
 
-            scoreFrontCorridor(unit, prefersBadGoing) {
+            scoreFrontCorridor(unit) {
                 const hits = this.collectFrontCorridorHits(unit);
                 let score = 0;
                 if (hits.water > 0) {
@@ -753,7 +929,13 @@
                     score -= 30 + Math.min(hits.impassable, 6) * 3;
                 }
                 const badHits = hits.forest + hits.swamp;
-                if (prefersBadGoing) {
+                if (unit.type === 'Shooter') {
+                    if (hits.water === 0 && hits.impassable === 0) {
+                        score += 6;
+                    }
+                    return score;
+                }
+                if (this.unitPrefersBadGoing(unit.type)) {
                     if (badHits > 0) {
                         score += 6;
                     }
@@ -767,72 +949,111 @@
                 return score;
             },
 
+            describeAutoDeployOccupied(units, size) {
+                if (!units.length) {
+                    return [];
+                }
+                const fronts = units.map((unit) => this.getUnitFrontCenter(unit));
+                const minX = Math.min(...fronts.map((front) => front.x));
+                const maxX = Math.max(...fronts.map((front) => front.x));
+                return fronts.map((front) => ({
+                    x: front.x,
+                    y: front.y,
+                    minX,
+                    maxX,
+                    size
+                }));
+            },
+
+            scoreAutoDeployOverlap(units, frontAnchor, forward, occupiedFronts) {
+                const fronts = units.map((unit) => this.getUnitFrontCenter(unit));
+                const thisMinX = Math.min(...fronts.map((front) => front.x));
+                const thisMaxX = Math.max(...fronts.map((front) => front.x));
+                const thisSize = units.length;
+                const midX = data.BOARD_SIZE / 2;
+                const flankDistance = Math.abs(frontAnchor.x - midX);
+                let score = 0;
+
+                if (occupiedFronts.length === 0) {
+                    score += Math.max(0, 12 - (flankDistance / 28));
+                    return score;
+                }
+
+                occupiedFronts.forEach((friendly) => {
+                    const friendlySize = friendly.size || 1;
+                    const friendlyMin = friendly.minX ?? friendly.x;
+                    const friendlyMax = friendly.maxX ?? friendly.x;
+                    const overlaps = thisMinX <= friendlyMax + 8 && thisMaxX >= friendlyMin - 8;
+                    const friendlyAhead = geometry.dot(geometry.subtract(friendly, frontAnchor), forward);
+                    if (!overlaps) {
+                        const gap = thisMinX > friendlyMax ? thisMinX - friendlyMax : friendlyMin - thisMaxX;
+                        if (Math.abs(friendlyAhead) <= 24 && gap < 80) {
+                            score += Math.max(0, 18 - (gap / 4));
+                        }
+                        return;
+                    }
+                    if (friendlyAhead > 10) {
+                        score -= thisSize < friendlySize ? 8 : 36;
+                    } else if (friendlyAhead < -10) {
+                        score -= 70;
+                    }
+                });
+
+                const minFriendlyX = Math.min(...occupiedFronts.map((friendly) => friendly.minX ?? friendly.x));
+                const maxFriendlyX = Math.max(...occupiedFronts.map((friendly) => friendly.maxX ?? friendly.x));
+                if (thisMaxX < minFriendlyX - 8 || thisMinX > maxFriendlyX + 8) {
+                    score += 16;
+                }
+                return score;
+            },
+
             scoreAutoDeployFormation(formation, units, frontAnchor, enemyLine, isAttacker, friendlyFronts = []) {
                 let score = 0;
                 const playerId = formation.entries[0].playerId;
                 const rotation = this.getDefaultDeploymentRotation(playerId);
                 const forward = geometry.getForwardVector(rotation);
                 units.forEach((unit) => {
+                    if (formation.role === 'flyer') {
+                        return;
+                    }
                     const occupied = rules.sampleUnitTerrain(unit, this.state.terrain);
                     const inBadGoing = occupied.has('forest') || occupied.has('swamp');
-                    if (formation.prefersBadGoing) {
+                    if (this.unitPrefersBadGoing(unit.type)) {
                         score += inBadGoing ? 28 : -8;
-                    } else if (formation.role !== 'flyer') {
+                    } else {
                         score += inBadGoing ? -30 : 10;
                     }
-                    if (formation.role !== 'flyer') {
-                        score += this.scoreFrontCorridor(unit, formation.prefersBadGoing);
-                    }
+                    score += this.scoreFrontCorridor(unit);
                 });
 
                 const midX = data.BOARD_SIZE / 2;
                 const flankDistance = Math.abs(frontAnchor.x - midX);
-                const allowsBehind = formation.role === 'fast' || formation.role === 'flyer' || formation.role === 'rear';
-
-                if (formation.role === 'fast' || formation.role === 'flyer') {
-                    score += Math.min(28, flankDistance / 9);
+                if (formation.role === 'flyer' || (friendlyFronts.length > 0 && units.length <= 2 && formation.role === 'fast')) {
+                    score += Math.min(18, flankDistance / 12);
                     if (formation.role === 'flyer') {
                         score += 4;
                     }
-                } else if (formation.role === 'rear') {
-                    score += Math.min(18, flankDistance / 14);
                 }
 
-                if (friendlyFronts.length === 0) {
-                    if (formation.role === 'front' || formation.role === 'bad-going') {
-                        score += Math.max(0, 10 - (flankDistance / 30));
-                    }
-                } else {
-                    const nearestDx = Math.min(...friendlyFronts.map((friendly) => Math.abs(friendly.x - frontAnchor.x)));
-                    score += Math.min(40, nearestDx / 3);
-                    const minFriendlyX = Math.min(...friendlyFronts.map((friendly) => friendly.x));
-                    const maxFriendlyX = Math.max(...friendlyFronts.map((friendly) => friendly.x));
-                    if (frontAnchor.x < minFriendlyX - 16 || frontAnchor.x > maxFriendlyX + 16) {
-                        score += 18;
-                    }
-
-                    friendlyFronts.forEach((friendly) => {
-                        const dx = Math.abs(frontAnchor.x - friendly.x);
-                        if (dx > data.UNIT_WIDTH * 1.35) {
-                            return;
-                        }
-                        const friendlyAhead = geometry.dot(geometry.subtract(friendly, frontAnchor), forward);
-                        if (friendlyAhead <= 10) {
-                            return;
-                        }
-                        score -= allowsBehind ? 14 : 60;
-                    });
-                }
+                score += this.scoreAutoDeployOverlap(units, frontAnchor, forward, friendlyFronts);
 
                 if (isAttacker && enemyLine.length > 0) {
                     let matchupPull = 0;
                     enemyLine.forEach((enemy) => {
                         const sampleWeight = 1 / (1 + (Math.abs(enemy.x - frontAnchor.x) / 48));
-                        matchupPull += sampleWeight * (1 + data.getDeploymentMatchupScore(formation.type, enemy.type));
+                        matchupPull += sampleWeight * (1 + this.getFormationMatchupScore(formation, enemy.type));
                     });
                     score += matchupPull * 14;
                 }
                 return score;
+            },
+
+            getFormationMatchupScore(formation, enemyType) {
+                const types = (formation.entries || []).map((entry) => entry.type);
+                if (types.length === 0) {
+                    return data.getDeploymentMatchupScore(formation.type, enemyType);
+                }
+                return types.reduce((sum, type) => sum + data.getDeploymentMatchupScore(type, enemyType), 0) / types.length;
             },
 
             getEnemyDeploymentLine(playerId) {
@@ -903,29 +1124,37 @@
                     pushCandidate(anchor.x - rankWidth - data.UNIT_WIDTH, anchor.y);
                 });
 
+                const orientations = [formation.entries];
+                if (formation.entries.length > 1) {
+                    orientations.push([...formation.entries].reverse());
+                }
+
                 let best = null;
-                candidates.forEach((frontAnchor) => {
-                    let nextId = this.nextUnitId;
-                    const built = this.buildAutoDeployFormationUnits(formation, frontAnchor, () => {
-                        const id = `unit-${nextId}`;
-                        nextId += 1;
-                        return id;
+                orientations.forEach((entries) => {
+                    const oriented = { ...formation, entries };
+                    candidates.forEach((frontAnchor) => {
+                        let nextId = this.nextUnitId;
+                        const built = this.buildAutoDeployFormationUnits(oriented, frontAnchor, () => {
+                            const id = `unit-${nextId}`;
+                            nextId += 1;
+                            return id;
+                        });
+                        const units = built.map((entry) => entry.unit);
+                        if (!this.isAutoDeployBatchLegal(units)) {
+                            return;
+                        }
+                        const score = this.scoreAutoDeployFormation(
+                            oriented,
+                            units,
+                            frontAnchor,
+                            enemyLine,
+                            isAttacker,
+                            occupiedFrontAnchors
+                        );
+                        if (!best || score > best.score) {
+                            best = { frontAnchor, built, score };
+                        }
                     });
-                    const units = built.map((entry) => entry.unit);
-                    if (!this.isAutoDeployBatchLegal(units)) {
-                        return;
-                    }
-                    const score = this.scoreAutoDeployFormation(
-                        formation,
-                        units,
-                        frontAnchor,
-                        enemyLine,
-                        isAttacker,
-                        occupiedFrontAnchors
-                    );
-                    if (!best || score > best.score) {
-                        best = { frontAnchor, built, score };
-                    }
                 });
                 return best;
             },
@@ -936,18 +1165,24 @@
                     return;
                 }
                 const activePlayerId = deployment.activePlayerId;
-                const trayEntries = deployment.tray.filter((entry) => entry.playerId === activePlayerId);
+                let trayEntries = deployment.tray.filter((entry) => entry.playerId === activePlayerId);
                 if (trayEntries.length === 0) {
-                    this.updateStatus('All of your units are already deployed.');
-                    return;
+                    const deployedIds = [...(deployment.deployedByPlayerId[activePlayerId] || [])];
+                    if (deployedIds.length === 0) {
+                        this.updateStatus('There are no units to auto-deploy.');
+                        return;
+                    }
+                    this.returnDeployedUnitsToTray(deployedIds);
+                    trayEntries = deployment.tray.filter((entry) => entry.playerId === activePlayerId);
                 }
 
                 const formations = this.buildAutoDeployFormations(trayEntries);
                 const enemyLine = this.getEnemyDeploymentLine(activePlayerId);
                 const isAttacker = activePlayerId === deployment.attackerPlayerId;
-                const occupiedFrontAnchors = this.state.units
-                    .filter((unit) => this.getUnitPlayerId(unit) === activePlayerId)
-                    .map((unit) => this.getUnitFrontCenter(unit));
+                const occupiedFrontAnchors = this.describeAutoDeployOccupied(
+                    this.state.units.filter((unit) => this.getUnitPlayerId(unit) === activePlayerId),
+                    1
+                );
                 let placedCount = 0;
                 let skippedFormations = 0;
 
@@ -971,8 +1206,11 @@
                         deployment.tray.splice(trayIndex, 1);
                         deployment.deployedByPlayerId[activePlayerId].push(unit.id);
                         placedCount += 1;
-                        occupiedFrontAnchors.push(this.getUnitFrontCenter(unit));
                     });
+                    occupiedFrontAnchors.push(...this.describeAutoDeployOccupied(
+                        placement.built.map((entry) => entry.unit),
+                        placement.built.length
+                    ));
                     this.nextUnitId += placement.built.length;
                 });
 
@@ -1077,8 +1315,7 @@
                     this.ui.finishDeploymentButton.disabled = !this.canFinishDeploymentTurn();
                 }
                 if (this.ui.autoDeployButton) {
-                    const remainingTray = deployment.tray.filter((entry) => entry.playerId === activePlayerId).length;
-                    this.ui.autoDeployButton.disabled = remainingTray === 0;
+                    this.ui.autoDeployButton.disabled = false;
                 }
                 if (this.ui.returnToTrayButton) {
                     const selectedCount = this.getSelectedUnits()
@@ -1099,7 +1336,9 @@
                     return;
                 }
                 const activePlayerId = deployment.activePlayerId;
-                const trayEntries = deployment.tray.filter((entry) => entry.playerId === activePlayerId);
+                const trayEntries = this.sortDeploymentTrayEntries(
+                    deployment.tray.filter((entry) => entry.playerId === activePlayerId)
+                );
                 this.ui.deploymentTray.innerHTML = trayEntries.length === 0
                     ? '<p class="deployment-empty">All units deployed for this player.</p>'
                     : trayEntries.map((entry) => {
