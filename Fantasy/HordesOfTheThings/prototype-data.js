@@ -102,6 +102,38 @@
         Flyers: { value: 2, depth: 20, troopClass: 'mounted', moves: { road: 1200, good: 1200, bad: 1200, water: 1200 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false }, movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 } },
         Behemoth: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 400, good: 300, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } }
     };
+
+    const AUTO_DEPLOY_MAX_RANK = 4;
+
+    // Additive matchup bias on top of strength-difference scoring for attacker auto-deploy.
+    const DEPLOYMENT_MATCHUP_BONUSES = Object.freeze({
+        Blade: { Horde: 1, Warband: 1 },
+        Spear: { Knights: 1, Riders: 1, Beasts: 1 },
+        'Heavy-Spear': { Knights: 1, Riders: 1, Behemoth: 1 },
+        Warband: { Spear: 1, 'Heavy-Spear': 1 },
+        'Heavy-Warband': { Spear: 1, Blade: 1 },
+        Shooter: { Knights: 1, Riders: 1, Flyers: 1 },
+        Artillery: { Behemoth: 2, Knights: 1, Hero: 1 },
+        Horde: {},
+        Knights: { Shooter: 2, Horde: 2, Blade: 1, Warband: 1, Spear: -1 },
+        Riders: { Shooter: 1, Artillery: 1, Horde: 1 },
+        Hero: { Hero: 1, Behemoth: 1, Knights: 1 },
+        Beasts: { Warband: 1, Horde: 1, Shooter: 1 },
+        Flyers: { Artillery: 1, Shooter: 1, Horde: 1 },
+        Behemoth: { Knights: 1, Spear: 1, Blade: 1, Artillery: -2 }
+    });
+
+    function getDeploymentMatchupScore(attackerType, defenderType) {
+        const attacker = UNIT_TYPES[attackerType];
+        const defender = UNIT_TYPES[defenderType];
+        if (!attacker || !defender) {
+            return 0;
+        }
+        const strengthEdge = attacker.strength[defender.troopClass] - defender.strength[attacker.troopClass];
+        const bonus = DEPLOYMENT_MATCHUP_BONUSES[attackerType]?.[defenderType] || 0;
+        return strengthEdge + bonus;
+    }
+
     function pacesToMm(paces) {
         return paces * MM_PER_PACE;
     }
@@ -265,6 +297,9 @@
         COLORS,
         UNIT_TYPES,
         TERRAIN_STYLE,
+        AUTO_DEPLOY_MAX_RANK,
+        DEPLOYMENT_MATCHUP_BONUSES,
+        getDeploymentMatchupScore,
         createTerrainOffer,
         pacesToMm,
         convertMovesToMm,

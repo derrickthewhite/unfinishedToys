@@ -1704,3 +1704,166 @@ test('deployment handoff enters game mode with defender as active player and rol
     assert.equal(app.state.remainingMoves, 5);
     assert.deepEqual(app.state.losses, { 'player-1': [], 'player-2': [] });
 });
+
+test('getDeploymentMatchupScore favors likely attacker edges from the scored table', () => {
+    assert.ok(data.getDeploymentMatchupScore('Knights', 'Shooter') > data.getDeploymentMatchupScore('Knights', 'Spear'));
+    assert.ok(data.getDeploymentMatchupScore('Artillery', 'Behemoth') > 0);
+});
+
+test('auto deploy places the active player tray in legal same-type ranks and leaves units editable', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            },
+            terrain: {
+                roads: [],
+                features: [
+                    { kind: 'forest', cx: 160, cy: 520, rx: 50, ry: 40, wobble: 0.2 },
+                    { kind: 'swamp', cx: 440, cy: 520, rx: 50, ry: 40, wobble: 0.2 }
+                ]
+            }
+        }
+    });
+    app.ui.autoDeployButton = { disabled: false };
+    app.adjustArmyUnit('player-1', 'Blade', 5);
+    app.adjustArmyUnit('player-1', 'Warband', 2);
+    app.adjustArmyUnit('player-1', 'Shooter', 2);
+    app.adjustArmyUnit('player-2', 'Spear', 2);
+    app.initializeUnitDeployment();
+
+    app.autoDeployActiveArmy();
+
+    const deployment = app.getDeploymentSetup();
+    const playerOneUnits = app.state.units.filter((unit) => unit.playerId === 'player-1');
+    assert.equal(playerOneUnits.length, 9);
+    assert.equal(deployment.tray.filter((entry) => entry.playerId === 'player-1').length, 0);
+    assert.equal(app.canFinishDeploymentTurn(), true);
+    playerOneUnits.forEach((unit) => {
+        assert.equal(app.isUnitPlacementInZone(unit, 'player-1'), true);
+        assert.equal(app.findDeploymentOverlap(unit, unit.id), null);
+    });
+
+    const bladeRanks = playerOneUnits.filter((unit) => unit.type === 'Blade');
+    assert.equal(bladeRanks.length, 5);
+    const forward = geometry.getForwardVector(0);
+    const bladeGroups = [];
+    bladeRanks.forEach((unit) => {
+        const front = app.getUnitFrontCenter(unit);
+        const frontDepth = geometry.dot(front, forward);
+        let group = bladeGroups.find((entry) => Math.abs(entry.frontDepth - frontDepth) < 0.5);
+        if (!group) {
+            group = { frontDepth, fronts: [] };
+            bladeGroups.push(group);
+        }
+        group.fronts.push(front);
+    });
+    assert.ok(bladeGroups.some((group) => group.fronts.length > 1));
+    bladeGroups.filter((group) => group.fronts.length > 1).forEach((group) => {
+        const baseline = group.frontDepth;
+        group.fronts.forEach((front) => {
+            assert.ok(Math.abs(geometry.dot(front, forward) - baseline) < 0.01);
+        });
+    });
+
+    const moved = playerOneUnits[0];
+    const originalX = moved.x;
+    moved.x += 12;
+    assert.notEqual(moved.x, originalX);
+});
+
+test('auto deploy spreads line troops laterally instead of stacking files', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            },
+            terrain: { roads: [], features: [] }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 8);
+    app.adjustArmyUnit('player-2', 'Spear', 2);
+    app.initializeUnitDeployment();
+    app.autoDeployActiveArmy();
+
+    const blades = app.state.units.filter((unit) => unit.playerId === 'player-1' && unit.type === 'Blade');
+    assert.equal(blades.length, 8);
+    const fronts = blades.map((unit) => app.getUnitFrontCenter(unit));
+    const xs = fronts.map((front) => front.x).sort((left, right) => left - right);
+    assert.ok(xs[xs.length - 1] - xs[0] >= 200);
+
+    const forward = geometry.getForwardVector(0);
+    const depths = fronts.map((front) => geometry.dot(front, forward));
+    const depthSpan = Math.max(...depths) - Math.min(...depths);
+    assert.ok(depthSpan < 50);
+});
+
+test('auto deploy keeps good-going troops off lanes with bad going, water, or impassable ahead', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            },
+            terrain: {
+                roads: [],
+                features: [
+                    { kind: 'forest', cx: 300, cy: 390, rx: 70, ry: 50, wobble: 0.18 },
+                    { kind: 'water', cx: 300, cy: 300, rx: 60, ry: 40, wobble: 0.16 },
+                    { kind: 'impassable', cx: 80, cy: 390, rx: 40, ry: 36, wobble: 0.14 }
+                ]
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 4);
+    app.adjustArmyUnit('player-2', 'Spear', 2);
+    app.initializeUnitDeployment();
+    app.autoDeployActiveArmy();
+
+    const blades = app.state.units.filter((unit) => unit.playerId === 'player-1' && unit.type === 'Blade');
+    assert.equal(blades.length, 4);
+    blades.forEach((unit) => {
+        const hits = app.collectFrontCorridorHits(unit);
+        assert.equal(hits.water, 0);
+        assert.equal(hits.impassable, 0);
+        assert.equal(hits.forest + hits.swamp, 0);
+    });
+});
+
+test('attacker auto deploy uses the enemy line for matchup-biased placement', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            },
+            terrain: { roads: [], features: [] }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Shooter', 3);
+    app.adjustArmyUnit('player-2', 'Knights', 3);
+    app.initializeUnitDeployment();
+    app.autoDeployActiveArmy();
+    app.finishDeploymentTurn();
+
+    assert.equal(app.getDeploymentSetup().activePlayerId, 'player-2');
+    app.autoDeployActiveArmy();
+
+    const knights = app.state.units.filter((unit) => unit.playerId === 'player-2' && unit.type === 'Knights');
+    const shooters = app.state.units.filter((unit) => unit.playerId === 'player-1' && unit.type === 'Shooter');
+    assert.equal(knights.length, 3);
+    assert.equal(shooters.length, 3);
+    const shooterMean = shooters.reduce((sum, unit) => sum + geometry.getUnitCenter(unit).x, 0) / shooters.length;
+    const knightMean = knights.reduce((sum, unit) => sum + geometry.getUnitCenter(unit).x, 0) / knights.length;
+    assert.ok(Math.abs(knightMean - shooterMean) < 160);
+});

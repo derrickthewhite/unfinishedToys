@@ -94,16 +94,26 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 ## Movement Prototype
 
 ### Scope
-- The current prototype lives in `prototype.html`, `prototype.css`, and `prototype.js` in this folder.
-- The prototype is intentionally movement-focused and canvas-first. Combat, AI, persistence, and later phases are deferred.
+- The current prototype lives in `prototype.html`, `prototype.css`, and the `prototype-*.js` modules in this folder.
+- The prototype is canvas-first and now covers guided setup, movement, shooting, melee, and local-storage saves for in-game state.
 - Unit state is stored as the left-front corner of the base plus a rotation value in radians.
 
 ### Default Prototype Map
 - The board remains 600 mm square with good going as the baseline terrain.
 - The good-going reference grid is drawn in 40 mm squares.
-- Two roads cross the whole map and intersect at the center.
-- One quadrant contains a water blob, one contains obstructing bad going (forest), one contains an impassable blob, and one contains non-obstructing bad going (swamp).
-- The default setup also includes sample red and blue forces arranged so single-unit movement, rank movement, mounted movement, and file movement can be exercised immediately without seeded overlap.
+- New games use guided setup (army builder → terrain placement → sequential unit deployment) instead of seeded blue/red sample armies.
+- Edit mode can still place free units for debugging.
+
+### Guided Setup And Auto Deploy
+- Each army must total exactly 24 AP. Both players choose a presentation color and faction independently of ownership IDs (`player-1` / `player-2`).
+- After armies are accepted, a coin flip chooses the temporary defender. The defender places terrain, then deploys in the bottom quarter; the attacker deploys afterward in the top quarter.
+- Deployment requires every base corner to stay in the assigned quarter with no overlaps.
+- **Auto Deploy** places only the active player's remaining tray units, then leaves them editable:
+  - Same-type blocks prefer ranks up to about four wide, sharing one front line (not center-aligned). Line troops spread laterally across the zone and avoid stacking in files; only flyers, fast movers, and artillery may sit behind, and even they also consider flank/mid placements.
+  - Bad-going-tolerant troops (including Shooters and Warbands) bias toward forest/swamp; other troops avoid bad going underfoot. Auto Deploy samples a frontage-wide corridor about 180 mm ahead so good-going troops do not sit in front of forest, swamp, water, or impassable terrain.
+  - Shooters stay front-line. Artillery prefers the rear. Fast movers and Flyers prefer flanks or rear; Flyers stay in their own formations.
+  - Defenders use terrain and formation heuristics. Attackers also use a scored matchup table (`getDeploymentMatchupScore`) to align against the defender's line where practical.
+  - Facing stays the default for the quarter; depth prefers mid-zone unless a rear/flank role asks for behind.
 
 ### Shared Controls
 - The prototype supports free camera pan and zoom on the canvas.

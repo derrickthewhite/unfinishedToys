@@ -68,6 +68,7 @@
                 deploymentStatus: document.getElementById('deploymentStatus'),
                 deploymentSnapCheckbox: document.getElementById('deploymentSnapCheckbox'),
                 deploymentTray: document.getElementById('deploymentTray'),
+                autoDeployButton: document.getElementById('autoDeployButton'),
                 finishDeploymentButton: document.getElementById('finishDeploymentButton'),
                 confirmationModal: document.getElementById('confirmationModal'),
                 confirmationBackdrop: document.getElementById('confirmationBackdrop'),
