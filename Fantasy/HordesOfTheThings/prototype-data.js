@@ -35,13 +35,19 @@
     const RESERVE_CAPACITY = 24;
     const RESERVE_RECYCLE_TYPES = Object.freeze(['Horde']);
     const RESERVE_ENEMY_CLEARANCE_PACES = 200;
+    const MAGICIAN_MAX_RANGE_PACES = 600;
+    const MAGICIAN_MOVE_COST = 2;
+    const MAGICIAN_ATTACK_DECLARE_COST = 2;
+    const ENSORCELLED_RETURN_MOVE_COST = 6;
+    const MAGICIAN_ENSORCELLED_RETURN_PACES = 250;
+    const ENSORCELLABLE_TYPES = Object.freeze(['Hero', 'Magician']);
 
     const PLAYER_IDS = Object.freeze(['player-1', 'player-2']);
     const ARMY_POINT_TARGET = 24;
     const FACTIONS = Object.freeze(['Panda', 'Undead', 'Goblin', 'Gunpowder', 'Dinosaurs']);
     const FACTION_ROSTERS = Object.freeze({
         Panda: Object.freeze(['Blade', 'Spear', 'Shooter', 'Artillery', 'Knights', 'Hero']),
-        Undead: Object.freeze(['Blade', 'Spear', 'Warband', 'Horde', 'Riders']),
+        Undead: Object.freeze(['Blade', 'Spear', 'Warband', 'Horde', 'Riders', 'Magician']),
         Goblin: Object.freeze(['Spear', 'Heavy-Warband', 'Shooter', 'Horde', 'Riders']),
         Gunpowder: Object.freeze(['Blade', 'Shooter', 'Artillery', 'Riders']),
         Dinosaurs: Object.freeze(['Heavy-Spear', 'Beasts', 'Flyers', 'Behemoth'])
@@ -178,6 +184,15 @@
         Knights: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 400, good: 400, bad: 200, water: 100 }, strength: { infantry: 3, mounted: 4 }, combat: { ignoresBadGoingPenalty: false } },
         Riders: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 500, good: 500, bad: 200, water: 100 }, strength: { infantry: 3, mounted: 3 }, combat: { ignoresBadGoingPenalty: false } },
         Hero: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 500, good: 500, bad: 200, water: 100 }, strength: { infantry: 5, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } },
+        Magician: {
+            value: 4,
+            depth: 40,
+            troopClass: 'mounted',
+            moves: { road: 500, good: 500, bad: 200, water: 100 },
+            strength: { infantry: 4, mounted: 4 },
+            ranged: { phase: 'shooting', range: MAGICIAN_MAX_RANGE_PACES, magician: true, requiresOwnTurn: true },
+            combat: { ignoresBadGoingPenalty: false, moveCost: MAGICIAN_MOVE_COST, attackDeclareCost: MAGICIAN_ATTACK_DECLARE_COST }
+        },
         Beasts: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 400, good: 400, bad: 400, water: 100 }, strength: { infantry: 3, mounted: 4 }, combat: { ignoresBadGoingPenalty: true } },
         Flyers: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 1200, good: 1200, bad: 1200, water: 1200 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false }, movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 } },
         Behemoth: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 400, good: 300, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } }
@@ -198,6 +213,7 @@
         Knights: { Shooter: 2, Horde: 2, Blade: 1, Warband: 1, Spear: -1 },
         Riders: { Shooter: 1, Artillery: 1, Horde: 1 },
         Hero: { Hero: 1, Behemoth: 1, Knights: 1 },
+        Magician: { Hero: 1, Magician: 1 },
         Beasts: { Warband: 1, Horde: 1, Shooter: 1 },
         Flyers: { Artillery: 1, Shooter: 1, Horde: 1 },
         Behemoth: { Knights: 1, Spear: 1, Blade: 1, Artillery: -2 }
@@ -232,6 +248,7 @@
             return null;
         }
         return {
+            ...ranged,
             phase: ranged.phase,
             range: pacesToMm(ranged.range),
             width: ranged.width,
@@ -376,6 +393,12 @@
         RESERVE_CAPACITY,
         RESERVE_RECYCLE_TYPES,
         RESERVE_ENEMY_CLEARANCE_PACES,
+        MAGICIAN_MAX_RANGE_PACES,
+        MAGICIAN_MOVE_COST,
+        MAGICIAN_ATTACK_DECLARE_COST,
+        ENSORCELLED_RETURN_MOVE_COST,
+        MAGICIAN_ENSORCELLED_RETURN_PACES,
+        ENSORCELLABLE_TYPES,
         ARMY_POINT_TARGET,
         FACTIONS,
         FACTION_ROSTERS,

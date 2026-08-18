@@ -222,7 +222,7 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`,
 
 ## Planned Game Extensions
 
-- Add reserve deployment for units such as Hordes and future Lurkers: these units begin off-board or are removed from the board, then enter during play using the deployment tray and placement validation as shared foundations. **Done for Hordes** — each player has a world-space reserve lot left of the board; destroyed Hordes go there after combat acknowledge and can be redeployed onto the home edge for 1 PIP. Heroes, Magicians, and Lurkers can use the same lot later.
+- Add reserve deployment for units such as Hordes and future Lurkers: these units begin off-board or are removed from the board, then enter during play using the deployment tray and placement validation as shared foundations. **Done for Hordes** — each player has a world-space reserve lot left of the board; destroyed Hordes go there after combat acknowledge and can be redeployed onto the home edge for 1 PIP. Ensorcelled Heroes return onto the enemy home edge for 0 or 6 PIPs; ensorcelled Magicians return within 250 paces of the spot they left. Magicians are in the Undead roster with faction art at `assets/Undead/Magician.svg`.
 - Add further armies once their artwork is available.
 - Add an optional game-start mode that limits each faction to an allowed unit roster. **Done** — Game Settings has a default-on toggle; each faction can recruit only the types it has artwork for.
 - Add more unit types.

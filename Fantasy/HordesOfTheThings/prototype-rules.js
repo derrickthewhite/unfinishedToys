@@ -382,12 +382,52 @@
         return Boolean(unit && unit.ranged && unit.ranged.phase === 'shooting');
     }
 
-    function canUnitShoot(unit, activePlayerId) {
+    function isMagicianUnit(unit) {
+        return Boolean(unit && unit.type === 'Magician');
+    }
+
+    function isEnsorcellableType(unit) {
+        return Boolean(unit && data.ENSORCELLABLE_TYPES.includes(unit.type));
+    }
+
+    function getMoveCost(unit) {
+        return unit?.combat?.moveCost || 1;
+    }
+
+    function getAttackDeclareCost(unit) {
+        return unit?.combat?.attackDeclareCost || 0;
+    }
+
+    function getDraftMoveCost(unitIds, units) {
+        return unitIds.some((unitId) => {
+            const unit = units.find((entry) => entry.id === unitId);
+            return getMoveCost(unit) > 1;
+        }) ? data.MAGICIAN_MOVE_COST : 1;
+    }
+
+    function getBaseEdgeDistance(left, right) {
+        return geometry.minDistanceBetweenPolygons(
+            geometry.getUnitCorners(left),
+            geometry.getUnitCorners(right)
+        );
+    }
+
+    function isMagicianSightLineBlocked(start, end, terrain) {
+        return sampleSegmentTerrain(start, end, terrain).some((sample) => sample.kind === 'impassable');
+    }
+
+    function canUnitShoot(unit, activePlayerId, options) {
         if (!isRangedUnit(unit)) {
             return false;
         }
         if (unit.ranged.requiresOwnTurn && activePlayerId && getPlayerId(unit) !== normalizePlayerId(activePlayerId)) {
             return false;
+        }
+        if (!options?.allowAlreadyAttacked && unit.attackedThisTurn) {
+            return false;
+        }
+        if (isMagicianUnit(unit)) {
+            return !unit.ranged.requiresStationary || !unit.movedThisTurn;
         }
         return !unit.ranged.requiresStationary || !unit.movedThisTurn;
     }
@@ -400,8 +440,9 @@
         const frontMid = geometry.midpoint(corners.frontLeft, corners.frontRight);
         const right = geometry.getRightVector(unit.rotation);
         const forward = geometry.getForwardVector(unit.rotation);
-        const nearLeft = geometry.add(frontMid, geometry.scaleVector(right, -unit.ranged.width / 2));
-        const nearRight = geometry.add(frontMid, geometry.scaleVector(right, unit.ranged.width / 2));
+        const width = unit.ranged.width || data.SHOOTING_BOX_WIDTH;
+        const nearLeft = geometry.add(frontMid, geometry.scaleVector(right, -width / 2));
+        const nearRight = geometry.add(frontMid, geometry.scaleVector(right, width / 2));
         const farLeft = geometry.add(nearLeft, geometry.scaleVector(forward, unit.ranged.range));
         const farRight = geometry.add(nearRight, geometry.scaleVector(forward, unit.ranged.range));
         return { nearLeft, nearRight, farRight, farLeft };
@@ -659,9 +700,35 @@
         });
     }
 
-    function isValidShootingAttack(attacker, target, units, terrain, activePlayerId) {
-        if (!attacker || !target || getPlayerId(attacker) === getPlayerId(target) || !canUnitShoot(attacker, activePlayerId)) {
+    function isValidMagicianAttack(attacker, target, units, terrain, activePlayerId, options) {
+        if (!attacker || !target || getPlayerId(attacker) === getPlayerId(target) || !canUnitShoot(attacker, activePlayerId, options)) {
             return false;
+        }
+        if (!isMagicianUnit(attacker)) {
+            return false;
+        }
+        if (isUnitEngagedForShooting(attacker, units)) {
+            return false;
+        }
+        if (getBaseEdgeDistance(attacker, target) > attacker.ranged.range + 0.5) {
+            return false;
+        }
+        const shooterCorners = geometry.getUnitCorners(attacker);
+        const frontMid = geometry.midpoint(shooterCorners.frontLeft, shooterCorners.frontRight);
+        const nearestSide = getNearestTargetSide(attacker, target);
+        if (!nearestSide) {
+            return false;
+        }
+        const targetMid = sideMidpoint(nearestSide);
+        return !isMagicianSightLineBlocked(frontMid, targetMid, terrain);
+    }
+
+    function isValidShootingAttack(attacker, target, units, terrain, activePlayerId, options) {
+        if (!attacker || !target || getPlayerId(attacker) === getPlayerId(target) || !canUnitShoot(attacker, activePlayerId, options)) {
+            return false;
+        }
+        if (isMagicianUnit(attacker)) {
+            return isValidMagicianAttack(attacker, target, units, terrain, activePlayerId, options);
         }
         if (isUnitEngagedForShooting(attacker, units)) {
             return false;
@@ -763,6 +830,12 @@
         if (loser.type === 'Behemoth' && winner.type === 'Artillery') {
             return { outcome: 'flee', destructionRule: null };
         }
+        if (loser.type === 'Magician' && winner.type === 'Hero' && phase === 'melee') {
+            return { outcome: 'destroy', destructionRule: 'Heroes destroy Magicians when they win melee.' };
+        }
+        if (winner.type === 'Magician' && (loser.type === 'Hero' || loser.type === 'Magician')) {
+            return { outcome: 'ensorcel', destructionRule: 'Magicians ensorcel Heroes and Magicians on a minor win.' };
+        }
         if (loser.type === 'Hero') {
             return { outcome: 'recoil', destructionRule: null };
         }
@@ -813,7 +886,15 @@
             strength: unit.strength ? { ...unit.strength } : undefined,
             ranged: unit.ranged ? { ...unit.ranged } : null,
             movement: unit.movement ? { ...unit.movement } : {},
-            combat: unit.combat ? { ...unit.combat } : {}
+            combat: unit.combat ? { ...unit.combat } : {},
+            ensorcelledByUnitId: unit.ensorcelledByUnitId
+        };
+    }
+
+    function buildEnsorcelledUnit(unit, ensorcelledByUnitId) {
+        return {
+            ...cloneUnit(unit),
+            ensorcelledByUnitId: ensorcelledByUnitId === undefined ? null : ensorcelledByUnitId
         };
     }
 
@@ -1016,7 +1097,7 @@
         Object.entries(declarations || {}).forEach(([attackerId, targetId]) => {
             const attacker = baseUnits.find((unit) => unit.id === attackerId);
             const target = baseUnits.find((unit) => unit.id === targetId);
-            if (!attacker || !target || !isValidShootingAttack(attacker, target, baseUnits, terrain, activePlayerId)) {
+            if (!attacker || !target || !isValidShootingAttack(attacker, target, baseUnits, terrain, activePlayerId, { allowAlreadyAttacked: true })) {
                 return;
             }
             if (!attacksByTarget.has(targetId)) {
@@ -1085,6 +1166,7 @@
                 return;
             }
             result.loserId = loser.id;
+            result.winnerId = winner.id;
             if (highTotal >= lowTotal * 2) {
                 result.outcome = 'destroy';
                 result.destructionRule = 'Double total destroys the loser.';
@@ -1098,6 +1180,7 @@
         });
 
         const destroyedIds = new Set();
+        const ensorcelledIds = new Map();
         const recoils = [];
         results.forEach((result) => {
             if (!result.loserId) {
@@ -1107,12 +1190,22 @@
                 destroyedIds.add(result.loserId);
                 return;
             }
+            if (result.outcome === 'ensorcel') {
+                ensorcelledIds.set(result.loserId, result.winnerId);
+                return;
+            }
             if (result.outcome === 'recoil' || result.outcome === 'flee') {
                 recoils.push({ unitId: result.loserId, flee: result.outcome === 'flee' });
             }
         });
+        results.forEach((result) => {
+            const attacker = baseUnits.find((unit) => unit.id === result.primaryAttackerId);
+            if (attacker?.type === 'Magician' && result.attackerRoll === 1) {
+                ensorcelledIds.set(attacker.id, null);
+            }
+        });
 
-        let mutableUnits = units.map(cloneUnit).filter((unit) => !destroyedIds.has(unit.id));
+        let mutableUnits = units.map(cloneUnit).filter((unit) => !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id));
         recoils.forEach((entry) => {
             const unitId = entry.unitId;
             if (destroyedIds.has(unitId)) {
@@ -1150,9 +1243,14 @@
         });
 
         const destroyedUnits = units.filter((unit) => destroyedIds.has(unit.id)).map(cloneUnit);
+        const ensorcelledUnits = [...ensorcelledIds.entries()].map(([unitId, ensorcelledByUnitId]) => {
+            const unit = units.find((entry) => entry.id === unitId);
+            return unit ? buildEnsorcelledUnit(unit, ensorcelledByUnitId) : null;
+        }).filter(Boolean);
         return {
-            units: mutableUnits.filter((unit) => !destroyedIds.has(unit.id)),
+            units: mutableUnits.filter((unit) => !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id)),
             destroyedUnits,
+            ensorcelledUnits,
             results,
             recoilDestructions,
             attacksByTarget: Object.fromEntries(Array.from(attacksByTarget.entries()).map(([targetId, attackerIds]) => [targetId, [...attackerIds]]))
@@ -1716,14 +1814,27 @@
         });
 
         const destroyedIds = new Set();
+        const ensorcelledIds = new Map();
         const recoilQueue = [];
         results.forEach((result) => {
             if (!result.loserCombatantId) {
                 return;
             }
             const loserCombatant = combatantsById.get(result.loserCombatantId);
+            const winnerCombatant = result.loserCombatantId === result.leftCombatantId
+                ? combatantsById.get(result.rightCombatantId)
+                : combatantsById.get(result.leftCombatantId);
             if (result.outcome === 'destroy') {
                 loserCombatant.unitIds.forEach((unitId) => destroyedIds.add(unitId));
+                return;
+            }
+            if (result.outcome === 'ensorcel') {
+                loserCombatant.unitIds.forEach((unitId) => {
+                    const unit = mutableStartingUnits.find((entry) => entry.id === unitId);
+                    if (unit && isEnsorcellableType(unit)) {
+                        ensorcelledIds.set(unitId, winnerCombatant.primaryUnit.id);
+                    }
+                });
                 return;
             }
             if (result.outcome === 'recoil' || result.outcome === 'flee') {
@@ -1735,7 +1846,7 @@
             }
         });
 
-        let mutableUnits = mutableStartingUnits.filter((unit) => !destroyedIds.has(unit.id));
+        let mutableUnits = mutableStartingUnits.filter((unit) => !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id));
         recoilQueue.forEach((entry) => {
             if (entry.combatant.unitIds.some((unitId) => destroyedIds.has(unitId))) {
                 return;
@@ -1772,9 +1883,14 @@
         });
 
         const destroyedUnits = mutableStartingUnits.filter((unit) => destroyedIds.has(unit.id)).map(cloneUnit);
+        const ensorcelledUnits = [...ensorcelledIds.entries()].map(([unitId, ensorcelledByUnitId]) => {
+            const unit = mutableStartingUnits.find((entry) => entry.id === unitId);
+            return unit ? buildEnsorcelledUnit(unit, ensorcelledByUnitId) : null;
+        }).filter(Boolean);
         return {
-            units: mutableUnits.filter((unit) => !destroyedIds.has(unit.id)),
+            units: mutableUnits.filter((unit) => !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id)),
             destroyedUnits,
+            ensorcelledUnits,
             results,
             recoilDestructions,
             combats: adjustedCombats,
@@ -2469,6 +2585,11 @@
         movementAllowanceForSeverity,
         resolveAngledRankMoveContact,
         isRangedUnit,
+        isMagicianUnit,
+        isEnsorcellableType,
+        getMoveCost,
+        getAttackDeclareCost,
+        getDraftMoveCost,
         canUnitShoot,
         getRangedArea,
         getNearestTargetSide,

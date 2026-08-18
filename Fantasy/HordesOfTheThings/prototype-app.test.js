@@ -20,6 +20,7 @@ test('unit asset lookup includes generic artwork for the remaining unit types', 
         assert.equal(app.getUnitAssetPath({ type, faction: 'Panda' }), `assets/${type}.svg`);
     });
     assert.equal(app.getUnitAssetPath({ type: 'Artillery', faction: 'Undead' }), 'assets/Artillery.svg');
+    assert.equal(app.getUnitAssetPath({ type: 'Magician', faction: 'Undead' }), 'assets/undead/Magician.svg');
     assert.equal(app.getUnitAssetPath({ type: 'Spear', faction: 'Goblin' }), 'assets/goblin/Spear.svg');
     assert.equal(app.getUnitAssetPath({ type: 'Blade', faction: 'Goblin' }), 'assets/Blade.svg');
     assert.equal(app.getUnitAssetPath({ type: 'Artillery', faction: 'Gunpowder' }), 'assets/gunpowder/Artillery.svg');
@@ -1319,6 +1320,59 @@ test('drawCombatResolutionOverlays still renders summaries for destroyed partici
 
     assert.equal(labels.length, 1);
     assert.equal(labels[0].text, '5 vs 2');
+});
+
+test('combat labels use ghost positions for ensorcelled participants', () => {
+    const attacker = data.createUnit('Magician', 'player-1', 'Undead', { x: 280, y: 520, rotation: 0 }, () => 'mag');
+    const defender = data.createUnit('Hero', 'player-2', 'Undead', { x: 280, y: 400, rotation: Math.PI }, () => 'hero');
+    const reservePose = { ...attacker, inReserve: true, reserveSlot: 0, x: -120, y: 520 };
+    const app = createAppHarness({
+        state: {
+            units: [defender],
+            reserveUnits: [reservePose],
+            combatResolution: {
+                phase: 'shooting',
+                participantIds: new Set(['mag', 'hero']),
+                ghostSnapshot: {
+                    mag: { ...attacker }
+                },
+                movedUnitIds: ['mag'],
+                results: [{
+                    primaryAttackerId: 'mag',
+                    defenderId: 'hero',
+                    attackerIds: ['mag'],
+                    attackerTotal: 5,
+                    defenderTotal: 9
+                }]
+            }
+        }
+    });
+    const labels = [];
+    const ctx = {
+        save() {},
+        restore() {},
+        beginPath() {},
+        roundRect() {},
+        fill() {},
+        stroke() {},
+        fillText(text, x, y) {
+            labels.push({ text, x, y });
+        },
+        set fillStyle(value) {},
+        set strokeStyle(value) {},
+        set lineWidth(value) {},
+        set font(value) {},
+        set textAlign(value) {},
+        set textBaseline(value) {}
+    };
+
+    app.drawCombatResolutionOverlays(ctx);
+
+    assert.equal(labels.length, 1);
+    const expected = geometry.midpoint(geometry.getUnitCenter(attacker), geometry.getUnitCenter(defender));
+    assert.ok(Math.abs(labels[0].x - expected.x) < 0.01);
+    assert.ok(Math.abs(labels[0].y - expected.y) < 0.01);
+    assert.ok(labels[0].x > 0, 'label should stay on the board, not over the reserve lot');
 });
 
 test('render draws combat summaries after units', () => {

@@ -11,7 +11,7 @@
     class GameFlowMethods {
         stepSingleDraft() {
             const draft = this.state.draft;
-            if (!draft || this.state.selectionAnalysis.type !== 'single' || draft.kind === 'reserve-deploy') {
+            if (!draft || this.state.selectionAnalysis.type !== 'single' || this.isReserveDeployDraft()) {
                 return;
             }
             this.evaluateDraft();
@@ -37,20 +37,32 @@
                 this.updateStatus('Move is still illegal. Fix highlighted units or cancel the draft.');
                 return;
             }
-            // Commit the move and mark moved units so they cannot move again this turn
-            this.state.remainingMoves = Math.max(0, this.state.remainingMoves - 1);
+            let moveCost = 1;
+            if (draft.kind === 'reserve-deploy') {
+                moveCost = 1;
+            } else if (draft.kind === 'ensorcelled-return') {
+                moveCost = draft.returnCost || 0;
+            } else {
+                moveCost = rules.getDraftMoveCost(draft.unitIds, this.state.units);
+            }
+            this.state.remainingMoves = Math.max(0, this.state.remainingMoves - moveCost);
             const reserveDeploy = draft.kind === 'reserve-deploy';
+            const ensorcelledReturn = draft.kind === 'ensorcelled-return';
             draft.unitIds.forEach((unitId) => {
                 const unit = this.getUnitById(unitId);
                 const before = draft.initialOrigin[unitId];
                 if (!unit) {
                     return;
                 }
-                if (reserveDeploy) {
+                if (reserveDeploy || ensorcelledReturn) {
                     unit.movedThisTurn = true;
                     this.clearLossForUnit(unit.id);
                     delete unit.inReserve;
                     delete unit.reserveSlot;
+                    if (ensorcelledReturn) {
+                        delete unit.ensorcelledByUnitId;
+                        delete unit.ensorcelledFrom;
+                    }
                     return;
                 }
                 if (before && this.hasUnitMoved(before, unit)) {
@@ -71,16 +83,16 @@
             if (this.state.mode !== 'game' || this.state.phase !== 'move') {
                 return;
             }
-            // Cancel any active draft and proceed to form-up as if moves were exhausted
+            // Unused PIPs persist into shooting so Magicians can still declare attacks.
             this.cancelDraft(false);
-            this.state.remainingMoves = 0;
             this.beginFormUpPhase();
         }
 
         resetMovedFlags(playerId) {
             this.state.units.forEach((unit) => {
-            if (!playerId || this.getUnitPlayerId(unit) === playerId) {
+                if (!playerId || this.getUnitPlayerId(unit) === playerId) {
                     unit.movedThisTurn = false;
+                    unit.attackedThisTurn = false;
                 }
             });
         }
@@ -130,9 +142,24 @@
             };
         }
 
+        canDeclareShootingAttack(unit) {
+            if (!unit || this.state.mode !== 'game') {
+                return false;
+            }
+            const declareCost = rules.getAttackDeclareCost(unit);
+            if (declareCost > 0 && this.state.remainingMoves < declareCost) {
+                return false;
+            }
+            return rules.canUnitShoot(unit, this.state.activePlayerId)
+                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activePlayerId).length > 0;
+        }
+
         hasAnyShootingAttacks() {
-            return this.state.units.some((unit) => rules.isRangedUnit(unit)
-                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activePlayerId).length > 0);
+            return this.state.units.some((unit) => this.canDeclareShootingAttack(unit));
+        }
+
+        hasUndeclaredShootingAttacks() {
+            return this.state.units.some((unit) => this.needsShootingDeclaration(unit));
         }
 
         advanceToNextTurn() {
@@ -189,9 +216,7 @@
                 return false;
             }
             const attacks = this.state.shooting?.attacksByAttacker || {};
-            return rules.canUnitShoot(unit, this.state.activePlayerId)
-                && !attacks[unit.id]
-                && rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activePlayerId).length > 0;
+            return this.canDeclareShootingAttack(unit) && !attacks[unit.id];
         }
 
         isUnitShootingParticipant(unit) {
@@ -243,7 +268,19 @@
                 return;
             }
             if (shooting.focusedAttackerId && shooting.validTargetIds.includes(unit.id)) {
+                const attacker = this.getUnitById(shooting.focusedAttackerId);
+                const declareCost = rules.getAttackDeclareCost(attacker);
+                if (declareCost > 0 && this.state.remainingMoves < declareCost) {
+                    this.updateStatus(`Declaring a ${attacker.type} attack requires ${declareCost} moves.`);
+                    return;
+                }
                 shooting.attacksByAttacker[shooting.focusedAttackerId] = unit.id;
+                if (declareCost > 0) {
+                    this.state.remainingMoves = Math.max(0, this.state.remainingMoves - declareCost);
+                }
+                if (attacker) {
+                    attacker.attackedThisTurn = true;
+                }
                 this.state.selectedIds = [shooting.focusedAttackerId];
                 this.syncUiFromState();
                 this.requestRender();
@@ -261,7 +298,15 @@
                     this.state.selectedIds = [];
                     this.syncUiFromState();
                     this.requestRender();
-                    this.updateStatus(`${unit.type} cannot shoot after moving this turn.`);
+                    const status = rules.isMagicianUnit(unit) && unit.attackedThisTurn
+                        ? `${unit.type} has already attacked this turn.`
+                        : `${unit.type} cannot shoot after moving this turn.`;
+                    this.updateStatus(status);
+                    return;
+                }
+                const declareCost = rules.getAttackDeclareCost(unit);
+                if (declareCost > 0 && this.state.remainingMoves < declareCost) {
+                    this.updateStatus(`Declaring a ${unit.type} attack requires ${declareCost} moves.`);
                     return;
                 }
                 const validTargetIds = rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activePlayerId);
@@ -304,10 +349,14 @@
             const participantIds = new Set();
             const ghostSnapshot = {};
             const destroyedIds = new Set(result.destroyedUnits.map((unit) => unit.id));
+            const ensorcelledIds = new Set((result.ensorcelledUnits || []).map((unit) => unit.id));
             allIds.forEach((unitId) => {
                 const before = snapshot[unitId];
-                const live = result.units.find((unit) => unit.id === unitId) || result.destroyedUnits.find((unit) => unit.id === unitId) || null;
-                if (destroyedIds.has(unitId) || !live || this.hasUnitMoved(before, live)) {
+                const live = result.units.find((unit) => unit.id === unitId)
+                    || result.destroyedUnits.find((unit) => unit.id === unitId)
+                    || (result.ensorcelledUnits || []).find((unit) => unit.id === unitId)
+                    || null;
+                if (destroyedIds.has(unitId) || ensorcelledIds.has(unitId) || !live || this.hasUnitMoved(before, live)) {
                     ghostSnapshot[unitId] = { ...before };
                     participantIds.add(unitId);
                 }
@@ -327,6 +376,7 @@
                 ghostSnapshot,
                 destroyedIds,
                 recycledUnits: (result.destroyedUnits || []).filter((unit) => this.isReserveRecycleType(unit)),
+                ensorcelledUnits: result.ensorcelledUnits || [],
                 movedUnitIds: Object.keys(ghostSnapshot),
                 results: result.results.map((entry) => ({
                     ...entry,
@@ -376,11 +426,22 @@
             (result.recoilDestructions || []).forEach((entry) => {
                 console.log(`recoil destruction: ${this.describeCombatUnits(result, [entry.unitId])} | reason ${entry.reason}`);
             });
+            (result.ensorcelledUnits || []).forEach((unit) => {
+                const ensorceller = unit.ensorcelledByUnitId === null
+                    ? 'self (rolled 1)'
+                    : (this.getCombatUnit(result, unit.ensorcelledByUnitId)
+                        ? this.describeCombatUnits(result, [unit.ensorcelledByUnitId])
+                        : unit.ensorcelledByUnitId);
+                console.log(`ensorcelled: ${this.describeCombatUnits(result, [unit.id])} | ensorcelled by ${ensorceller}`);
+            });
             console.groupEnd();
         }
 
         getCombatUnit(result, unitId) {
-            return result.units.find((unit) => unit.id === unitId) || result.destroyedUnits.find((unit) => unit.id === unitId) || null;
+            return result.units.find((unit) => unit.id === unitId)
+                || result.destroyedUnits.find((unit) => unit.id === unitId)
+                || (result.ensorcelledUnits || []).find((unit) => unit.id === unitId)
+                || null;
         }
 
         getCombatSideLabel(result, unitId) {
@@ -415,7 +476,24 @@
                 .join(', ');
         }
 
-        resolveShootingPhase() {
+        skipShootingPhase() {
+            this.state.shooting = null;
+            this.state.selectedIds = [];
+            this.setPhase('melee');
+            if (this.maybeAutoAdvanceCombatPhase()) {
+                return;
+            }
+            this.updateSelectionAnalysis();
+            this.syncUiFromState();
+            this.updateStatus('Shooting skipped. Melee phase: resolve all detected combats.');
+        }
+
+        openSkipShootingConfirmation() {
+            this.state.confirmation = 'skip-shooting';
+            this.syncUiFromState();
+        }
+
+        resolveShootingPhase(options = {}) {
             if (this.state.mode !== 'game' || this.state.phase !== 'shooting') {
                 return;
             }
@@ -423,6 +501,15 @@
                 return;
             }
             const shooting = this.getShootingState();
+            if (this.hasUndeclaredShootingAttacks() && !options.skipUndeclared) {
+                this.openSkipShootingConfirmation();
+                return;
+            }
+            this.state.confirmation = null;
+            if (Object.keys(shooting.attacksByAttacker || {}).length === 0) {
+                this.skipShootingPhase();
+                return;
+            }
             const snapshot = geometry.snapshotPositions(this.state.units.map((unit) => unit.id), this.state.units);
             const result = rules.resolveShooting(
                 this.state.units,
@@ -434,12 +521,22 @@
             this.state.units = result.units;
             this.recordLosses(result.destroyedUnits);
             this.state.combatResolution = this.buildCombatResolution(snapshot, result, 'shooting');
+            this.settleEnsorcelledUnits(result.ensorcelledUnits);
             this.logCombatResults(result, 'shooting');
             this.state.selectedIds = [];
             this.state.shooting = null;
             this.updateSelectionAnalysis();
             this.syncUiFromState();
-            this.updateStatus(`Shooting resolved: ${result.destroyedUnits.length} units destroyed. Review the aftermath, then click Acknowledged.`);
+            const ensorcelledCount = (result.ensorcelledUnits || []).length;
+            const destroyedCount = result.destroyedUnits.length;
+            const summary = [];
+            if (destroyedCount > 0) {
+                summary.push(`${destroyedCount} destroyed`);
+            }
+            if (ensorcelledCount > 0) {
+                summary.push(`${ensorcelledCount} ensorcelled`);
+            }
+            this.updateStatus(`Shooting resolved${summary.length ? `: ${summary.join(', ')}` : ''}. Review the aftermath, then click Acknowledged.`);
         }
 
         resolveMeleePhase() {
@@ -451,6 +548,7 @@
             this.state.units = result.units;
             this.recordLosses(result.destroyedUnits);
             this.state.combatResolution = this.buildCombatResolution(snapshot, result, 'melee');
+            this.settleEnsorcelledUnits(result.ensorcelledUnits);
             this.logCombatResults(result, 'melee');
             this.state.selectedIds = [];
             this.state.melee = null;
@@ -465,7 +563,10 @@
             const points = losses.reduce((sum, unit) => sum + unit.value, 0);
             const title = losses.length === 0
                 ? 'No losses.'
-                : losses.map((unit) => `${unit.type} (${unit.value})${reserveIds.has(unit.id) ? ' in reserve' : ''}`).join('\n');
+                : losses.map((unit) => {
+                    const suffix = reserveIds.has(unit.id) ? ' in reserve' : '';
+                    return `${unit.type} (${unit.value})${suffix}`;
+                }).join('\n');
             return { points, title };
         }
 
@@ -569,6 +670,16 @@
             if (this.state.draft.kind === 'reserve-deploy') {
                 const unit = this.getUnitById(this.state.draft.unitIds[0]);
                 const result = this.validateReserveDeploy(unit, this.state.units, this.state.terrain);
+                this.state.draft.invalidIds = result.invalid ? new Set(this.state.draft.unitIds) : new Set();
+                this.state.draft.reasonById = result.invalid
+                    ? new Map([[this.state.draft.unitIds[0], result.reason]])
+                    : new Map();
+                this.syncUiFromState();
+                return;
+            }
+            if (this.state.draft.kind === 'ensorcelled-return') {
+                const unit = this.getUnitById(this.state.draft.unitIds[0]);
+                const result = this.validateEnsorcelledReturn(unit, this.state.units, this.state.terrain);
                 this.state.draft.invalidIds = result.invalid ? new Set(this.state.draft.unitIds) : new Set();
                 this.state.draft.reasonById = result.invalid
                     ? new Map([[this.state.draft.unitIds[0], result.reason]])

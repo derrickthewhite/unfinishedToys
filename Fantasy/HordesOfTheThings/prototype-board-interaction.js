@@ -62,14 +62,28 @@
                     return false;
                 }
                 const unit = this.getUnitById(selectedUnits[0].id);
-                this.applyReserveDeployPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(unit).x + delta.x);
+                if (this.isEnsorcelledLocalReturnDraft()) {
+                    unit.x += delta.x;
+                    unit.y += delta.y;
+                } else {
+                    this.applyReserveDraftPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(unit).x + delta.x);
+                }
                 this.evaluateDraft();
                 this.requestRender();
                 return true;
             }
+            if (this.isEnsorcelledLocalReturnDraft()) {
+                const unit = selectedUnits[0];
+                unit.x += delta.x;
+                unit.y += delta.y;
+                this.evaluateDraft();
+                this.requestRender();
+                this.updateStatus('Draft nudged.');
+                return true;
+            }
             if (this.isReserveDeployDraft()) {
                 const unit = selectedUnits[0];
-                this.applyReserveDeployPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(unit).x + delta.x);
+                this.applyReserveDraftPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(unit).x + delta.x);
                 this.evaluateDraft();
                 this.requestRender();
                 this.updateStatus('Draft nudged.');
@@ -409,8 +423,15 @@
                 const unitId = interaction.draftIds[0];
                 const base = interaction.dragBase[unitId];
                 const unit = this.getUnitById(unitId);
+                if (this.isEnsorcelledLocalReturnDraft()) {
+                    unit.x = base.x + delta.x;
+                    unit.y = base.y + delta.y;
+                    this.evaluateDraft();
+                    this.requestRender();
+                    return;
+                }
                 if (this.isReserveDeployDraft()) {
-                    this.applyReserveDeployPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(base).x + delta.x);
+                    this.applyReserveDraftPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(base).x + delta.x);
                     this.evaluateDraft();
                     this.requestRender();
                     return;
@@ -718,7 +739,7 @@
         }
 
         getSelectionHandles() {
-            if (this.isReserveDeployDraft()) {
+            if (this.isReserveDeployDraft() && !this.isEnsorcelledLocalReturnDraft()) {
                 return [];
             }
             if (this.state.mode === 'game' && this.state.phase !== 'move' && this.state.setupStage !== 'unit-deployment') {
@@ -1116,6 +1137,11 @@
                 this.updateStatus('No moves remain for this side.');
                 return false;
             }
+            const moveCost = rules.getDraftMoveCost(unitIds, this.state.units);
+            if (this.state.remainingMoves < moveCost) {
+                this.updateStatus(`This move requires ${moveCost} moves.`);
+                return false;
+            }
             if (this.state.draft && geometry.sameIdSet(this.state.draft.unitIds, unitIds)) {
                 return true;
             }
@@ -1210,14 +1236,17 @@
                 this.syncUiFromState();
                 return;
             }
-            if (this.state.draft.kind === 'reserve-deploy') {
+            if (this.isReserveDeployDraft()) {
+                const draftKind = this.state.draft.kind;
                 this.restoreReserveDeploy(this.state.draft);
                 this.state.draft = null;
                 this.updateSelectionAnalysis();
                 this.syncUiFromState();
                 this.requestRender();
                 if (showStatus) {
-                    this.updateStatus('Reserve deployment cancelled.');
+                    this.updateStatus(draftKind === 'ensorcelled-return'
+                        ? 'Ensorcelled return cancelled.'
+                        : 'Reserve deployment cancelled.');
                 }
                 return;
             }

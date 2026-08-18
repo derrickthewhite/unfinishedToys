@@ -18,7 +18,8 @@
             strength: unit.strength ? { ...unit.strength } : undefined,
             ranged: unit.ranged ? { ...unit.ranged } : null,
             movement: unit.movement ? { ...unit.movement } : {},
-            combat: unit.combat ? { ...unit.combat } : {}
+            combat: unit.combat ? { ...unit.combat } : {},
+            ensorcelledFrom: unit.ensorcelledFrom ? { ...unit.ensorcelledFrom } : undefined
         };
     }
 
@@ -78,7 +79,50 @@
             },
 
             isReserveDeployDraft() {
-                return this.state.draft?.kind === 'reserve-deploy';
+                return this.state.draft?.kind === 'reserve-deploy' || this.state.draft?.kind === 'ensorcelled-return';
+            },
+
+            isEnsorcelledLocalReturnDraft() {
+                const unit = this.getUnitById(this.state.draft?.unitIds?.[0]);
+                return this.state.draft?.kind === 'ensorcelled-return' && this.usesEnsorcelledLocalReturn(unit);
+            },
+
+            usesEnsorcelledLocalReturn(unit) {
+                return Boolean(unit && unit.type === 'Magician' && unit.ensorcelledFrom
+                    && Number.isFinite(unit.ensorcelledFrom.x)
+                    && Number.isFinite(unit.ensorcelledFrom.y));
+            },
+
+            isEnsorcelledInReserve(unitOrId) {
+                const unit = typeof unitOrId === 'string' ? this.getUnitById(unitOrId) : unitOrId;
+                return Boolean(unit && unit.inReserve && unit.ensorcelledByUnitId !== undefined);
+            },
+
+            getOpponentHomeEdge(playerId) {
+                return this.getHomeEdge(playerId) === 'bottom' ? 'top' : 'bottom';
+            },
+
+            getOpponentHomeEdgeRotation(playerId) {
+                return this.getOpponentHomeEdge(playerId) === 'bottom' ? 0 : Math.PI;
+            },
+
+            getEnsorcelledReturnCost(unit) {
+                if (!unit || unit.ensorcelledByUnitId === null || unit.ensorcelledByUnitId === undefined) {
+                    return 0;
+                }
+                const ensorceller = this.getUnitById(unit.ensorcelledByUnitId);
+                if (!ensorceller || this.isUnitInReserve(ensorceller.id)) {
+                    return 0;
+                }
+                return data.ENSORCELLED_RETURN_MOVE_COST;
+            },
+
+            isEnsorcellerActive(ensorcelledByUnitId) {
+                if (!ensorcelledByUnitId) {
+                    return false;
+                }
+                const ensorceller = this.getUnitById(ensorcelledByUnitId);
+                return Boolean(ensorceller && !this.isUnitInReserve(ensorceller.id));
             },
 
             getReserveSlotPose(playerId, slotIndex) {
@@ -121,7 +165,7 @@
                 return this.getReserveUnits().filter((unit) => this.getUnitPlayerId(unit) === playerId).length;
             },
 
-            sendUnitToReserve(unit) {
+            sendUnitToReserve(unit, options = {}) {
                 if (!unit) {
                     return null;
                 }
@@ -132,14 +176,34 @@
                 reserved.inReserve = true;
                 reserved.reserveSlot = slot;
                 reserved.movedThisTurn = false;
+                if (options.ensorcelledByUnitId !== undefined) {
+                    const origin = geometry.getUnitCenter(unit);
+                    reserved.ensorcelledByUnitId = options.ensorcelledByUnitId;
+                    reserved.ensorcelledFrom = {
+                        x: origin.x,
+                        y: origin.y,
+                        rotation: unit.rotation
+                    };
+                    this.recordLosses([unit]);
+                }
                 this.state.units = (this.state.units || []).filter((entry) => entry.id !== unit.id);
                 this.getReserveUnits().push(reserved);
                 return reserved;
             },
 
+            settleEnsorcelledUnits(units) {
+                (units || []).forEach((unit) => {
+                    if (!unit || this.isUnitInReserve(unit.id)) {
+                        return;
+                    }
+                    this.sendUnitToReserve(unit, { ensorcelledByUnitId: unit.ensorcelledByUnitId });
+                });
+            },
+
             settleRecycledCasualties() {
-                const recycledUnits = this.state.combatResolution?.recycledUnits || [];
-                recycledUnits.forEach((unit) => this.sendUnitToReserve(unit));
+                const resolution = this.state.combatResolution;
+                (resolution?.recycledUnits || []).forEach((unit) => this.sendUnitToReserve(unit));
+                this.settleEnsorcelledUnits(resolution?.ensorcelledUnits);
             },
 
             clearLossForUnit(unitId) {
@@ -171,6 +235,16 @@
                 unit.y = unit.depth;
                 unit.rotation = Math.PI;
                 return unit;
+            },
+
+            applyReserveDraftPose(unit, playerId, worldX) {
+                if (this.isEnsorcelledLocalReturnDraft()) {
+                    return unit;
+                }
+                if (this.state.draft?.kind === 'ensorcelled-return') {
+                    return this.applyEnsorcelledReturnPose(unit, playerId, worldX);
+                }
+                return this.applyReserveDeployPose(unit, playerId, worldX);
             },
 
             getDefaultReserveDeployWorldX() {
@@ -227,9 +301,117 @@
                 return { invalid: false, reason: '' };
             },
 
+            applyEnsorcelledLocalReturnPose(unit) {
+                const origin = unit?.ensorcelledFrom;
+                if (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) {
+                    return this.applyEnsorcelledReturnPose(unit, this.getUnitPlayerId(unit), this.getDefaultReserveDeployWorldX());
+                }
+                const restored = geometry.buildUnitFromCenter(
+                    unit,
+                    origin,
+                    Number.isFinite(origin.rotation) ? origin.rotation : unit.rotation
+                );
+                unit.x = restored.x;
+                unit.y = restored.y;
+                unit.rotation = restored.rotation;
+                return unit;
+            },
+
+            validateEnsorcelledLocalReturn(unit, boardUnits, terrain) {
+                if (!unit) {
+                    return { invalid: true, reason: 'No unit selected for ensorcelled return.' };
+                }
+                const origin = unit.ensorcelledFrom;
+                const radius = data.pacesToMm(data.MAGICIAN_ENSORCELLED_RETURN_PACES);
+                const center = geometry.getUnitCenter(unit);
+                if (!origin || geometry.distance(center, origin) > radius + 0.01) {
+                    return { invalid: true, reason: `Ensorcelled return must stay within ${data.MAGICIAN_ENSORCELLED_RETURN_PACES} paces of the original spot.` };
+                }
+                const corners = geometry.getUnitCorners(unit);
+                const points = geometry.cornersToPoints(corners);
+                const onBoard = points.every((point) => (
+                    point.x >= -0.01
+                    && point.x <= data.BOARD_SIZE + 0.01
+                    && point.y >= -0.01
+                    && point.y <= data.BOARD_SIZE + 0.01
+                ));
+                if (!onBoard) {
+                    return { invalid: true, reason: 'Ensorcelled return must stay on the board.' };
+                }
+                const others = (boardUnits || this.state.units || []).filter((other) => other.id !== unit.id);
+                if (others.some((other) => geometry.polygonsOverlap(corners, geometry.getUnitCorners(other)))) {
+                    return { invalid: true, reason: 'Ensorcelled return overlaps another unit.' };
+                }
+                const terrainTypes = rules.sampleUnitTerrain(unit, terrain || this.state.terrain);
+                if (terrainTypes.has('impassable')) {
+                    return { invalid: true, reason: 'Ensorcelled return cannot occupy impassable terrain.' };
+                }
+                return { invalid: false, reason: '' };
+            },
+
+            applyEnsorcelledReturnPose(unit, playerId, worldX) {
+                const edge = this.getOpponentHomeEdge(playerId);
+                const left = geometry.clamp(worldX - (unit.width / 2), 0, data.BOARD_SIZE - unit.width);
+                if (edge === 'bottom') {
+                    unit.x = left;
+                    unit.y = data.BOARD_SIZE - unit.depth;
+                    unit.rotation = 0;
+                    return unit;
+                }
+                unit.x = left + unit.width;
+                unit.y = unit.depth;
+                unit.rotation = Math.PI;
+                return unit;
+            },
+
+            validateEnsorcelledReturn(unit, boardUnits, terrain) {
+                if (this.usesEnsorcelledLocalReturn(unit)) {
+                    return this.validateEnsorcelledLocalReturn(unit, boardUnits, terrain);
+                }
+                if (!unit) {
+                    return { invalid: true, reason: 'No unit selected for ensorcelled return.' };
+                }
+                const playerId = this.getUnitPlayerId(unit);
+                const edge = this.getOpponentHomeEdge(playerId);
+                const expectedRotation = this.getOpponentHomeEdgeRotation(playerId);
+                if (Math.abs(geometry.normalizeAngle(unit.rotation - expectedRotation)) > 0.01) {
+                    return { invalid: true, reason: 'Ensorcelled return must face inward from the enemy board edge.' };
+                }
+                const corners = geometry.getUnitCorners(unit);
+                const points = geometry.cornersToPoints(corners);
+                const onBoard = points.every((point) => (
+                    point.x >= -0.01
+                    && point.x <= data.BOARD_SIZE + 0.01
+                    && point.y >= -0.01
+                    && point.y <= data.BOARD_SIZE + 0.01
+                ));
+                if (!onBoard) {
+                    return { invalid: true, reason: 'Ensorcelled return must stay on the board.' };
+                }
+                const rearPoints = [corners.backLeft, corners.backRight];
+                const onEdge = edge === 'bottom'
+                    ? rearPoints.every((point) => Math.abs(point.y - data.BOARD_SIZE) <= EDGE_CONTACT_EPSILON)
+                    : rearPoints.every((point) => Math.abs(point.y) <= EDGE_CONTACT_EPSILON);
+                if (!onEdge) {
+                    return { invalid: true, reason: 'Ensorcelled return must contact the enemy board edge.' };
+                }
+                const others = (boardUnits || this.state.units || []).filter((other) => other.id !== unit.id);
+                if (others.some((other) => geometry.polygonsOverlap(corners, geometry.getUnitCorners(other)))) {
+                    return { invalid: true, reason: 'Ensorcelled return overlaps another unit.' };
+                }
+                const terrainTypes = rules.sampleUnitTerrain(unit, terrain || this.state.terrain);
+                if (terrainTypes.has('impassable')) {
+                    return { invalid: true, reason: 'Ensorcelled return cannot occupy impassable terrain.' };
+                }
+                return { invalid: false, reason: '' };
+            },
+
             beginReserveDeploy(unit, worldX) {
                 if (!unit || !this.isUnitInReserve(unit.id)) {
                     return false;
+                }
+                if (this.isEnsorcelledInReserve(unit)) {
+                    return this.beginEnsorcelledReturn(unit, worldX);
                 }
                 if (this.state.mode !== 'game' || this.state.phase !== 'move') {
                     this.updateStatus('Reserve units can only deploy during the move phase.');
@@ -273,6 +455,65 @@
                 this.updateSelectionAnalysis();
                 this.evaluateDraft();
                 this.updateStatus(`Deploy ${live.type} onto your board edge. This will spend one move.`);
+                return true;
+            },
+
+            beginEnsorcelledReturn(unit, worldX) {
+                if (!unit || !this.isEnsorcelledInReserve(unit)) {
+                    return false;
+                }
+                if (this.state.mode !== 'game' || this.state.phase !== 'move') {
+                    this.updateStatus('Ensorcelled units can only return during the move phase.');
+                    return false;
+                }
+                if (this.getUnitPlayerId(unit) !== this.state.activePlayerId) {
+                    this.updateStatus('Only the original owner can return ensorcelled units.');
+                    return false;
+                }
+                const returnCost = this.getEnsorcelledReturnCost(unit);
+                if (this.state.remainingMoves < returnCost) {
+                    this.updateStatus(`Returning this unit requires ${returnCost} moves.`);
+                    return false;
+                }
+                if (this.state.draft && !this.isReserveDeployDraft()) {
+                    this.cancelDraft(false);
+                }
+                const reserved = this.getReserveUnits().find((entry) => entry.id === unit.id);
+                if (!reserved) {
+                    return false;
+                }
+                const restore = cloneReserveUnit(reserved);
+                this.state.reserveUnits = this.getReserveUnits().filter((entry) => entry.id !== unit.id);
+                const live = cloneReserveUnit(reserved);
+                delete live.inReserve;
+                delete live.reserveSlot;
+                if (this.usesEnsorcelledLocalReturn(live)) {
+                    this.applyEnsorcelledLocalReturnPose(live);
+                } else {
+                    this.applyEnsorcelledReturnPose(live, this.getUnitPlayerId(live), Number.isFinite(worldX) ? worldX : this.getDefaultReserveDeployWorldX());
+                }
+                this.state.units = [...(this.state.units || []).filter((entry) => entry.id !== live.id), live];
+                this.state.selectedIds = [live.id];
+                this.state.draft = {
+                    kind: 'ensorcelled-return',
+                    unitIds: [live.id],
+                    reserveRestore: restore,
+                    returnCost,
+                    initialOrigin: geometry.snapshotPositions([live.id], [restore]),
+                    validationOrigin: geometry.snapshotPositions([live.id], this.state.units),
+                    origin: geometry.snapshotPositions([live.id], this.state.units),
+                    allowSingleRotationFormationEscape: false,
+                    history: [],
+                    invalidIds: new Set(),
+                    reasonById: new Map()
+                };
+                this.updateSelectionAnalysis();
+                this.evaluateDraft();
+                const costLabel = returnCost === 0 ? 'no moves' : `${returnCost} moves`;
+                const placeLabel = this.usesEnsorcelledLocalReturn(live)
+                    ? `within ${data.MAGICIAN_ENSORCELLED_RETURN_PACES} paces of where they were ensorcelled`
+                    : 'onto the enemy board edge';
+                this.updateStatus(`Return ${live.type} ${placeLabel}. This will spend ${costLabel}.`);
                 return true;
             },
 

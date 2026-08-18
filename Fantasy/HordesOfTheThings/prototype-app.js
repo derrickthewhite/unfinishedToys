@@ -165,6 +165,7 @@
                 shooting: null,
                 melee: null,
                 combatResolution: null,
+                confirmation: null,
                 storageModalOpen: false,
                 gameSettingsModalOpen: false,
                 snapEnabled: true,
@@ -215,11 +216,19 @@
         }
 
         closeSetupConfirmation() {
-            this.state.setup.confirmation = null;
+            this.state.confirmation = null;
+            if (this.state.setup) {
+                this.state.setup.confirmation = null;
+            }
             this.syncUiFromState();
         }
 
         confirmSetupStage() {
+            if (this.state.confirmation === 'skip-shooting') {
+                this.state.confirmation = null;
+                this.resolveShootingPhase({ skipUndeclared: true });
+                return;
+            }
             if (this.state.setup?.confirmation === 'new-game') {
                 this.startNewGame();
                 return;
@@ -370,7 +379,7 @@
             if (this.isTypingTarget(event.target)) {
                 return;
             }
-            if (event.key === 'Escape' && this.state.setup?.confirmation) {
+            if (event.key === 'Escape' && (this.state.confirmation || this.state.setup?.confirmation)) {
                 event.preventDefault();
                 this.closeSetupConfirmation();
                 return;
@@ -562,9 +571,14 @@
             if (this.ui.terrainPlacement) this.ui.terrainPlacement.hidden = this.state.setupStage !== 'terrain-placement';
             if (this.ui.deploymentScreen) this.ui.deploymentScreen.hidden = this.state.setupStage !== 'unit-deployment';
             this.hostSelectionPanel();
-            const confirmation = this.state.setup?.confirmation;
+            const confirmation = this.state.confirmation || this.state.setup?.confirmation;
             if (this.ui.confirmationModal) this.ui.confirmationModal.hidden = !confirmation;
-            if (confirmation === 'new-game') {
+            if (confirmation === 'skip-shooting') {
+                if (this.ui.confirmationTitle) this.ui.confirmationTitle.textContent = 'Skip Remaining Shots';
+                if (this.ui.confirmationText) this.ui.confirmationText.textContent = 'Some units can still shoot. Resolve now and skip the rest?';
+                if (this.ui.confirmSetupButton) this.ui.confirmSetupButton.textContent = 'Skip and Resolve';
+                if (this.ui.cancelConfirmationButton) this.ui.cancelConfirmationButton.textContent = 'Keep Shooting';
+            } else if (confirmation === 'new-game') {
                 if (this.ui.confirmationTitle) this.ui.confirmationTitle.textContent = 'Start New Game';
                 if (this.ui.confirmationText) this.ui.confirmationText.textContent = 'Unsaved progress will be lost.';
                 if (this.ui.confirmSetupButton) this.ui.confirmSetupButton.textContent = 'New Game';
@@ -635,7 +649,6 @@
             this.ui.resolveShootingButton.disabled = this.state.mode !== 'game'
                 || (this.state.phase !== 'shooting' && this.state.phase !== 'melee')
                 || Boolean(this.state.combatResolution)
-                || (this.state.phase === 'shooting' && Object.keys(this.state.shooting?.attacksByAttacker || {}).length === 0)
                 || (this.state.phase === 'melee' && this.getMeleeState().combats.length === 0);
             this.ui.cancelMoveButton.disabled = this.state.mode !== 'game' || this.state.phase !== 'move' || !this.state.draft;
             this.ui.undoMoveButton.disabled = this.state.mode === 'edit' ? this.state.editHistory.length === 0 : !this.state.draft;

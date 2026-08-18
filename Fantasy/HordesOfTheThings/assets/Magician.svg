@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <defs>
+    <clipPath id="magician-clip">
+      <rect x="1" y="1" width="38" height="38" rx="2.5" ry="2.5"/>
+    </clipPath>
+  </defs>
+  <rect x="1" y="1" width="38" height="38" rx="2.5" ry="2.5" fill="none" stroke="#f2eadb" stroke-opacity="0.75" stroke-dasharray="2 1"/>
+  <path d="M8 3H32" fill="none" stroke="#faf5eb" stroke-width="1.5" stroke-linecap="round"/>
+  <g clip-path="url(#magician-clip)" fill="none" stroke="#231714" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 8L22 14L28 15L23 19L24.5 25L20 22L15.5 25L17 19L12 15L18 14Z"/>
+    <path d="M20 22V33"/>
+    <path d="M16 33H24"/>
+    <path d="M14 28L26 28"/>
+    <path d="M11 12L14 10"/>
+    <path d="M29 12L26 10"/>
+  </g>
+</svg>

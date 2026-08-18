@@ -18,6 +18,7 @@
         Knights: 'assets/Knights.svg',
         Riders: 'assets/Riders.svg',
         Hero: 'assets/Hero.svg',
+        Magician: 'assets/Magician.svg',
         'Heavy-Spear': 'assets/Heavy-Spear.svg',
         'Heavy-Warband': 'assets/Heavy-Warband.svg',
         Beasts: 'assets/Beasts.svg',
@@ -110,13 +111,30 @@
                 const label = `${this.getPlayerLabel(playerId)} Reserve`;
                 ctx.fillText(label, rect.left + rect.width / 2, rect.top + 10 / this.state.camera.scale);
             });
-            if (this.isReserveDeployDraft()) {
+            if (this.isEnsorcelledLocalReturnDraft()) {
+                const unit = this.getUnitById(this.state.draft.unitIds[0]);
+                const origin = unit?.ensorcelledFrom;
+                if (origin) {
+                    const colors = this.getPlayerColors(this.state.activePlayerId);
+                    const radius = data.pacesToMm(data.MAGICIAN_ENSORCELLED_RETURN_PACES);
+                    ctx.fillStyle = colors.glow;
+                    ctx.strokeStyle = colors.stroke;
+                    ctx.lineWidth = 2 / this.state.camera.scale;
+                    ctx.beginPath();
+                    ctx.arc(origin.x, origin.y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            } else if (this.isReserveDeployDraft()) {
                 const playerId = this.state.activePlayerId;
-                const homeEdge = this.getHomeEdge(playerId);
+                const draftKind = this.state.draft.kind;
+                const edge = draftKind === 'ensorcelled-return'
+                    ? this.getOpponentHomeEdge(playerId)
+                    : this.getHomeEdge(playerId);
                 const colors = this.getPlayerColors(playerId);
                 const depth = this.getUnitById(this.state.draft.unitIds[0])?.depth || data.RESERVE_SLOT_SIZE;
                 ctx.fillStyle = colors.glow;
-                if (homeEdge === 'bottom') {
+                if (edge === 'bottom') {
                     ctx.fillRect(0, data.BOARD_SIZE - depth, data.BOARD_SIZE, depth);
                 } else {
                     ctx.fillRect(0, 0, data.BOARD_SIZE, depth);
@@ -216,6 +234,10 @@
 
         }
 
+        getCombatLabelUnit(resolution, unitId) {
+            return resolution.ghostSnapshot?.[unitId] || this.getUnitById(unitId);
+        }
+
         drawCombatResolutionOverlays(ctx) {
             const resolution = this.state.combatResolution;
             if (!resolution) {
@@ -227,13 +249,13 @@
                 let leftTotal = null;
                 let rightTotal = null;
                 if (resolution.phase === 'shooting') {
-                    leftUnit = this.getUnitById(entry.primaryAttackerId) || resolution.ghostSnapshot[entry.primaryAttackerId];
-                    rightUnit = this.getUnitById(entry.defenderId) || resolution.ghostSnapshot[entry.defenderId];
+                    leftUnit = this.getCombatLabelUnit(resolution, entry.primaryAttackerId);
+                    rightUnit = this.getCombatLabelUnit(resolution, entry.defenderId);
                     leftTotal = entry.attackerTotal;
                     rightTotal = entry.defenderTotal;
                 } else {
-                    leftUnit = this.getUnitById(entry.leftPrimaryId) || resolution.ghostSnapshot[entry.leftPrimaryId];
-                    rightUnit = this.getUnitById(entry.rightPrimaryId) || resolution.ghostSnapshot[entry.rightPrimaryId];
+                    leftUnit = this.getCombatLabelUnit(resolution, entry.leftPrimaryId);
+                    rightUnit = this.getCombatLabelUnit(resolution, entry.rightPrimaryId);
                     leftTotal = entry.leftTotal;
                     rightTotal = entry.rightTotal;
                 }

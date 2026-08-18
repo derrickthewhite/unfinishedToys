@@ -262,6 +262,7 @@
             this.state.shooting = null;
             this.state.melee = null;
             this.state.combatResolution = null;
+            this.state.confirmation = null;
             this.state.editHistory = [];
             this.state.marquee = null;
             this.state.interaction = null;

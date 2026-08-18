@@ -66,9 +66,9 @@
                 `Water ${this.formatPaces(unit.moves.water)}`
             ].join(' / ');
             const ranged = unit.ranged
-                ? `${this.formatPaces(unit.ranged.range)} range, ${unit.ranged.width}mm frontage`
+                ? `${this.formatPaces(unit.ranged.range)} range, ${unit.ranged.width || data.SHOOTING_BOX_WIDTH}mm frontage`
                 : 'None';
-            return [
+            const details = [
                 { label: 'Player', value: this.getPlayerLabel(this.getUnitPlayerId(unit)) },
                 { label: 'Class', value: unit.troopClass },
                 { label: 'AP', value: String(unit.value) },
@@ -77,6 +77,25 @@
                 { label: 'Ranged', value: ranged },
                 { label: 'Bad Going', value: unit.combat?.ignoresBadGoingPenalty ? 'Ignores penalty' : 'Normal penalty' }
             ];
+            if (rules.isMagicianUnit(unit)) {
+                details.push({
+                    label: 'Action cost',
+                    value: `${rules.getMoveCost(unit)} moves to move, ${rules.getAttackDeclareCost(unit)} to declare an attack`
+                });
+            }
+            if (unit.ensorcelledByUnitId !== undefined) {
+                let ensorcellerLabel;
+                if (unit.ensorcelledByUnitId === null) {
+                    ensorcellerLabel = 'Self (rolled 1)';
+                } else {
+                    const ensorceller = this.getUnitById(unit.ensorcelledByUnitId);
+                    ensorcellerLabel = ensorceller
+                        ? `${ensorceller.type} (${this.getPlayerLabel(this.getUnitPlayerId(ensorceller))})`
+                        : 'Unknown (destroyed or in reserve)';
+                }
+                details.push({ label: 'Ensorcelled by', value: ensorcellerLabel });
+            }
+            return details;
         }
 
         renderSelectionInfo() {
