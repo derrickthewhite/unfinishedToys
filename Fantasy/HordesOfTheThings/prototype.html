@@ -215,10 +215,18 @@
             <header class="modal-header">
                 <div>
                     <h2 id="gameSettingsTitle">Game Settings</h2>
-                    <p>These options apply to new terrain offers. Saved games keep the pieces they already have.</p>
+                    <p>Army options apply immediately. Terrain options apply to new offers; saved games keep the pieces they already have.</p>
                 </div>
                 <button id="closeGameSettingsButton" class="icon-button" type="button" aria-label="Close game settings">Close</button>
             </header>
+            <section class="game-settings-section" aria-labelledby="armySettingsTitle">
+                <h3 id="armySettingsTitle">Armies</h3>
+                <p>When limited, each faction can only recruit the unit types it has artwork for.</p>
+                <label class="game-settings-toggle">
+                    <input id="limitFactionRostersCheckbox" type="checkbox" checked>
+                    Limit factions to their own unit types
+                </label>
+            </section>
             <section class="game-settings-section" aria-labelledby="terrainSettingsTitle">
                 <h3 id="terrainSettingsTitle">Terrain</h3>
                 <p>Choose which types can appear in each shape during setup.</p>

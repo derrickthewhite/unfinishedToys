@@ -24,7 +24,35 @@
                 return data.PLAYER_IDS.every((playerId) => this.isArmyValid(playerId));
             },
 
+            getAllowedUnitTypes(playerId) {
+                const types = Object.keys(data.UNIT_TYPES);
+                if (!this.areFactionRostersLimited()) {
+                    return types;
+                }
+                const roster = data.FACTION_ROSTERS[this.getPlayer(playerId)?.faction] || [];
+                return types.filter((type) => roster.includes(type));
+            },
+
+            pruneArmyToAllowedTypes(playerId) {
+                const allowed = new Set(this.getAllowedUnitTypes(playerId));
+                const counts = this.getArmyDraft(playerId).counts;
+                Object.keys(counts).forEach((type) => {
+                    if (!allowed.has(type)) {
+                        delete counts[type];
+                    }
+                });
+            },
+
+            pruneArmiesToAllowedTypes() {
+                data.PLAYER_IDS.forEach((playerId) => this.pruneArmyToAllowedTypes(playerId));
+            },
+
             adjustArmyUnit(playerId, type, delta) {
+                if (this.state.setupStage === 'army-builder'
+                    && delta > 0
+                    && !this.getAllowedUnitTypes(playerId).includes(type)) {
+                    return;
+                }
                 const draft = this.getArmyDraft(playerId);
                 const current = draft.counts[type] || 0;
                 const next = Math.max(0, current + delta);
@@ -40,20 +68,36 @@
                     return;
                 }
                 this.state.players[playerId][property] = value;
+                if (property === 'faction') {
+                    this.pruneArmyToAllowedTypes(playerId);
+                }
                 this.syncUiFromState();
             },
 
             chooseRandomArmy(playerId, random = Math.random) {
-                const counts = this.getArmyDraft(playerId).counts;
-                Object.keys(counts).forEach((type) => delete counts[type]);
-                let remaining = data.ARMY_POINT_TARGET;
-                const templates = Object.entries(data.UNIT_TYPES);
-                while (remaining > 0) {
-                    const eligible = templates.filter(([, unit]) => unit.value <= remaining);
-                    const [type, unit] = eligible[Math.floor(random() * eligible.length)];
-                    counts[type] = (counts[type] || 0) + 1;
-                    remaining -= unit.value;
+                const templates = this.getAllowedUnitTypes(playerId)
+                    .map((type) => [type, data.UNIT_TYPES[type]])
+                    .filter(([, unit]) => unit);
+                let counts = {};
+                for (let attempt = 0; attempt < 40; attempt += 1) {
+                    counts = {};
+                    let remaining = data.ARMY_POINT_TARGET;
+                    let stuck = false;
+                    while (remaining > 0) {
+                        const eligible = templates.filter(([, unit]) => unit.value <= remaining);
+                        if (eligible.length === 0) {
+                            stuck = true;
+                            break;
+                        }
+                        const [type, unit] = eligible[Math.floor(random() * eligible.length)];
+                        counts[type] = (counts[type] || 0) + 1;
+                        remaining -= unit.value;
+                    }
+                    if (!stuck) {
+                        break;
+                    }
                 }
+                this.getArmyDraft(playerId).counts = counts;
                 this.updateStatus(`Player ${data.PLAYER_IDS.indexOf(playerId) + 1} received a random 24 AP army.`);
             },
 
@@ -84,7 +128,8 @@
                     const factionOptions = data.FACTIONS.map((faction) => (
                         `<option value="${faction}"${faction === player.faction ? ' selected' : ''}>${faction}</option>`
                     )).join('');
-                    const rows = Object.entries(data.UNIT_TYPES).map(([type, unit]) => {
+                    const rows = this.getAllowedUnitTypes(playerId).map((type) => {
+                        const unit = data.UNIT_TYPES[type];
                         const count = this.getArmyDraft(playerId).counts[type] || 0;
                         const assetPath = this.getUnitAssetPath({ type, faction: player.faction });
                         return `

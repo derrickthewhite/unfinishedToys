@@ -196,6 +196,7 @@
             return {
                 ...normalized,
                 playerId,
+                depth: data.UNIT_TYPES[unit.type]?.depth ?? unit.depth,
                 moves: unit.moves ? { ...unit.moves } : undefined,
                 strength: unit.strength ? { ...unit.strength } : undefined,
                 ranged: unit.ranged ? { ...unit.ranged } : null,

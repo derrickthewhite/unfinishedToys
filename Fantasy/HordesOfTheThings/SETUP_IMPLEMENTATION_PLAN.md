@@ -111,7 +111,7 @@ Do not use `attacker` or `defender` as permanent player identifiers. They determ
 ## Product Decisions
 
 - Each army must total exactly 24 AP before it can be accepted.
-- Both players select a color and faction; both may select Panda or Undead.
+- Both players select a color and faction; both may select Panda, Undead, Goblin, Gunpowder, or Dinosaurs.
 - Missing faction-specific unit artwork must fall back to generic unit art.
 - A random coin flip selects the defender after both armies are accepted.
 - Terrain count defaults to the result of `2d4`, then may be edited from 0 through 8.
@@ -224,7 +224,7 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`,
 
 - Add reserve deployment for units such as Hordes and future Lurkers: these units begin off-board or are removed from the board, then enter during play using the deployment tray and placement validation as shared foundations.
 - Add further armies once their artwork is available.
-- Add an optional game-start mode that limits each faction to an allowed unit roster.
+- Add an optional game-start mode that limits each faction to an allowed unit roster. **Done** — Game Settings has a default-on toggle; each faction can recruit only the types it has artwork for.
 - Add more unit types.
 - Move the cheating-oriented Edit Mode behind an extra-click modal or settings control.
 - Add a new game button in the gear menu. **Done** — New Game lives on the gear/saved-games modal and resets to empty army drafts.

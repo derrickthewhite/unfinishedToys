@@ -72,11 +72,49 @@ test('army builder random actions create an exact army and can clear it', () => 
     assert.equal(app.getArmyValue('player-1'), data.ARMY_POINT_TARGET);
 
     app.randomizeArmyPresentation('player-1', () => 0.99);
-    assert.equal(app.state.players['player-1'].colorId, 'gold');
-    assert.equal(app.state.players['player-1'].faction, 'Undead');
+    const colorIds = Object.keys(data.PLAYER_COLORS);
+    assert.equal(app.state.players['player-1'].colorId, colorIds[colorIds.length - 1]);
+    assert.equal(app.state.players['player-1'].faction, data.FACTIONS[data.FACTIONS.length - 1]);
 
     app.clearArmy('player-1');
     assert.equal(app.getArmyValue('player-1'), 0);
+});
+
+test('the army builder offers about a dozen player colors', () => {
+    assert.equal(Object.keys(data.PLAYER_COLORS).length, 12);
+    assert.equal(data.PLAYER_COLORS.silver.label, 'Silver');
+    assert.equal(data.PLAYER_COLORS.white.label, 'White');
+    assert.equal(data.PLAYER_COLORS.white.stroke, '#f7f3ea');
+    assert.equal(data.PLAYER_COLORS.black.stroke, '#141210');
+});
+
+test('faction rosters are limited by default and can be turned off in game settings', () => {
+    const app = createAppHarness({
+        state: { setupStage: 'army-builder', setup: { armies: Object.create(HordesPrototype.prototype).createArmyDrafts(), confirmation: null } }
+    });
+    app.settingsStorage = createStorage();
+
+    assert.equal(app.areFactionRostersLimited(), true);
+    assert.deepEqual(app.getAllowedUnitTypes('player-1'), data.FACTION_ROSTERS.Panda);
+
+    app.adjustArmyUnit('player-1', 'Behemoth', 1);
+    assert.equal(app.getArmyDraft('player-1').counts.Behemoth, undefined);
+
+    app.updateArmyPlayer('player-1', 'faction', 'Dinosaurs');
+    app.chooseRandomArmy('player-1', () => 0);
+    assert.equal(app.getArmyValue('player-1'), data.ARMY_POINT_TARGET);
+    assert.deepEqual(Object.keys(app.getArmyDraft('player-1').counts), ['Heavy-Spear']);
+
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    assert.equal(app.getArmyDraft('player-1').counts.Blade, undefined);
+
+    app.setLimitFactionRosters(false);
+    assert.equal(app.areFactionRostersLimited(), false);
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    assert.equal(app.getArmyDraft('player-1').counts.Blade, 1);
+
+    const stored = JSON.parse(app.settingsStorage.getItem('hordes-of-the-things-settings'));
+    assert.equal(stored.limitFactionRosters, false);
 });
 
 test('terrain offer descriptions include shape and size labels, with a road exception', () => {

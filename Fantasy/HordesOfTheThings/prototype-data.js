@@ -29,7 +29,14 @@
 
     const PLAYER_IDS = Object.freeze(['player-1', 'player-2']);
     const ARMY_POINT_TARGET = 24;
-    const FACTIONS = Object.freeze(['Panda', 'Undead']);
+    const FACTIONS = Object.freeze(['Panda', 'Undead', 'Goblin', 'Gunpowder', 'Dinosaurs']);
+    const FACTION_ROSTERS = Object.freeze({
+        Panda: Object.freeze(['Blade', 'Spear', 'Shooter', 'Artillery', 'Knights', 'Hero']),
+        Undead: Object.freeze(['Blade', 'Spear', 'Warband', 'Horde', 'Riders']),
+        Goblin: Object.freeze(['Spear', 'Heavy-Warband', 'Shooter', 'Horde', 'Riders']),
+        Gunpowder: Object.freeze(['Blade', 'Shooter', 'Artillery', 'Riders']),
+        Dinosaurs: Object.freeze(['Heavy-Spear', 'Beasts', 'Flyers', 'Behemoth'])
+    });
     const TERRAIN_OFFER_KINDS = Object.freeze(['forest', 'swamp', 'water', 'impassable', 'road']);
     const TERRAIN_FEATURE_KINDS = Object.freeze(['forest', 'swamp', 'water', 'impassable']);
     const TERRAIN_COUNT_MAX = 8;
@@ -75,6 +82,54 @@
             fill: '#c9a650',
             stroke: '#72531d',
             glow: 'rgba(181, 139, 38, 0.28)'
+        },
+        purple: {
+            label: 'Purple',
+            fill: '#8a6bb0',
+            stroke: '#4a2f6e',
+            glow: 'rgba(122, 78, 168, 0.28)'
+        },
+        orange: {
+            label: 'Orange',
+            fill: '#d4843c',
+            stroke: '#7a3e12',
+            glow: 'rgba(196, 108, 42, 0.28)'
+        },
+        teal: {
+            label: 'Teal',
+            fill: '#4f9a96',
+            stroke: '#1f5452',
+            glow: 'rgba(62, 140, 136, 0.28)'
+        },
+        white: {
+            label: 'White',
+            fill: '#e8e2d6',
+            stroke: '#f7f3ea',
+            glow: 'rgba(245, 239, 228, 0.34)'
+        },
+        black: {
+            label: 'Black',
+            fill: '#3a3632',
+            stroke: '#141210',
+            glow: 'rgba(20, 18, 16, 0.4)'
+        },
+        rose: {
+            label: 'Rose',
+            fill: '#c46b86',
+            stroke: '#6e2d45',
+            glow: 'rgba(176, 78, 108, 0.28)'
+        },
+        brown: {
+            label: 'Brown',
+            fill: '#8b5e3c',
+            stroke: '#4a2e1c',
+            glow: 'rgba(122, 78, 48, 0.28)'
+        },
+        silver: {
+            label: 'Silver',
+            fill: '#9aa3ad',
+            stroke: '#3d444c',
+            glow: 'rgba(90, 100, 110, 0.26)'
         }
     });
 
@@ -115,7 +170,7 @@
         Riders: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 500, good: 500, bad: 200, water: 100 }, strength: { infantry: 3, mounted: 3 }, combat: { ignoresBadGoingPenalty: false } },
         Hero: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 500, good: 500, bad: 200, water: 100 }, strength: { infantry: 5, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } },
         Beasts: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 400, good: 400, bad: 400, water: 100 }, strength: { infantry: 3, mounted: 4 }, combat: { ignoresBadGoingPenalty: true } },
-        Flyers: { value: 2, depth: 20, troopClass: 'mounted', moves: { road: 1200, good: 1200, bad: 1200, water: 1200 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false }, movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 } },
+        Flyers: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 1200, good: 1200, bad: 1200, water: 1200 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false }, movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 } },
         Behemoth: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 400, good: 300, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } }
     };
 
@@ -305,6 +360,7 @@
         ROUGH_LOS_ALLOWANCE_PACES,
         ARMY_POINT_TARGET,
         FACTIONS,
+        FACTION_ROSTERS,
         TERRAIN_OFFER_KINDS,
         TERRAIN_FEATURE_KINDS,
         TERRAIN_COUNT_MAX,

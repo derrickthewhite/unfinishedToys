@@ -20,6 +20,12 @@ test('unit asset lookup includes generic artwork for the remaining unit types', 
         assert.equal(app.getUnitAssetPath({ type, faction: 'Panda' }), `assets/${type}.svg`);
     });
     assert.equal(app.getUnitAssetPath({ type: 'Artillery', faction: 'Undead' }), 'assets/Artillery.svg');
+    assert.equal(app.getUnitAssetPath({ type: 'Spear', faction: 'Goblin' }), 'assets/goblin/Spear.svg');
+    assert.equal(app.getUnitAssetPath({ type: 'Blade', faction: 'Goblin' }), 'assets/Blade.svg');
+    assert.equal(app.getUnitAssetPath({ type: 'Artillery', faction: 'Gunpowder' }), 'assets/gunpowder/Artillery.svg');
+    assert.equal(app.getUnitAssetPath({ type: 'Hero', faction: 'Gunpowder' }), 'assets/Hero.svg');
+    assert.equal(app.getUnitAssetPath({ type: 'Behemoth', faction: 'Dinosaurs' }), 'assets/dinosaurs/Behemoth.svg');
+    assert.equal(app.getUnitAssetPath({ type: 'Blade', faction: 'Dinosaurs' }), 'assets/Blade.svg');
 });
 
 test('left wheeling bubble stays outside the rank and mirrors the right bubble rotation', () => {
@@ -872,6 +878,29 @@ test('loadGame restores saved state from local storage', () => {
         assert.ok(app.state.shooting);
         assert.equal(app.state.storageModalOpen, false);
         assert.equal(app.lastStatus, 'Loaded saved game loaded slot.');
+    } finally {
+        global.window = previousWindow;
+    }
+});
+
+test('loadGame updates legacy Flyer depth to the current 30 mm template', () => {
+    const previousWindow = global.window;
+    const storage = createStorage();
+    storage.setItem('hordes-of-the-things-saves', JSON.stringify([{
+        id: 'save-flyers',
+        name: 'legacy flyers',
+        savedAt: '2026-05-29T15:30:00.000Z',
+        snapshot: {
+            setupStage: 'game',
+            units: [{ id: 'flyer-1', type: 'Flyers', playerId: 'player-1', width: 40, depth: 20, x: 100, y: 220, rotation: 0 }]
+        }
+    }]));
+    global.window = { localStorage: storage };
+
+    try {
+        const app = createAppHarness();
+        app.loadGame('save-flyers');
+        assert.equal(app.state.units[0].depth, 30);
     } finally {
         global.window = previousWindow;
     }

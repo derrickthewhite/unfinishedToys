@@ -121,6 +121,7 @@
                 gameSettingsModal: document.getElementById('gameSettingsModal'),
                 gameSettingsBackdrop: document.getElementById('gameSettingsBackdrop'),
                 closeGameSettingsButton: document.getElementById('closeGameSettingsButton'),
+                limitFactionRostersCheckbox: document.getElementById('limitFactionRostersCheckbox'),
                 terrainSettingsList: document.getElementById('terrainSettingsList'),
                 blueLosses: document.getElementById('blueLosses'),
                 redLosses: document.getElementById('redLosses'),
@@ -348,6 +349,9 @@
             this.ui.openGameSettingsButton.addEventListener('click', () => this.openGameSettingsModal());
             this.ui.closeGameSettingsButton.addEventListener('click', () => this.closeGameSettingsModal());
             this.ui.gameSettingsBackdrop.addEventListener('click', () => this.closeGameSettingsModal());
+            this.ui.limitFactionRostersCheckbox.addEventListener('change', () => {
+                this.setLimitFactionRosters(this.ui.limitFactionRostersCheckbox.checked);
+            });
             this.ui.cancelMoveButton.addEventListener('click', () => this.cancelDraft(true));
             this.ui.acknowledgedButton.addEventListener('click', () => this.acknowledgePhase());
             this.ui.undoMoveButton.addEventListener('click', () => {

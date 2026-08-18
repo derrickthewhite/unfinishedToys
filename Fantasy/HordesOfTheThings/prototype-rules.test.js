@@ -1860,7 +1860,7 @@ test('new unit templates use the requested stats and special profiles', () => {
         combat: { ignoresBadGoingPenalty: true }
     });
     assert.equal(data.UNIT_TYPES.Flyers.moves.good, 1200);
-    assert.equal(data.UNIT_TYPES.Flyers.depth, 20);
+    assert.equal(data.UNIT_TYPES.Flyers.depth, 30);
     assert.equal(data.UNIT_TYPES.Flyers.movement.ignoresTerrain, true);
     assert.equal(data.UNIT_TYPES.Behemoth.value, 4);
     assert.deepEqual(data.UNIT_TYPES.Behemoth.strength, { infantry: 4, mounted: 5 });
@@ -1949,9 +1949,9 @@ test('Flyers recoil then flee 600 paces after losing shooting or melee', () => {
     const melee = rules.resolveMelee([meleeFlyer, blade], terrain, () => meleeRolls.shift());
 
     assert.equal(shooting.results[0].outcome, 'flee');
-    assert.equal(shooting.units.find((unit) => unit.id === shootingFlyer.id).y, 0);
+    assert.equal(shooting.units.find((unit) => unit.id === shootingFlyer.id).y, -10);
     assert.equal(melee.results[0].outcome, 'flee');
-    assert.equal(melee.units.find((unit) => unit.id === meleeFlyer.id).y, 390);
+    assert.equal(melee.units.find((unit) => unit.id === meleeFlyer.id).y, 400);
 });
 
 test('Behemoths flee from Artillery by the shallowest legal heading', () => {

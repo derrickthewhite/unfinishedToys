@@ -63,7 +63,7 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 | Riders | Mounted | 2 | 30 mm | 500 | 500 | 200 | 100 | +3 | +3 |
 | Hero | Mounted | 4 | 40 mm | 500 | 500 | 200 | 100 | +5 | +5 |
 | Beasts | Mounted | 2 | 30 mm | 400 | 400 | 400 | 100 | +3 | +4 |
-| Flyers | Mounted | 2 | 20 mm | 1200 | 1200 | 1200 | 1200 | +2 | +2 |
+| Flyers | Mounted | 2 | 30 mm | 1200 | 1200 | 1200 | 1200 | +2 | +2 |
 | Behemoth | Mounted | 4 | 40 mm | 400 | 300 | 200 | 100 | +4 | +5 |
 
 ## Combat
@@ -105,7 +105,7 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 - Edit mode can still place free units for debugging.
 
 ### Guided Setup And Auto Deploy
-- Each army must total exactly 24 AP. Both players choose a presentation color and faction independently of ownership IDs (`player-1` / `player-2`).
+- Each army must total exactly 24 AP. Both players choose a presentation color and faction independently of ownership IDs (`player-1` / `player-2`). Available factions are Panda, Undead, Goblin, Gunpowder, and Dinosaurs. Twelve presentation colors are available. By default, Game Settings limits each faction to the unit types it has artwork for.
 - After armies are accepted, a coin flip chooses the temporary defender. The defender places terrain, then deploys in the bottom quarter; the attacker deploys afterward in the top quarter.
 - Deployment requires every base corner to stay on the 600 mm board and in the assigned quarter, with no overlaps.
 - During deployment, the active player can Shift-click or marquee-select their units, drag them, and use rotate/reverse handles. Rank/file convert is not available. Units can be returned to the tray with Delete/Backspace, the Return to Tray button, or by dragging them onto the tray. Tray units can be clicked then placed, or dragged onto the board.

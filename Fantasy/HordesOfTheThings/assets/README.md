@@ -16,6 +16,7 @@ Current sample files:
 - `Shooter.svg` -> `viewBox="0 0 40 20"`
 - `Knights.svg` -> `viewBox="0 0 40 30"`
 - `Riders.svg` -> `viewBox="0 0 40 30"`
+- `Flyers.svg` -> `viewBox="0 0 40 30"`
 - `Horde.svg` -> `viewBox="0 0 40 40"`
 - `Hero.svg` -> `viewBox="0 0 40 40"`
 

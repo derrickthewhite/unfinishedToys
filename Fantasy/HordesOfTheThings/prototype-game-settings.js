@@ -43,19 +43,24 @@
             },
 
             readGameSettings() {
+                const defaults = {
+                    limitFactionRosters: true,
+                    terrainShapeKinds: createDefaultTerrainShapeKindSettings()
+                };
                 const storage = this.getGameSettingsStorage();
                 if (!storage) {
-                    return { terrainShapeKinds: createDefaultTerrainShapeKindSettings() };
+                    return defaults;
                 }
                 try {
                     const raw = storage.getItem(SETTINGS_KEY);
                     const parsed = raw ? JSON.parse(raw) : {};
                     return {
+                        limitFactionRosters: parsed?.limitFactionRosters !== false,
                         terrainShapeKinds: normalizeTerrainShapeKindSettings(parsed?.terrainShapeKinds)
                     };
                 } catch (error) {
                     console.warn('Unable to read game settings from local storage.', error);
-                    return { terrainShapeKinds: createDefaultTerrainShapeKindSettings() };
+                    return defaults;
                 }
             },
 
@@ -65,9 +70,25 @@
                     return false;
                 }
                 storage.setItem(SETTINGS_KEY, JSON.stringify({
+                    limitFactionRosters: settings?.limitFactionRosters !== false,
                     terrainShapeKinds: normalizeTerrainShapeKindSettings(settings?.terrainShapeKinds)
                 }));
                 return true;
+            },
+
+            areFactionRostersLimited() {
+                return this.readGameSettings().limitFactionRosters !== false;
+            },
+
+            setLimitFactionRosters(enabled) {
+                const settings = this.readGameSettings();
+                settings.limitFactionRosters = Boolean(enabled);
+                this.writeGameSettings(settings);
+                if (settings.limitFactionRosters) {
+                    this.pruneArmiesToAllowedTypes();
+                }
+                this.syncUiFromState();
+                return settings.limitFactionRosters;
             },
 
             getTerrainShapeKindSettings() {
@@ -124,6 +145,9 @@
             },
 
             renderGameSettings() {
+                if (this.ui.limitFactionRostersCheckbox) {
+                    this.ui.limitFactionRostersCheckbox.checked = this.areFactionRostersLimited();
+                }
                 const list = this.ui.terrainSettingsList;
                 if (!list) {
                     return;
