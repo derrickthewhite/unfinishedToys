@@ -38,6 +38,83 @@
         return start + (end - start) * t;
     }
 
+    function lerpPoint(start, end, t) {
+        return {
+            x: lerp(start.x, end.x, t),
+            y: lerp(start.y, end.y, t)
+        };
+    }
+
+    function cross(left, right) {
+        return (left.x * right.y) - (left.y * right.x);
+    }
+
+    function orientation(a, b, c) {
+        const value = cross(subtract(b, a), subtract(c, a));
+        if (Math.abs(value) <= 0.0001) {
+            return 0;
+        }
+        return value > 0 ? 1 : -1;
+    }
+
+    function onSegment(a, point, b) {
+        return point.x >= Math.min(a.x, b.x) - 0.0001
+            && point.x <= Math.max(a.x, b.x) + 0.0001
+            && point.y >= Math.min(a.y, b.y) - 0.0001
+            && point.y <= Math.max(a.y, b.y) + 0.0001;
+    }
+
+    function segmentsIntersect(a1, a2, b1, b2) {
+        const o1 = orientation(a1, a2, b1);
+        const o2 = orientation(a1, a2, b2);
+        const o3 = orientation(b1, b2, a1);
+        const o4 = orientation(b1, b2, a2);
+        if (o1 !== o2 && o3 !== o4) {
+            return true;
+        }
+        if (o1 === 0 && onSegment(a1, b1, a2)) {
+            return true;
+        }
+        if (o2 === 0 && onSegment(a1, b2, a2)) {
+            return true;
+        }
+        if (o3 === 0 && onSegment(b1, a1, b2)) {
+            return true;
+        }
+        if (o4 === 0 && onSegment(b1, a2, b2)) {
+            return true;
+        }
+        return false;
+    }
+
+    function sharedSegmentLength(a1, a2, b1, b2) {
+        if (orientation(a1, a2, b1) !== 0 || orientation(a1, a2, b2) !== 0) {
+            return 0;
+        }
+        const axis = normalize(subtract(a2, a1));
+        const aStart = dot(a1, axis);
+        const aEnd = dot(a2, axis);
+        const bStart = dot(b1, axis);
+        const bEnd = dot(b2, axis);
+        const overlapStart = Math.max(Math.min(aStart, aEnd), Math.min(bStart, bEnd));
+        const overlapEnd = Math.min(Math.max(aStart, aEnd), Math.max(bStart, bEnd));
+        return Math.max(0, overlapEnd - overlapStart);
+    }
+
+    function segmentIntersectsPolygon(start, end, polygon) {
+        if (pointInPolygon(start, polygon) || pointInPolygon(end, polygon)) {
+            return true;
+        }
+        const points = cornersToPoints(polygon);
+        for (let index = 0; index < points.length; index += 1) {
+            const next = points[(index + 1) % points.length];
+            if (segmentsIntersect(start, end, points[index], next)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function normalizeAngle(angle) {
         let value = angle;
         while (value <= -Math.PI) {
@@ -683,6 +760,13 @@
         normalize,
         clamp,
         lerp,
+        lerpPoint,
+        cross,
+        orientation,
+        onSegment,
+        segmentsIntersect,
+        sharedSegmentLength,
+        segmentIntersectsPolygon,
         normalizeAngle,
         lerpAngle,
         midpoint,
