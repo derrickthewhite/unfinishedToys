@@ -127,7 +127,7 @@
                     }
                 }
                 this.getArmyDraft(playerId).counts = counts;
-                this.updateStatus(`Player ${data.PLAYER_IDS.indexOf(playerId) + 1} received a random 24 AP army.`);
+                this.updateStatus(`${this.getArmyIdentity(playerId).label} received a random 24 AP army.`);
             },
 
             randomizeArmyPresentation(playerId, random = Math.random) {
@@ -141,7 +141,7 @@
 
             clearArmy(playerId) {
                 this.getArmyDraft(playerId).counts = {};
-                this.updateStatus(`Player ${data.PLAYER_IDS.indexOf(playerId) + 1}'s army was cleared.`);
+                this.updateStatus(`${this.getArmyIdentity(playerId).label}'s army was cleared.`);
             },
 
             renderArmyBuilder() {
@@ -182,7 +182,7 @@
                         <section class="army-player" style="--player-fill: ${colors.fill}; --player-stroke: ${colors.stroke};" aria-labelledby="armyPlayerTitle${playerIndex}">
                             <header class="army-player-header">
                                 <div class="army-player-heading">
-                                    <h2 id="armyPlayerTitle${playerIndex}">Player ${playerIndex + 1}</h2>
+                                    <h2 id="armyPlayerTitle${playerIndex}">${this.getArmyIdentity(playerId).label}</h2>
                                     <output class="army-total ${valueClass}">${value} / ${data.ARMY_POINT_TARGET} AP</output>
                                 </div>
                                 <div class="army-player-options">

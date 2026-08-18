@@ -10,7 +10,7 @@ const {
 } = require('./harness.js');
 
 function getPlayerId(unit) {
-    return unit.playerId || (unit.side === 'red' ? 'player-2' : 'player-1');
+    return unit.playerId;
 }
 
 function wireDraftValidation(app) {
@@ -180,7 +180,7 @@ function createStragglerScenario() {
             createBlade('u1', 100, 130),
             createBlade('u2', 140, 130),
             createBlade('u3', 400, 580),
-            { ...createBlade('r1', 400, 100), side: 'red' }
+            { ...createBlade('r1', 400, 100, 'player-2') }
         ]
     };
 }

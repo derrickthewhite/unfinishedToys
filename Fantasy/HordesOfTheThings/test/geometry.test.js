@@ -46,8 +46,8 @@ test('reverseUnitFacing preserves the occupied rectangle while swapping facing',
 });
 
 test('findFriendlySnapOffset snaps parallel friendly units into side alignment', () => {
-    const stationary = { id: 's1', side: 'blue', width: 40, depth: 20, x: 100, y: 200, rotation: 0 };
-    const moving = { id: 'm1', side: 'blue', width: 40, depth: 20, x: 145, y: 200, rotation: 0 };
+    const stationary = { id: 's1', playerId: 'player-1', width: 40, depth: 20, x: 100, y: 200, rotation: 0 };
+    const moving = { id: 'm1', playerId: 'player-1', width: 40, depth: 20, x: 145, y: 200, rotation: 0 };
 
     const offset = geometry.findFriendlySnapOffset([moving], [stationary]);
 
@@ -55,8 +55,8 @@ test('findFriendlySnapOffset snaps parallel friendly units into side alignment',
 });
 
 test('findFriendlySnapOffset snaps colliding friendly units to nearest corner contact more aggressively', () => {
-    const stationary = { id: 's1', side: 'blue', width: 40, depth: 20, x: 100, y: 200, rotation: 0 };
-    const moving = { id: 'm1', side: 'blue', width: 40, depth: 20, x: 136, y: 183, rotation: 0 };
+    const stationary = { id: 's1', playerId: 'player-1', width: 40, depth: 20, x: 100, y: 200, rotation: 0 };
+    const moving = { id: 'm1', playerId: 'player-1', width: 40, depth: 20, x: 136, y: 183, rotation: 0 };
 
     const offset = geometry.findFriendlySnapOffset([moving], [stationary]);
 

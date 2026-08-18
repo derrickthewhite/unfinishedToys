@@ -55,7 +55,7 @@ test('road contact at any sampled point keeps road speed for the whole move', ()
     const shooters = {
         id: 'u1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 260,
@@ -66,7 +66,7 @@ test('road contact at any sampled point keeps road speed for the whole move', ()
     const riders = {
         id: 'u2',
         type: 'Riders',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 30,
         x: 300,
@@ -91,7 +91,7 @@ test('rotation distance validation uses traveled corner path, not straight-line 
     const unit = {
         id: 'u1',
         type: 'Test',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 100,
@@ -114,7 +114,7 @@ test('reversing in place does not consume corner travel when left-right corners 
     const unit = {
         id: 'u1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 100,
@@ -133,7 +133,7 @@ test('single-unit rotation can pass through starting formation contact when the 
     const unit = {
         id: 'u1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 100,
@@ -144,7 +144,7 @@ test('single-unit rotation can pass through starting formation contact when the 
     const neighbor = {
         id: 'u2',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 140,
@@ -172,7 +172,7 @@ test('single-unit rotation escape still rejects an illegal final collision', () 
     const unit = {
         id: 'u1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 100,
@@ -183,7 +183,7 @@ test('single-unit rotation escape still rejects an illegal final collision', () 
     const neighbor = {
         id: 'u2',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 125,
@@ -210,7 +210,7 @@ test('step checkpoints restart collision sampling without resetting total move d
     const unit = {
         id: 'u1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 145,
@@ -223,7 +223,7 @@ test('step checkpoints restart collision sampling without resetting total move d
     const blocker = {
         id: 'u2',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 95,
@@ -247,7 +247,7 @@ test('step checkpoints do not reset total movement allowance', () => {
     const unit = {
         id: 'u1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 160,
@@ -321,7 +321,7 @@ test('file movement does not report self-overlap when units remain in legal cont
     const lead = {
         id: 'u1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 120,
@@ -332,7 +332,7 @@ test('file movement does not report self-overlap when units remain in legal cont
     const follower = {
         id: 'u2',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 120,
@@ -358,7 +358,7 @@ test('movement-time angled rank contact shifts the still-moving element orthogon
         {
             id: 'b1',
             type: 'Blade',
-            side: 'blue',
+            playerId: 'player-1',
             width: 40,
             depth: 20,
             x: 80,
@@ -369,7 +369,7 @@ test('movement-time angled rank contact shifts the still-moving element orthogon
         {
             id: 'b2',
             type: 'Blade',
-            side: 'blue',
+            playerId: 'player-1',
             width: 40,
             depth: 20,
             x: 120,
@@ -386,7 +386,7 @@ test('movement-time angled rank contact shifts the still-moving element orthogon
         {
             id: 'r1',
             type: 'Blade',
-            side: 'red',
+            playerId: 'player-2',
             width: 40,
             depth: 20,
             x: 100,
@@ -397,7 +397,7 @@ test('movement-time angled rank contact shifts the still-moving element orthogon
         {
             id: 'r2',
             type: 'Blade',
-            side: 'red',
+            playerId: 'player-2',
             width: 40,
             depth: 20,
             x: 128.2842712474619,
@@ -434,7 +434,7 @@ test('movement-time angled rank contact can shove a chain of neighboring units a
         {
             id: 'b1',
             type: 'Blade',
-            side: 'blue',
+            playerId: 'player-1',
             width: 40,
             depth: 20,
             x: 80,
@@ -445,7 +445,7 @@ test('movement-time angled rank contact can shove a chain of neighboring units a
         {
             id: 'b2',
             type: 'Blade',
-            side: 'blue',
+            playerId: 'player-1',
             width: 40,
             depth: 20,
             x: 120,
@@ -456,7 +456,7 @@ test('movement-time angled rank contact can shove a chain of neighboring units a
         {
             id: 'b3',
             type: 'Blade',
-            side: 'blue',
+            playerId: 'player-1',
             width: 40,
             depth: 20,
             x: 160,
@@ -474,7 +474,7 @@ test('movement-time angled rank contact can shove a chain of neighboring units a
         {
             id: 'r1',
             type: 'Blade',
-            side: 'red',
+            playerId: 'player-2',
             width: 40,
             depth: 20,
             x: 140,
@@ -485,7 +485,7 @@ test('movement-time angled rank contact can shove a chain of neighboring units a
         {
             id: 'r2',
             type: 'Blade',
-            side: 'red',
+            playerId: 'player-2',
             width: 40,
             depth: 20,
             x: 168.2842712474619,
@@ -517,7 +517,7 @@ test('rank wheel pivot stays on the outermost unit even if that unit is slightly
     const blade = {
         id: 'unit-1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 168.41269204324092,
@@ -527,7 +527,7 @@ test('rank wheel pivot stays on the outermost unit even if that unit is slightly
     const spear = {
         id: 'unit-2',
         type: 'Spear',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 206.5179672443281,
@@ -537,7 +537,7 @@ test('rank wheel pivot stays on the outermost unit even if that unit is slightly
     const shooter = {
         id: 'unit-3',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 244.6232424454153,
@@ -547,7 +547,7 @@ test('rank wheel pivot stays on the outermost unit even if that unit is slightly
     const riders = {
         id: 'unit-4',
         type: 'Riders',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 30,
         x: 282.72851764650255,
@@ -557,7 +557,7 @@ test('rank wheel pivot stays on the outermost unit even if that unit is slightly
     const warband = {
         id: 'unit-5',
         type: 'Warband',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 129.27548535577557,
@@ -585,7 +585,7 @@ test('automatic form up translates a unit to enemy corner contact within the con
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 100,
@@ -596,7 +596,7 @@ test('automatic form up translates a unit to enemy corner contact within the con
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 100,
@@ -618,7 +618,7 @@ test('describeSelection uses the unit type for a single selection', () => {
     const blade = {
         id: 'u1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 100,
@@ -635,7 +635,7 @@ test('automatic form up can rotate to face the enemy within the configured dista
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 140,
@@ -646,7 +646,7 @@ test('automatic form up can rotate to face the enemy within the configured dista
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 190,
@@ -666,7 +666,7 @@ test('automatic form up can finish with its front facing an enemy side when it s
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 60,
@@ -677,7 +677,7 @@ test('automatic form up can finish with its front facing an enemy side when it s
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 100,
@@ -701,7 +701,7 @@ test('automatic form up keeps side-facing unavailable when the unit starts ahead
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 60,
@@ -712,7 +712,7 @@ test('automatic form up keeps side-facing unavailable when the unit starts ahead
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 100,
@@ -732,7 +732,7 @@ test('automatic form up allows side-facing when the unit is only slightly ahead 
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 60,
@@ -743,7 +743,7 @@ test('automatic form up allows side-facing when the unit is only slightly ahead 
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 100,
@@ -763,7 +763,7 @@ test('automatic form up prefers the enemy flank when the unit is approaching fro
     const blue = {
         id: 'b1',
         type: 'Riders',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 30,
         x: 376.63328577160837,
@@ -774,7 +774,7 @@ test('automatic form up prefers the enemy flank when the unit is approaching fro
     const red = {
         id: 'r1',
         type: 'Horde',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 40,
         x: 467.45549051227385,
@@ -795,7 +795,7 @@ test('automatic form up triggers from a single close front corner even when the 
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 120,
@@ -806,7 +806,7 @@ test('automatic form up triggers from a single close front corner even when the 
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 180,
@@ -826,7 +826,7 @@ test('automatic form up only moves the angled elements that can individually rea
     const blueLead = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 120,
@@ -837,7 +837,7 @@ test('automatic form up only moves the angled elements that can individually rea
     const blueWing = {
         id: 'b2',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 148.2842712474619,
@@ -848,7 +848,7 @@ test('automatic form up only moves the angled elements that can individually rea
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 180,
@@ -870,7 +870,7 @@ test('automatic form up slides a non-qualifying angled neighbor sideways to avoi
     const blueLead = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 100,
@@ -881,7 +881,7 @@ test('automatic form up slides a non-qualifying angled neighbor sideways to avoi
     const blueWing = {
         id: 'b2',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 71.7157287525381,
@@ -892,7 +892,7 @@ test('automatic form up slides a non-qualifying angled neighbor sideways to avoi
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 120,
@@ -920,7 +920,7 @@ test('automatic form up keeps mixed-depth front-aligned units in one formation g
     const blueRiders = {
         id: 'b4',
         type: 'Riders',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 30,
         x: 367.27272727272725,
@@ -931,7 +931,7 @@ test('automatic form up keeps mixed-depth front-aligned units in one formation g
     const blueHorde = {
         id: 'b6',
         type: 'Horde',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 40,
         x: 407.27272727272725,
@@ -942,7 +942,7 @@ test('automatic form up keeps mixed-depth front-aligned units in one formation g
     const blueWarband = {
         id: 'b5',
         type: 'Warband',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 447.27272727272725,
@@ -953,7 +953,7 @@ test('automatic form up keeps mixed-depth front-aligned units in one formation g
     const redBlade = {
         id: 'r10',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 20,
         x: 448.2549045788197,
@@ -964,7 +964,7 @@ test('automatic form up keeps mixed-depth front-aligned units in one formation g
     const redHorde = {
         id: 'r11',
         type: 'Horde',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 40,
         x: 408.2549045788197,
@@ -1155,7 +1155,7 @@ test('shooters can target enemies whose nearest side lies inside the shooting bo
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1170,7 +1170,7 @@ test('shooters can target enemies whose nearest side lies inside the shooting bo
     const target = {
         id: 't1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1189,7 +1189,7 @@ test('artillery can shoot while stationary but not after moving', () => {
     const artillery = {
         id: 'a1',
         type: 'Artillery',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 40,
@@ -1205,7 +1205,7 @@ test('artillery can shoot while stationary but not after moving', () => {
     const target = {
         id: 't1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1234,7 +1234,7 @@ test('shooters can shoot after moving', () => {
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1250,7 +1250,7 @@ test('shooters can shoot after moving', () => {
     const target = {
         id: 't1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1269,7 +1269,7 @@ test('shooters with enemy front contact cannot make ranged attacks', () => {
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1284,7 +1284,7 @@ test('shooters with enemy front contact cannot make ranged attacks', () => {
     const enemyInMelee = {
         id: 'e1',
         type: 'Riders',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'mounted',
         width: 40,
         depth: 30,
@@ -1298,7 +1298,7 @@ test('shooters with enemy front contact cannot make ranged attacks', () => {
     const target = {
         id: 't1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1319,7 +1319,7 @@ test('getRangedArea stays attached to the shooter front edge', () => {
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1345,7 +1345,7 @@ test('other units block shooting line of sight', () => {
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1360,7 +1360,7 @@ test('other units block shooting line of sight', () => {
     const blocker = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1374,7 +1374,7 @@ test('other units block shooting line of sight', () => {
     const target = {
         id: 't1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1393,7 +1393,7 @@ test('rough ground blocks shooting unless it is shallow near an endpoint', () =>
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1408,7 +1408,7 @@ test('rough ground blocks shooting unless it is shallow near an endpoint', () =>
     const target = {
         id: 't1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1436,7 +1436,7 @@ test('resolveShooting applies multiple-shooter defender penalty and bad-going co
     const shooterOne = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1456,7 +1456,7 @@ test('resolveShooting applies multiple-shooter defender penalty and bad-going co
     const defender = {
         id: 'd1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1488,7 +1488,7 @@ test('resolveShooting destroys a recoiling defender that would recoil into water
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1503,7 +1503,7 @@ test('resolveShooting destroys a recoiling defender that would recoil into water
     const defender = {
         id: 'd1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1530,7 +1530,7 @@ test('resolveRecoil ignores enemy corner contact on the rear edge', () => {
     const recoilingUnit = {
         id: 'b1',
         type: 'Spear',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1544,7 +1544,7 @@ test('resolveRecoil ignores enemy corner contact on the rear edge', () => {
     const enemyCornerTouch = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1567,7 +1567,7 @@ test('resolveRecoil ignores a tiny rear-edge sliver contact', () => {
     const recoilingUnit = {
         id: 'b1',
         type: 'Spear',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1581,7 +1581,7 @@ test('resolveRecoil ignores a tiny rear-edge sliver contact', () => {
     const enemySliver = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1604,7 +1604,7 @@ test('resolveRecoil still destroys on real rear-edge contact', () => {
     const recoilingUnit = {
         id: 'b1',
         type: 'Spear',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1618,7 +1618,7 @@ test('resolveRecoil still destroys on real rear-edge contact', () => {
     const rearEnemy = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1640,7 +1640,7 @@ test('resolveShooting does not make the shooting attacker lose the exchange', ()
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1655,7 +1655,7 @@ test('resolveShooting does not make the shooting attacker lose the exchange', ()
     const defender = {
         id: 'd1',
         type: 'Knights',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'mounted',
         width: 40,
         depth: 30,
@@ -1706,7 +1706,7 @@ test('detectMeleeCombats finds front-to-front enemy contacts', () => {
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1720,7 +1720,7 @@ test('detectMeleeCombats finds front-to-front enemy contacts', () => {
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1743,7 +1743,7 @@ test('detectMeleeCombats groups stacked spears as one combatant', () => {
     const frontSpear = {
         id: 'b1',
         type: 'Spear',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1763,7 +1763,7 @@ test('detectMeleeCombats groups stacked spears as one combatant', () => {
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1785,7 +1785,7 @@ test('detectMeleeCombats ignores corner-only contact even when the touched unit 
     const blueFront = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1805,7 +1805,7 @@ test('detectMeleeCombats ignores corner-only contact even when the touched unit 
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1828,7 +1828,7 @@ test('detectMeleeCombats pairs idle enemies that are touching side-to-side', () 
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1842,7 +1842,7 @@ test('detectMeleeCombats pairs idle enemies that are touching side-to-side', () 
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1867,7 +1867,7 @@ test('previewMeleeCombats reports factors and modifier sources without rolling d
     const blue = {
         id: 'b1',
         type: 'Spear',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1887,7 +1887,7 @@ test('previewMeleeCombats reports factors and modifier sources without rolling d
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1912,7 +1912,7 @@ test('resolveMelee turns a singly engaged side-contact combatant to face the ene
     const blue = {
         id: 'b1',
         type: 'Blade',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1926,7 +1926,7 @@ test('resolveMelee turns a singly engaged side-contact combatant to face the ene
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1962,7 +1962,7 @@ test('resolveMelee applies stacked and flank modifiers', () => {
     const frontSpear = {
         id: 'b1',
         type: 'Spear',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -1982,7 +1982,7 @@ test('resolveMelee applies stacked and flank modifiers', () => {
     const red = {
         id: 'r1',
         type: 'Blade',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 20,
@@ -2017,7 +2017,7 @@ test('resolveMelee applies overlap modifier for an idle enemy on the fighter fla
     const blue = {
         id: 'b1',
         type: 'Horde',
-        side: 'blue',
+        playerId: 'player-1',
         troopClass: 'infantry',
         width: 40,
         depth: 40,
@@ -2031,7 +2031,7 @@ test('resolveMelee applies overlap modifier for an idle enemy on the fighter fla
     const redFront = {
         id: 'r1',
         type: 'Horde',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 40,
@@ -2045,7 +2045,7 @@ test('resolveMelee applies overlap modifier for an idle enemy on the fighter fla
     const redOverlap = {
         id: 'r2',
         type: 'Horde',
-        side: 'red',
+        playerId: 'player-2',
         troopClass: 'infantry',
         width: 40,
         depth: 40,

@@ -94,11 +94,11 @@
                 confirmationText: document.getElementById('confirmationText'),
                 cancelConfirmationButton: document.getElementById('cancelConfirmationButton'),
                 confirmSetupButton: document.getElementById('confirmSetupButton'),
-                activeSideSelect: document.getElementById('activeSideSelect'),
+                activePlayerSelect: document.getElementById('activePlayerSelect'),
                 remainingMovesInput: document.getElementById('remainingMovesInput'),
                 phaseSelect: document.getElementById('phaseSelect'),
                 newUnitTypeSelect: document.getElementById('newUnitTypeSelect'),
-                placementSideSelect: document.getElementById('placementSideSelect'),
+                placementPlayerSelect: document.getElementById('placementPlayerSelect'),
                 placeUnitButton: document.getElementById('placeUnitButton'),
                 deleteUnitButton: document.getElementById('deleteUnitButton'),
                 destroyUnitButton: document.getElementById('destroyUnitButton'),
@@ -141,8 +141,8 @@
                 closeGameSettingsButton: document.getElementById('closeGameSettingsButton'),
                 limitFactionRostersCheckbox: document.getElementById('limitFactionRostersCheckbox'),
                 terrainSettingsList: document.getElementById('terrainSettingsList'),
-                blueLosses: document.getElementById('blueLosses'),
-                redLosses: document.getElementById('redLosses'),
+                playerOneLosses: document.getElementById('playerOneLosses'),
+                playerTwoLosses: document.getElementById('playerTwoLosses'),
                 statusText: document.getElementById('statusText'),
                 selectionText: document.getElementById('selectionText'),
                 selectionPanel: document.getElementById('selectionPanel'),
@@ -314,6 +314,39 @@
             return this.getPlayerColors(playerId).label;
         }
 
+        getPlayerSelectLabel(playerId) {
+            return this.getArmyIdentity(playerId).label;
+        }
+
+        syncPlayerSelect(select, selectedPlayerId) {
+            if (!select) {
+                return;
+            }
+            data.PLAYER_IDS.forEach((playerId, index) => {
+                const option = select.options?.[index];
+                if (!option) {
+                    return;
+                }
+                option.value = playerId;
+                option.textContent = this.getPlayerSelectLabel(playerId);
+            });
+            select.value = selectedPlayerId;
+        }
+
+        syncLossPill(element, playerId) {
+            if (!element) {
+                return;
+            }
+            const summary = this.getLossSummary(playerId);
+            const colors = this.getPlayerColors(playerId);
+            element.textContent = `${this.getPlayerSelectLabel(playerId)} lost: ${summary.points}`;
+            element.title = summary.title;
+            if (typeof element.style?.setProperty === 'function') {
+                element.style.setProperty('--player-fill', colors.fill);
+                element.style.setProperty('--player-stroke', colors.stroke);
+            }
+        }
+
         getOpponentPlayerId(playerId) {
             return data.PLAYER_IDS.find((candidate) => candidate !== playerId) || null;
         }
@@ -347,12 +380,12 @@
             this.ui.autoPlaceTerrainButton.addEventListener('click', () => this.autoPlaceTerrain());
             this.ui.confirmTerrainButton.addEventListener('click', () => this.openTerrainConfirmation());
             this.bindUnitDeploymentUi();
-            this.ui.activeSideSelect.addEventListener('change', () => {
-                this.state.activePlayerId = this.ui.activeSideSelect.value;
+            this.ui.activePlayerSelect.addEventListener('change', () => {
+                this.state.activePlayerId = this.ui.activePlayerSelect.value;
                 this.resetMovedFlags(this.state.activePlayerId);
                 this.cancelDraft(false);
                 this.updateSelectionAnalysis();
-                this.updateStatus(this.state.mode === 'edit' ? 'Edit mode: active side updated.' : 'Game mode: active side updated.');
+                this.updateStatus(this.state.mode === 'edit' ? 'Edit mode: active player updated.' : 'Game mode: active player updated.');
             });
             this.ui.remainingMovesInput.addEventListener('change', () => {
                 this.state.remainingMoves = geometry.clamp(Number(this.ui.remainingMovesInput.value) || 0, 0, 9);
@@ -369,8 +402,8 @@
             this.ui.newUnitTypeSelect.addEventListener('change', () => {
                 this.state.placementType = this.ui.newUnitTypeSelect.value;
             });
-            this.ui.placementSideSelect.addEventListener('change', () => {
-                this.state.placementPlayerId = this.ui.placementSideSelect.value;
+            this.ui.placementPlayerSelect.addEventListener('change', () => {
+                this.state.placementPlayerId = this.ui.placementPlayerSelect.value;
             });
             this.ui.placeUnitButton.addEventListener('click', () => {
                 this.state.placingUnit = !this.state.placingUnit;
@@ -736,21 +769,21 @@
             }
             this.ui.editGroup.hidden = this.state.mode !== 'edit';
             this.ui.actionGroup.hidden = false;
-            this.ui.activeSideSelect.value = this.state.activePlayerId;
+            this.syncPlayerSelect(this.ui.activePlayerSelect, this.state.activePlayerId);
             this.ui.remainingMovesInput.value = String(this.state.remainingMoves);
             this.ui.phaseSelect.value = this.state.phase;
             this.ui.newUnitTypeSelect.value = this.state.placementType;
-            this.ui.placementSideSelect.value = this.state.placementPlayerId;
+            this.syncPlayerSelect(this.ui.placementPlayerSelect, this.state.placementPlayerId);
             this.ui.placeUnitButton.textContent = this.state.placingUnit ? 'Cancel Placement' : 'Place Unit';
             this.ui.placeUnitButton.disabled = this.state.mode !== 'edit';
             this.ui.newUnitTypeSelect.disabled = this.state.mode !== 'edit';
-            this.ui.placementSideSelect.disabled = this.state.mode !== 'edit';
+            this.ui.placementPlayerSelect.disabled = this.state.mode !== 'edit';
             const canRemoveSelection = this.state.mode === 'edit' && this.state.selectedIds.length > 0;
             this.ui.deleteUnitButton.disabled = this.state.mode !== 'edit' || this.state.selectedIds.length === 0;
             this.ui.destroyUnitButton.disabled = this.state.mode !== 'edit' || this.state.selectedIds.length === 0;
             this.ui.deleteUnitButton.hidden = this.state.mode !== 'edit';
             this.ui.destroyUnitButton.hidden = this.state.mode !== 'edit';
-            this.ui.activeSideSelect.disabled = this.state.mode !== 'edit';
+            this.ui.activePlayerSelect.disabled = this.state.mode !== 'edit';
             this.ui.remainingMovesInput.disabled = this.state.mode !== 'edit';
             this.ui.phaseSelect.disabled = this.state.mode !== 'edit';
             this.ui.finishMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
@@ -814,12 +847,8 @@
             this.ui.storageModal.hidden = !this.state.storageModalOpen;
             if (this.ui.gameSettingsModal) this.ui.gameSettingsModal.hidden = !this.state.gameSettingsModalOpen;
             if (this.ui.saveStorageButton) this.ui.saveStorageButton.disabled = false;
-            const playerOneLosses = this.getLossSummary('player-1');
-            const playerTwoLosses = this.getLossSummary('player-2');
-            this.ui.blueLosses.textContent = `${this.getPlayerLabel('player-1')} lost: ${playerOneLosses.points}`;
-            this.ui.blueLosses.title = playerOneLosses.title;
-            this.ui.redLosses.textContent = `${this.getPlayerLabel('player-2')} lost: ${playerTwoLosses.points}`;
-            this.ui.redLosses.title = playerTwoLosses.title;
+            this.syncLossPill(this.ui.playerOneLosses, 'player-1');
+            this.syncLossPill(this.ui.playerTwoLosses, 'player-2');
             this.ui.statusText.textContent = this.state.status;
             this.renderSelectionInfo();
             this.renderVictoryModal();

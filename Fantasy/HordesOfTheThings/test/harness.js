@@ -3,11 +3,11 @@ const data = require('../src/data.js');
 const geometry = require('../src/geometry.js');
 const rules = require('../src/rules/index.js');
 
-function createBlade(id, x, y) {
+function createBlade(id, x, y, playerId = 'player-1') {
     return {
         id,
         type: 'Blade',
-        side: 'blue',
+        playerId,
         width: 40,
         depth: 20,
         x,
@@ -23,11 +23,11 @@ function createBlade(id, x, y) {
     };
 }
 
-function createArtillery(id, x, y, side = 'blue') {
+function createArtillery(id, x, y, playerId = 'player-1') {
     return {
         id,
         type: 'Artillery',
-        side,
+        playerId,
         width: 40,
         depth: 40,
         x,
@@ -43,11 +43,11 @@ function createArtillery(id, x, y, side = 'blue') {
     };
 }
 
-function createRankPair(leftId, rightId, x, y, rotation, side) {
+function createRankPair(leftId, rightId, x, y, rotation, playerId = 'player-1') {
     const right = geometry.getRightVector(rotation);
     return [
-        { ...createBlade(leftId, x, y), rotation, side: side || 'blue' },
-        { ...createBlade(rightId, x + (right.x * 40), y + (right.y * 40)), rotation, side: side || 'blue' }
+        { ...createBlade(leftId, x, y, playerId), rotation },
+        { ...createBlade(rightId, x + (right.x * 40), y + (right.y * 40), playerId), rotation }
     ];
 }
 

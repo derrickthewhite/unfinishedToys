@@ -122,7 +122,7 @@ test('rank wheeling only allows forward rotation', () => {
 
 test('move-rank keeps an angled contact element formed up while the other element keeps moving forward', () => {
     const blueUnits = createRankPair('b1', 'b2', 100, 200, 0);
-    const redUnits = createRankPair('r1', 'r2', 100, 100, Math.PI / 4, 'red');
+    const redUnits = createRankPair('r1', 'r2', 100, 100, Math.PI / 4, 'player-2');
     const app = createAppHarness({
         state: {
             units: [...blueUnits, ...redUnits],
@@ -179,7 +179,7 @@ test('move-rank keeps an angled contact element formed up while the other elemen
 
 test('rotate-rank keeps an angled contact element formed up while the other element keeps wheeling', () => {
     const blueUnits = createRankPair('u1', 'u2', 240, 260, 0);
-    const redUnits = createRankPair('e1', 'e2', 220, 200, Math.PI / 4, 'red');
+    const redUnits = createRankPair('e1', 'e2', 220, 200, Math.PI / 4, 'player-2');
     const app = createAppHarness({
         state: {
             units: [...blueUnits, ...redUnits],
@@ -431,7 +431,7 @@ test('single-unit corner rotation keeps the front corner fixed for forward rotat
 
 test('snapSelection can snap a unit against an enemy frontage', () => {
     const mover = createBlade('u1', 100, 220);
-    const enemy = { ...createBlade('u2', 145, 220), side: 'red' };
+    const enemy = { ...createBlade('u2', 145, 220), playerId: 'player-2' };
     const app = createAppHarness({
         state: {
             units: [mover, enemy],
@@ -447,7 +447,7 @@ test('snapSelection can snap a unit against an enemy frontage', () => {
 
 test('snapSelection leaves positions alone when snapping is disabled', () => {
     const mover = createBlade('u1', 100, 220);
-    const enemy = { ...createBlade('u2', 145, 220), side: 'red' };
+    const enemy = { ...createBlade('u2', 145, 220), playerId: 'player-2' };
     const app = createAppHarness({
         state: {
             units: [mover, enemy],
@@ -525,9 +525,8 @@ test('collectGhostUnits includes future form-up positions when preview is enable
 
 test('collectGhostUnits omits future form-up positions when preview is disabled', () => {
     const blue = createBlade('b1', 140, 280);
-    blue.side = 'blue';
     blue.rotation = Math.PI / 2;
-    const red = { ...createBlade('r1', 190, 310), side: 'red', rotation: Math.PI };
+    const red = { ...createBlade('r1', 190, 310), playerId: 'player-2', rotation: Math.PI };
     const app = createAppHarness({
         state: {
             mode: 'game',
@@ -559,11 +558,11 @@ test('keyboard shortcut toggles form-up preview and persists the checkbox state 
             gameModeButton: { classList: { toggle() {} } },
             editGroup: { hidden: false },
             actionGroup: { hidden: false },
-            activeSideSelect: { value: '' },
+            activePlayerSelect: { value: '' },
             remainingMovesInput: { value: '' },
             phaseSelect: { value: '' },
             newUnitTypeSelect: { value: '' },
-            placementSideSelect: { value: '' },
+            placementPlayerSelect: { value: '' },
             placeUnitButton: { textContent: '', disabled: false },
             deleteUnitButton: { hidden: false, disabled: false },
             destroyUnitButton: { hidden: false, disabled: false },
@@ -587,8 +586,8 @@ test('keyboard shortcut toggles form-up preview and persists the checkbox state 
             undoMoveButton: { hidden: false, disabled: false },
             acknowledgedButton: { hidden: false, disabled: false },
             storageModal: { hidden: true },
-            blueLosses: { textContent: '', title: '' },
-            redLosses: { textContent: '', title: '' },
+            playerOneLosses: { textContent: '', title: '' },
+            playerTwoLosses: { textContent: '', title: '' },
             statusText: { textContent: '' },
             selectionText: { textContent: '' }
         }
@@ -602,6 +601,82 @@ test('keyboard shortcut toggles form-up preview and persists the checkbox state 
 
     assert.equal(app.state.showFormUpPreview, true);
     assert.equal(app.ui.formUpPreviewCheckbox.checked, true);
+});
+
+test('player chrome uses chosen colors instead of fixed Blue and Red sides', () => {
+    const app = createAppHarness({
+        state: {
+            mode: 'edit',
+            players: {
+                'player-1': { id: 'player-1', colorId: 'gold', faction: 'Dinosaurs' },
+                'player-2': { id: 'player-2', colorId: 'teal', faction: 'Goblin' }
+            }
+        },
+        ui: {
+            modeGroup: { hidden: true },
+            editModeSettingsButton: { hidden: false },
+            editModeSettingsHint: { hidden: true },
+            gameModeButton: { classList: { toggle() {} } },
+            editGroup: { hidden: false },
+            actionGroup: { hidden: false },
+            activePlayerSelect: {
+                value: '',
+                options: [
+                    { value: 'player-1', textContent: 'Blue Panda' },
+                    { value: 'player-2', textContent: 'Red Undead' }
+                ]
+            },
+            remainingMovesInput: { value: '' },
+            phaseSelect: { value: '' },
+            newUnitTypeSelect: { value: '' },
+            placementPlayerSelect: {
+                value: '',
+                options: [
+                    { value: 'player-1', textContent: 'Blue Panda' },
+                    { value: 'player-2', textContent: 'Red Undead' }
+                ]
+            },
+            placeUnitButton: { textContent: '', disabled: false },
+            deleteUnitButton: { hidden: false, disabled: false },
+            destroyUnitButton: { hidden: false, disabled: false },
+            finishMoveButton: { hidden: false, disabled: false },
+            endMovePhaseButton: { hidden: false, disabled: false },
+            stepMoveButton: { hidden: false, disabled: false },
+            snapLabel: { hidden: false },
+            snapCheckbox: { checked: false },
+            formUpPreviewLabel: { hidden: false },
+            formUpPreviewCheckbox: { checked: false },
+            cornerRotationLabel: { hidden: false },
+            cornerRotationCheckbox: { checked: false },
+            rangedAreaLabel: { hidden: false },
+            rangedAreaCheckbox: { checked: false },
+            moveErrorsLabel: { hidden: false },
+            moveErrorsCheckbox: { checked: false },
+            battleStatsLabel: { hidden: false },
+            battleStatsCheckbox: { checked: false },
+            resolveShootingButton: { hidden: false, textContent: '', disabled: false },
+            cancelMoveButton: { hidden: false, disabled: false },
+            undoMoveButton: { hidden: false, disabled: false },
+            acknowledgedButton: { hidden: false, disabled: false },
+            storageModal: { hidden: true },
+            playerOneLosses: { textContent: '', title: '', style: { setProperty() {} } },
+            playerTwoLosses: { textContent: '', title: '', style: { setProperty() {} } },
+            statusText: { textContent: '' },
+            selectionText: { textContent: '' }
+        }
+    });
+    app.syncUiFromState = HordesPrototype.prototype.syncUiFromState;
+    app.renderSelectionInfo = () => {};
+    app.getMeleeState = () => ({ combats: [] });
+    app.getLossSummary = () => ({ points: 0, title: 'No losses.' });
+
+    app.syncUiFromState();
+
+    assert.equal(app.ui.activePlayerSelect.options[0].textContent, 'Gold Dinosaurs');
+    assert.equal(app.ui.activePlayerSelect.options[1].textContent, 'Teal Goblin');
+    assert.equal(app.ui.placementPlayerSelect.options[0].textContent, 'Gold Dinosaurs');
+    assert.equal(app.ui.playerOneLosses.textContent, 'Gold Dinosaurs lost: 0');
+    assert.equal(app.ui.playerTwoLosses.textContent, 'Teal Goblin lost: 0');
 });
 
 test('zoomAt can reach the increased maximum zoom level', () => {
@@ -688,9 +763,7 @@ test('renderSelectionInfo shows single-unit details in the side panel', () => {
 test('battle stats markers list the active side first and fill the selection panel on click', () => {
     const blue = createBlade('b1', 100, 220);
     const red = {
-        ...createBlade('r1', 140, 220),
-        playerId: 'player-2',
-        side: 'red',
+        ...createBlade('r1', 140, 220, 'player-2'),
         rotation: Math.PI
     };
     const app = createAppHarness({
@@ -937,7 +1010,7 @@ test('convertSelection rejects illegal final formations', () => {
         createBlade('u1', 100, 220),
         createBlade('u2', 140, 220),
         createBlade('u3', 180, 220),
-        { ...createBlade('blocker', 140, 240), side: 'red' }
+        { ...createBlade('blocker', 140, 240), playerId: 'player-2' }
     ];
     const app = createAppHarness({
         state: {
@@ -1290,7 +1363,7 @@ test('handleShootingClick does not select a shooter with enemy front contact', (
     const shooter = {
         id: 's1',
         type: 'Shooter',
-        side: 'blue',
+        playerId: 'player-1',
         width: 40,
         depth: 20,
         x: 328.2549045788197,
@@ -1307,7 +1380,7 @@ test('handleShootingClick does not select a shooter with enemy front contact', (
     const enemyInMelee = {
         id: 'e1',
         type: 'Riders',
-        side: 'red',
+        playerId: 'player-2',
         width: 40,
         depth: 30,
         x: 328.2549045788197,
@@ -1338,7 +1411,7 @@ test('handleShootingClick does not select a shooter with enemy front contact', (
 
 test('movement flags persist through shooting and reset for the incoming side', () => {
     const blueArtillery = createArtillery('blue-artillery', 100, 220);
-    const redArtillery = createArtillery('red-artillery', 160, 220, 'red');
+    const redArtillery = createArtillery('red-artillery', 160, 220, 'player-2');
     blueArtillery.movedThisTurn = true;
     redArtillery.movedThisTurn = true;
     const app = createAppHarness({
@@ -1363,7 +1436,7 @@ test('movement flags persist through shooting and reset for the incoming side', 
 
 test('handleShootingClick rejects moved and inactive artillery', () => {
     const artillery = createArtillery('a1', 100, 220);
-    const target = { ...createBlade('t1', 100, 100), side: 'red', rotation: Math.PI };
+    const target = { ...createBlade('t1', 100, 100), playerId: 'player-2', rotation: Math.PI };
     artillery.movedThisTurn = true;
     const app = createAppHarness({
         state: {
@@ -1379,7 +1452,7 @@ test('handleShootingClick rejects moved and inactive artillery', () => {
     assert.equal(app.lastStatus, 'Artillery cannot shoot after moving this turn.');
 
     artillery.movedThisTurn = false;
-    artillery.side = 'red';
+    artillery.playerId = 'player-2';
     app.handleShootingClick(artillery);
 
     assert.equal(app.state.shooting.focusedAttackerId, null);
@@ -1388,7 +1461,7 @@ test('handleShootingClick rejects moved and inactive artillery', () => {
 
 test('handleShootingClick selects stationary artillery on its own turn', () => {
     const artillery = createArtillery('a1', 100, 220);
-    const target = { ...createBlade('t1', 100, 100), side: 'red', rotation: Math.PI };
+    const target = { ...createBlade('t1', 100, 100), playerId: 'player-2', rotation: Math.PI };
     const app = createAppHarness({
         state: {
             phase: 'shooting',
@@ -1413,7 +1486,7 @@ test('handleShootingClick allows shooters to fire on the opposing side turn', ()
         strength: { infantry: 3, mounted: 4 },
         combat: { ignoresBadGoingPenalty: true }
     };
-    const target = { ...createBlade('t1', 100, 170), side: 'red', rotation: Math.PI };
+    const target = { ...createBlade('t1', 100, 170), playerId: 'player-2', rotation: Math.PI };
     const app = createAppHarness({
         state: {
             activeSide: 'red',
@@ -1438,7 +1511,7 @@ test('needsShootingDeclaration identifies eligible undeclared shooters', () => {
         strength: { infantry: 3, mounted: 4 },
         combat: { ignoresBadGoingPenalty: true }
     };
-    const target = { ...createBlade('t1', 100, 170), side: 'red', rotation: Math.PI };
+    const target = { ...createBlade('t1', 100, 170), playerId: 'player-2', rotation: Math.PI };
     const app = createAppHarness({
         state: {
             phase: 'shooting',
@@ -1650,8 +1723,8 @@ test('logCombatResults includes modifiers, rolls, and outcome details', () => {
 
     try {
         app.logCombatResults({
-            units: [{ id: 'u1', side: 'blue', type: 'Shooter' }, { id: 'u3', side: 'blue', type: 'Shooter' }],
-            destroyedUnits: [{ id: 'u2', side: 'red', type: 'Blade' }],
+            units: [{ id: 'u1', playerId: 'player-1', type: 'Shooter' }, { id: 'u3', playerId: 'player-1', type: 'Shooter' }],
+            destroyedUnits: [{ id: 'u2', playerId: 'player-2', type: 'Blade' }],
             recoilDestructions: [{ unitId: 'u2', reason: 'recoil path enters water' }],
             results: [{
                 primaryAttackerId: 'u1',

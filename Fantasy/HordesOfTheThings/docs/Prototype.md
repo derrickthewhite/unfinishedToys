@@ -37,7 +37,7 @@ Keep these three concepts separate:
 | Display color | `state.players[playerId].colorId` | Chosen during setup (twelve colors) |
 | Opening role | setup defender / attacker | Setup only |
 
-Do not use attacker or defender as permanent player identifiers. Legacy saves with `side: 'blue'` / `'red'` still load and normalize to player IDs.
+Do not use attacker or defender as permanent player identifiers. The game bar, loss pills, and army columns show each army's color and faction (`Gold Dinosaurs`), not fixed Blue/Red sides. Blue and Red remain available as presentation colors. Legacy saves with `side: 'blue'` / `'red'` still load and normalize to player IDs.
 
 ## Setup
 
@@ -52,7 +52,7 @@ New games use guided setup instead of seeded armies: army builder → terrain pl
 ## Play
 
 - The canvas pans (right drag) and zooms (wheel around the cursor). Left click selects; drag on empty space marquees. The right-hand panel shows a single selected unit's art and stats.
-- Game mode restricts interaction to the active side. Phases are `move`, `form-up`, `shooting`, and `melee`.
+- Game mode restricts interaction to the active player. Phases are `move`, `form-up`, `shooting`, and `melee`.
 - Single-unit and formation moves are drafted first. Illegal positions highlight red instead of being blocked immediately. `Finish Move` commits; `Cancel Move` restores the draft origin; `Step` saves a legal intermediate and continues. Ghost bases stay at earlier positions. `Undo` steps back through committed formation adjustments.
 - Rank handles: forward, wheel bubbles outside the ends, reverse on a square in front, convert on a square behind. File moves from the lead element inside a forward cone. Conversion ignores path crossings through the selected formation but the final pose must be legal.
 - Form-up, shooting, and melee each leave aftermath ghosts (and combat totals) until **Acknowledged** advances the phase. Destroyed Hordes appear in reserve after that acknowledge.
