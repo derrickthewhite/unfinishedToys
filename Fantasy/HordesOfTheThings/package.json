@@ -1,0 +1,7 @@
+{
+  "name": "hordes-of-the-things",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/**/*.test.js tools/**/*.test.js"
+  }
+}
