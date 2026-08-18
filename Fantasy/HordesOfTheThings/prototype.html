@@ -9,8 +9,7 @@
 <body>
     <div class="app-shell">
         <header class="game-bar">
-            <div class="bar-group mode-group">
-                <button id="editModeButton" class="mode-button is-active" type="button">Edit Mode</button>
+            <div class="bar-group mode-group" id="modeGroup" hidden>
                 <button id="gameModeButton" class="mode-button" type="button">Game Mode</button>
             </div>
             <div class="bar-group turn-group">
@@ -60,6 +59,15 @@
                 <button id="endMovePhaseButton" type="button">End Move Phase</button>
                 <button id="stepMoveButton" type="button">Step</button>
                 <button id="cancelMoveButton" type="button">Cancel Move</button>
+                <button id="resolveShootingButton" type="button" hidden>Resolve Shooting</button>
+                <button id="undoMoveButton" type="button">Undo</button>
+                <button id="acknowledgedButton" type="button" hidden>Acknowledged</button>
+            </div>
+            <div class="bar-group status-group">
+                <div id="statusText">Edit mode: place, drag, marquee-select, or rotate units.</div>
+                <div id="selectionText">No units selected.</div>
+            </div>
+            <div class="bar-group toggle-group">
                 <label id="snapLabel">
                     <input id="snapCheckbox" type="checkbox" checked>
                     Snap
@@ -76,13 +84,14 @@
                     <input id="rangedAreaCheckbox" type="checkbox">
                     Ranged Area
                 </label>
-                <button id="resolveShootingButton" type="button" hidden>Resolve Shooting</button>
-                <button id="undoMoveButton" type="button">Undo</button>
-                <button id="acknowledgedButton" type="button" hidden>Acknowledged</button>
-            </div>
-            <div class="bar-group status-group">
-                <div id="statusText">Edit mode: place, drag, marquee-select, or rotate units.</div>
-                <div id="selectionText">No units selected.</div>
+                <label id="moveErrorsLabel">
+                    <input id="moveErrorsCheckbox" type="checkbox">
+                    Move Errors
+                </label>
+                <label id="battleStatsLabel">
+                    <input id="battleStatsCheckbox" type="checkbox">
+                    Battle Stats
+                </label>
             </div>
         </header>
         <main class="board-shell">
@@ -224,6 +233,12 @@
                 </div>
                 <button id="closeGameSettingsButton" class="icon-button" type="button" aria-label="Close game settings">Close</button>
             </header>
+            <section class="game-settings-section" aria-labelledby="playSettingsTitle">
+                <h3 id="playSettingsTitle">Play</h3>
+                <p>Edit mode bypasses turn rules so you can freely place, move, and adjust units.</p>
+                <button id="editModeSettingsButton" class="settings-action-button" type="button">Enter Edit Mode</button>
+                <p id="editModeSettingsHint" class="settings-hint" hidden>Edit mode is active. Use Game Mode in the toolbar to return to normal play.</p>
+            </section>
             <section class="game-settings-section" aria-labelledby="armySettingsTitle">
                 <h3 id="armySettingsTitle">Armies</h3>
                 <p>When limited, each faction can only recruit the unit types it has artwork for.</p>

@@ -694,6 +694,7 @@
             const result = rules.validateDraftState(this.state.draft, this.state.units, this.state.terrain);
             this.state.draft.invalidIds = result.invalidIds;
             this.state.draft.reasonById = result.reasonById;
+            this.state.draft.cornerViolations = result.cornerViolations;
             this.syncUiFromState();
         }
 

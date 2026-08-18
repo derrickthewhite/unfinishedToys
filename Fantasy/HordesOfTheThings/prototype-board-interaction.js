@@ -32,8 +32,10 @@
         'getSelectionHandles',
         'getFormationCenterInfo',
         'getFormationReverseHandle',
+        'getFormationForwardHandle',
         'getFormationConvertHandle',
         'applyReverseSelection',
+        'applyMaxForwardMove',
         'buildCenteredLinearOffsets',
         'getUnitFrontCenter',
         'getUnitSideCenter',
@@ -248,6 +250,11 @@
                 if (handleHit.kind === 'formation-reverse' || handleHit.kind === 'single-reverse') {
                     this.state.interaction.suppressClick = true;
                     this.applyReverseSelection();
+                    return;
+                }
+                if (handleHit.kind === 'formation-forward' || handleHit.kind === 'single-forward') {
+                    this.state.interaction.suppressClick = true;
+                    this.applyMaxForwardMove();
                     return;
                 }
                 if (handleHit.kind === 'formation-convert') {
@@ -604,6 +611,21 @@
             if (typeof this.isGameOver === 'function' && this.isGameOver()) {
                 return;
             }
+            const battleHit = typeof this.getBattleStatHit === 'function' ? this.getBattleStatHit(world) : null;
+            if (battleHit) {
+                this.state.selectedBattleId = battleHit.id;
+                this.state.selectedIds = [];
+                if (this.state.draft) {
+                    this.cancelDraft(false);
+                }
+                this.updateSelectionAnalysis();
+                this.syncUiFromState();
+                this.requestRender();
+                return;
+            }
+            if (this.state.selectedBattleId) {
+                this.state.selectedBattleId = null;
+            }
             const unitHit = interaction.unitHit ? this.getUnitById(interaction.unitHit) : this.pickUnit(world);
             if (this.state.mode === 'game' && this.state.phase === 'shooting') {
                 this.handleShootingClick(unitHit);
@@ -660,6 +682,7 @@
         }
 
         toggleSelection(unitId, additive) {
+            this.state.selectedBattleId = null;
             if (!additive) {
                 if (this.state.selectedIds.length === 1 && this.state.selectedIds[0] === unitId) {
                     this.clearSelection();
@@ -681,6 +704,7 @@
 
         clearSelection() {
             this.state.selectedIds = [];
+            this.state.selectedBattleId = null;
             if (this.state.draft) {
                 this.cancelDraft(false);
             }
@@ -764,6 +788,12 @@
                 }
                 const center = geometry.getUnitCenter(unit);
                 return [{
+                    kind: 'single-forward',
+                    unitId: unit.id,
+                    radius: data.HANDLE_RADIUS,
+                    position: geometry.add(center, geometry.scaleVector(geometry.getForwardVector(unit.rotation), (unit.depth / 2) + 12)),
+                    rotation: Math.atan2(geometry.getForwardVector(unit.rotation).y, geometry.getForwardVector(unit.rotation).x)
+                }, {
                     kind: 'single-rotate',
                     unitId: unit.id,
                     radius: data.HANDLE_RADIUS,
@@ -773,11 +803,12 @@
                     kind: 'single-reverse',
                     unitId: unit.id,
                     radius: data.HANDLE_RADIUS,
-                    position: geometry.add(center, geometry.scaleVector(geometry.getForwardVector(unit.rotation), (unit.depth / 2) + 12)),
+                    position: geometry.add(center, geometry.scaleVector(geometry.getForwardVector(unit.rotation), -((unit.depth / 2) + 12))),
                     rotation: geometry.normalizeAngle(unit.rotation + (Math.PI / 2))
                 }];
             }
             if (analysis.type === 'rank') {
+                const forwardHandle = this.getFormationForwardHandle(analysis);
                 const reverseHandle = this.getFormationReverseHandle(analysis);
                 const convertHandle = this.getFormationConvertHandle(analysis);
                 const leftWheelVector = geometry.subtract(analysis.leftPivot, analysis.rightPivot);
@@ -796,17 +827,20 @@
                     pivot: analysis.leftPivot,
                     rotation: Math.atan2(analysis.rightOutward.y, analysis.rightOutward.x),
                     forwardRotationSign: Math.sign(geometry.dot({ x: -rightWheelVector.y, y: rightWheelVector.x }, analysis.forward)) || 1
-                }, reverseHandle];
+                }, forwardHandle];
                 if (this.state.setupStage !== 'unit-deployment') {
                     handles.push(convertHandle);
                 }
+                handles.push(reverseHandle);
                 return handles;
             }
             if (analysis.type === 'file') {
+                const forwardHandle = this.getFormationForwardHandle(analysis);
+                const reverseHandle = this.getFormationReverseHandle(analysis);
                 if (this.state.setupStage === 'unit-deployment') {
-                    return [this.getFormationReverseHandle(analysis)];
+                    return [forwardHandle, reverseHandle];
                 }
-                return [this.getFormationReverseHandle(analysis), this.getFormationConvertHandle(analysis)];
+                return [forwardHandle, this.getFormationConvertHandle(analysis), reverseHandle];
             }
             return [];
         }
@@ -833,22 +867,140 @@
 
         getFormationReverseHandle(analysis) {
             const info = this.getFormationCenterInfo(analysis);
+            const backCenter = geometry.add(info.formationCenter, geometry.scaleVector(analysis.forward, -info.backOffset));
+            const lateralOffset = this.state.setupStage === 'unit-deployment' ? 0 : -24;
             return {
                 kind: 'formation-reverse',
                 radius: data.HANDLE_RADIUS,
-                position: geometry.add(info.formationCenter, geometry.scaleVector(analysis.forward, info.frontOffset)),
+                position: geometry.add(backCenter, geometry.scaleVector(analysis.right, lateralOffset)),
                 rotation: geometry.normalizeAngle(Math.atan2(analysis.forward.y, analysis.forward.x) + (Math.PI / 2))
+            };
+        }
+
+        getFormationForwardHandle(analysis) {
+            const info = this.getFormationCenterInfo(analysis);
+            return {
+                kind: 'formation-forward',
+                radius: data.HANDLE_RADIUS,
+                position: geometry.add(info.formationCenter, geometry.scaleVector(analysis.forward, info.frontOffset)),
+                rotation: Math.atan2(analysis.forward.y, analysis.forward.x)
             };
         }
 
         getFormationConvertHandle(analysis) {
             const info = this.getFormationCenterInfo(analysis);
+            const backCenter = geometry.add(info.formationCenter, geometry.scaleVector(analysis.forward, -info.backOffset));
             return {
                 kind: 'formation-convert',
                 radius: data.HANDLE_RADIUS,
-                position: geometry.add(info.formationCenter, geometry.scaleVector(analysis.forward, -info.backOffset)),
+                position: geometry.add(backCenter, geometry.scaleVector(analysis.right, 24)),
                 rotation: geometry.normalizeAngle(Math.atan2(analysis.forward.y, analysis.forward.x) + (Math.PI / 2))
             };
+        }
+
+        applyMaxForwardMove() {
+            const analysis = this.state.selectionAnalysis;
+            if (!analysis || analysis.invalid || analysis.type === 'none') {
+                return;
+            }
+            if (this.state.mode !== 'game' || this.state.phase !== 'move') {
+                return;
+            }
+            if (!this.ensureDraft(this.state.selectedIds)) {
+                return;
+            }
+
+            const draft = this.state.draft;
+            const draftIds = draft.unitIds;
+            const base = draft.validationOrigin;
+            const forward = analysis.forward;
+            const liveSnapshot = geometry.snapshotPositions(draftIds, this.state.units);
+            const maxSearch = draftIds.reduce((limit, unitId) => {
+                const unit = this.getUnitById(unitId);
+                if (!unit) {
+                    return limit;
+                }
+                const unitMax = Math.max(unit.moves.road, unit.moves.good, unit.moves.bad, unit.moves.water);
+                return Math.max(limit, unitMax);
+            }, data.BOARD_SIZE);
+
+            const applyForwardDistance = (distance) => {
+                geometry.restoreSnapshot(liveSnapshot, this.state.units);
+                const moveDelta = geometry.scaleVector(forward, distance);
+                if (analysis.type === 'single') {
+                    const unitId = draftIds[0];
+                    const unit = this.getUnitById(unitId);
+                    const origin = base[unitId];
+                    unit.x = origin.x + moveDelta.x;
+                    unit.y = origin.y + moveDelta.y;
+                    return;
+                }
+                if (analysis.type === 'rank') {
+                    draftIds.forEach((unitId) => {
+                        const unit = this.getUnitById(unitId);
+                        const origin = base[unitId];
+                        unit.x = origin.x + moveDelta.x;
+                        unit.y = origin.y + moveDelta.y;
+                    });
+                    return;
+                }
+                const orderedIds = analysis.orderedIds;
+                const leadId = orderedIds[0];
+                const lead = this.getUnitById(leadId);
+                const leadBase = base[leadId];
+                lead.x = leadBase.x + moveDelta.x;
+                lead.y = leadBase.y + moveDelta.y;
+                lead.rotation = leadBase.rotation;
+                for (let index = 1; index < orderedIds.length; index += 1) {
+                    const previousUnit = this.getUnitById(orderedIds[index - 1]);
+                    const follower = this.getUnitById(orderedIds[index]);
+                    const followerBase = base[orderedIds[index]];
+                    const previousCorners = geometry.getUnitCorners(previousUnit);
+                    follower.x = previousCorners.backLeft.x;
+                    follower.y = previousCorners.backLeft.y;
+                    follower.rotation = followerBase.rotation;
+                }
+            };
+
+            const isValidDistance = (distance) => {
+                applyForwardDistance(distance);
+                this.evaluateDraft();
+                return draft.invalidIds.size === 0;
+            };
+
+            if (!isValidDistance(0)) {
+                geometry.restoreSnapshot(liveSnapshot, this.state.units);
+                this.evaluateDraft();
+                this.updateStatus('The current draft is already invalid.');
+                return;
+            }
+
+            let best = 0;
+            const step = 2;
+            for (let distance = step; distance <= maxSearch; distance += step) {
+                if (!isValidDistance(distance)) {
+                    break;
+                }
+                best = distance;
+            }
+
+            applyForwardDistance(best);
+            if (analysis.type === 'rank') {
+                const projectedUnits = draftIds.map((unitId) => ({ ...this.getUnitById(unitId) }));
+                this.applyProjectedRankUnits({ draftIds, dragBase: base }, projectedUnits, true);
+            } else {
+                this.snapSelection(draftIds);
+            }
+            this.evaluateDraft();
+            if (analysis.type !== 'single' && best > 0.05) {
+                this.commitDraftStep();
+            }
+            this.updateSelectionAnalysis();
+            this.syncUiFromState();
+            this.requestRender();
+            this.updateStatus(best <= 0.05
+                ? 'No forward movement is legal from here.'
+                : `Moved ${Math.round(best)} mm forward.`);
         }
 
         applyReverseSelection() {
@@ -1161,7 +1313,8 @@
                 allowSingleRotationFormationEscape: false,
                 history: [],
                 invalidIds: new Set(),
-                reasonById: new Map()
+                reasonById: new Map(),
+                cornerViolations: []
             };
             this.evaluateDraft();
             this.syncUiFromState();

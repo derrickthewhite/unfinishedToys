@@ -122,11 +122,14 @@
         return { type: 'invalid', invalid: true, reason: 'Selection is not a legal rank or file formation.' };
     }
 
+    const CORNER_TRAVEL_NAMES = ['frontLeft', 'frontRight', 'backLeft', 'backRight'];
+
     function validateDraftState(draft, units, terrain) {
         const invalidIds = new Set();
         const reasonById = new Map();
+        const cornerViolations = [];
         if (!draft) {
-            return { invalidIds, reasonById };
+            return { invalidIds, reasonById, cornerViolations };
         }
         const pathOrigin = draft.origin || draft.initialOrigin;
         const validationOrigin = draft.validationOrigin || draft.initialOrigin || draft.origin;
@@ -285,13 +288,26 @@
                 return;
             }
             const allowance = movementAllowanceForSeverity(unit, worstSeverityById.get(unit.id));
-            const maxCornerTravel = Math.max(...travelById.get(unit.id));
+            const travels = travelById.get(unit.id);
+            const maxCornerTravel = Math.max(...travels);
             if (maxCornerTravel > allowance + 0.5) {
                 setInvalid(invalidIds, reasonById, unit.id, 'A corner moved farther than the terrain-limited allowance.');
+                const originCorners = geometry.getUnitCorners(validationOrigin[unit.id]);
+                const currentCorners = geometry.getUnitCorners(unit);
+                CORNER_TRAVEL_NAMES.forEach((cornerName, index) => {
+                    if (travels[index] > allowance + 0.5) {
+                        cornerViolations.push({
+                            unitId: unit.id,
+                            corner: cornerName,
+                            from: originCorners[cornerName],
+                            to: currentCorners[cornerName]
+                        });
+                    }
+                });
             }
         });
 
-        return { invalidIds, reasonById };
+        return { invalidIds, reasonById, cornerViolations };
     }
 
     function buildSampleMap(selectedUnits, originSnapshot, t, stationaryIds) {
@@ -432,9 +448,43 @@
         return !unit.ranged.requiresStationary || !unit.movedThisTurn;
     }
 
+    function getOutwardEdgeNormal(start, end) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const length = Math.hypot(dx, dy);
+        if (length <= Number.EPSILON) {
+            return { x: 0, y: 0 };
+        }
+        return { x: dy / length, y: -dx / length };
+    }
+
+    function getMagicianRangedArea(unit) {
+        const range = unit.ranged.range;
+        const vertices = geometry.cornersToPoints(geometry.getUnitCorners(unit));
+        const corners = vertices.map((vertex, index) => {
+            const prev = vertices[(index - 1 + vertices.length) % vertices.length];
+            const next = vertices[(index + 1) % vertices.length];
+            const normalIn = getOutwardEdgeNormal(prev, vertex);
+            const normalOut = getOutwardEdgeNormal(vertex, next);
+            return {
+                vertex,
+                arcStart: geometry.add(vertex, geometry.scaleVector(normalIn, range)),
+                arcEnd: geometry.add(vertex, geometry.scaleVector(normalOut, range))
+            };
+        });
+        return {
+            kind: 'offset-rect',
+            range,
+            corners
+        };
+    }
+
     function getRangedArea(unit) {
         if (!isRangedUnit(unit)) {
             return null;
+        }
+        if (isMagicianUnit(unit) || unit.ranged?.magician) {
+            return getMagicianRangedArea(unit);
         }
         const corners = geometry.getUnitCorners(unit);
         const frontMid = geometry.midpoint(corners.frontLeft, corners.frontRight);
@@ -445,7 +495,13 @@
         const nearRight = geometry.add(frontMid, geometry.scaleVector(right, width / 2));
         const farLeft = geometry.add(nearLeft, geometry.scaleVector(forward, unit.ranged.range));
         const farRight = geometry.add(nearRight, geometry.scaleVector(forward, unit.ranged.range));
-        return { nearLeft, nearRight, farRight, farLeft };
+        return {
+            kind: 'box',
+            nearLeft,
+            nearRight,
+            farRight,
+            farLeft
+        };
     }
 
     function getUnitSides(unit) {
@@ -484,8 +540,16 @@
     }
 
     function getNearestTargetSide(attacker, target) {
-        const attackerArea = getRangedArea(attacker);
-        const origin = attackerArea ? geometry.midpoint(attackerArea.nearLeft, attackerArea.nearRight) : geometry.getUnitCenter(attacker);
+        let origin;
+        if (isMagicianUnit(attacker)) {
+            const corners = geometry.getUnitCorners(attacker);
+            origin = geometry.midpoint(corners.frontLeft, corners.frontRight);
+        } else {
+            const attackerArea = getRangedArea(attacker);
+            origin = attackerArea?.kind === 'box'
+                ? geometry.midpoint(attackerArea.nearLeft, attackerArea.nearRight)
+                : geometry.getUnitCenter(attacker);
+        }
         return getUnitSides(target).reduce((best, side) => {
             const distance = distancePointToSegment(origin, side.start, side.end);
             if (!best || distance < best.distance) {
@@ -776,40 +840,78 @@
         return Math.min(count - 1, 2);
     }
 
+    function getCombatModifierLabel(id) {
+        return {
+            'bad-going': 'In bad going',
+            'mounted-into-bad-going': 'Mounted against enemy in bad going',
+            'multiple-shooters': 'Multiple shooters',
+            'stacked': 'Supporting element',
+            'flank-attacked': 'Attacked in flank',
+            'rear-attacked': 'Attacked in rear',
+            'overlapped': 'Overlap from idle enemy'
+        }[id] || id;
+    }
+
+    function combatModifier(id, value, detail) {
+        const modifier = {
+            id,
+            value,
+            label: getCombatModifierLabel(id)
+        };
+        if (detail) {
+            modifier.detail = detail;
+        }
+        return modifier;
+    }
+
+    function formatSignedModifier(value) {
+        return `${value >= 0 ? '+' : ''}${value}`;
+    }
+
+    function describeCombatModifier(modifier) {
+        const label = modifier.label || getCombatModifierLabel(modifier.id);
+        const signed = formatSignedModifier(modifier.value);
+        return modifier.detail ? `${label} (${modifier.detail}) ${signed}` : `${label} ${signed}`;
+    }
+
     function getCombatModifiers(context) {
         const modifiers = [];
         const unitInBadGoing = isUnitInBadGoing(context.unit, context.terrain);
         if (unitInBadGoing && !context.unit.combat?.ignoresBadGoingPenalty) {
-            modifiers.push({ id: 'bad-going', value: -2 });
+            modifiers.push(combatModifier('bad-going', -2));
         }
         if (context.role === 'attacker' && context.unit.troopClass === 'mounted' && isUnitInBadGoing(context.opponent, context.terrain)) {
             const hasBadGoingPenalty = modifiers.some((modifier) => modifier.value === -2);
             if (!hasBadGoingPenalty) {
-                modifiers.push({ id: 'mounted-into-bad-going', value: -2 });
+                modifiers.push(combatModifier('mounted-into-bad-going', -2));
             }
         }
         if (context.phase === 'shooting' && context.role === 'defender' && context.attackers) {
             const extraShooterPenalty = getExtraShooterPenalty(context.attackers.length);
             if (extraShooterPenalty > 0) {
-                modifiers.push({ id: 'multiple-shooters', value: -extraShooterPenalty });
+                modifiers.push(combatModifier('multiple-shooters', -extraShooterPenalty));
             }
         }
         if (context.phase === 'melee') {
             if (context.combatant && context.combatant.unitIds.length > 1) {
-                modifiers.push({ id: 'stacked', value: 1 });
+                const supports = (context.combatant.units || [])
+                    .filter((unit) => unit.id !== context.unit.id)
+                    .map((unit) => unit.type);
+                modifiers.push(combatModifier('stacked', 1, supports.length > 0 ? supports.join(', ') : null));
             }
             const incomingEdges = context.incomingEdges || [];
             if (incomingEdges.includes('left') || incomingEdges.includes('right')) {
-                modifiers.push({ id: 'flank-attacked', value: -1 });
+                const sides = incomingEdges.filter((edge) => edge === 'left' || edge === 'right');
+                modifiers.push(combatModifier('flank-attacked', -1, sides.join(' and ')));
             }
             if (incomingEdges.includes('rear') && context.opponentCombatant && !hasFrontContactOnCombatant(context.opponentCombatant.id, context.combats || [])) {
-                modifiers.push({ id: 'rear-attacked', value: -1 });
+                modifiers.push(combatModifier('rear-attacked', -1));
             }
             if (context.combatant && context.opponentCombatant && context.combatants && context.fightingCombatantIds) {
                 const idleEnemyCombatants = context.combatants.filter((combatant) => combatant.playerId === context.opponentCombatant.playerId);
                 const overlapCount = countOverlapsOnCombatant(context.combatant, idleEnemyCombatants, context.fightingCombatantIds);
                 if (overlapCount > 0) {
-                    modifiers.push({ id: 'overlapped', value: -overlapCount });
+                    modifiers.push(combatModifier('overlapped', -overlapCount, overlapCount === 1 ? 'one flank' : 'both flanks'));
                 }
             }
         }
@@ -1719,6 +1821,80 @@
             destroyedIds: [],
             destructionReasons: {}
         };
+    }
+
+    function buildMeleeCombatSide(combatant, opponentCombatant, incomingEdges, role, adjustedCombats, combatants, fightingCombatantIds, terrain) {
+        const strength = getUnitStrengthAgainst(combatant.primaryUnit, opponentCombatant.primaryUnit);
+        const modifiers = getCombatModifiers({
+            phase: 'melee',
+            role,
+            unit: combatant.primaryUnit,
+            opponent: opponentCombatant.primaryUnit,
+            combatant,
+            opponentCombatant,
+            incomingEdges,
+            combats: adjustedCombats,
+            combatants,
+            fightingCombatantIds,
+            terrain
+        });
+        return {
+            combatantId: combatant.id,
+            playerId: combatant.playerId,
+            primaryId: combatant.primaryUnit.id,
+            primaryType: combatant.primaryUnit.type,
+            troopClass: combatant.primaryUnit.troopClass,
+            unitIds: [...combatant.unitIds],
+            unitTypes: combatant.units.map((unit) => unit.type),
+            strength,
+            modifiers,
+            factor: strength + sumModifiers(modifiers),
+            center: geometry.getUnitCenter(combatant.primaryUnit)
+        };
+    }
+
+    function previewMeleeCombats(units, terrain) {
+        const combatSetup = detectMeleeCombats(units);
+        const facingPlans = buildCombatFacingPlans(combatSetup);
+        const adjustedCombats = combatSetup.combats.map((combat) => ({
+            ...combat,
+            edgesOnLeft: facingPlans.has(combat.leftCombatantId) ? ['front'] : combat.edgesOnLeft,
+            edgesOnRight: facingPlans.has(combat.rightCombatantId) ? ['front'] : combat.edgesOnRight
+        }));
+        const facedUnits = applyCombatFacing(units, combatSetup, facingPlans);
+        const combatantsById = new Map(buildMeleeCombatants(facedUnits).map((combatant) => [combatant.id, combatant]));
+        const combatants = [...combatantsById.values()];
+        const fightingCombatantIds = new Set(adjustedCombats.flatMap((combat) => [combat.leftCombatantId, combat.rightCombatantId]));
+        return adjustedCombats.map((combat) => {
+            const leftCombatant = combatantsById.get(combat.leftCombatantId);
+            const rightCombatant = combatantsById.get(combat.rightCombatantId);
+            const left = buildMeleeCombatSide(
+                leftCombatant,
+                rightCombatant,
+                combat.edgesOnLeft,
+                'attacker',
+                adjustedCombats,
+                combatants,
+                fightingCombatantIds,
+                terrain
+            );
+            const right = buildMeleeCombatSide(
+                rightCombatant,
+                leftCombatant,
+                combat.edgesOnRight,
+                'defender',
+                adjustedCombats,
+                combatants,
+                fightingCombatantIds,
+                terrain
+            );
+            return {
+                id: combat.id,
+                left,
+                right,
+                position: geometry.midpoint(left.center, right.center)
+            };
+        });
     }
 
     function resolveMelee(units, terrain, rollDie) {
@@ -2753,7 +2929,10 @@
         isValidShootingAttack,
         getValidShootingTargets,
         detectMeleeCombats,
+        previewMeleeCombats,
         getCombatModifiers,
+        describeCombatModifier,
+        formatSignedModifier,
         getExtraShooterPenalty,
         getMinorLossResolution,
         resolveRecoil,

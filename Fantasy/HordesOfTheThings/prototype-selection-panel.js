@@ -55,6 +55,57 @@
             return Math.round(distanceMm / data.MM_PER_PACE) + 'p';
         }
 
+        getSelectedBattleMarker() {
+            if (!this.state.selectedBattleId || typeof this.getBattleStatMarkers !== 'function') {
+                return null;
+            }
+            return this.getBattleStatMarkers().find((marker) => marker.id === this.state.selectedBattleId) || null;
+        }
+
+        getSelectedBattleDetails(marker) {
+            if (!marker) {
+                return [];
+            }
+            const details = [];
+            [marker.active, marker.opponent].forEach((side, index) => {
+                const opponent = index === 0 ? marker.opponent : marker.active;
+                const playerLabel = this.getPlayerLabel(side.playerId);
+                const support = side.unitTypes.filter((_, unitIndex) => side.unitIds[unitIndex] !== side.primaryId);
+                details.push({
+                    label: `${playerLabel} ${side.primaryType}`,
+                    value: `Strength ${side.strength} vs ${opponent.troopClass}${support.length ? `; with ${support.join(', ')}` : ''}`
+                });
+                if (side.modifiers.length === 0) {
+                    details.push({
+                        label: `${playerLabel} bonuses`,
+                        value: 'None'
+                    });
+                } else {
+                    side.modifiers.forEach((modifier) => {
+                        details.push({
+                            label: `${playerLabel} ${modifier.label || modifier.id}`,
+                            value: modifier.detail
+                                ? `${rules.formatSignedModifier(modifier.value)} from ${modifier.detail}`
+                                : rules.formatSignedModifier(modifier.value)
+                        });
+                    });
+                }
+                details.push({
+                    label: `${playerLabel} factor`,
+                    value: String(side.factor)
+                });
+            });
+            const delta = marker.relative;
+            const leader = delta === 0
+                ? 'Even before dice'
+                : `${this.getPlayerLabel(delta > 0 ? marker.active.playerId : marker.opponent.playerId)} ${rules.formatSignedModifier(Math.abs(delta))} before dice`;
+            details.push({
+                label: 'Relative',
+                value: leader
+            });
+            return details;
+        }
+
         getSelectedUnitDetails(unit) {
             if (!unit) {
                 return [];
@@ -100,17 +151,21 @@
 
         renderSelectionInfo() {
             const selectedUnits = this.getSelectedUnits();
+            const battle = this.getSelectedBattleMarker();
             if (this.ui.selectionText) {
-                this.ui.selectionText.textContent = rules.describeSelection(this.state.selectionAnalysis, selectedUnits, this.state.draft);
+                this.ui.selectionText.textContent = battle
+                    ? `Battle ${battle.label}`
+                    : rules.describeSelection(this.state.selectionAnalysis, selectedUnits, this.state.draft);
             }
 
             if (!this.ui.selectionPanel) {
                 return;
             }
 
-            const unit = this.getInspectedUnit();
-            const details = this.getSelectedUnitDetails(unit);
-            this.ui.selectionPanel.classList.toggle('is-empty', !unit);
+            const unit = battle ? null : this.getInspectedUnit();
+            const details = battle ? this.getSelectedBattleDetails(battle) : this.getSelectedUnitDetails(unit);
+            const hasContent = Boolean(battle || unit);
+            this.ui.selectionPanel.classList.toggle('is-empty', !hasContent);
 
             if (this.ui.selectionPanelPortrait) {
                 this.ui.selectionPanelPortrait.hidden = !unit;
@@ -135,18 +190,24 @@
                 }
             }
             if (this.ui.selectionPanelEyebrow) {
-                this.ui.selectionPanelEyebrow.textContent = unit ? this.getPlayerLabel(this.getUnitPlayerId(unit)) + ' unit' : 'Selection';
+                this.ui.selectionPanelEyebrow.textContent = battle
+                    ? 'Battle stats'
+                    : (unit ? this.getPlayerLabel(this.getUnitPlayerId(unit)) + ' unit' : 'Selection');
             }
             if (this.ui.selectionPanelTitle) {
-                this.ui.selectionPanelTitle.textContent = unit ? unit.type : 'No unit selected';
+                this.ui.selectionPanelTitle.textContent = battle
+                    ? `${this.getPlayerLabel(battle.active.playerId)} ${battle.label}`
+                    : (unit ? unit.type : 'No unit selected');
             }
             if (this.ui.selectionPanelHint) {
-                this.ui.selectionPanelHint.textContent = unit
-                    ? `${unit.width}mm frontage, ${unit.depth}mm depth.`
-                    : 'Select a single unit to inspect its stats.';
+                this.ui.selectionPanelHint.textContent = battle
+                    ? 'Factors before dice. Active side listed first. Click another marker or a unit to change the inspect target.'
+                    : (unit
+                        ? `${unit.width}mm frontage, ${unit.depth}mm depth.`
+                        : 'Select a single unit to inspect its stats.');
             }
             if (this.ui.selectionPanelStats) {
-                this.ui.selectionPanelStats.hidden = !unit;
+                this.ui.selectionPanelStats.hidden = !hasContent;
                 this.ui.selectionPanelStats.innerHTML = details.map((entry) => (`
                     <div class="selection-stat">
                         <dt>${entry.label}</dt>

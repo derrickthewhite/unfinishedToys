@@ -60,9 +60,19 @@
             getReserveRect(playerId) {
                 const size = this.getReserveRectSize();
                 const homeEdge = this.getHomeEdge(playerId);
+                const left = (data.BOARD_SIZE - size.width) / 2;
+                if (homeEdge === 'bottom') {
+                    return {
+                        left,
+                        top: data.BOARD_SIZE + data.RESERVE_BOARD_GAP,
+                        width: size.width,
+                        height: size.height,
+                        homeEdge
+                    };
+                }
                 return {
-                    left: -data.RESERVE_BOARD_GAP - size.width,
-                    top: homeEdge === 'bottom' ? data.BOARD_SIZE - size.height : 0,
+                    left,
+                    top: -data.RESERVE_BOARD_GAP - size.height,
                     width: size.width,
                     height: size.height,
                     homeEdge
@@ -129,24 +139,23 @@
                 const rect = this.getReserveRect(playerId);
                 const capacity = data.RESERVE_COLUMNS * data.RESERVE_ROWS;
                 const index = ((Number(slotIndex) || 0) % capacity + capacity) % capacity;
-                const colFromBoard = index % data.RESERVE_COLUMNS;
+                const col = index % data.RESERVE_COLUMNS;
                 const rowFromEdge = Math.floor(index / data.RESERVE_COLUMNS);
-                const slotRight = rect.left + rect.width - data.RESERVE_PADDING
-                    - (colFromBoard * (data.RESERVE_SLOT_SIZE + data.RESERVE_SLOT_GAP));
-                const slotLeft = slotRight - data.RESERVE_SLOT_SIZE;
+                const slotLeft = rect.left + data.RESERVE_PADDING
+                    + (col * (data.RESERVE_SLOT_SIZE + data.RESERVE_SLOT_GAP));
                 let slotTop;
                 if (rect.homeEdge === 'bottom') {
+                    slotTop = rect.top + data.RESERVE_PADDING
+                        + (rowFromEdge * (data.RESERVE_SLOT_SIZE + data.RESERVE_SLOT_GAP));
+                } else {
                     const slotBottom = rect.top + rect.height - data.RESERVE_PADDING
                         - (rowFromEdge * (data.RESERVE_SLOT_SIZE + data.RESERVE_SLOT_GAP));
                     slotTop = slotBottom - data.RESERVE_SLOT_SIZE;
-                } else {
-                    slotTop = rect.top + data.RESERVE_PADDING
-                        + (rowFromEdge * (data.RESERVE_SLOT_SIZE + data.RESERVE_SLOT_GAP));
                 }
                 return {
                     x: slotLeft + (data.RESERVE_SLOT_SIZE / 2),
                     y: slotTop + (data.RESERVE_SLOT_SIZE / 2),
-                    rotation: Math.PI / 2
+                    rotation: this.getHomeEdgeRotation(playerId)
                 };
             },
 
@@ -527,6 +536,17 @@
                 if (!alreadyReserved) {
                     this.getReserveUnits().push(cloneReserveUnit(restore));
                 }
+            },
+
+            relayoutReserveUnits() {
+                this.getReserveUnits().forEach((unit) => {
+                    const playerId = this.getUnitPlayerId(unit);
+                    const pose = this.getReserveSlotPose(playerId, unit.reserveSlot);
+                    const relaid = geometry.buildUnitFromCenter(unit, pose, pose.rotation);
+                    unit.x = relaid.x;
+                    unit.y = relaid.y;
+                    unit.rotation = relaid.rotation;
+                });
             }
         });
     }

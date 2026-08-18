@@ -553,7 +553,9 @@ test('keyboard shortcut toggles form-up preview and persists the checkbox state 
             showFormUpPreview: false
         },
         ui: {
-            editModeButton: { classList: { toggle() {} } },
+            modeGroup: { hidden: true },
+            editModeSettingsButton: { hidden: false },
+            editModeSettingsHint: { hidden: true },
             gameModeButton: { classList: { toggle() {} } },
             editGroup: { hidden: false },
             actionGroup: { hidden: false },
@@ -576,6 +578,10 @@ test('keyboard shortcut toggles form-up preview and persists the checkbox state 
             cornerRotationCheckbox: { checked: false },
             rangedAreaLabel: { hidden: false },
             rangedAreaCheckbox: { checked: false },
+            moveErrorsLabel: { hidden: false },
+            moveErrorsCheckbox: { checked: false },
+            battleStatsLabel: { hidden: false },
+            battleStatsCheckbox: { checked: false },
             resolveShootingButton: { hidden: false, textContent: '', disabled: false },
             cancelMoveButton: { hidden: false, disabled: false },
             undoMoveButton: { hidden: false, disabled: false },
@@ -679,6 +685,70 @@ test('renderSelectionInfo shows single-unit details in the side panel', () => {
     assert.deepEqual(app.ui.selectionPanel.toggled, [['is-empty', false]]);
 });
 
+test('battle stats markers list the active side first and fill the selection panel on click', () => {
+    const blue = createBlade('b1', 100, 220);
+    const red = {
+        ...createBlade('r1', 140, 220),
+        playerId: 'player-2',
+        side: 'red',
+        rotation: Math.PI
+    };
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-2',
+            showBattleStats: true,
+            units: [blue, red]
+        },
+        ui: {
+            selectionText: { textContent: '' },
+            selectionPanel: {
+                toggled: [],
+                classList: {
+                    toggle(name, value) {
+                        this.owner.toggled.push([name, value]);
+                    },
+                    owner: null
+                }
+            },
+            selectionPanelEyebrow: { textContent: '' },
+            selectionPanelTitle: { textContent: '' },
+            selectionPanelHint: { textContent: '' },
+            selectionPanelStats: { hidden: true, innerHTML: '' },
+            selectionPanelPortrait: { hidden: true, style: { setProperty() {} } },
+            selectionPanelAsset: { hidden: true, src: '', alt: '', removeAttribute() {} }
+        }
+    });
+    app.ui.selectionPanel.classList.owner = app.ui.selectionPanel;
+    app.getBattleStatMarkers = HordesPrototype.prototype.getBattleStatMarkers;
+    app.getBattlePreviewUnits = HordesPrototype.prototype.getBattlePreviewUnits;
+    app.getBattleStatHit = HordesPrototype.prototype.getBattleStatHit;
+    app.getBattleStatMarkerSize = HordesPrototype.prototype.getBattleStatMarkerSize;
+    app.getSelectedBattleMarker = HordesPrototype.prototype.getSelectedBattleMarker;
+    app.getSelectedBattleDetails = HordesPrototype.prototype.getSelectedBattleDetails;
+    app.renderSelectionInfo = HordesPrototype.prototype.renderSelectionInfo;
+    app.handleClick = HordesPrototype.prototype.handleClick;
+    app.getPlayerLabel = HordesPrototype.prototype.getPlayerLabel;
+    app.getPlayerColors = HordesPrototype.prototype.getPlayerColors;
+    app.getPlayer = HordesPrototype.prototype.getPlayer;
+
+    const markers = app.getBattleStatMarkers();
+    assert.equal(markers.length, 1);
+    assert.equal(markers[0].active.playerId, 'player-2');
+    assert.equal(markers[0].opponent.playerId, 'player-1');
+    assert.equal(markers[0].label, '5 vs 5');
+
+    app.handleClick(markers[0].position, { unitHit: null, shiftKey: false });
+    assert.equal(app.state.selectedBattleId, markers[0].id);
+    app.renderSelectionInfo();
+    assert.equal(app.ui.selectionPanelTitle.textContent, 'Red 5 vs 5');
+    assert.match(app.ui.selectionPanelStats.innerHTML, /Red Blade/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /Blue Blade/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /None/);
+    assert.equal(app.ui.selectionPanelPortrait.hidden, true);
+});
+
 test('handle clicks do not collapse a formation selection to one underlying unit', () => {
     const units = [
         createBlade('u1', 100, 220),
@@ -700,6 +770,51 @@ test('handle clicks do not collapse a formation selection to one underlying unit
 
     assert.deepEqual(app.state.selectedIds, ['u1', 'u2', 'u3']);
     assert.equal(app.state.selectionAnalysis.type, 'rank');
+});
+
+test('rank selection exposes forward and rear reverse handles', () => {
+    const units = [
+        createBlade('u1', 100, 220),
+        createBlade('u2', 140, 220)
+    ];
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            units,
+            selectedIds: ['u1', 'u2']
+        }
+    });
+    app.updateSelectionAnalysis();
+    const handles = app.getSelectionHandles();
+    assert.ok(handles.some((entry) => entry.kind === 'formation-forward'));
+    assert.ok(handles.some((entry) => entry.kind === 'formation-reverse'));
+    assert.ok(handles.some((entry) => entry.kind === 'formation-convert'));
+});
+
+test('applyMaxForwardMove advances a legal rank to its terrain-limited distance', () => {
+    const units = [
+        createBlade('u1', 100, 400),
+        createBlade('u2', 140, 400)
+    ];
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            remainingMoves: 4,
+            units,
+            selectedIds: ['u1', 'u2']
+        }
+    });
+    app.updateSelectionAnalysis();
+    app.ensureDraft(['u1', 'u2']);
+    const startCenter = geometry.getUnitCenter(units[0]);
+    app.applyMaxForwardMove();
+    const endCenter = geometry.getUnitCenter(app.state.units.find((unit) => unit.id === 'u1'));
+    const travel = geometry.distance(startCenter, endCenter);
+    assert.ok(travel >= 45);
+    assert.equal(app.state.draft.invalidIds.size, 0);
 });
 
 test('convertSelection turns a rank into a legal file without recentering the whole formation', () => {

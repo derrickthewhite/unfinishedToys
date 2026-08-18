@@ -62,7 +62,9 @@
             this.drawGhostUnits(ctx);
             this.drawShootingOverlays(ctx);
             this.drawUnits(ctx);
+            this.drawCornerTravelViolations(ctx);
             this.drawSelectionHandles(ctx);
+            this.drawBattleStatOverlays(ctx);
             if (this.state.combatResolution) {
                 this.drawCombatResolutionOverlays(ctx);
             }
@@ -109,7 +111,10 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const label = `${this.getPlayerLabel(playerId)} Reserve`;
-                ctx.fillText(label, rect.left + rect.width / 2, rect.top + 10 / this.state.camera.scale);
+                const labelY = rect.homeEdge === 'bottom'
+                    ? rect.top + 10 / this.state.camera.scale
+                    : rect.top + rect.height - (10 / this.state.camera.scale);
+                ctx.fillText(label, rect.left + rect.width / 2, labelY);
             });
             if (this.isEnsorcelledLocalReturnDraft()) {
                 const unit = this.getUnitById(this.state.draft.unitIds[0]);
@@ -213,11 +218,28 @@
                     ctx.lineWidth = (highlighted ? 2.2 : 1.2) / this.state.camera.scale;
                     ctx.strokeStyle = highlighted ? 'rgba(215, 172, 55, 0.95)' : 'rgba(137, 55, 47, 0.72)';
                     ctx.beginPath();
-                    ctx.moveTo(area.nearLeft.x, area.nearLeft.y);
-                    ctx.lineTo(area.nearRight.x, area.nearRight.y);
-                    ctx.lineTo(area.farRight.x, area.farRight.y);
-                    ctx.lineTo(area.farLeft.x, area.farLeft.y);
-                    ctx.closePath();
+                    if (area.kind === 'offset-rect') {
+                        ctx.moveTo(area.corners[0].arcStart.x, area.corners[0].arcStart.y);
+                        area.corners.forEach((corner, index) => {
+                            const next = area.corners[(index + 1) % area.corners.length];
+                            ctx.arc(
+                                corner.vertex.x,
+                                corner.vertex.y,
+                                area.range,
+                                Math.atan2(corner.arcStart.y - corner.vertex.y, corner.arcStart.x - corner.vertex.x),
+                                Math.atan2(corner.arcEnd.y - corner.vertex.y, corner.arcEnd.x - corner.vertex.x),
+                                false
+                            );
+                            ctx.lineTo(next.arcStart.x, next.arcStart.y);
+                        });
+                        ctx.closePath();
+                    } else {
+                        ctx.moveTo(area.nearLeft.x, area.nearLeft.y);
+                        ctx.lineTo(area.nearRight.x, area.nearRight.y);
+                        ctx.lineTo(area.farRight.x, area.farRight.y);
+                        ctx.lineTo(area.farLeft.x, area.farLeft.y);
+                        ctx.closePath();
+                    }
                     ctx.stroke();
                     ctx.restore();
                 });
@@ -278,6 +300,80 @@
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = '#6e231c';
                 ctx.fillText(`${leftTotal} vs ${rightTotal}`, labelPosition.x, labelPosition.y);
+                ctx.restore();
+            });
+        }
+
+        getBattlePreviewUnits() {
+            if (this.state.mode === 'edit' || this.state.phase === 'move') {
+                return rules.resolveAutomaticFormUp(this.state.units, this.state.activePlayerId, this.state.terrain).units;
+            }
+            return this.state.units;
+        }
+
+        getBattleStatMarkers() {
+            if (!this.state.showBattleStats || this.state.combatResolution) {
+                return [];
+            }
+            const previews = rules.previewMeleeCombats(this.getBattlePreviewUnits(), this.state.terrain);
+            const activePlayerId = this.state.activePlayerId;
+            return previews.map((preview) => {
+                const activeFirst = preview.left.playerId === activePlayerId || preview.right.playerId !== activePlayerId;
+                const active = activeFirst ? preview.left : preview.right;
+                const opponent = activeFirst ? preview.right : preview.left;
+                return {
+                    id: preview.id,
+                    position: preview.position,
+                    label: `${active.factor} vs ${opponent.factor}`,
+                    relative: active.factor - opponent.factor,
+                    active,
+                    opponent
+                };
+            });
+        }
+
+        getBattleStatMarkerSize() {
+            return {
+                width: 52 / this.state.camera.scale,
+                height: 16 / this.state.camera.scale
+            };
+        }
+
+        getBattleStatHit(world) {
+            const size = this.getBattleStatMarkerSize();
+            return this.getBattleStatMarkers().find((marker) => (
+                Math.abs(world.x - marker.position.x) <= (size.width / 2)
+                && Math.abs(world.y - marker.position.y) <= (size.height / 2)
+            )) || null;
+        }
+
+        drawBattleStatOverlays(ctx) {
+            const markers = this.getBattleStatMarkers();
+            if (markers.length === 0) {
+                return;
+            }
+            const size = this.getBattleStatMarkerSize();
+            markers.forEach((marker) => {
+                const selected = this.state.selectedBattleId === marker.id;
+                ctx.save();
+                ctx.fillStyle = selected ? 'rgba(255, 242, 206, 0.96)' : 'rgba(255, 249, 236, 0.94)';
+                ctx.strokeStyle = selected ? 'rgba(128, 95, 29, 0.7)' : 'rgba(55, 45, 36, 0.35)';
+                ctx.lineWidth = (selected ? 1.6 : 1) / this.state.camera.scale;
+                ctx.beginPath();
+                ctx.roundRect(
+                    marker.position.x - size.width / 2,
+                    marker.position.y - size.height / 2,
+                    size.width,
+                    size.height,
+                    4 / this.state.camera.scale
+                );
+                ctx.fill();
+                ctx.stroke();
+                ctx.font = `${10 / this.state.camera.scale}px Georgia`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#6e231c';
+                ctx.fillText(marker.label, marker.position.x, marker.position.y);
                 ctx.restore();
             });
         }
@@ -500,6 +596,30 @@
             ctx.restore();
         }
 
+        drawCornerTravelViolations(ctx) {
+            if (!this.state.showMoveErrors) {
+                return;
+            }
+            const violations = this.state.draft?.cornerViolations;
+            if (!violations || violations.length === 0) {
+                return;
+            }
+            ctx.save();
+            ctx.strokeStyle = 'rgba(176, 48, 40, 0.92)';
+            ctx.lineWidth = 2 / this.state.camera.scale;
+            violations.forEach((violation) => {
+                ctx.beginPath();
+                ctx.moveTo(violation.from.x, violation.from.y);
+                ctx.lineTo(violation.to.x, violation.to.y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(violation.from.x, violation.from.y, 3 / this.state.camera.scale, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(176, 48, 40, 0.95)';
+                ctx.fill();
+            });
+            ctx.restore();
+        }
+
         drawSelectionHandles(ctx) {
             const handles = this.getSelectionHandles();
             if (handles.length === 0) {
@@ -509,6 +629,10 @@
             handles.forEach((handle) => {
                 if (handle.kind === 'formation-convert') {
                     this.drawConvertHandle(ctx, handle);
+                    return;
+                }
+                if (handle.kind === 'formation-forward' || handle.kind === 'single-forward') {
+                    this.drawForwardHandle(ctx, handle);
                     return;
                 }
                 if (handle.kind === 'formation-reverse' || handle.kind === 'single-reverse') {
@@ -551,6 +675,31 @@
             };
             this.drawArrowHead(ctx, tip, -0.45);
             ctx.restore();
+            ctx.restore();
+        }
+
+        drawForwardHandle(ctx, handle) {
+            ctx.save();
+            ctx.translate(handle.position.x, handle.position.y);
+            ctx.rotate(handle.rotation || 0);
+            const size = handle.radius * 2;
+            ctx.beginPath();
+            ctx.rect(-handle.radius, -handle.radius, size, size);
+            ctx.fillStyle = '#fff7dd';
+            ctx.fill();
+            ctx.lineWidth = 2 / this.state.camera.scale;
+            ctx.strokeStyle = '#7e6420';
+            ctx.stroke();
+
+            const shaftStart = -handle.radius * 0.35;
+            const shaftEnd = handle.radius * 0.1;
+            ctx.beginPath();
+            ctx.moveTo(shaftStart, 0);
+            ctx.lineTo(shaftEnd, 0);
+            ctx.strokeStyle = '#7e6420';
+            ctx.lineWidth = 1.8 / this.state.camera.scale;
+            ctx.stroke();
+            this.drawArrowHead(ctx, { x: shaftEnd, y: 0 }, 0);
             ctx.restore();
         }
 

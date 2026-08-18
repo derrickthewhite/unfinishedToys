@@ -129,6 +129,7 @@
                 this.closeStorageModal(false);
                 this.state.gameSettingsModalOpen = true;
                 this.renderGameSettings();
+                this.syncUiFromState();
                 if (this.ui.gameSettingsModal) {
                     this.ui.gameSettingsModal.hidden = false;
                 }

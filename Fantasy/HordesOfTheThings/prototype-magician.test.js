@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const data = require('./prototype-data.js');
+const geometry = require('./prototype-geometry.js');
 const rules = require('./prototype-rules.js');
 const { createAppHarness } = require('./prototype-test-harness.js');
 
@@ -116,6 +117,24 @@ test('magician rolling 1 goes to reserve immediately after shooting resolves', (
     assert.equal(app.getReserveUnits().find((unit) => unit.id === 'mag').ensorcelledByUnitId, null);
     assert.equal(app.state.units.some((unit) => unit.id === 'mag'), false);
     assert.equal(app.getLossSummary('player-1').points, 4);
+});
+
+test('magician ranged helper is a range-offset base with flat sides and corner arcs', () => {
+    const magician = createUnit('Magician', 'player-1', 280, 520, 0, 'mag');
+    const area = rules.getRangedArea(magician);
+    const range = magician.ranged.range;
+    const corners = geometry.getUnitCorners(magician);
+
+    assert.equal(area.kind, 'offset-rect');
+    assert.equal(area.range, range);
+    assert.equal(area.corners.length, 4);
+    assert.deepEqual(area.corners[0].vertex, corners.frontLeft);
+    assert.deepEqual(area.corners[0].arcStart, { x: corners.frontLeft.x - range, y: corners.frontLeft.y });
+    assert.deepEqual(area.corners[0].arcEnd, { x: corners.frontLeft.x, y: corners.frontLeft.y - range });
+    assert.deepEqual(area.corners[1].arcEnd, { x: corners.frontRight.x + range, y: corners.frontRight.y });
+    const frontFlatMid = geometry.midpoint(area.corners[0].arcEnd, area.corners[1].arcStart);
+    assert.equal(frontFlatMid.y, corners.frontLeft.y - range);
+    assert.equal(frontFlatMid.x, (corners.frontLeft.x + corners.frontRight.x) / 2);
 });
 
 test('magician can shoot any enemy in range, not only heroes', () => {

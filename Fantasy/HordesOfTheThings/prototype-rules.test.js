@@ -106,6 +106,8 @@ test('rotation distance validation uses traveled corner path, not straight-line 
     const result = rules.validateDraftState({ unitIds: ['u1'], origin, history: [] }, [unit], data.createDefaultTerrain());
     assert.equal(result.invalidIds.has('u1'), true);
     assert.equal(result.reasonById.get('u1'), 'A corner moved farther than the terrain-limited allowance.');
+    assert.ok(result.cornerViolations.length > 0);
+    assert.equal(result.cornerViolations[0].unitId, 'u1');
 });
 
 test('reversing in place does not consume corner travel when left-right corners are interchangeable', () => {
@@ -1332,6 +1334,7 @@ test('getRangedArea stays attached to the shooter front edge', () => {
 
     const area = rules.getRangedArea(shooter);
 
+    assert.equal(area.kind, 'box');
     assert.deepEqual(area.nearLeft, { x: 60, y: 220 });
     assert.deepEqual(area.nearRight, { x: 180, y: 220 });
     assert.deepEqual(area.farLeft, { x: 60, y: 170 });
@@ -1858,6 +1861,51 @@ test('detectMeleeCombats pairs idle enemies that are touching side-to-side', () 
     assert.equal(result.combats[0].edgesOnRight.includes('left'), true);
     assert.equal(result.participantIds.has('b1'), true);
     assert.equal(result.participantIds.has('r1'), true);
+});
+
+test('previewMeleeCombats reports factors and modifier sources without rolling dice', () => {
+    const blue = {
+        id: 'b1',
+        type: 'Spear',
+        side: 'blue',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 220,
+        rotation: 0,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 4, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const support = {
+        ...blue,
+        id: 'b2',
+        x: 60,
+        y: 220
+    };
+    const red = {
+        id: 'r1',
+        type: 'Blade',
+        side: 'red',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 140,
+        y: 220,
+        rotation: Math.PI,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 3 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+
+    const previews = rules.previewMeleeCombats([blue, support, red], data.createDefaultTerrain());
+    assert.equal(previews.length, 1);
+    assert.equal(previews[0].left.playerId, 'player-1');
+    assert.equal(previews[0].left.factor, 5);
+    assert.equal(previews[0].right.factor, 5);
+    assert.equal(previews[0].left.modifiers.some((modifier) => modifier.id === 'stacked'), true);
+    assert.match(rules.describeCombatModifier(previews[0].left.modifiers[0]), /Supporting element/);
 });
 
 test('resolveMelee turns a singly engaged side-contact combatant to face the enemy', () => {

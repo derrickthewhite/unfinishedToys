@@ -14,7 +14,7 @@ function createHorde(id, playerId, x, y, rotation = 0) {
     return data.createUnit('Horde', playerId, 'Undead', { x, y, rotation }, () => id);
 }
 
-test('reserve lots sit beside the board and can hold 24 hordes', () => {
+test('reserve lots sit above and below the board and can hold 24 hordes', () => {
     const app = createAppHarness();
     const size = app.getReserveRectSize();
     const bottom = app.getReserveRect('player-1');
@@ -23,9 +23,10 @@ test('reserve lots sit beside the board and can hold 24 hordes', () => {
     assert.equal(data.RESERVE_COLUMNS * data.RESERVE_ROWS, 24);
     assert.ok(size.width >= 240);
     assert.ok(size.height >= 160);
-    assert.ok(bottom.left + bottom.width <= 0);
-    assert.equal(bottom.top + bottom.height, data.BOARD_SIZE);
-    assert.equal(top.top, 0);
+    assert.ok(bottom.top >= data.BOARD_SIZE);
+    assert.equal(bottom.left + (bottom.width / 2), data.BOARD_SIZE / 2);
+    assert.ok(top.top + top.height <= 0);
+    assert.equal(top.left + (top.width / 2), data.BOARD_SIZE / 2);
     assert.equal(app.getHomeEdge('player-1'), 'bottom');
     assert.equal(app.getHomeEdge('player-2'), 'top');
 });
@@ -207,4 +208,9 @@ test('saved games restore reserve units and home edges', () => {
     assert.equal(app.getUnitById('h1').type, 'Horde');
     assert.equal(app.state.homeEdgeByPlayerId['player-1'], 'bottom');
     assert.equal(app.getUnitById('h1').reserveSlot, reserved.reserveSlot);
+    const relaid = app.getUnitById('h1');
+    const expectedPose = app.getReserveSlotPose('player-1', relaid.reserveSlot);
+    const center = geometry.getUnitCenter(relaid);
+    assert.equal(center.x, expectedPose.x);
+    assert.equal(center.y, expectedPose.y);
 });

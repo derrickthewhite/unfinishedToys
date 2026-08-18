@@ -51,7 +51,9 @@
 
         captureUi() {
             return {
-                editModeButton: document.getElementById('editModeButton'),
+                modeGroup: document.getElementById('modeGroup'),
+                editModeSettingsButton: document.getElementById('editModeSettingsButton'),
+                editModeSettingsHint: document.getElementById('editModeSettingsHint'),
                 gameModeButton: document.getElementById('gameModeButton'),
                 turnGroup: document.querySelector('.turn-group'),
                 editGroup: document.querySelector('.edit-group'),
@@ -110,6 +112,10 @@
                 cornerRotationLabel: document.getElementById('cornerRotationLabel'),
                 rangedAreaCheckbox: document.getElementById('rangedAreaCheckbox'),
                 rangedAreaLabel: document.getElementById('rangedAreaLabel'),
+                moveErrorsCheckbox: document.getElementById('moveErrorsCheckbox'),
+                moveErrorsLabel: document.getElementById('moveErrorsLabel'),
+                battleStatsCheckbox: document.getElementById('battleStatsCheckbox'),
+                battleStatsLabel: document.getElementById('battleStatsLabel'),
                 resolveShootingButton: document.getElementById('resolveShootingButton'),
                 cancelMoveButton: document.getElementById('cancelMoveButton'),
                 undoMoveButton: document.getElementById('undoMoveButton'),
@@ -185,6 +191,9 @@
                 showFormUpPreview: false,
                 singleRotationMode: 'center',
                 showRangedArea: false,
+                showMoveErrors: false,
+                showBattleStats: false,
+                selectedBattleId: null,
                 losses: { 'player-1': [], 'player-2': [] },
                 startingArmyValueByPlayerId: null,
                 victory: null,
@@ -301,8 +310,14 @@
             this.populateUnitTypes();
             window.addEventListener('resize', () => this.resizeCanvas());
             window.addEventListener('keydown', (event) => this.onKeyDown(event));
-            this.ui.editModeButton.addEventListener('click', () => this.setMode('edit'));
             this.ui.gameModeButton.addEventListener('click', () => this.setMode('game'));
+            if (this.ui.editModeSettingsButton) {
+                this.ui.editModeSettingsButton.addEventListener('click', () => {
+                    this.setMode('edit');
+                    this.closeGameSettingsModal(false);
+                    this.closeStorageModal(false);
+                });
+            }
             this.ui.acceptArmiesButton.addEventListener('click', () => this.openArmyConfirmation());
             this.ui.cancelConfirmationButton.addEventListener('click', () => this.closeSetupConfirmation());
             this.ui.confirmationBackdrop.addEventListener('click', () => this.closeSetupConfirmation());
@@ -375,6 +390,18 @@
             });
             this.ui.rangedAreaCheckbox.addEventListener('change', () => {
                 this.state.showRangedArea = this.ui.rangedAreaCheckbox.checked;
+                this.requestRender();
+            });
+            this.ui.moveErrorsCheckbox.addEventListener('change', () => {
+                this.state.showMoveErrors = this.ui.moveErrorsCheckbox.checked;
+                this.requestRender();
+            });
+            this.ui.battleStatsCheckbox.addEventListener('change', () => {
+                this.state.showBattleStats = this.ui.battleStatsCheckbox.checked;
+                if (!this.state.showBattleStats) {
+                    this.state.selectedBattleId = null;
+                    this.syncUiFromState();
+                }
                 this.requestRender();
             });
             this.ui.resolveShootingButton.addEventListener('click', () => {
@@ -655,8 +682,18 @@
             if (this.state.setupStage === 'unit-deployment') {
                 this.renderUnitDeployment();
             }
-            this.ui.editModeButton.classList.toggle('is-active', this.state.mode === 'edit');
-            this.ui.gameModeButton.classList.toggle('is-active', this.state.mode === 'game');
+            if (this.ui.modeGroup) {
+                this.ui.modeGroup.hidden = this.state.mode !== 'edit';
+            }
+            if (this.ui.editModeSettingsButton) {
+                this.ui.editModeSettingsButton.hidden = this.state.mode === 'edit';
+            }
+            if (this.ui.editModeSettingsHint) {
+                this.ui.editModeSettingsHint.hidden = this.state.mode !== 'edit';
+            }
+            if (this.ui.gameModeButton) {
+                this.ui.gameModeButton.classList.toggle('is-active', this.state.mode === 'edit');
+            }
             this.ui.editGroup.hidden = this.state.mode !== 'edit';
             this.ui.actionGroup.hidden = false;
             this.ui.activeSideSelect.value = this.state.activePlayerId;
@@ -683,6 +720,8 @@
             this.ui.formUpPreviewLabel.hidden = false;
             this.ui.cornerRotationLabel.hidden = false;
             this.ui.rangedAreaLabel.hidden = false;
+            this.ui.moveErrorsLabel.hidden = false;
+            this.ui.battleStatsLabel.hidden = false;
             this.ui.resolveShootingButton.hidden = this.state.mode !== 'game'
                 || (this.state.phase !== 'shooting' && this.state.phase !== 'melee')
                 || Boolean(this.state.combatResolution);
@@ -701,6 +740,8 @@
             this.ui.formUpPreviewCheckbox.checked = this.state.showFormUpPreview;
             this.ui.cornerRotationCheckbox.checked = this.state.singleRotationMode === 'front-corner';
             this.ui.rangedAreaCheckbox.checked = this.state.showRangedArea;
+            this.ui.moveErrorsCheckbox.checked = this.state.showMoveErrors;
+            this.ui.battleStatsCheckbox.checked = this.state.showBattleStats;
             this.ui.resolveShootingButton.textContent = this.state.phase === 'melee' ? 'Resolve Melee' : 'Resolve Shooting';
             this.ui.resolveShootingButton.disabled = this.state.mode !== 'game'
                 || (this.state.phase !== 'shooting' && this.state.phase !== 'melee')

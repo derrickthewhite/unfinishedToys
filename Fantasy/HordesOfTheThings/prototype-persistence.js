@@ -165,6 +165,8 @@
                     snapEnabled: this.state.snapEnabled,
                     singleRotationMode: this.state.singleRotationMode,
                     showRangedArea: this.state.showRangedArea,
+                    showMoveErrors: this.state.showMoveErrors,
+                    showBattleStats: this.state.showBattleStats,
                     showFormUpPreview: this.state.showFormUpPreview,
                     nextUnitId: this.nextUnitId
                 }
@@ -253,6 +255,7 @@
                 ? snapshot.reserveUnits.map((unit) => this.normalizeSavedUnit(unit))
                 : [];
             this.state.homeEdgeByPlayerId = this.normalizeSavedHomeEdges(snapshot.homeEdgeByPlayerId);
+            this.relayoutReserveUnits();
             this.state.losses = this.normalizeSavedLosses(snapshot.losses);
             this.state.startingArmyValueByPlayerId = snapshot.startingArmyValueByPlayerId || null;
             this.state.victory = snapshot.victory || null;
@@ -261,6 +264,9 @@
             this.state.showFormUpPreview = Boolean(snapshot.showFormUpPreview);
             this.state.singleRotationMode = snapshot.singleRotationMode === 'front-corner' ? 'front-corner' : 'center';
             this.state.showRangedArea = Boolean(snapshot.showRangedArea);
+            this.state.showMoveErrors = Boolean(snapshot.showMoveErrors);
+            this.state.showBattleStats = Boolean(snapshot.showBattleStats);
+            this.state.selectedBattleId = null;
             this.state.selectedIds = [];
             this.state.selectionAnalysis = { type: 'none', invalid: false, reason: '' };
             this.state.draft = null;

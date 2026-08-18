@@ -510,6 +510,7 @@ test('deployment shift-click and marquee select only the active player, without 
     app.updateSelectionAnalysis();
     const singleHandles = app.getSelectionHandles();
     assert.ok(singleHandles.some((handle) => handle.kind === 'single-rotate'));
+    assert.ok(singleHandles.some((handle) => handle.kind === 'single-forward'));
     assert.ok(singleHandles.some((handle) => handle.kind === 'single-reverse'));
     assert.equal(singleHandles.some((handle) => handle.kind === 'formation-convert'), false);
 });
