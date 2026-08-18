@@ -102,6 +102,11 @@ function createAppHarness(overrides) {
         reserveUnits: [],
         homeEdgeByPlayerId: { 'player-1': 'bottom', 'player-2': 'top' },
         editHistory: [],
+        moveHistory: [],
+        autoMoveGhost: null,
+        autoMoveModalOpen: false,
+        autoMoveInProgress: false,
+        autoMoveAwaitingAck: false,
         marquee: null,
         interaction: null,
         camera: { x: 0, y: 0, scale: 1, minScale: 0.6, maxScale: 6 },
@@ -129,6 +134,11 @@ function createAppHarness(overrides) {
         finishDeploymentButton: { disabled: false },
         returnToTrayButton: { disabled: true },
         autoDeployButton: { disabled: false },
+        autoMoveModal: { hidden: true },
+        autoMoveTitle: { textContent: 'Auto Move' },
+        autoMoveProgressText: { textContent: '' },
+        cancelAutoMoveButton: { hidden: false },
+        acknowledgeAutoMoveButton: { hidden: true },
         ...overrides?.ui
     };
     app.canvas = {

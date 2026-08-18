@@ -244,6 +244,7 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`,
 - `prototype-reserve.js`: home-edge lookup, reserve lot layout, Horde recycling, and home-edge redeployment validation.
 - `prototype-unit-deployment.js`: sequential deployment, tray placement validation.
 - `prototype-ai.js`: Auto Deploy grouping, scoring, and placement. First slice of opponent/setup AI.
+- `prototype-move-ai.js`: In-game Auto Move — candidate discovery across all unmoved rank/file subsets, forward-only scoring, and one-click move execution. See `AUTO_MOVE_IMPLEMENTATION_PLAN.md`.
 - `prototype-geometry.js`: `pointInBlob`, `drawBlob`, `getTerrainFeaturePoints`, catalog-backed outlines, `applyTerrainOutlineWave` for uploaded blocks, `getUnitCorners`, polygon overlap helpers.
 - `prototype-game-settings.js`: gear-menu New Game, Game Settings modal, local-storage terrain shape/kind availability.
 - `prototype-rules.js`: `getTerrainTypeAt`, movement terrain sampling, player-ID ownership comparisons, shooting, form-up, melee.

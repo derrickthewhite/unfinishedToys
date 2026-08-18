@@ -17,13 +17,14 @@
             require('./prototype-setup-camera.js'),
             require('./prototype-unit-deployment.js'),
             require('./prototype-ai.js'),
+            require('./prototype-move-ai.js'),
             require('./prototype-selection-panel.js'),
             require('./prototype-victory.js')
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesSelectionPanel, root.HordesVictory);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, selectionPanel, victory) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesMoveAi, root.HordesSelectionPanel, root.HordesVictory);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, moveAi, selectionPanel, victory) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -102,6 +103,12 @@
                 deleteUnitButton: document.getElementById('deleteUnitButton'),
                 destroyUnitButton: document.getElementById('destroyUnitButton'),
                 finishMoveButton: document.getElementById('finishMoveButton'),
+                autoMoveButton: document.getElementById('autoMoveButton'),
+                autoMoveModal: document.getElementById('autoMoveModal'),
+                autoMoveTitle: document.getElementById('autoMoveTitle'),
+                autoMoveProgressText: document.getElementById('autoMoveProgressText'),
+                cancelAutoMoveButton: document.getElementById('cancelAutoMoveButton'),
+                acknowledgeAutoMoveButton: document.getElementById('acknowledgeAutoMoveButton'),
                 endMovePhaseButton: document.getElementById('endMovePhaseButton'),
                 stepMoveButton: document.getElementById('stepMoveButton'),
                 snapCheckbox: document.getElementById('snapCheckbox'),
@@ -201,6 +208,11 @@
                 reserveUnits: [],
                 homeEdgeByPlayerId: this.getDefaultHomeEdges(),
                 editHistory: [],
+                moveHistory: [],
+                autoMoveGhost: null,
+                autoMoveModalOpen: false,
+                autoMoveInProgress: false,
+                autoMoveAwaitingAck: false,
                 marquee: null,
                 interaction: null,
                 camera: {
@@ -372,6 +384,17 @@
                 this.removeSelectedUnits({ countAsLoss: true });
             });
             this.ui.finishMoveButton.addEventListener('click', () => this.finishDraft());
+            if (this.ui.autoMoveButton) {
+                this.ui.autoMoveButton.addEventListener('click', () => {
+                    void this.autoMove();
+                });
+            }
+            if (this.ui.cancelAutoMoveButton) {
+                this.ui.cancelAutoMoveButton.addEventListener('click', () => this.cancelAutoMoveSearch());
+            }
+            if (this.ui.acknowledgeAutoMoveButton) {
+                this.ui.acknowledgeAutoMoveButton.addEventListener('click', () => this.acknowledgeAutoMoveModal());
+            }
             this.ui.endMovePhaseButton.addEventListener('click', () => this.endMovePhase());
             this.ui.stepMoveButton.addEventListener('click', () => this.stepSingleDraft());
             this.ui.snapCheckbox.addEventListener('change', () => {
@@ -429,7 +452,11 @@
                     this.undoEditStep();
                     return;
                 }
-                this.undoDraftStep();
+                if (this.state.draft) {
+                    this.undoDraftStep();
+                    return;
+                }
+                this.undoFinishedMove();
             });
         }
 
@@ -450,6 +477,15 @@
             if (event.key === 'Escape' && this.state.gameSettingsModalOpen) {
                 event.preventDefault();
                 this.closeGameSettingsModal();
+                return;
+            }
+            if (event.key === 'Escape' && this.state.autoMoveModalOpen) {
+                event.preventDefault();
+                if (this.state.autoMoveAwaitingAck) {
+                    this.acknowledgeAutoMoveModal();
+                } else {
+                    this.cancelAutoMoveSearch();
+                }
                 return;
             }
             if (event.key === 'Escape' && this.state.storageModalOpen) {
@@ -477,7 +513,11 @@
                     this.undoEditStep();
                     return;
                 }
-                this.undoDraftStep();
+                if (this.state.draft) {
+                    this.undoDraftStep();
+                    return;
+                }
+                this.undoFinishedMove();
                 return;
             }
             if (event.code === 'Space') {
@@ -714,6 +754,9 @@
             this.ui.remainingMovesInput.disabled = this.state.mode !== 'edit';
             this.ui.phaseSelect.disabled = this.state.mode !== 'edit';
             this.ui.finishMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
+            if (this.ui.autoMoveButton) {
+                this.ui.autoMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
+            }
             this.ui.endMovePhaseButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
             this.ui.stepMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
             this.ui.snapLabel.hidden = false;
@@ -729,6 +772,22 @@
             this.ui.acknowledgedButton.hidden = this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution);
             this.ui.undoMoveButton.hidden = this.state.mode === 'game' && this.state.phase !== 'move';
             this.ui.finishMoveButton.disabled = this.state.mode !== 'game' || this.state.phase !== 'move' || !this.state.draft;
+            if (this.ui.autoMoveButton) {
+                this.ui.autoMoveButton.disabled = this.state.mode !== 'game'
+                    || this.state.phase !== 'move'
+                    || this.state.remainingMoves <= 0
+                    || this.state.autoMoveInProgress;
+            }
+            if (this.ui.autoMoveModal) {
+                this.ui.autoMoveModal.hidden = !this.state.autoMoveModalOpen;
+            }
+            if (this.ui.cancelAutoMoveButton) {
+                this.ui.cancelAutoMoveButton.hidden = !this.state.autoMoveModalOpen
+                    || this.state.autoMoveAwaitingAck;
+            }
+            if (this.ui.acknowledgeAutoMoveButton) {
+                this.ui.acknowledgeAutoMoveButton.hidden = !this.state.autoMoveAwaitingAck;
+            }
             this.ui.endMovePhaseButton.disabled = this.state.mode !== 'game' || this.state.phase !== 'move';
             this.ui.stepMoveButton.disabled = this.state.mode !== 'game'
                 || this.state.phase !== 'move'
@@ -748,7 +807,9 @@
                 || Boolean(this.state.combatResolution)
                 || (this.state.phase === 'melee' && this.getMeleeState().combats.length === 0);
             this.ui.cancelMoveButton.disabled = this.state.mode !== 'game' || this.state.phase !== 'move' || !this.state.draft;
-            this.ui.undoMoveButton.disabled = this.state.mode === 'edit' ? this.state.editHistory.length === 0 : !this.state.draft;
+            this.ui.undoMoveButton.disabled = this.state.mode === 'edit'
+                ? this.state.editHistory.length === 0
+                : (!this.state.draft && (!this.state.moveHistory || this.state.moveHistory.length === 0));
             this.ui.acknowledgedButton.disabled = this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution);
             this.ui.storageModal.hidden = !this.state.storageModalOpen;
             if (this.ui.gameSettingsModal) this.ui.gameSettingsModal.hidden = !this.state.gameSettingsModalOpen;
@@ -765,6 +826,9 @@
             const gameOver = this.isGameOver();
             if (gameOver) {
                 this.ui.finishMoveButton.disabled = true;
+                if (this.ui.autoMoveButton) {
+                    this.ui.autoMoveButton.disabled = true;
+                }
                 this.ui.endMovePhaseButton.disabled = true;
                 this.ui.stepMoveButton.disabled = true;
                 this.ui.resolveShootingButton.disabled = true;
@@ -793,6 +857,7 @@
     setupCamera.install(HordesPrototype);
     unitDeployment.install(HordesPrototype);
     ai.install(HordesPrototype);
+    moveAi.install(HordesPrototype);
     selectionPanel.install(HordesPrototype);
     victory.install(HordesPrototype);
     return { HordesPrototype };

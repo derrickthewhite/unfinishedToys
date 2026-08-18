@@ -35,6 +35,9 @@
         'getFormationForwardHandle',
         'getFormationConvertHandle',
         'applyReverseSelection',
+        'findMaxForwardDistance',
+        'finalizeForwardDraftPositions',
+        'applyForwardMove',
         'applyMaxForwardMove',
         'buildCenteredLinearOffsets',
         'getUnitFrontCenter',
@@ -697,6 +700,7 @@
             if (this.state.draft && !geometry.sameIdSet(this.state.selectedIds, this.state.draft.unitIds)) {
                 this.cancelDraft(false);
             }
+            this.maybeClearAutoMoveGhost();
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.requestRender();
@@ -708,6 +712,7 @@
             if (this.state.draft) {
                 this.cancelDraft(false);
             }
+            this.maybeClearAutoMoveGhost();
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.requestRender();
@@ -738,6 +743,7 @@
             if (this.state.draft && !geometry.sameIdSet(this.state.selectedIds, this.state.draft.unitIds)) {
                 this.cancelDraft(false);
             }
+            this.maybeClearAutoMoveGhost();
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.requestRender();
@@ -898,19 +904,13 @@
             };
         }
 
-        applyMaxForwardMove() {
+        findMaxForwardDistance() {
             const analysis = this.state.selectionAnalysis;
-            if (!analysis || analysis.invalid || analysis.type === 'none') {
-                return;
-            }
-            if (this.state.mode !== 'game' || this.state.phase !== 'move') {
-                return;
-            }
-            if (!this.ensureDraft(this.state.selectedIds)) {
-                return;
+            const draft = this.state.draft;
+            if (!analysis || analysis.invalid || analysis.type === 'none' || !draft) {
+                return null;
             }
 
-            const draft = this.state.draft;
             const draftIds = draft.unitIds;
             const base = draft.validationOrigin;
             const forward = analysis.forward;
@@ -964,6 +964,7 @@
 
             const isValidDistance = (distance) => {
                 applyForwardDistance(distance);
+                this.finalizeForwardDraftPositions(analysis, draftIds, base);
                 this.evaluateDraft();
                 return draft.invalidIds.size === 0;
             };
@@ -971,8 +972,7 @@
             if (!isValidDistance(0)) {
                 geometry.restoreSnapshot(liveSnapshot, this.state.units);
                 this.evaluateDraft();
-                this.updateStatus('The current draft is already invalid.');
-                return;
+                return null;
             }
 
             let best = 0;
@@ -984,23 +984,108 @@
                 best = distance;
             }
 
-            applyForwardDistance(best);
+            geometry.restoreSnapshot(liveSnapshot, this.state.units);
+            this.evaluateDraft();
+            return best;
+        }
+
+        finalizeForwardDraftPositions(analysis, draftIds, base) {
             if (analysis.type === 'rank') {
                 const projectedUnits = draftIds.map((unitId) => ({ ...this.getUnitById(unitId) }));
                 this.applyProjectedRankUnits({ draftIds, dragBase: base }, projectedUnits, true);
-            } else {
-                this.snapSelection(draftIds);
+                return;
             }
+            this.snapSelection(draftIds);
+        }
+
+        applyForwardMove(distance) {
+            const analysis = this.state.selectionAnalysis;
+            const draft = this.state.draft;
+            if (!analysis || analysis.invalid || analysis.type === 'none' || !draft) {
+                return false;
+            }
+            if (this.state.mode !== 'game' || this.state.phase !== 'move') {
+                return false;
+            }
+
+            const draftIds = draft.unitIds;
+            const base = draft.validationOrigin;
+            const forward = analysis.forward;
+            const liveSnapshot = geometry.snapshotPositions(draftIds, this.state.units);
+            const moveDelta = geometry.scaleVector(forward, distance);
+
+            if (analysis.type === 'single') {
+                const unitId = draftIds[0];
+                const unit = this.getUnitById(unitId);
+                const origin = base[unitId];
+                unit.x = origin.x + moveDelta.x;
+                unit.y = origin.y + moveDelta.y;
+            } else if (analysis.type === 'rank') {
+                draftIds.forEach((unitId) => {
+                    const unit = this.getUnitById(unitId);
+                    const origin = base[unitId];
+                    unit.x = origin.x + moveDelta.x;
+                    unit.y = origin.y + moveDelta.y;
+                });
+            } else {
+                const orderedIds = analysis.orderedIds;
+                const leadId = orderedIds[0];
+                const lead = this.getUnitById(leadId);
+                const leadBase = base[leadId];
+                lead.x = leadBase.x + moveDelta.x;
+                lead.y = leadBase.y + moveDelta.y;
+                lead.rotation = leadBase.rotation;
+                for (let index = 1; index < orderedIds.length; index += 1) {
+                    const previousUnit = this.getUnitById(orderedIds[index - 1]);
+                    const follower = this.getUnitById(orderedIds[index]);
+                    const followerBase = base[orderedIds[index]];
+                    const previousCorners = geometry.getUnitCorners(previousUnit);
+                    follower.x = previousCorners.backLeft.x;
+                    follower.y = previousCorners.backLeft.y;
+                    follower.rotation = followerBase.rotation;
+                }
+            }
+
+            this.finalizeForwardDraftPositions(analysis, draftIds, base);
             this.evaluateDraft();
-            if (analysis.type !== 'single' && best > 0.05) {
+            if (draft.invalidIds.size > 0) {
+                geometry.restoreSnapshot(liveSnapshot, this.state.units);
+                this.evaluateDraft();
+                return false;
+            }
+            if (analysis.type !== 'single' && distance > 0.05) {
                 this.commitDraftStep();
             }
             this.updateSelectionAnalysis();
+            return true;
+        }
+
+        applyMaxForwardMove() {
+            const analysis = this.state.selectionAnalysis;
+            if (!analysis || analysis.invalid || analysis.type === 'none') {
+                return;
+            }
+            if (this.state.mode !== 'game' || this.state.phase !== 'move') {
+                return;
+            }
+            if (!this.ensureDraft(this.state.selectedIds)) {
+                return;
+            }
+
+            const best = this.findMaxForwardDistance();
+            if (best === null) {
+                this.updateStatus('The current draft is already invalid.');
+                return;
+            }
+            if (best <= 0.05) {
+                this.updateStatus('No forward movement is legal from here.');
+                return;
+            }
+
+            this.applyForwardMove(best);
             this.syncUiFromState();
             this.requestRender();
-            this.updateStatus(best <= 0.05
-                ? 'No forward movement is legal from here.'
-                : `Moved ${Math.round(best)} mm forward.`);
+            this.updateStatus(`Moved ${Math.round(best)} mm forward.`);
         }
 
         applyReverseSelection() {

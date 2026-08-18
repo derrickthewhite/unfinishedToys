@@ -462,6 +462,9 @@
                 this.state.draft.history.forEach((snapshot) => pushSnapshot(snapshot, this.state.draft.unitIds));
                 pushSnapshot(this.state.draft.origin, this.state.draft.unitIds);
             }
+            if (this.state.autoMoveGhost) {
+                pushSnapshot(this.state.autoMoveGhost.ghostSnapshot, this.state.autoMoveGhost.unitIds);
+            }
             const interaction = this.state.interaction;
             if (interaction && interaction.dragBase && interaction.draftIds) {
                 pushSnapshot(interaction.dragBase, interaction.draftIds);

@@ -303,6 +303,16 @@ button:disabled {
     z-index: 30;
 }
 
+#autoMoveModal {
+    z-index: 35;
+}
+
+.auto-move-panel p {
+    margin: 0.35rem 0 0;
+    color: rgba(55, 45, 36, 0.82);
+    line-height: 1.45;
+}
+
 .modal-backdrop {
     position: absolute;
     inset: 0;

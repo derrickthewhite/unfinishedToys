@@ -45,6 +45,26 @@
             } else {
                 moveCost = rules.getDraftMoveCost(draft.unitIds, this.state.units);
             }
+            const movedThisTurnBefore = {};
+            draft.unitIds.forEach((unitId) => {
+                const unit = this.getUnitById(unitId);
+                movedThisTurnBefore[unitId] = Boolean(unit?.movedThisTurn);
+            });
+            if (!this.state.moveHistory) {
+                this.state.moveHistory = [];
+            }
+            const positionsBefore = {};
+            draft.unitIds.forEach((unitId) => {
+                if (draft.initialOrigin[unitId]) {
+                    positionsBefore[unitId] = { ...draft.initialOrigin[unitId] };
+                }
+            });
+            this.state.moveHistory.push({
+                unitIds: [...draft.unitIds],
+                positionsBefore,
+                movedThisTurnBefore,
+                moveCost
+            });
             this.state.remainingMoves = Math.max(0, this.state.remainingMoves - moveCost);
             const reserveDeploy = draft.kind === 'reserve-deploy';
             const ensorcelledReturn = draft.kind === 'ensorcelled-return';
@@ -85,7 +105,38 @@
             }
             // Unused PIPs persist into shooting so Magicians can still declare attacks.
             this.cancelDraft(false);
+            this.clearMoveTurnState();
             this.beginFormUpPhase();
+        }
+
+        clearMoveTurnState() {
+            this.state.moveHistory = [];
+            this.state.autoMoveGhost = null;
+        }
+
+        undoFinishedMove() {
+            const entry = this.state.moveHistory?.pop();
+            if (!entry) {
+                this.updateStatus('No finished move to undo.');
+                return;
+            }
+            geometry.restoreSnapshot(entry.positionsBefore, this.state.units);
+            entry.unitIds.forEach((unitId) => {
+                const unit = this.getUnitById(unitId);
+                if (!unit) {
+                    return;
+                }
+                unit.movedThisTurn = Boolean(entry.movedThisTurnBefore[unitId]);
+            });
+            this.state.remainingMoves += entry.moveCost;
+            if (this.state.autoMoveGhost && geometry.sameIdSet(this.state.autoMoveGhost.unitIds, entry.unitIds)) {
+                this.state.autoMoveGhost = null;
+            }
+            this.state.selectedIds = [...entry.unitIds];
+            this.updateSelectionAnalysis();
+            this.syncUiFromState();
+            this.requestRender();
+            this.updateStatus('Last finished move undone.');
         }
 
         resetMovedFlags(playerId) {
@@ -174,6 +225,7 @@
             }
             this.state.activePlayerId = this.getOpponentPlayerId(this.state.activePlayerId);
             this.state.remainingMoves = this.rollDie();
+            this.clearMoveTurnState();
             this.resetMovedFlags(this.state.activePlayerId);
             this.setPhase('move');
             this.updateSelectionAnalysis();
@@ -579,6 +631,20 @@
         }
 
         getFormUpPreview() {
+            if (this.state.autoMovePreview) {
+                const preview = rules.resolveAutomaticFormUp(
+                    this.state.autoMovePreview.afterUnits,
+                    this.state.activePlayerId,
+                    this.state.terrain
+                );
+                if (preview.movedUnitIds.length > 0) {
+                    return preview;
+                }
+                return {
+                    units: this.state.autoMovePreview.afterUnits,
+                    movedUnitIds: [...this.state.autoMovePreview.unitIds]
+                };
+            }
             if (this.state.mode !== 'game' || this.state.phase !== 'move' || !this.state.showFormUpPreview) {
                 return null;
             }
@@ -590,6 +656,7 @@
         }
 
         beginFormUpPhase() {
+            this.clearMoveTurnState();
             const activeUnits = this.state.units.filter((unit) => this.getUnitPlayerId(unit) === this.state.activePlayerId);
             const activeIds = activeUnits.map((unit) => unit.id);
             const ghostSnapshot = geometry.snapshotPositions(activeIds, this.state.units);
