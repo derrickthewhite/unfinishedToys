@@ -207,6 +207,33 @@
         return { min: Math.min(...values), max: Math.max(...values) };
     }
 
+    function distancePointToSegment(point, start, end) {
+        const edge = subtract(end, start);
+        const lengthSq = edge.x * edge.x + edge.y * edge.y;
+        if (lengthSq <= 1e-8) {
+            return distance(point, start);
+        }
+        const t = clamp(dot(subtract(point, start), edge) / lengthSq, 0, 1);
+        return distance(point, add(start, scaleVector(edge, t)));
+    }
+
+    function minDistanceBetweenPolygons(aCorners, bCorners) {
+        if (polygonsOverlap(aCorners, bCorners)) {
+            return 0;
+        }
+        const polygons = [cornersToPoints(aCorners), cornersToPoints(bCorners)];
+        let min = Infinity;
+        polygons.forEach((source, sourceIndex) => {
+            const target = polygons[1 - sourceIndex];
+            source.forEach((point) => {
+                for (let index = 0; index < target.length; index += 1) {
+                    min = Math.min(min, distancePointToSegment(point, target[index], target[(index + 1) % target.length]));
+                }
+            });
+        });
+        return min;
+    }
+
     function polygonsOverlap(aCorners, bCorners) {
         const polygons = [cornersToPoints(aCorners), cornersToPoints(bCorners)];
         for (const polygon of polygons) {
@@ -676,6 +703,8 @@
         pointInPolygon,
         polygonInsideRect,
         polygonsOverlap,
+        distancePointToSegment,
+        minDistanceBetweenPolygons,
         normalizeRect,
         pointInBlob,
         getTerrainShapeLocalPoints,

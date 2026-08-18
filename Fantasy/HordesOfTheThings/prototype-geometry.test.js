@@ -29,6 +29,14 @@ test('polygonsOverlap treats shared edges as contact, not overlap', () => {
     assert.equal(geometry.polygonsOverlap(geometry.getUnitCorners(left), geometry.getUnitCorners(right)), false);
 });
 
+test('minDistanceBetweenPolygons measures the gap between separated bases', () => {
+    const left = { id: 'a', width: 40, depth: 40, x: 100, y: 200, rotation: 0 };
+    const right = { id: 'b', width: 40, depth: 40, x: 190, y: 200, rotation: 0 };
+
+    assert.equal(geometry.minDistanceBetweenPolygons(geometry.getUnitCorners(left), geometry.getUnitCorners(right)), 50);
+    assert.equal(geometry.minDistanceBetweenPolygons(geometry.getUnitCorners(left), geometry.getUnitCorners(left)), 0);
+});
+
 test('reverseUnitFacing preserves the occupied rectangle while swapping facing', () => {
     const unit = { id: 'u1', width: 40, depth: 20, x: 100, y: 200, rotation: 0 };
     const reversed = geometry.reverseUnitFacing(unit);

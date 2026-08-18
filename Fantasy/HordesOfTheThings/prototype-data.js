@@ -26,6 +26,15 @@
     const SHOOTING_RANGE_PACES = 200;
     const SHOOTING_BOX_WIDTH = 120;
     const ROUGH_LOS_ALLOWANCE_PACES = 50;
+    const RESERVE_COLUMNS = 6;
+    const RESERVE_ROWS = 4;
+    const RESERVE_SLOT_SIZE = 40;
+    const RESERVE_SLOT_GAP = 4;
+    const RESERVE_PADDING = 8;
+    const RESERVE_BOARD_GAP = 24;
+    const RESERVE_CAPACITY = 24;
+    const RESERVE_RECYCLE_TYPES = Object.freeze(['Horde']);
+    const RESERVE_ENEMY_CLEARANCE_PACES = 200;
 
     const PLAYER_IDS = Object.freeze(['player-1', 'player-2']);
     const ARMY_POINT_TARGET = 24;
@@ -358,6 +367,15 @@
         SHOOTING_RANGE_PACES,
         SHOOTING_BOX_WIDTH,
         ROUGH_LOS_ALLOWANCE_PACES,
+        RESERVE_COLUMNS,
+        RESERVE_ROWS,
+        RESERVE_SLOT_SIZE,
+        RESERVE_SLOT_GAP,
+        RESERVE_PADDING,
+        RESERVE_BOARD_GAP,
+        RESERVE_CAPACITY,
+        RESERVE_RECYCLE_TYPES,
+        RESERVE_ENEMY_CLEARANCE_PACES,
         ARMY_POINT_TARGET,
         FACTIONS,
         FACTION_ROSTERS,

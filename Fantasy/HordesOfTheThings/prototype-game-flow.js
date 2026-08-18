@@ -11,7 +11,7 @@
     class GameFlowMethods {
         stepSingleDraft() {
             const draft = this.state.draft;
-            if (!draft || this.state.selectionAnalysis.type !== 'single') {
+            if (!draft || this.state.selectionAnalysis.type !== 'single' || draft.kind === 'reserve-deploy') {
                 return;
             }
             this.evaluateDraft();
@@ -39,11 +39,21 @@
             }
             // Commit the move and mark moved units so they cannot move again this turn
             this.state.remainingMoves = Math.max(0, this.state.remainingMoves - 1);
-            // Mark units that actually changed footprint as having moved this turn
+            const reserveDeploy = draft.kind === 'reserve-deploy';
             draft.unitIds.forEach((unitId) => {
                 const unit = this.getUnitById(unitId);
                 const before = draft.initialOrigin[unitId];
-                if (unit && before && this.hasUnitMoved(before, unit)) {
+                if (!unit) {
+                    return;
+                }
+                if (reserveDeploy) {
+                    unit.movedThisTurn = true;
+                    this.clearLossForUnit(unit.id);
+                    delete unit.inReserve;
+                    delete unit.reserveSlot;
+                    return;
+                }
+                if (before && this.hasUnitMoved(before, unit)) {
                     unit.movedThisTurn = true;
                 }
             });
@@ -316,6 +326,7 @@
                 phase,
                 ghostSnapshot,
                 destroyedIds,
+                recycledUnits: (result.destroyedUnits || []).filter((unit) => this.isReserveRecycleType(unit)),
                 movedUnitIds: Object.keys(ghostSnapshot),
                 results: result.results.map((entry) => ({
                     ...entry,
@@ -449,11 +460,12 @@
         }
 
         getLossSummary(side) {
-            const losses = this.state.losses[side];
+            const losses = this.state.losses[side] || [];
+            const reserveIds = new Set(this.getReserveUnits().map((unit) => unit.id));
             const points = losses.reduce((sum, unit) => sum + unit.value, 0);
             const title = losses.length === 0
                 ? 'No losses.'
-                : losses.map((unit) => `${unit.type} (${unit.value})`).join('\n');
+                : losses.map((unit) => `${unit.type} (${unit.value})${reserveIds.has(unit.id) ? ' in reserve' : ''}`).join('\n');
             return { points, title };
         }
 
@@ -526,6 +538,7 @@
             }
             if (this.state.phase === 'shooting') {
                 if (this.state.combatResolution) {
+                    this.settleRecycledCasualties();
                     this.state.combatResolution = null;
                     this.setPhase('melee');
                     if (this.maybeAutoAdvanceCombatPhase()) {
@@ -544,12 +557,23 @@
                 return;
             }
             if (this.state.phase === 'melee' && this.state.combatResolution) {
+                this.settleRecycledCasualties();
                 this.advanceToNextTurn();
             }
         }
 
         evaluateDraft() {
             if (!this.state.draft) {
+                return;
+            }
+            if (this.state.draft.kind === 'reserve-deploy') {
+                const unit = this.getUnitById(this.state.draft.unitIds[0]);
+                const result = this.validateReserveDeploy(unit, this.state.units, this.state.terrain);
+                this.state.draft.invalidIds = result.invalid ? new Set(this.state.draft.unitIds) : new Set();
+                this.state.draft.reasonById = result.invalid
+                    ? new Map([[this.state.draft.unitIds[0], result.reason]])
+                    : new Map();
+                this.syncUiFromState();
                 return;
             }
             const result = rules.validateDraftState(this.state.draft, this.state.units, this.state.terrain);
@@ -562,7 +586,8 @@
             this.state.selectionAnalysis = rules.analyzeSelection(this.getSelectedUnits());
             this.syncUiFromState();
         }
-    }
+
+    }
 
     function install(GameFlowPrototype) {
         const descriptors = Object.getOwnPropertyDescriptors(GameFlowMethods.prototype);

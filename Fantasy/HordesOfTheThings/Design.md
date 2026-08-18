@@ -43,7 +43,8 @@ Hordes of the Things is a tabletop wargame. Measurements and rules below are giv
 - Forming up: after normal moves, units that can reach an enemy by moving the configured form-up distance or less may form up (maintaining formation); a single front corner getting close enough is sufficient to trigger the form-up check, even when the final alignment requires rotation.
 - Default form-up still prefers the usual face-to-face result, but a unit approaching from the side may instead finish with its front facing the enemy side if both of its starting front corners are at or just barely past the enemy front line from the enemy's point of view.
 - Recoil: moving backwards equal to unit depth (a combat result).
-- A recoil destroys the original recoiling unit if its destination enters water or impassable terrain, in addition to the existing unit-contact obstructions.
+- A recoil destroys the original recoiling unit if its destination enters water or impassable terrain, in addition to the existing unit-contact obstructions. Destroyed Hordes are sent to that player's reserve instead of being removed.
+- Reserve: each player has a world-space reserve lot to the left of the 600 mm board, aligned with their home edge (defender bottom, attacker top) and large enough for 24 Horde bases. Clicking a reserve unit during the move phase spends one move to place it on that player's rear board edge, fully on-board, not on impassable terrain, and not within 200 paces of an enemy. The deployed unit counts as having moved. Hordes currently in reserve count as lost until they return.
 - Retreat: moving backwards a specified amount; limited maneuver is allowed.
 
 ## Starting Unit Types
@@ -75,7 +76,7 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 - Shooting declarations are made before resolution. Clicking a ranged unit that is not tied down by enemy front contact highlights it and its valid targets; clicking a valid enemy target assigns that shot and draws a red arched arrow.
 - Shooting currently resolves once per defender. If several shooters target the same enemy, the strongest single shooter supplies the attack strength and extra shooters apply only the defender penalty: 2 shooters gives the defender `-1`; 3 or more gives `-2`.
 - A unit doing the shooting does not suffer a loss result for losing a ranged exchange during the shooting phase; it can still be destroyed or recoiled when it is the target of enemy shooting.
-- `Resolve Shooting` resolves all declared shots, applies destruction or recoil, removes destroyed units from the board, records their point values in the loss bar, and advances to melee.
+- `Resolve Shooting` resolves all declared shots, applies destruction or recoil, sends destroyed Hordes to reserve after the aftermath is acknowledged, removes other destroyed units from the board, records their point values in the loss bar, and advances to melee.
 - Combat modifiers are now structured as composable rule fragments so later melee modifiers can be added without rewriting the resolver.
 - Forest and swamp are bad going for combat. A unit in bad going takes `-2` unless its type ignores the bad-going penalty; Warbands, Heavy-Warbands, Shooters, and Beasts ignore it. A mounted attacker also takes `-2` when fighting an opponent in bad going, unless it is already receiving the same `-2` bad-going penalty.
 - Riders and Knights that lose in bad going are destroyed rather than recoiling. Knights also lose their minor-win destruction effect against Spears, Blades, and Hordes when the losing unit is in bad going.
@@ -89,7 +90,7 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 - When a combatant is engaged in exactly one melee and does not already have enemy contact on its own front, it turns to face that opponent as combat starts by anchoring the turn on the shared contact edge rather than spinning around its center. This makes side-contact and other one-on-one non-frontal engagements resolve as facing combats while keeping the fight tied to the original contact line.
 - Spears and Warbands can stack when two same-side, same-type elements share a facing and one element's front is flush against the other's side. Stacked pairs fight as one combatant and gain `+1` in melee. Heavy-Spears and Heavy-Warbands use their corresponding base type's combat behavior but cannot stack.
 - Melee-only penalties currently implemented are `-1` for flank attack, `-1` for rear attack when the rear attacker is not frontally engaged elsewhere, and overlap penalties from idle enemy elements that are touching the fighter's left or right flank without being in melee themselves.
-- `Resolve Melee` resolves every detected melee at once, applies destruction or recoil, records losses, and shows the same ghosted aftermath review used for shooting.
+- `Resolve Melee` resolves every detected melee at once, applies destruction or recoil, records losses, and shows the same ghosted aftermath review used for shooting. After **Acknowledged**, destroyed Hordes appear in that player's reserve lot.
 
 ## Movement Prototype
 
@@ -106,7 +107,7 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 
 ### Guided Setup And Auto Deploy
 - Each army must total exactly 24 AP. Both players choose a presentation color and faction independently of ownership IDs (`player-1` / `player-2`). Available factions are Panda, Undead, Goblin, Gunpowder, and Dinosaurs. Twelve presentation colors are available. By default, Game Settings limits each faction to the unit types it has artwork for.
-- After armies are accepted, a coin flip chooses the temporary defender. The defender places terrain, then deploys in the bottom quarter; the attacker deploys afterward in the top quarter.
+- After armies are accepted, a coin flip chooses the temporary defender. The defender places terrain, then deploys in the bottom quarter; the attacker deploys afterward in the top quarter. Those top/bottom assignments become each player's home edge for reserve deployment.
 - Deployment requires every base corner to stay on the 600 mm board and in the assigned quarter, with no overlaps.
 - During deployment, the active player can Shift-click or marquee-select their units, drag them, and use rotate/reverse handles. Rank/file convert is not available. Units can be returned to the tray with Delete/Backspace, the Return to Tray button, or by dragging them onto the tray. Tray units can be clicked then placed, or dragged onto the board.
 - **Auto Deploy** places the active player's remaining tray units, then leaves them editable. If that player's army is already fully deployed, Auto Deploy stays available and recalls those units to the tray before placing them again:

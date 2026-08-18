@@ -629,4 +629,6 @@ test('deployment handoff enters game mode with defender as active player and rol
     assert.equal(app.state.phase, 'move');
     assert.equal(app.state.remainingMoves, 5);
     assert.deepEqual(app.state.losses, { 'player-1': [], 'player-2': [] });
+    assert.deepEqual(app.state.homeEdgeByPlayerId, { 'player-1': 'bottom', 'player-2': 'top' });
+    assert.deepEqual(app.state.reserveUnits, []);
 });

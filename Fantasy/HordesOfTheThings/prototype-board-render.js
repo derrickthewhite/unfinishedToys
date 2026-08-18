@@ -56,6 +56,7 @@
             ctx.scale(this.state.camera.scale, this.state.camera.scale);
             ctx.translate(-this.state.camera.x, -this.state.camera.y);
             this.drawBoard(ctx);
+            this.drawReserveZones(ctx);
             this.drawTerrain(ctx);
             this.drawGhostUnits(ctx);
             this.drawShootingOverlays(ctx);
@@ -89,6 +90,38 @@
             ctx.strokeStyle = 'rgba(58, 50, 40, 0.28)';
             ctx.lineWidth = 2 / this.state.camera.scale;
             ctx.strokeRect(0, 0, data.BOARD_SIZE, data.BOARD_SIZE);
+            ctx.restore();
+        }
+
+        drawReserveZones(ctx) {
+            ctx.save();
+            data.PLAYER_IDS.forEach((playerId) => {
+                const rect = this.getReserveRect(playerId);
+                const colors = this.getPlayerColors(playerId);
+                ctx.fillStyle = 'rgba(92, 82, 68, 0.12)';
+                ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
+                ctx.strokeStyle = colors.stroke;
+                ctx.lineWidth = 2 / this.state.camera.scale;
+                ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+                ctx.fillStyle = colors.stroke;
+                ctx.font = `${12 / this.state.camera.scale}px Georgia, serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const label = `${this.getPlayerLabel(playerId)} Reserve`;
+                ctx.fillText(label, rect.left + rect.width / 2, rect.top + 10 / this.state.camera.scale);
+            });
+            if (this.isReserveDeployDraft()) {
+                const playerId = this.state.activePlayerId;
+                const homeEdge = this.getHomeEdge(playerId);
+                const colors = this.getPlayerColors(playerId);
+                const depth = this.getUnitById(this.state.draft.unitIds[0])?.depth || data.RESERVE_SLOT_SIZE;
+                ctx.fillStyle = colors.glow;
+                if (homeEdge === 'bottom') {
+                    ctx.fillRect(0, data.BOARD_SIZE - depth, data.BOARD_SIZE, depth);
+                } else {
+                    ctx.fillRect(0, 0, data.BOARD_SIZE, depth);
+                }
+            }
             ctx.restore();
         }
 
@@ -128,6 +161,16 @@
                     invalid: isDraftInvalid || (isSelected && invalidSelection),
                     highlighted: this.state.mode === 'game' && this.state.phase === 'shooting' && validTargetIds.has(unit.id),
                     needsShootingDeclaration: this.needsShootingDeclaration(unit),
+                    ghost: false
+                });
+            });
+            this.getReserveUnits().forEach((unit) => {
+                const isSelected = selectedIds.has(unit.id);
+                this.drawUnitBase(ctx, unit, {
+                    selected: isSelected,
+                    invalid: isSelected && invalidSelection,
+                    highlighted: false,
+                    needsShootingDeclaration: false,
                     ghost: false
                 });
             });

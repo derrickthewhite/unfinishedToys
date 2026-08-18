@@ -157,6 +157,8 @@
                     })),
                     terrain: this.cloneJson(this.state.terrain, { roads: [], features: [] }),
                     losses: this.cloneJson(this.state.losses, { 'player-1': [], 'player-2': [] }),
+                    reserveUnits: this.cloneJson(this.getReserveUnits(), []),
+                    homeEdgeByPlayerId: this.cloneJson(this.state.homeEdgeByPlayerId, this.getDefaultHomeEdges()),
                     snapEnabled: this.state.snapEnabled,
                     singleRotationMode: this.state.singleRotationMode,
                     showRangedArea: this.state.showRangedArea,
@@ -211,6 +213,17 @@
             };
         }
 
+        normalizeSavedHomeEdges(homeEdgeByPlayerId) {
+            const source = homeEdgeByPlayerId || {};
+            const edges = this.getDefaultHomeEdges();
+            data.PLAYER_IDS.forEach((playerId) => {
+                if (source[playerId] === 'top' || source[playerId] === 'bottom') {
+                    edges[playerId] = source[playerId];
+                }
+            });
+            return edges;
+        }
+
         loadGame(recordId) {
             const record = this.getStorageRecords().find((entry) => entry.id === recordId);
             if (!record) {
@@ -233,6 +246,10 @@
             this.state.phase = snapshot.phase || 'move';
             this.state.terrain = snapshot.terrain || (setupStage === 'game' ? data.createDefaultTerrain() : { roads: [], features: [] });
             this.state.units = Array.isArray(snapshot.units) ? snapshot.units.map((unit) => this.normalizeSavedUnit(unit)) : [];
+            this.state.reserveUnits = Array.isArray(snapshot.reserveUnits)
+                ? snapshot.reserveUnits.map((unit) => this.normalizeSavedUnit(unit))
+                : [];
+            this.state.homeEdgeByPlayerId = this.normalizeSavedHomeEdges(snapshot.homeEdgeByPlayerId);
             this.state.losses = this.normalizeSavedLosses(snapshot.losses);
             this.state.snapEnabled = snapshot.snapEnabled !== false;
             this.state.showFormUpPreview = Boolean(snapshot.showFormUpPreview);
@@ -249,7 +266,10 @@
             this.state.marquee = null;
             this.state.interaction = null;
             this.state.placingUnit = false;
-            this.nextUnitId = snapshot.nextUnitId || this.deriveNextUnitId(this.state.units);
+            this.nextUnitId = snapshot.nextUnitId || this.deriveNextUnitId([
+                ...this.state.units,
+                ...this.getReserveUnits()
+            ]);
             if (setupStage === 'game' && this.state.phase === 'shooting') {
                 this.initializeShootingPhase();
             }

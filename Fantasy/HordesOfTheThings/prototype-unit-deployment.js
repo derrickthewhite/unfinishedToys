@@ -84,6 +84,7 @@
                 this.state.melee = null;
                 this.state.combatResolution = null;
                 this.state.losses = { 'player-1': [], 'player-2': [] };
+                this.state.reserveUnits = [];
                 this.state.editHistory = [];
                 this.state.placingUnit = false;
                 this.state.mode = 'edit';
@@ -526,6 +527,8 @@
                     return;
                 }
                 const firstPlayerId = deployment.defenderPlayerId;
+                this.state.homeEdgeByPlayerId = { ...deployment.zoneByPlayerId };
+                this.state.reserveUnits = [];
                 this.state.setupStage = 'game';
                 this.state.mode = 'game';
                 this.state.setup.deployment = null;

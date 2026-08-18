@@ -96,6 +96,8 @@ function createAppHarness(overrides) {
         singleRotationMode: 'center',
         showRangedArea: false,
         losses: { 'player-1': [], 'player-2': [] },
+        reserveUnits: [],
+        homeEdgeByPlayerId: { 'player-1': 'bottom', 'player-2': 'top' },
         editHistory: [],
         marquee: null,
         interaction: null,

@@ -222,7 +222,7 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`,
 
 ## Planned Game Extensions
 
-- Add reserve deployment for units such as Hordes and future Lurkers: these units begin off-board or are removed from the board, then enter during play using the deployment tray and placement validation as shared foundations.
+- Add reserve deployment for units such as Hordes and future Lurkers: these units begin off-board or are removed from the board, then enter during play using the deployment tray and placement validation as shared foundations. **Done for Hordes** — each player has a world-space reserve lot left of the board; destroyed Hordes go there after combat acknowledge and can be redeployed onto the home edge for 1 PIP. Heroes, Magicians, and Lurkers can use the same lot later.
 - Add further armies once their artwork is available.
 - Add an optional game-start mode that limits each faction to an allowed unit roster. **Done** — Game Settings has a default-on toggle; each faction can recruit only the types it has artwork for.
 - Add more unit types.
@@ -241,7 +241,7 @@ Primary files: `prototype-persistence.js`, `Design.md`, `prototype-app.test.js`,
 - `prototype-data.js`: player palette/defaults, unit template data, `createUnit`, default terrain/unit factories, auto-deploy matchup scoring.
 - `prototype-app.js`: `createInitialState`, `captureUi`, `bindUi`, player helpers, DOM `syncUiFromState`.
 - `prototype-board-render.js`: battle-board render scheduling, terrain/unit/overlay/handle drawing, asset lookup/loading.
-- `prototype-game-flow.js`: move completion, form-up, shooting/melee phases, turn advancement, combat resolution state.
+- `prototype-reserve.js`: home-edge lookup, reserve lot layout, Horde recycling, and home-edge redeployment validation.
 - `prototype-unit-deployment.js`: sequential deployment, tray placement validation.
 - `prototype-ai.js`: Auto Deploy grouping, scoring, and placement. First slice of opponent/setup AI.
 - `prototype-geometry.js`: `pointInBlob`, `drawBlob`, `getTerrainFeaturePoints`, catalog-backed outlines, `applyTerrainOutlineWave` for uploaded blocks, `getUnitCorners`, polygon overlap helpers.

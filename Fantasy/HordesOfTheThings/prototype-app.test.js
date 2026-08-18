@@ -1345,6 +1345,7 @@ test('render draws combat summaries after units', () => {
     };
     app.syncCanvasResolution = () => {};
     app.drawBoard = () => order.push('board');
+    app.drawReserveZones = () => order.push('reserve');
     app.drawTerrain = () => order.push('terrain');
     app.drawGhostUnits = () => order.push('ghosts');
     app.drawShootingOverlays = () => order.push('shooting');

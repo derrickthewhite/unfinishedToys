@@ -13,6 +13,7 @@
             require('./prototype-board-interaction.js'),
             require('./prototype-board-render.js'),
             require('./prototype-game-flow.js'),
+            require('./prototype-reserve.js'),
             require('./prototype-setup-camera.js'),
             require('./prototype-unit-deployment.js'),
             require('./prototype-ai.js'),
@@ -20,8 +21,8 @@
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesSelectionPanel);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, setupCamera, unitDeployment, ai, selectionPanel) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesSelectionPanel);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, selectionPanel) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -171,6 +172,8 @@
                 singleRotationMode: 'center',
                 showRangedArea: false,
                 losses: { 'player-1': [], 'player-2': [] },
+                reserveUnits: [],
+                homeEdgeByPlayerId: this.getDefaultHomeEdges(),
                 editHistory: [],
                 marquee: null,
                 interaction: null,
@@ -523,7 +526,9 @@
         }
 
         getUnitById(unitId) {
-            return this.state.units.find((unit) => unit.id === unitId) || null;
+            return this.state.units.find((unit) => unit.id === unitId)
+                || this.getReserveUnits().find((unit) => unit.id === unitId)
+                || null;
         }
 
         getSelectedUnits() {
@@ -619,6 +624,7 @@
             this.ui.stepMoveButton.disabled = this.state.mode !== 'game'
                 || this.state.phase !== 'move'
                 || !this.state.draft
+                || this.state.draft.kind === 'reserve-deploy'
                 || this.state.selectionAnalysis.type !== 'single'
                 || this.state.draft.invalidIds.size > 0;
             this.ui.snapCheckbox.checked = this.state.snapEnabled;
@@ -657,6 +663,7 @@
     boardInteraction.install(HordesPrototype);
     boardRender.install(HordesPrototype);
     gameFlow.install(HordesPrototype);
+    reserve.install(HordesPrototype);
     setupCamera.install(HordesPrototype);
     unitDeployment.install(HordesPrototype);
     ai.install(HordesPrototype);

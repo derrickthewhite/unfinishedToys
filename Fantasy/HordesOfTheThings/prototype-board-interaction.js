@@ -57,6 +57,24 @@
             if (selectedUnits.length === 0) {
                 return false;
             }
+            if (selectedUnits.length === 1 && this.isUnitInReserve(selectedUnits[0].id)) {
+                if (!this.beginReserveDeploy(selectedUnits[0])) {
+                    return false;
+                }
+                const unit = this.getUnitById(selectedUnits[0].id);
+                this.applyReserveDeployPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(unit).x + delta.x);
+                this.evaluateDraft();
+                this.requestRender();
+                return true;
+            }
+            if (this.isReserveDeployDraft()) {
+                const unit = selectedUnits[0];
+                this.applyReserveDeployPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(unit).x + delta.x);
+                this.evaluateDraft();
+                this.requestRender();
+                this.updateStatus('Draft nudged.');
+                return true;
+            }
             if (this.state.mode === 'edit' || this.state.setupStage === 'unit-deployment') {
                 const deploymentNudge = this.state.setupStage === 'unit-deployment';
                 const nudgeSnapshot = deploymentNudge
@@ -224,6 +242,24 @@
 
             const isSelectedUnit = unitHit && this.state.selectedIds.includes(unitHit.id);
 
+            if (unitHit && this.isUnitInReserve(unitHit.id)) {
+                if (this.state.mode === 'game' && this.state.phase === 'move') {
+                    if (!this.beginReserveDeploy(unitHit, world.x)) {
+                        this.state.selectedIds = [unitHit.id];
+                        this.updateSelectionAnalysis();
+                        this.syncUiFromState();
+                        this.requestRender();
+                        return;
+                    }
+                    this.state.interaction.type = 'move-single';
+                    this.state.interaction.draftIds = [...this.state.selectedIds];
+                    this.state.interaction.dragBase = geometry.snapshotPositions(this.state.selectedIds, this.state.units);
+                    this.state.interaction.anchorWorld = world;
+                    this.state.interaction.suppressClick = true;
+                }
+                return;
+            }
+
             if (this.state.setupStage !== 'unit-deployment' && this.state.mode === 'game' && this.state.phase === 'move' && isSelectedUnit) {
                 const analysis = this.state.selectionAnalysis;
                 if (analysis.type === 'single' || analysis.type === 'rank' || (analysis.type === 'file' && analysis.leadId === unitHit.id)) {
@@ -373,6 +409,12 @@
                 const unitId = interaction.draftIds[0];
                 const base = interaction.dragBase[unitId];
                 const unit = this.getUnitById(unitId);
+                if (this.isReserveDeployDraft()) {
+                    this.applyReserveDeployPose(unit, this.getUnitPlayerId(unit), geometry.getUnitCenter(base).x + delta.x);
+                    this.evaluateDraft();
+                    this.requestRender();
+                    return;
+                }
                 unit.x = base.x + delta.x;
                 unit.y = base.y + delta.y;
                 this.snapSelection(interaction.draftIds);
@@ -546,6 +588,16 @@
                 if (this.state.setupStage === 'unit-deployment' && this.getUnitPlayerId(unitHit) !== this.getDeploymentSetup()?.activePlayerId) {
                     return;
                 }
+                if (this.isUnitInReserve(unitHit.id)) {
+                    if (this.state.mode === 'game' && this.state.phase === 'move') {
+                        this.beginReserveDeploy(unitHit, world.x);
+                    } else if (this.state.mode === 'game' && this.getUnitPlayerId(unitHit) !== this.state.activePlayerId) {
+                        this.updateStatus('Only the active side can be selected in game mode.');
+                    } else {
+                        this.toggleSelection(unitHit.id, false);
+                    }
+                    return;
+                }
                 if (this.state.mode === 'game' && this.state.setupStage !== 'unit-deployment' && this.getUnitPlayerId(unitHit) !== this.state.activePlayerId) {
                     this.updateStatus('Only the active side can be selected in game mode.');
                     return;
@@ -645,6 +697,13 @@
                     return unit;
                 }
             }
+            const reserveUnits = this.getReserveUnits();
+            for (let index = reserveUnits.length - 1; index >= 0; index -= 1) {
+                const unit = reserveUnits[index];
+                if (geometry.pointInPolygon(world, geometry.getUnitCorners(unit))) {
+                    return unit;
+                }
+            }
             return null;
         }
 
@@ -659,6 +718,9 @@
         }
 
         getSelectionHandles() {
+            if (this.isReserveDeployDraft()) {
+                return [];
+            }
             if (this.state.mode === 'game' && this.state.phase !== 'move' && this.state.setupStage !== 'unit-deployment') {
                 return [];
             }
@@ -1034,6 +1096,9 @@
             if (this.state.mode !== 'game') {
                 return false;
             }
+            if (unitIds.length === 1 && this.isUnitInReserve(unitIds[0])) {
+                return this.beginReserveDeploy(this.getUnitById(unitIds[0]));
+            }
             if (this.state.phase !== 'move') {
                 this.updateStatus('Movement is only available during the move phase.');
                 return false;
@@ -1143,6 +1208,17 @@
         cancelDraft(showStatus) {
             if (!this.state.draft) {
                 this.syncUiFromState();
+                return;
+            }
+            if (this.state.draft.kind === 'reserve-deploy') {
+                this.restoreReserveDeploy(this.state.draft);
+                this.state.draft = null;
+                this.updateSelectionAnalysis();
+                this.syncUiFromState();
+                this.requestRender();
+                if (showStatus) {
+                    this.updateStatus('Reserve deployment cancelled.');
+                }
                 return;
             }
             geometry.restoreSnapshot(this.state.draft.initialOrigin, this.state.units);
