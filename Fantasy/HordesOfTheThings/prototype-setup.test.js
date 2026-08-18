@@ -47,6 +47,32 @@ test('army drafts require exactly 24 AP for both players before terrain placemen
     assert.equal(app.state.setup.confirmation, null);
 });
 
+test('army builder cannot accept matching colors or matching factions', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'army-builder',
+            setup: { armies: Object.create(HordesPrototype.prototype).createArmyDrafts(), confirmation: null }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 12);
+    app.adjustArmyUnit('player-2', 'Blade', 12);
+    assert.equal(app.canAcceptArmies(), true);
+
+    app.updateArmyPlayer('player-1', 'colorId', 'red');
+    assert.equal(app.getArmyIdentityConflict(), 'Each army needs its own color.');
+    assert.equal(app.canAcceptArmies(), false);
+
+    app.updateArmyPlayer('player-1', 'colorId', 'blue');
+    app.updateArmyPlayer('player-1', 'faction', 'Undead');
+    assert.equal(app.getArmyIdentityConflict(), 'Each army needs its own faction.');
+    assert.equal(app.canAcceptArmies(), false);
+
+    app.updateArmyPlayer('player-1', 'colorId', 'red');
+    assert.equal(app.getArmyIdentityConflict(), 'Each army needs its own color and faction.');
+    app.openArmyConfirmation();
+    assert.equal(app.state.setup.confirmation, null);
+});
+
 test('army builder updates player color and faction without changing player identity', () => {
     const app = createAppHarness({
         state: {

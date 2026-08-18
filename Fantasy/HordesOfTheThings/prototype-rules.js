@@ -2060,6 +2060,43 @@
         return Math.min(delta, Math.abs(Math.PI - delta));
     }
 
+    function areOpposingLines(leftRotation, rightRotation) {
+        const delta = Math.abs(geometry.normalizeAngle(leftRotation - rightRotation));
+        return Math.abs(delta - Math.PI) <= data.FORM_UP_SPLIT_ANGLE;
+    }
+
+    function shouldUseSplitFormUp(groupRotation, enemyRotation) {
+        return getLineAngleDelta(groupRotation, enemyRotation) > data.FORM_UP_SPLIT_ANGLE
+            || areOpposingLines(groupRotation, enemyRotation);
+    }
+
+    function getRankNeighbors(unit, groupUnits) {
+        return groupUnits.filter((other) => other.id !== unit.id && sharesFormationContact(unit, other));
+    }
+
+    function getFriendlyDressDistance(unit, neighbors) {
+        const unitCorners = geometry.getUnitCorners(unit);
+        let best = Number.POSITIVE_INFINITY;
+        neighbors.forEach((neighbor) => {
+            const neighborCorners = geometry.getUnitCorners(neighbor);
+            [
+                [unitCorners.frontRight, neighborCorners.frontLeft],
+                [unitCorners.frontLeft, neighborCorners.frontRight]
+            ].forEach(([left, right]) => {
+                best = Math.min(best, geometry.distance(left, right));
+            });
+        });
+        return best;
+    }
+
+    function isDressedWithRankNeighbor(unit, groupUnits) {
+        const neighbors = getRankNeighbors(unit, groupUnits);
+        if (neighbors.length === 0) {
+            return false;
+        }
+        return getFriendlyDressDistance(unit, neighbors) <= data.FORMATION_GAP_TOLERANCE;
+    }
+
     function translateUnits(units, delta) {
         return units.map((unit) => ({
             ...unit,
@@ -2075,7 +2112,7 @@
         return blockers.every((otherUnit) => !geometry.polygonsOverlap(geometry.getUnitCorners(unit), geometry.getUnitCorners(otherUnit)));
     }
 
-    function findBestSingleUnitFormUpCandidate(unit, enemyUnit, option, blockers, terrain, maxTriggerDistance) {
+    function findBestSingleUnitFormUpCandidate(unit, enemyUnit, option, blockers, terrain, maxTriggerDistance, maxTranslationDistance) {
         const currentFriendlyCorners = geometry.getUnitCorners(unit);
         const currentOriginCorners = [currentFriendlyCorners.frontLeft, currentFriendlyCorners.frontRight];
         const orientedUnit = geometry.rotateUnitsAroundCenter([unit], option.targetRotation)[0];
@@ -2083,6 +2120,7 @@
         const orientedOriginCorners = [orientedFriendlyCorners.frontLeft, orientedFriendlyCorners.frontRight];
         let best = null;
         const triggerLimit = Number.isFinite(maxTriggerDistance) ? maxTriggerDistance : data.FORM_UP_DISTANCE + 0.5;
+        const translationLimit = Number.isFinite(maxTranslationDistance) ? maxTranslationDistance : Number.POSITIVE_INFINITY;
 
         orientedOriginCorners.forEach((orientedOriginPoint, index) => {
             const triggerOriginPoint = currentOriginCorners[index];
@@ -2101,6 +2139,9 @@
                     return;
                 }
                 const translationDistance = geometry.distance(orientedOriginPoint, targetPoint);
+                if (translationDistance > translationLimit) {
+                    return;
+                }
                 if (!best
                     || triggerDistance < best.triggerDistance - data.COLLISION_EPSILON
                     || (Math.abs(triggerDistance - best.triggerDistance) <= data.COLLISION_EPSILON
@@ -2470,6 +2511,108 @@
         };
     }
 
+    function findBestPerUnitOpposingFormUpCandidate(groupUnits, enemyUnits, otherUnits, terrain) {
+        const opposingEnemies = enemyUnits.filter((enemyUnit) => (
+            areOpposingLines(groupUnits[0].rotation, enemyUnit.rotation)
+        ));
+        if (opposingEnemies.length === 0) {
+            return null;
+        }
+
+        const movedUnitsById = new Map();
+        const movedStats = [];
+
+        groupUnits.forEach((groupUnit) => {
+            let unitBest = null;
+            const dressedWithNeighbor = isDressedWithRankNeighbor(groupUnit, groupUnits);
+            opposingEnemies.forEach((enemyUnit) => {
+                const preferredApproach = getPreferredFormUpApproach(groupUnit, enemyUnit);
+                getFormUpOrientationOptions(groupUnit, enemyUnit).forEach((option) => {
+                    const blockers = otherUnits.concat(Array.from(movedUnitsById.values()));
+                    const candidate = findBestSingleUnitFormUpCandidate(
+                        groupUnit,
+                        enemyUnit,
+                        option,
+                        blockers,
+                        terrain
+                    );
+                    if (!candidate) {
+                        return;
+                    }
+                    if (dressedWithNeighbor
+                        && candidate.triggerDistance <= data.COLLISION_EPSILON
+                        && candidate.translationDistance > data.FORM_UP_DISTANCE + 0.5) {
+                        return;
+                    }
+                    if (!candidate) {
+                        return;
+                    }
+                    const approachPenalty = option.kind === preferredApproach ? 0 : 1;
+                    if (!unitBest
+                        || approachPenalty < unitBest.approachPenalty
+                        || (approachPenalty === unitBest.approachPenalty && (
+                            candidate.triggerDistance < unitBest.triggerDistance - data.COLLISION_EPSILON
+                            || (Math.abs(candidate.triggerDistance - unitBest.triggerDistance) <= data.COLLISION_EPSILON
+                                && candidate.translationDistance < unitBest.translationDistance - data.COLLISION_EPSILON)
+                        ))) {
+                        unitBest = {
+                            approachPenalty,
+                            triggerDistance: candidate.triggerDistance,
+                            translationDistance: candidate.translationDistance,
+                            unit: candidate.unit
+                        };
+                    }
+                });
+            });
+            if (unitBest) {
+                movedUnitsById.set(groupUnit.id, unitBest.unit);
+                movedStats.push(unitBest);
+            }
+        });
+
+        if (movedUnitsById.size === 0) {
+            return null;
+        }
+
+        const resolvedUnitsById = new Map();
+        const movedUnitIds = [];
+
+        groupUnits.forEach((groupUnit) => {
+            if (movedUnitsById.has(groupUnit.id)) {
+                resolvedUnitsById.set(groupUnit.id, movedUnitsById.get(groupUnit.id));
+                movedUnitIds.push(groupUnit.id);
+                return;
+            }
+            const blockers = otherUnits.concat(Array.from(resolvedUnitsById.values()));
+            const shiftedUnit = findMinimalOrthogonalShift(groupUnit, blockers, terrain);
+            if (!shiftedUnit) {
+                resolvedUnitsById.clear();
+                return;
+            }
+            resolvedUnitsById.set(groupUnit.id, shiftedUnit);
+            if (!geometry.sameFootprint(groupUnit, shiftedUnit)) {
+                movedUnitIds.push(groupUnit.id);
+            }
+        });
+
+        if (resolvedUnitsById.size !== groupUnits.length) {
+            return null;
+        }
+
+        const resolvedUnits = groupUnits.map((groupUnit) => resolvedUnitsById.get(groupUnit.id));
+        if (!isLegalFormUpPosition(resolvedUnits, otherUnits, terrain)) {
+            return null;
+        }
+
+        return {
+            movedCount: movedStats.length,
+            triggerDistance: movedStats.reduce((total, entry) => total + entry.triggerDistance, 0),
+            translationDistance: movedStats.reduce((total, entry) => total + entry.translationDistance, 0),
+            unitIds: movedUnitIds,
+            units: resolvedUnits
+        };
+    }
+
     function findBestFormUpCandidate(groupUnits, allUnits, activePlayerId, terrain) {
         if (groupUnits.length === 0) {
             return null;
@@ -2479,7 +2622,8 @@
         let best = null;
 
         enemyUnits.forEach((enemyUnit) => {
-            const splitFormUpForEnemy = getLineAngleDelta(groupUnits[0].rotation, enemyUnit.rotation) > data.FORM_UP_SPLIT_ANGLE;
+            const splitFormUpForEnemy = shouldUseSplitFormUp(groupUnits[0].rotation, enemyUnit.rotation)
+                && !areOpposingLines(groupUnits[0].rotation, enemyUnit.rotation);
             groupUnits.forEach((groupUnit) => {
                 const currentFriendlyCorners = geometry.getUnitCorners(groupUnit);
                 const currentOriginCorners = [currentFriendlyCorners.frontLeft, currentFriendlyCorners.frontRight];
@@ -2550,6 +2694,18 @@
                 });
             });
         });
+
+        const perUnitOpposing = findBestPerUnitOpposingFormUpCandidate(groupUnits, enemyUnits, otherUnits, terrain);
+        if (perUnitOpposing && (!best || perUnitOpposing.movedCount > (best.movedCount || 0))) {
+            best = {
+                movedCount: perUnitOpposing.movedCount,
+                approachPenalty: best?.approachPenalty ?? 0,
+                triggerDistance: perUnitOpposing.triggerDistance,
+                translationDistance: perUnitOpposing.translationDistance,
+                unitIds: perUnitOpposing.unitIds,
+                units: perUnitOpposing.units
+            };
+        }
 
         return best;
     }

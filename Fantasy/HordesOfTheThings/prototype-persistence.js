@@ -157,6 +157,9 @@
                     })),
                     terrain: this.cloneJson(this.state.terrain, { roads: [], features: [] }),
                     losses: this.cloneJson(this.state.losses, { 'player-1': [], 'player-2': [] }),
+                    startingArmyValueByPlayerId: this.cloneJson(this.state.startingArmyValueByPlayerId, null),
+                    victory: this.cloneJson(this.state.victory, null),
+                    victoryModalDismissed: Boolean(this.state.victoryModalDismissed),
                     reserveUnits: this.cloneJson(this.getReserveUnits(), []),
                     homeEdgeByPlayerId: this.cloneJson(this.state.homeEdgeByPlayerId, this.getDefaultHomeEdges()),
                     snapEnabled: this.state.snapEnabled,
@@ -251,6 +254,9 @@
                 : [];
             this.state.homeEdgeByPlayerId = this.normalizeSavedHomeEdges(snapshot.homeEdgeByPlayerId);
             this.state.losses = this.normalizeSavedLosses(snapshot.losses);
+            this.state.startingArmyValueByPlayerId = snapshot.startingArmyValueByPlayerId || null;
+            this.state.victory = snapshot.victory || null;
+            this.state.victoryModalDismissed = Boolean(snapshot.victoryModalDismissed);
             this.state.snapEnabled = snapshot.snapEnabled !== false;
             this.state.showFormUpPreview = Boolean(snapshot.showFormUpPreview);
             this.state.singleRotationMode = snapshot.singleRotationMode === 'front-corner' ? 'front-corner' : 'center';
@@ -278,6 +284,9 @@
                 this.initializeMeleePhase();
             }
             this.closeStorageModal(false);
+            if (setupStage === 'game' && !this.state.victory) {
+                this.ensureStartingArmyValues();
+            }
             if (setupStage === 'game' && this.maybeAutoAdvanceCombatPhase()) {
                 return;
             }

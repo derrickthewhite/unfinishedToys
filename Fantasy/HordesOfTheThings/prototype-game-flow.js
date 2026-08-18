@@ -168,6 +168,10 @@
             this.state.melee = null;
             this.state.combatResolution = null;
             this.state.selectedIds = [];
+            if (this.checkVictoryAtTurnEnd()) {
+                this.syncUiFromState();
+                return;
+            }
             this.state.activePlayerId = this.getOpponentPlayerId(this.state.activePlayerId);
             this.state.remainingMoves = this.rollDie();
             this.resetMovedFlags(this.state.activePlayerId);
@@ -178,7 +182,7 @@
         }
 
         maybeAutoAdvanceCombatPhase() {
-            if (this.state.mode !== 'game' || this.state.combatResolution) {
+            if (this.isGameOver() || this.state.mode !== 'game' || this.state.combatResolution) {
                 return false;
             }
             if (this.state.phase === 'shooting' && !this.hasAnyShootingAttacks()) {

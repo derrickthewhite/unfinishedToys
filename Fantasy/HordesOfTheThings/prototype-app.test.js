@@ -283,6 +283,105 @@ test('edit mode click selects a single unit without requiring a drag', () => {
     assert.equal(app.state.selectionAnalysis.type, 'single');
 });
 
+test('edit mode delete removes selected units without recording losses', () => {
+    const units = [createBlade('u1', 100, 220), createBlade('u2', 200, 220)];
+    const app = createAppHarness({
+        state: {
+            mode: 'edit',
+            setupStage: 'game',
+            units,
+            selectedIds: ['u1', 'u2']
+        }
+    });
+
+    app.removeSelectedUnits({ countAsLoss: false });
+
+    assert.deepEqual(app.state.units, []);
+    assert.deepEqual(app.state.selectedIds, []);
+    assert.deepEqual(app.state.losses['player-1'], []);
+});
+
+test('edit mode destroy removes selected units and records losses', () => {
+    const units = [createBlade('u1', 100, 220)];
+    const app = createAppHarness({
+        state: {
+            mode: 'edit',
+            setupStage: 'game',
+            units,
+            selectedIds: ['u1']
+        }
+    });
+
+    app.removeSelectedUnits({ countAsLoss: true });
+
+    assert.equal(app.state.units.length, 0);
+    assert.deepEqual(app.state.losses['player-1'], [{ id: 'u1', type: 'Blade', value: 2 }]);
+});
+
+test('edit mode destroy undo restores units and losses', () => {
+    const units = [createBlade('u1', 100, 220)];
+    const app = createAppHarness({
+        state: {
+            mode: 'edit',
+            setupStage: 'game',
+            units,
+            selectedIds: ['u1']
+        }
+    });
+
+    app.removeSelectedUnits({ countAsLoss: true });
+    app.undoEditStep();
+
+    assert.equal(app.state.units.length, 1);
+    assert.equal(app.state.units[0].id, 'u1');
+    assert.deepEqual(app.state.losses['player-1'], []);
+    assert.deepEqual(app.state.selectedIds, ['u1']);
+});
+
+test('edit mode delete clears an existing loss entry for a reserve unit', () => {
+    const reserved = { ...createBlade('u1', 0, 0), playerId: 'player-1' };
+    const app = createAppHarness({
+        state: {
+            mode: 'edit',
+            setupStage: 'game',
+            units: [],
+            reserveUnits: [reserved],
+            selectedIds: ['u1'],
+            losses: {
+                'player-1': [{ id: 'u1', type: 'Blade', value: 2 }],
+                'player-2': []
+            }
+        }
+    });
+
+    app.removeSelectedUnits({ countAsLoss: false });
+
+    assert.deepEqual(app.state.reserveUnits, []);
+    assert.deepEqual(app.state.losses['player-1'], []);
+});
+
+test('edit mode destroy of a reserve unit does not double-count losses', () => {
+    const reserved = { ...createBlade('u1', 0, 0), playerId: 'player-1' };
+    const app = createAppHarness({
+        state: {
+            mode: 'edit',
+            setupStage: 'game',
+            units: [],
+            reserveUnits: [reserved],
+            selectedIds: ['u1'],
+            losses: {
+                'player-1': [{ id: 'u1', type: 'Blade', value: 2 }],
+                'player-2': []
+            }
+        }
+    });
+
+    app.removeSelectedUnits({ countAsLoss: true });
+
+    assert.deepEqual(app.state.reserveUnits, []);
+    assert.deepEqual(app.state.losses['player-1'], [{ id: 'u1', type: 'Blade', value: 2 }]);
+});
+
 test('edit mode single-unit rotation handle still rotates the unit', () => {
     const units = [createBlade('u1', 100, 220)];
     const app = createAppHarness({
@@ -464,6 +563,8 @@ test('keyboard shortcut toggles form-up preview and persists the checkbox state 
             newUnitTypeSelect: { value: '' },
             placementSideSelect: { value: '' },
             placeUnitButton: { textContent: '', disabled: false },
+            deleteUnitButton: { hidden: false, disabled: false },
+            destroyUnitButton: { hidden: false, disabled: false },
             finishMoveButton: { hidden: false, disabled: false },
             endMovePhaseButton: { hidden: false, disabled: false },
             stepMoveButton: { hidden: false, disabled: false },

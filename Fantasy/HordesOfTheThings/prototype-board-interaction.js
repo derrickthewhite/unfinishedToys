@@ -48,6 +48,7 @@
         'createEditSnapshot',
         'recordEditSnapshot',
         'undoEditStep',
+        'removeSelectedUnits',
         'cancelDraft'
     ]);
 
@@ -211,6 +212,10 @@
                     cameraStartX: this.state.camera.x,
                     cameraStartY: this.state.camera.y
                 };
+                return;
+            }
+
+            if (typeof this.isGameOver === 'function' && this.isGameOver() && this.state.mode === 'game') {
                 return;
             }
 
@@ -596,6 +601,9 @@
         }
 
         handleClick(world, interaction) {
+            if (typeof this.isGameOver === 'function' && this.isGameOver()) {
+                return;
+            }
             const unitHit = interaction.unitHit ? this.getUnitById(interaction.unitHit) : this.pickUnit(world);
             if (this.state.mode === 'game' && this.state.phase === 'shooting') {
                 this.handleShootingClick(unitHit);
@@ -1204,7 +1212,13 @@
         }
 
         createEditSnapshot() {
-            return history.createEditSnapshot(this.state.units, this.state.selectedIds, this.nextUnitId);
+            return history.createEditSnapshot(
+                this.state.units,
+                this.state.selectedIds,
+                this.nextUnitId,
+                this.state.losses,
+                this.getReserveUnits()
+            );
         }
 
         recordEditSnapshot(snapshot) {
@@ -1225,10 +1239,69 @@
             this.state.units = restored.units;
             this.state.selectedIds = restored.selectedIds;
             this.nextUnitId = restored.nextUnitId;
+            if (restored.losses) {
+                this.state.losses = restored.losses;
+            }
+            this.state.reserveUnits = restored.reserveUnits || [];
             this.state.placingUnit = false;
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.updateStatus('Edit action undone.');
+        }
+
+        isUnitAlreadyLost(unitId) {
+            return data.PLAYER_IDS.some((playerId) => (
+                (this.state.losses[playerId] || []).some((entry) => entry.id === unitId)
+            ));
+        }
+
+        removeSelectedUnits(options = {}) {
+            const countAsLoss = Boolean(options.countAsLoss);
+            if (this.state.mode !== 'edit') {
+                return false;
+            }
+            const selected = this.getSelectedUnits();
+            if (selected.length === 0) {
+                this.updateStatus('Select one or more units to remove.');
+                return false;
+            }
+            if (typeof this.isGameOver === 'function' && this.isGameOver()) {
+                this.updateStatus('The battle is over.');
+                return false;
+            }
+
+            this.recordEditSnapshot(this.createEditSnapshot());
+
+            const removedIds = new Set(selected.map((unit) => unit.id));
+            const unitsToRecordLoss = [];
+
+            selected.forEach((unit) => {
+                if (this.isUnitInReserve(unit.id)) {
+                    this.state.reserveUnits = this.getReserveUnits().filter((entry) => entry.id !== unit.id);
+                }
+                if (countAsLoss) {
+                    if (!this.isUnitAlreadyLost(unit.id)) {
+                        unitsToRecordLoss.push(unit);
+                    }
+                } else {
+                    this.clearLossForUnit(unit.id);
+                }
+            });
+
+            this.state.units = this.state.units.filter((unit) => !removedIds.has(unit.id));
+
+            if (countAsLoss && unitsToRecordLoss.length > 0) {
+                this.recordLosses(unitsToRecordLoss);
+            }
+
+            this.state.selectedIds = [];
+            this.state.placingUnit = false;
+            this.cancelDraft(false);
+            this.updateSelectionAnalysis();
+            this.syncUiFromState();
+            this.requestRender();
+            this.updateStatus(`${countAsLoss ? 'Destroyed' : 'Removed'} ${removedIds.size} unit(s).`);
+            return true;
         }
 
         cancelDraft(showStatus) {

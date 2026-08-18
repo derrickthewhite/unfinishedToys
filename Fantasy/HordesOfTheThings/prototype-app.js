@@ -17,12 +17,13 @@
             require('./prototype-setup-camera.js'),
             require('./prototype-unit-deployment.js'),
             require('./prototype-ai.js'),
-            require('./prototype-selection-panel.js')
+            require('./prototype-selection-panel.js'),
+            require('./prototype-victory.js')
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesSelectionPanel);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, selectionPanel) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesSelectionPanel, root.HordesVictory);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, selectionPanel, victory) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -61,6 +62,7 @@
                 setupShell: document.getElementById('setupShell'),
                 armyBuilder: document.getElementById('armyBuilder'),
                 armyColumns: document.getElementById('armyColumns'),
+                armyIdentityHint: document.getElementById('armyIdentityHint'),
                 acceptArmiesButton: document.getElementById('acceptArmiesButton'),
                 setupPending: document.getElementById('setupPending'),
                 setupPendingText: document.getElementById('setupPendingText'),
@@ -95,6 +97,8 @@
                 newUnitTypeSelect: document.getElementById('newUnitTypeSelect'),
                 placementSideSelect: document.getElementById('placementSideSelect'),
                 placeUnitButton: document.getElementById('placeUnitButton'),
+                deleteUnitButton: document.getElementById('deleteUnitButton'),
+                destroyUnitButton: document.getElementById('destroyUnitButton'),
                 finishMoveButton: document.getElementById('finishMoveButton'),
                 endMovePhaseButton: document.getElementById('endMovePhaseButton'),
                 stepMoveButton: document.getElementById('stepMoveButton'),
@@ -134,7 +138,16 @@
                 selectionPanelEyebrow: document.getElementById('selectionPanelEyebrow'),
                 selectionPanelTitle: document.getElementById('selectionPanelTitle'),
                 selectionPanelHint: document.getElementById('selectionPanelHint'),
-                selectionPanelStats: document.getElementById('selectionPanelStats')
+                selectionPanelStats: document.getElementById('selectionPanelStats'),
+                victoryModal: document.getElementById('victoryModal'),
+                victoryBackdrop: document.getElementById('victoryBackdrop'),
+                victoryTitle: document.getElementById('victoryTitle'),
+                victorySubtitle: document.getElementById('victorySubtitle'),
+                victoryReason: document.getElementById('victoryReason'),
+                victoryWinnerSide: document.getElementById('victoryWinnerSide'),
+                victoryLoserSide: document.getElementById('victoryLoserSide'),
+                reviewVictoryButton: document.getElementById('reviewVictoryButton'),
+                victoryNewGameButton: document.getElementById('victoryNewGameButton')
             };
         }
 
@@ -173,6 +186,9 @@
                 singleRotationMode: 'center',
                 showRangedArea: false,
                 losses: { 'player-1': [], 'player-2': [] },
+                startingArmyValueByPlayerId: null,
+                victory: null,
+                victoryModalDismissed: false,
                 reserveUnits: [],
                 homeEdgeByPlayerId: this.getDefaultHomeEdges(),
                 editHistory: [],
@@ -291,6 +307,15 @@
             this.ui.cancelConfirmationButton.addEventListener('click', () => this.closeSetupConfirmation());
             this.ui.confirmationBackdrop.addEventListener('click', () => this.closeSetupConfirmation());
             this.ui.confirmSetupButton.addEventListener('click', () => this.confirmSetupStage());
+            if (this.ui.reviewVictoryButton) {
+                this.ui.reviewVictoryButton.addEventListener('click', () => this.dismissVictoryModal());
+            }
+            if (this.ui.victoryBackdrop) {
+                this.ui.victoryBackdrop.addEventListener('click', () => this.dismissVictoryModal());
+            }
+            if (this.ui.victoryNewGameButton) {
+                this.ui.victoryNewGameButton.addEventListener('click', () => this.openVictoryNewGameConfirmation());
+            }
             this.ui.terrainCountInput.addEventListener('change', () => this.setTerrainCount(this.ui.terrainCountInput.value));
             this.ui.autoPlaceTerrainButton.addEventListener('click', () => this.autoPlaceTerrain());
             this.ui.confirmTerrainButton.addEventListener('click', () => this.openTerrainConfirmation());
@@ -324,6 +349,12 @@
                 this.state.placingUnit = !this.state.placingUnit;
                 this.updateStatus(this.state.placingUnit ? 'Click the board to place a new ' + this.state.placementType + '.' : 'Placement cancelled.');
                 this.syncUiFromState();
+            });
+            this.ui.deleteUnitButton.addEventListener('click', () => {
+                this.removeSelectedUnits({ countAsLoss: false });
+            });
+            this.ui.destroyUnitButton.addEventListener('click', () => {
+                this.removeSelectedUnits({ countAsLoss: true });
             });
             this.ui.finishMoveButton.addEventListener('click', () => this.finishDraft());
             this.ui.endMovePhaseButton.addEventListener('click', () => this.endMovePhase());
@@ -379,6 +410,11 @@
             if (this.isTypingTarget(event.target)) {
                 return;
             }
+            if (event.key === 'Escape' && this.state.victory && !this.state.victoryModalDismissed) {
+                event.preventDefault();
+                this.dismissVictoryModal();
+                return;
+            }
             if (event.key === 'Escape' && (this.state.confirmation || this.state.setup?.confirmation)) {
                 event.preventDefault();
                 this.closeSetupConfirmation();
@@ -398,6 +434,13 @@
                 if (!this.state.storageModalOpen && !this.state.gameSettingsModalOpen && !this.state.setup?.confirmation) {
                     event.preventDefault();
                     this.returnSelectedUnitsToTray();
+                }
+                return;
+            }
+            if ((event.key === 'Delete' || event.key === 'Backspace') && this.state.mode === 'edit' && this.state.setupStage !== 'unit-deployment') {
+                if (!this.state.storageModalOpen && !this.state.gameSettingsModalOpen && !this.state.setup?.confirmation) {
+                    event.preventDefault();
+                    this.removeSelectedUnits({ countAsLoss: event.shiftKey });
                 }
                 return;
             }
@@ -500,6 +543,9 @@
                 this.state.formUp = null;
             }
             if (mode === 'game') {
+                if (!this.state.startingArmyValueByPlayerId) {
+                    this.captureStartingArmyValues();
+                }
                 this.state.selectedIds = this.state.selectedIds.filter((unitId) => {
                     const unit = this.getUnitById(unitId);
                     return unit && this.getUnitPlayerId(unit) === this.state.activePlayerId;
@@ -596,7 +642,12 @@
             }
             if (this.state.setupStage === 'army-builder') {
                 this.renderArmyBuilder();
+                const identityConflict = this.getArmyIdentityConflict();
                 if (this.ui.acceptArmiesButton) this.ui.acceptArmiesButton.disabled = !this.canAcceptArmies();
+                if (this.ui.armyIdentityHint) {
+                    this.ui.armyIdentityHint.hidden = !identityConflict;
+                    this.ui.armyIdentityHint.textContent = identityConflict || '';
+                }
             }
             if (this.state.setupStage === 'terrain-placement') {
                 this.renderTerrainPlacement();
@@ -617,6 +668,11 @@
             this.ui.placeUnitButton.disabled = this.state.mode !== 'edit';
             this.ui.newUnitTypeSelect.disabled = this.state.mode !== 'edit';
             this.ui.placementSideSelect.disabled = this.state.mode !== 'edit';
+            const canRemoveSelection = this.state.mode === 'edit' && this.state.selectedIds.length > 0;
+            this.ui.deleteUnitButton.disabled = this.state.mode !== 'edit' || this.state.selectedIds.length === 0;
+            this.ui.destroyUnitButton.disabled = this.state.mode !== 'edit' || this.state.selectedIds.length === 0;
+            this.ui.deleteUnitButton.hidden = this.state.mode !== 'edit';
+            this.ui.destroyUnitButton.hidden = this.state.mode !== 'edit';
             this.ui.activeSideSelect.disabled = this.state.mode !== 'edit';
             this.ui.remainingMovesInput.disabled = this.state.mode !== 'edit';
             this.ui.phaseSelect.disabled = this.state.mode !== 'edit';
@@ -664,6 +720,22 @@
             this.ui.redLosses.title = playerTwoLosses.title;
             this.ui.statusText.textContent = this.state.status;
             this.renderSelectionInfo();
+            this.renderVictoryModal();
+            const gameOver = this.isGameOver();
+            if (gameOver) {
+                this.ui.finishMoveButton.disabled = true;
+                this.ui.endMovePhaseButton.disabled = true;
+                this.ui.stepMoveButton.disabled = true;
+                this.ui.resolveShootingButton.disabled = true;
+                this.ui.cancelMoveButton.disabled = true;
+                this.ui.undoMoveButton.disabled = true;
+                this.ui.acknowledgedButton.disabled = true;
+                this.ui.deleteUnitButton.disabled = true;
+                this.ui.destroyUnitButton.disabled = true;
+            } else if (canRemoveSelection) {
+                this.ui.deleteUnitButton.disabled = false;
+                this.ui.destroyUnitButton.disabled = false;
+            }
         }
 
     }
@@ -681,5 +753,6 @@
     unitDeployment.install(HordesPrototype);
     ai.install(HordesPrototype);
     selectionPanel.install(HordesPrototype);
+    victory.install(HordesPrototype);
     return { HordesPrototype };
 }));

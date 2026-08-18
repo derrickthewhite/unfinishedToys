@@ -52,6 +52,8 @@
                     </select>
                 </label>
                 <button id="placeUnitButton" type="button">Place Unit</button>
+                <button id="deleteUnitButton" type="button">Delete Unit</button>
+                <button id="destroyUnitButton" type="button">Destroy Unit</button>
             </div>
             <div class="bar-group action-group">
                 <button id="finishMoveButton" type="button">Finish Move</button>
@@ -107,10 +109,11 @@
                 <header class="setup-header">
                     <p class="setup-kicker">Battle Setup · 1 of 3</p>
                     <h1 id="armyBuilderTitle">Build the Armies</h1>
-                    <p>Choose each player's color, faction, and force. Both armies must total 24 AP.</p>
+                    <p>Choose each player's color, faction, and force. Both armies must total 24 AP, and they cannot share a color or faction.</p>
                 </header>
                 <div id="armyColumns" class="army-columns"></div>
                 <footer class="setup-actions">
+                    <p id="armyIdentityHint" class="army-identity-hint" hidden></p>
                     <button id="acceptArmiesButton" class="setup-primary-action" type="button" disabled>Accept Armies</button>
                 </footer>
             </section>
@@ -168,6 +171,8 @@
             <span>P: toggle form-up preview</span>
             <span>R: toggle corner rotation</span>
             <span>S: step current single-unit move</span>
+            <span>Delete: remove unit (edit mode)</span>
+            <span>Shift+Delete: destroy unit (counts as loss)</span>
         </footer>
     </div>
     <div id="confirmationModal" class="modal-shell" hidden>
@@ -234,6 +239,42 @@
             </section>
         </section>
     </div>
+    <div id="victoryModal" class="modal-shell" hidden>
+        <div id="victoryBackdrop" class="modal-backdrop"></div>
+        <section class="modal-panel victory-panel" aria-labelledby="victoryTitle" aria-modal="true" role="dialog">
+            <header class="modal-header">
+                <div>
+                    <h2 id="victoryTitle">Victory</h2>
+                    <p id="victorySubtitle"></p>
+                </div>
+            </header>
+            <div class="victory-matchup">
+                <article id="victoryWinnerSide" class="victory-side">
+                    <div class="victory-side-portrait">
+                        <img class="victory-side-asset" alt="">
+                    </div>
+                    <p class="victory-side-eyebrow"></p>
+                    <p class="victory-side-color"></p>
+                    <h3 class="victory-side-title"></h3>
+                    <p class="victory-side-losses"></p>
+                </article>
+                <article id="victoryLoserSide" class="victory-side">
+                    <div class="victory-side-portrait">
+                        <img class="victory-side-asset" alt="">
+                    </div>
+                    <p class="victory-side-eyebrow"></p>
+                    <p class="victory-side-color"></p>
+                    <h3 class="victory-side-title"></h3>
+                    <p class="victory-side-losses"></p>
+                </article>
+            </div>
+            <p id="victoryReason" class="victory-reason"></p>
+            <div class="confirmation-actions">
+                <button id="reviewVictoryButton" type="button">Review Board</button>
+                <button id="victoryNewGameButton" class="setup-primary-action" type="button">New Game</button>
+            </div>
+        </section>
+    </div>
     <script src="prototype-data.js"></script>
     <script src="prototype-geometry.js"></script>
     <script src="prototype-rules.js"></script>
@@ -251,6 +292,7 @@
     <script src="prototype-unit-deployment.js"></script>
     <script src="prototype-ai.js"></script>
     <script src="prototype-selection-panel.js"></script>
+    <script src="prototype-victory.js"></script>
     <script src="prototype-app.js"></script>
     <script src="prototype.js"></script>
 </body>

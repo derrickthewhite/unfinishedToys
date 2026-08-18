@@ -171,12 +171,21 @@ Name, class, value, depth, moves (road / good / bad / water), strength vs infant
 ### Prototype Phase Flow
 - When the last move is spent in game mode, the prototype automatically enters `form up`.
 - Form up is automatic: any active-side unit or maintained formation that can rotate to face an enemy and align a front corner to an enemy corner within the configured form-up distance is moved into contact.
+- Opposing battle lines that are nearly parallel but face each other form up unit-by-unit when elements are interleaved; angled approaches still use split form-up for oblique contacts.
 - Units moved by form up leave their pre-form-up positions behind as translucent ghost bases until `Acknowledged` is clicked.
 - `Acknowledged` advances from `form up` to `shooting`, then from `shooting` to `melee`.
 - Shooting is interactive, resolves declared ranged attacks, then waits on an aftermath review before `Acknowledged` advances to melee.
 - Melee is auto-detected, resolves all current combats at once, then leaves the aftermath on screen until `Acknowledged` clears it.
 - Combat aftermath keeps numeric result labels and translucent ghost bases for destroyed participants so the resolved fight can still be reviewed before `Acknowledged` clears it.
 - Numeric combat result labels render above the units during aftermath review, and each resolved fight is logged to the console with combatants, team colors, unit types, modifiers, die rolls, totals, outcome, and the named destruction rule when one applies.
+
+### Victory
+- A side loses when it has lost at least half of its starting army value **and** has lost more AP than the opponent. Starting army value is captured when deployment finishes (or inferred from board, reserve, and losses for saved or edit-mode games).
+- Victory is checked once per turn, after melee is acknowledged and the turn would advance — not after individual shooting or melee resolutions. Losses from both combat phases in the same turn are totaled before the check runs.
+- Reserve and ensorcelled units count toward losses while they remain off the board. Returning a unit from reserve clears its loss entry and can keep a side below the half threshold.
+- If both sides reach half losses with equal AP lost, the battle continues until one side leads on casualties.
+- When victory is declared, a modal names each side by color and faction, shows the most expensive unit on each side as an army portrait (not labeled by unit type), and explains the reason. Additional loss conditions can add new reason ids later.
+- The board remains visible for review after dismissing the modal, but further game actions are blocked until a new game begins.
 
 ### Handle Icons
 - Rotation bubbles are slightly smaller and now show a curved-arrow icon rotated 180 degrees; left-side rank handles mirror that icon.

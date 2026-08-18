@@ -542,6 +542,9 @@
                 this.state.melee = null;
                 this.state.combatResolution = null;
                 this.state.losses = { 'player-1': [], 'player-2': [] };
+                this.captureStartingArmyValues();
+                this.state.victory = null;
+                this.state.victoryModalDismissed = false;
                 this.state.editHistory = [];
                 this.state.placingUnit = false;
                 this.state.marquee = null;

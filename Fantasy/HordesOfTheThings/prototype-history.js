@@ -9,11 +9,24 @@
         return units.map((unit) => ({ ...unit }));
     }
 
-    function createEditSnapshot(units, selectedIds, nextUnitId) {
+    function cloneLosses(losses) {
+        if (!losses) {
+            return null;
+        }
+        const cloned = {};
+        Object.keys(losses).forEach((playerId) => {
+            cloned[playerId] = (losses[playerId] || []).map((entry) => ({ ...entry }));
+        });
+        return cloned;
+    }
+
+    function createEditSnapshot(units, selectedIds, nextUnitId, losses, reserveUnits) {
         return {
             units: cloneUnits(units),
             selectedIds: [...selectedIds],
-            nextUnitId
+            nextUnitId,
+            losses: cloneLosses(losses),
+            reserveUnits: cloneUnits(reserveUnits || [])
         };
     }
 
@@ -21,7 +34,9 @@
         return {
             units: cloneUnits(snapshot.units),
             selectedIds: [...snapshot.selectedIds],
-            nextUnitId: snapshot.nextUnitId
+            nextUnitId: snapshot.nextUnitId,
+            losses: cloneLosses(snapshot.losses),
+            reserveUnits: cloneUnits(snapshot.reserveUnits || [])
         };
     }
 

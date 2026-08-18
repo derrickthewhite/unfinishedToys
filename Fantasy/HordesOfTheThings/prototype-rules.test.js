@@ -982,6 +982,173 @@ test('automatic form up keeps mixed-depth front-aligned units in one formation g
     assert.notEqual(result.units.find((unit) => unit.id === 'b6').x, blueHorde.x);
 });
 
+test('automatic form up pairs interleaved opposing lines unit by unit', () => {
+    const rotation = -0.09026803226928078;
+    const opposingRotation = 3.0878314172698613;
+    const pandaBlade = (id, x, y) => ({
+        id,
+        type: 'Blade',
+        playerId: 'player-1',
+        width: 40,
+        depth: 20,
+        x,
+        y,
+        rotation,
+        moves: { road: 100, good: 50, bad: 50, water: 25 }
+    });
+    const undeadRider = (id, x, y) => ({
+        id,
+        type: 'Riders',
+        playerId: 'player-2',
+        width: 40,
+        depth: 30,
+        x,
+        y,
+        rotation: opposingRotation,
+        moves: { road: 125, good: 125, bad: 50, water: 25 }
+    });
+    const units = [
+        pandaBlade('b0', 58.15, 378.03),
+        pandaBlade('b1', 97.99, 374.42),
+        pandaBlade('b2', 137.83, 370.82),
+        pandaBlade('b3', 177.66, 367.21),
+        {
+            id: 's1',
+            type: 'Spear',
+            playerId: 'player-1',
+            width: 40,
+            depth: 20,
+            x: 217.50,
+            y: 363.61,
+            rotation,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        undeadRider('r1', 97.78, 371.51),
+        undeadRider('r2', 137.72, 369.36),
+        undeadRider('r3', 177.66, 367.21),
+        {
+            id: 'b4',
+            type: 'Blade',
+            playerId: 'player-2',
+            width: 40,
+            depth: 20,
+            x: 257.38,
+            y: 360.05,
+            rotation: 3.0609275625181858,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b5',
+            type: 'Blade',
+            playerId: 'player-2',
+            width: 40,
+            depth: 20,
+            x: 217.51,
+            y: 363.27,
+            rotation: 3.0609275625181858,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        }
+    ];
+    const terrain = { roads: [], features: [] };
+
+    const pandaFormUp = rules.resolveAutomaticFormUp(units, 'player-1', terrain);
+    const afterPanda = pandaFormUp.units;
+    const undeadFormUp = rules.resolveAutomaticFormUp(afterPanda, 'player-2', terrain);
+
+    assert.deepEqual(pandaFormUp.movedUnitIds.sort(), ['b0', 'b1', 'b2', 'b3', 's1']);
+    assert.deepEqual(undeadFormUp.movedUnitIds.sort(), ['b4', 'b5', 'r1', 'r2', 'r3']);
+    const melee = rules.detectMeleeCombats(undeadFormUp.units, terrain);
+    assert.ok(melee.combats.length >= 4);
+    assert.ok(['r1', 'r2', 'r3'].every((id) => undeadFormUp.movedUnitIds.includes(id)));
+});
+
+test('automatic form up keeps rank-dressed units from sprinting past allies to distant enemy contact', () => {
+    const rotation = -0.09078298637430393;
+    const opposingRotation = 3.0609275625181858;
+    const riderRotation = 3.0878314172698613;
+    const pandaBlade = (id, x, y) => ({
+        id,
+        type: 'Blade',
+        playerId: 'player-1',
+        width: 40,
+        depth: 20,
+        x,
+        y,
+        rotation,
+        moves: { road: 100, good: 50, bad: 50, water: 25 }
+    });
+    const units = [
+        pandaBlade('b1', 57.94, 375.14),
+        pandaBlade('b2', 97.89, 372.99),
+        pandaBlade('b3', 137.83, 370.84),
+        pandaBlade('b4', 178.86, 380.40),
+        {
+            id: 's1',
+            type: 'Spear',
+            playerId: 'player-1',
+            width: 40,
+            depth: 20,
+            x: 217.82,
+            y: 367.09,
+            rotation,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'u13',
+            type: 'Blade',
+            playerId: 'player-2',
+            width: 40,
+            depth: 20,
+            x: 257.65,
+            y: 363.47,
+            rotation: opposingRotation,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'u14',
+            type: 'Blade',
+            playerId: 'player-2',
+            width: 40,
+            depth: 20,
+            x: 217.51,
+            y: 363.27,
+            rotation: opposingRotation,
+            moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'u18',
+            type: 'Riders',
+            playerId: 'player-2',
+            width: 40,
+            depth: 30,
+            x: 177.66,
+            y: 367.21,
+            rotation: riderRotation,
+            moves: { road: 125, good: 125, bad: 50, water: 25 }
+        },
+        {
+            id: 'u19',
+            type: 'Riders',
+            playerId: 'player-2',
+            width: 40,
+            depth: 30,
+            x: 136.22,
+            y: 340.88,
+            rotation: riderRotation,
+            moves: { road: 125, good: 125, bad: 50, water: 25 }
+        }
+    ];
+    const terrain = { roads: [], features: [] };
+    const afterPanda = rules.resolveAutomaticFormUp(units, 'player-1', terrain).units;
+    const undeadFormUp = rules.resolveAutomaticFormUp(afterPanda, 'player-2', terrain);
+    const before18 = afterPanda.find((unit) => unit.id === 'u18');
+    const after18 = undeadFormUp.units.find((unit) => unit.id === 'u18');
+    const travel = geometry.distance(before18, after18);
+
+    assert.ok(travel <= data.FORM_UP_DISTANCE + 1, `expected u18 to stay dressed with its ally, but it moved ${travel.toFixed(2)} mm`);
+    assert.ok(undeadFormUp.movedUnitIds.includes('u14') || undeadFormUp.movedUnitIds.includes('u13'));
+});
+
 test('shooters can target enemies whose nearest side lies inside the shooting box', () => {
     const shooter = {
         id: 's1',

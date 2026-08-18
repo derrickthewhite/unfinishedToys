@@ -20,8 +20,37 @@
                 return this.getArmyValue(playerId) === data.ARMY_POINT_TARGET;
             },
 
+            getArmyIdentity(playerId) {
+                const colors = this.getPlayerColors(playerId);
+                const faction = this.getPlayer(playerId)?.faction || '';
+                return {
+                    colorId: this.getPlayer(playerId)?.colorId || 'blue',
+                    colorLabel: colors.label,
+                    faction,
+                    label: faction ? `${colors.label} ${faction}` : colors.label
+                };
+            },
+
+            getArmyIdentityConflict() {
+                const playerOne = this.getArmyIdentity('player-1');
+                const playerTwo = this.getArmyIdentity('player-2');
+                const sameColor = playerOne.colorId === playerTwo.colorId;
+                const sameFaction = Boolean(playerOne.faction) && playerOne.faction === playerTwo.faction;
+                if (sameColor && sameFaction) {
+                    return 'Each army needs its own color and faction.';
+                }
+                if (sameColor) {
+                    return 'Each army needs its own color.';
+                }
+                if (sameFaction) {
+                    return 'Each army needs its own faction.';
+                }
+                return null;
+            },
+
             canAcceptArmies() {
-                return data.PLAYER_IDS.every((playerId) => this.isArmyValid(playerId));
+                return !this.getArmyIdentityConflict()
+                    && data.PLAYER_IDS.every((playerId) => this.isArmyValid(playerId));
             },
 
             getAllowedUnitTypes(playerId) {
@@ -102,9 +131,11 @@
             },
 
             randomizeArmyPresentation(playerId, random = Math.random) {
-                const colorIds = Object.keys(data.PLAYER_COLORS);
-                this.state.players[playerId].colorId = colorIds[Math.floor(random() * colorIds.length)];
-                this.state.players[playerId].faction = data.FACTIONS[Math.floor(random() * data.FACTIONS.length)];
+                const opponent = this.getPlayer(this.getOpponentPlayerId(playerId));
+                const colorIds = Object.keys(data.PLAYER_COLORS).filter((colorId) => colorId !== opponent?.colorId);
+                const factions = data.FACTIONS.filter((faction) => faction !== opponent?.faction);
+                this.state.players[playerId].colorId = colorIds[Math.floor(random() * colorIds.length)] || this.state.players[playerId].colorId;
+                this.state.players[playerId].faction = factions[Math.floor(random() * factions.length)] || this.state.players[playerId].faction;
                 this.syncUiFromState();
             },
 
@@ -122,11 +153,12 @@
                     const colors = this.getPlayerColors(playerId);
                     const value = this.getArmyValue(playerId);
                     const valueClass = value === data.ARMY_POINT_TARGET ? 'is-exact' : (value > data.ARMY_POINT_TARGET ? 'is-over' : 'is-under');
+                    const opponent = this.getPlayer(this.getOpponentPlayerId(playerId));
                     const colorOptions = Object.entries(data.PLAYER_COLORS).map(([colorId, color]) => (
-                        `<option value="${colorId}"${colorId === player.colorId ? ' selected' : ''}>${color.label}</option>`
+                        `<option value="${colorId}"${colorId === player.colorId ? ' selected' : ''}${colorId === opponent?.colorId ? ' disabled' : ''}>${color.label}</option>`
                     )).join('');
                     const factionOptions = data.FACTIONS.map((faction) => (
-                        `<option value="${faction}"${faction === player.faction ? ' selected' : ''}>${faction}</option>`
+                        `<option value="${faction}"${faction === player.faction ? ' selected' : ''}${faction === opponent?.faction ? ' disabled' : ''}>${faction}</option>`
                     )).join('');
                     const rows = this.getAllowedUnitTypes(playerId).map((type) => {
                         const unit = data.UNIT_TYPES[type];
