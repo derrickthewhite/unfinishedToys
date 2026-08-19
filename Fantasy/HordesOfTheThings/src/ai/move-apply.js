@@ -70,10 +70,87 @@
     }
 
 
-    function findBestAutoMove(context) {
-        const candidates = collectExtendedMoveCandidates(context);
-        const forwardCache = new Map();
+    function improvesBadTerrain(units, scored, terrain) {
+        return scored.unitIds.some((unitId) => {
+            const before = units.find((unit) => unit.id === unitId);
+            const after = scored.afterUnits.find((unit) => unit.id === unitId);
+            if (!before || !after || data.UNIT_TYPES[before.type]?.combat?.ignoresBadGoingPenalty) {
+                return false;
+            }
+            const beforeTerrain = rules.sampleUnitTerrain(before, terrain);
+            const afterTerrain = rules.sampleUnitTerrain(after, terrain);
+            if (beforeTerrain.has('water') && !afterTerrain.has('water')) {
+                return true;
+            }
+            const beforeSeverity = rules.severityFromTerrain(beforeTerrain);
+            const afterSeverity = rules.severityFromTerrain(afterTerrain);
+            return beforeSeverity >= rules.TERRAIN_SEVERITY.swamp && afterSeverity < beforeSeverity;
+        });
+    }
+
+
+    function clearsWaterExposure(units, scored, terrain) {
+        return scored.unitIds.some((unitId) => {
+            const before = units.find((unit) => unit.id === unitId);
+            const after = scored.afterUnits.find((unit) => unit.id === unitId);
+            if (!before || !after) {
+                return false;
+            }
+            const beforeTerrain = rules.sampleUnitTerrain(before, terrain);
+            const afterTerrain = rules.sampleUnitTerrain(after, terrain);
+            return beforeTerrain.has('water') && !afterTerrain.has('water');
+        });
+    }
+
+
+    function hasUnmovedUnitInWater(units, activePlayerId, terrain, getPlayerId) {
+        return units.some((unit) => {
+            if (getPlayerId(unit) !== activePlayerId || unit.movedThisTurn || unit.inReserve) {
+                return false;
+            }
+            return rules.sampleUnitTerrain(unit, terrain).has('water');
+        });
+    }
+
+
+    function resolveBestCandidate(context, best, bestTerrainEscape, bestWaterClear, bestReserveDeploy, bestEnsorcelledReturn) {
+        if (bestEnsorcelledReturn && bestEnsorcelledReturn.score >= MIN_BENEFIT) {
+            return bestEnsorcelledReturn;
+        }
+        if (best && best.score >= MIN_BENEFIT) {
+            if (hasUnmovedUnitInWater(context.units, context.activePlayerId, context.terrain, context.getPlayerId)
+                && bestWaterClear
+                && bestWaterClear.score > 0
+                && !clearsWaterExposure(context.units, best, context.terrain)) {
+                return bestWaterClear;
+            }
+            return best;
+        }
+        if (bestReserveDeploy && bestReserveDeploy.score >= MIN_BENEFIT) {
+            return bestReserveDeploy;
+        }
+        if (bestTerrainEscape && bestTerrainEscape.score > 0) {
+            return bestTerrainEscape;
+        }
+        if (bestWaterClear) {
+            return bestWaterClear;
+        }
+        if (bestReserveDeploy && bestReserveDeploy.score > 0) {
+            return bestReserveDeploy;
+        }
+        if (bestEnsorcelledReturn && bestEnsorcelledReturn.score > 0) {
+            return bestEnsorcelledReturn;
+        }
+        return null;
+    }
+
+
+    function pickBestCandidate(context, candidates, forwardCache) {
         let best = null;
+        let bestTerrainEscape = null;
+        let bestWaterClear = null;
+        let bestReserveDeploy = null;
+        let bestEnsorcelledReturn = null;
 
         candidates.forEach((candidate) => {
             const scored = simulateMoveCandidate(context, candidate, forwardCache);
@@ -83,12 +160,32 @@
             if (!best || scored.score > best.score) {
                 best = scored;
             }
+            if (candidate.moveKind === 'reserve-deploy'
+                && (!bestReserveDeploy || scored.score > bestReserveDeploy.score)) {
+                bestReserveDeploy = scored;
+            }
+            if (candidate.moveKind === 'ensorcelled-return'
+                && (!bestEnsorcelledReturn || scored.score > bestEnsorcelledReturn.score)) {
+                bestEnsorcelledReturn = scored;
+            }
+            if (improvesBadTerrain(context.units, scored, context.terrain)
+                && (!bestTerrainEscape || scored.score > bestTerrainEscape.score)) {
+                bestTerrainEscape = scored;
+            }
+            if (clearsWaterExposure(context.units, scored, context.terrain)
+                && (!bestWaterClear || scored.score > bestWaterClear.score)) {
+                bestWaterClear = scored;
+            }
         });
 
-        if (!best || best.score < MIN_BENEFIT) {
-            return null;
-        }
-        return best;
+        return resolveBestCandidate(context, best, bestTerrainEscape, bestWaterClear, bestReserveDeploy, bestEnsorcelledReturn);
+    }
+
+
+    function findBestAutoMove(context) {
+        const candidates = collectExtendedMoveCandidates(context);
+        const forwardCache = new Map();
+        return pickBestCandidate(context, candidates, forwardCache);
     }
 
 
@@ -115,6 +212,10 @@
         const candidates = collectExtendedMoveCandidates(context);
         const forwardCache = new Map();
         let best = null;
+        let bestTerrainEscape = null;
+        let bestWaterClear = null;
+        let bestReserveDeploy = null;
+        let bestEnsorcelledReturn = null;
 
         onProgress?.({
             phase: 'searching',
@@ -146,8 +247,26 @@
             });
 
             const scored = simulateMoveCandidate(context, candidate, forwardCache);
-            if (scored && (!best || scored.score > best.score)) {
-                best = scored;
+            if (scored) {
+                if (!best || scored.score > best.score) {
+                    best = scored;
+                }
+                if (candidate.moveKind === 'reserve-deploy'
+                    && (!bestReserveDeploy || scored.score > bestReserveDeploy.score)) {
+                    bestReserveDeploy = scored;
+                }
+                if (candidate.moveKind === 'ensorcelled-return'
+                    && (!bestEnsorcelledReturn || scored.score > bestEnsorcelledReturn.score)) {
+                    bestEnsorcelledReturn = scored;
+                }
+                if (improvesBadTerrain(context.units, scored, context.terrain)
+                    && (!bestTerrainEscape || scored.score > bestTerrainEscape.score)) {
+                    bestTerrainEscape = scored;
+                }
+                if (clearsWaterExposure(context.units, scored, context.terrain)
+                    && (!bestWaterClear || scored.score > bestWaterClear.score)) {
+                    bestWaterClear = scored;
+                }
             }
 
             if (index % yieldEvery === yieldEvery - 1 || index === candidates.length - 1) {
@@ -158,10 +277,15 @@
             }
         }
 
-        if (!best || best.score < MIN_BENEFIT) {
-            return { cancelled: false, suggestion: null };
-        }
-        return { cancelled: false, suggestion: best };
+        const suggestion = resolveBestCandidate(
+            context,
+            best,
+            bestTerrainEscape,
+            bestWaterClear,
+            bestReserveDeploy,
+            bestEnsorcelledReturn
+        );
+        return { cancelled: false, suggestion };
     }
 
 
@@ -205,8 +329,14 @@
             const degrees = Math.round(((suggestion.moveParam || 0) * 180) / Math.PI);
             return `wheel ${degrees}° ${moveKind === 'wheel-left' ? 'left' : 'right'}`;
         }
+        if (moveKind === 'sidestep-left' || moveKind === 'sidestep-right') {
+            return `sidestep ${Math.round(suggestion.distance || 0)} mm ${moveKind === 'sidestep-left' ? 'left' : 'right'}`;
+        }
         if (moveKind === 'reserve-deploy') {
             return 'reserve deploy';
+        }
+        if (moveKind === 'ensorcelled-return') {
+            return 'ensorcelled return';
         }
         return moveKind;
     }
@@ -226,6 +356,8 @@
             formatBreakdownValue('stack', suggestion.breakdown.stackBreak),
             formatBreakdownValue('recoil', suggestion.breakdown.recoilDeath),
             formatBreakdownValue('pinch', suggestion.breakdown.pinchRelief),
+            formatBreakdownValue('reserve', suggestion.breakdown.reserveEntry),
+            formatBreakdownValue('ensorcel', suggestion.breakdown.ensorcelledReturn),
             formatBreakdownValue('advance', suggestion.breakdown.advance),
             formatBreakdownValue('cohesion', suggestion.breakdown.cohesion),
             formatBreakdownValue('terrain', suggestion.breakdown.terrain)
@@ -307,11 +439,29 @@
                 if (!suggestion) {
                     return false;
                 }
-                if (suggestion.moveKind === 'reserve-deploy') {
+                if (suggestion.moveKind === 'reserve-deploy' || suggestion.moveKind === 'ensorcelled-return') {
                     const reserveUnit = this.getReserveUnits().find((entry) => entry.id === suggestion.reserveUnitId);
-                    if (!reserveUnit || !this.beginReserveDeploy(reserveUnit, suggestion.moveParam)) {
+                    const deployX = suggestion.moveKind === 'ensorcelled-return' && suggestion.localReturn
+                        ? this.getDefaultReserveDeployWorldX()
+                        : suggestion.moveParam;
+                    if (!reserveUnit || !this.beginReserveDeploy(reserveUnit, deployX)) {
                         this.updateStatus('Auto Move: reserve deployment could not be started.');
                         return false;
+                    }
+                    if (suggestion.localReturn) {
+                        const trialUnit = suggestion.afterUnits.find((entry) => entry.id === suggestion.unitIds[0]);
+                        const liveUnit = this.getUnitById(suggestion.unitIds[0]);
+                        if (trialUnit && liveUnit) {
+                            liveUnit.x = trialUnit.x;
+                            liveUnit.y = trialUnit.y;
+                            liveUnit.rotation = trialUnit.rotation;
+                        }
+                        this.evaluateDraft();
+                        if (this.state.draft?.invalidIds?.size > 0) {
+                            this.cancelDraft(false);
+                            this.updateStatus('Auto Move: the suggested ensorcelled return could not be applied.');
+                            return false;
+                        }
                     }
                     this.finishDraft();
                     this.updateStatus(formatAutoMoveStatus(suggestion, this.state.units));

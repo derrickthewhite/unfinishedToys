@@ -19,6 +19,7 @@
         getSideByName,
         sideMidpoint,
         cloneUnit,
+        isEnsorcellableType,
         buildEnsorcelledUnit
     } = core;
 
@@ -47,11 +48,6 @@
 
     function isMagicianUnit(unit) {
         return Boolean(unit && unit.type === 'Magician');
-    }
-
-
-    function isEnsorcellableType(unit) {
-        return Boolean(unit && data.ENSORCELLABLE_TYPES.includes(unit.type));
     }
 
 

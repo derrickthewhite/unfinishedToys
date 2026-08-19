@@ -30,7 +30,10 @@
         advance: 0.6,
         splitEfficiency: 0.5,
         cohesion: 2,
-        terrain: 1,
+        terrain: 1.5,
+        formationApproach: 1.2,
+        lateralReposition: 1,
+        ensorcelledReturn: 1,
         stationaryShooter: 2,
         rangeBand: 1.5,
         rangedOpportunity: 1.5
@@ -49,6 +52,22 @@
     const DRESS_JOIN_BONUS = 0.6;
 
     const DRESS_PARTNER_SCALE = 0.2;
+
+    const FORMATION_APPROACH_SCALE = 0.8;
+
+    const LATERAL_REPOSITION_BONUS = 0.2;
+
+    const STUCK_FORWARD_THRESHOLD = 0.25;
+
+    const STUCK_FORWARD_SIDESTEP_BONUS = 0.2;
+
+    const ENSORCELLED_RETURN_VALUE_SCALE = 2.5;
+
+    const ENSORCELLED_SIX_PIP_BONUS = 6;
+
+    const WATER_ESCAPE_BONUS = 1.2;
+
+    const BAD_TERRAIN_ESCAPE_SCALE = 0.75;
 
     const RECOIL_DEATH_PENALTY = 1.25;
 
@@ -180,8 +199,9 @@
         const beforePreviews = getFormUpPreviewCombats(beforeUnits, activePlayerId, terrain);
         const afterPreviews = getFormUpPreviewCombats(afterUnits, activePlayerId, terrain);
         const beforeByFingerprint = new Map(beforePreviews.map((preview) => [getCombatFingerprint(preview), preview]));
+        const sacrificingShooterIds = getSacrificingShooterIds(beforeUnits, movedUnitIds, terrain, activePlayerId);
 
-        const fight = getCombatAdvantageForPlayer(afterPreviews, activePlayerId)
+        let fight = getCombatAdvantageForPlayer(afterPreviews, activePlayerId)
             - getCombatAdvantageForPlayer(beforePreviews, activePlayerId);
 
         let matchup = 0;
@@ -196,15 +216,19 @@
             if (!afterSides) {
                 return;
             }
-
-            modifiers += getModifierQuality(afterSides.active);
-            const afterMatchup = data.getDeploymentMatchupScore(
-                afterSides.active.primaryType,
-                afterSides.opponent.primaryType
-            ) * MATCHUP_SCALE;
+            const sacrificesLiveShot = previewInvolvesSacrificingShooter(
+                afterPreview,
+                sacrificingShooterIds,
+                activePlayerId
+            );
 
             const beforePreview = beforeByFingerprint.get(getCombatFingerprint(afterPreview));
             if (beforePreview) {
+                modifiers += getModifierQuality(afterSides.active);
+                const afterMatchup = data.getDeploymentMatchupScore(
+                    afterSides.active.primaryType,
+                    afterSides.opponent.primaryType
+                ) * MATCHUP_SCALE;
                 const beforeSides = getActivePreviewSide(beforePreview, activePlayerId);
                 if (beforeSides) {
                     modifiers -= getModifierQuality(beforeSides.active);
@@ -223,7 +247,16 @@
                 return;
             }
 
-            matchup += afterMatchup;
+            if (sacrificesLiveShot) {
+                fight -= getCombatAdvantage(afterSides.active, afterSides.opponent);
+                return;
+            }
+
+            modifiers += getModifierQuality(afterSides.active);
+            matchup += data.getDeploymentMatchupScore(
+                afterSides.active.primaryType,
+                afterSides.opponent.primaryType
+            ) * MATCHUP_SCALE;
             newContact += NEW_CONTACT_BONUS;
             if (getCombatAdvantage(afterSides.active, afterSides.opponent) > 0) {
                 newContact += FAVORABLE_NEW_CONTACT_BONUS;
@@ -261,6 +294,80 @@
             }
         });
         return partners;
+    }
+
+
+    function getNearestSameTypeFriendlyDistance(units, unitId, activePlayerId, getPlayerId, movedUnitIds) {
+        const unit = units.find((entry) => entry.id === unitId);
+        if (!unit) {
+            return Infinity;
+        }
+        const movedSet = new Set(movedUnitIds);
+        const center = geometry.getUnitCenter(unit);
+        let nearest = Infinity;
+        units.forEach((entry) => {
+            if (getPlayerId(entry) !== activePlayerId || entry.inReserve || entry.id === unitId) {
+                return;
+            }
+            if (entry.type !== unit.type || movedSet.has(entry.id)) {
+                return;
+            }
+            if (Math.abs(geometry.normalizeAngle(entry.rotation - unit.rotation)) > 0.12) {
+                return;
+            }
+            nearest = Math.min(nearest, geometry.distance(center, geometry.getUnitCenter(entry)));
+        });
+        return nearest;
+    }
+
+
+    function scoreFormationApproach(beforeUnits, afterUnits, activePlayerId, getPlayerId, movedUnitIds) {
+        if (movedUnitIds.length === 0) {
+            return 0;
+        }
+        const gain = movedUnitIds.reduce((sum, unitId) => {
+            const beforeDistance = getNearestSameTypeFriendlyDistance(
+                beforeUnits,
+                unitId,
+                activePlayerId,
+                getPlayerId,
+                movedUnitIds
+            );
+            const afterDistance = getNearestSameTypeFriendlyDistance(
+                afterUnits,
+                unitId,
+                activePlayerId,
+                getPlayerId,
+                movedUnitIds
+            );
+            if (!Number.isFinite(beforeDistance) || !Number.isFinite(afterDistance)) {
+                return sum;
+            }
+            const delta = beforeDistance - afterDistance;
+            if (delta <= data.FORMATION_GAP_TOLERANCE) {
+                return sum;
+            }
+            return sum + (delta / 100) * FORMATION_APPROACH_SCALE;
+        }, 0);
+        return gain / movedUnitIds.length;
+    }
+
+
+    function scoreLateralReposition(moveKind, breakdown, forwardScore = null) {
+        if (!moveKind || !moveKind.startsWith('sidestep')) {
+            return 0;
+        }
+        if (breakdown.fight < 0 || breakdown.newContact < 0) {
+            return 0;
+        }
+        if (breakdown.fight !== 0 || breakdown.newContact > 0) {
+            return 0;
+        }
+        let bonus = LATERAL_REPOSITION_BONUS;
+        if (forwardScore !== null && forwardScore < STUCK_FORWARD_THRESHOLD) {
+            bonus += STUCK_FORWARD_SIDESTEP_BONUS;
+        }
+        return bonus;
     }
 
 
@@ -316,17 +423,32 @@
 
         const beforePreviews = getFormUpPreviewCombats(beforeUnits, activePlayerId, terrain);
         const afterPreviews = getFormUpPreviewCombats(afterUnits, activePlayerId, terrain);
+        const sacrificingShooterIds = getSacrificingShooterIds(beforeUnits, movedUnitIds, terrain, activePlayerId);
         const beforeStacked = sumStackedModifiers(beforePreviews, activePlayerId, movedUnitIds);
         const afterStacked = sumStackedModifiers(afterPreviews, activePlayerId, movedUnitIds);
         const beforeCombatUnits = sumActiveCombatUnits(beforePreviews, activePlayerId, movedUnitIds);
         const afterCombatUnits = sumActiveCombatUnits(afterPreviews, activePlayerId, movedUnitIds);
+        const sacrificingNewCombatUnits = sacrificingShooterIds.length === 0
+            ? 0
+            : afterPreviews.reduce((sum, preview) => {
+                if (!previewInvolvesSacrificingShooter(preview, sacrificingShooterIds, activePlayerId)) {
+                    return sum;
+                }
+                const fingerprint = getCombatFingerprint(preview);
+                if (beforePreviews.some((beforePreview) => getCombatFingerprint(beforePreview) === fingerprint)) {
+                    return sum;
+                }
+                const sides = getActivePreviewSide(preview, activePlayerId);
+                return sum + (sides ? sides.active.unitIds.length : 0);
+            }, 0);
 
         let formationSize = 0;
         if (afterStacked > beforeStacked) {
             formationSize += afterStacked - beforeStacked;
         }
-        if (afterCombatUnits > beforeCombatUnits && afterStacked >= beforeStacked) {
-            formationSize += (afterCombatUnits - beforeCombatUnits) * 0.15;
+        const combatUnitGain = afterCombatUnits - beforeCombatUnits - sacrificingNewCombatUnits;
+        if (combatUnitGain > 0 && afterStacked >= beforeStacked) {
+            formationSize += combatUnitGain * 0.15;
         }
 
         let stackBreak = 0;
@@ -372,6 +494,30 @@
             !other.inReserve
             && rules.isValidShootingAttack(unit, other, allUnits, terrain, activePlayerId)
         ));
+    }
+
+
+    function unitSacrificesLiveRangedShot(unit, beforeUnits, terrain, activePlayerId) {
+        if (!unit || !unit.ranged) {
+            return false;
+        }
+        if (!unit.ranged.requiresStationary && !unit.ranged.requiresOwnTurn) {
+            return false;
+        }
+        return hasValidShootingTarget(unit, beforeUnits, terrain, activePlayerId);
+    }
+
+
+    function getSacrificingShooterIds(beforeUnits, movedUnitIds, terrain, activePlayerId) {
+        return movedUnitIds.filter((unitId) => {
+            const unit = beforeUnits.find((entry) => entry.id === unitId);
+            return unitSacrificesLiveRangedShot(unit, beforeUnits, terrain, activePlayerId);
+        });
+    }
+
+
+    function previewInvolvesSacrificingShooter(preview, sacrificingIds, activePlayerId) {
+        return sacrificingIds.some((unitId) => combatInvolvesMovedUnits(preview, [unitId], activePlayerId));
     }
 
 
@@ -563,6 +709,22 @@
     }
 
 
+    function scoreEnsorcelledReturn(ensorcelledUnit, returnCost, remainingMoves) {
+        if (!ensorcelledUnit || ensorcelledUnit.ensorcelledByUnitId === undefined) {
+            return 0;
+        }
+        const template = data.UNIT_TYPES[ensorcelledUnit.type];
+        const unitValue = ensorcelledUnit.value ?? template?.value ?? 1;
+        let bonus = unitValue * ENSORCELLED_RETURN_VALUE_SCALE;
+        if (returnCost >= data.ENSORCELLED_RETURN_MOVE_COST && remainingMoves >= returnCost) {
+            bonus += ENSORCELLED_SIX_PIP_BONUS;
+        } else if (returnCost === 0) {
+            bonus += 3;
+        }
+        return bonus;
+    }
+
+
     function scoreCandidate(beforeUnits, afterUnits, activePlayerId, enemyPlayerId, getPlayerId, movedUnitIds, terrain, opts = {}) {
         const fightQuality = scoreFightQuality(
             beforeUnits,
@@ -606,8 +768,28 @@
                 beforeUnits, movedUnitIds,
                 activePlayerId, enemyPlayerId, getPlayerId, terrain
             ),
-            cohesion: scoreCohesion(beforeUnits, afterUnits, activePlayerId, getPlayerId),
-            terrain: scoreTerrain(beforeUnits, afterUnits, movedUnitIds, terrain)
+            cohesion: opts.moveKind === 'reserve-deploy' || opts.moveKind === 'ensorcelled-return'
+                ? 0
+                : scoreCohesion(beforeUnits, afterUnits, activePlayerId, getPlayerId),
+            terrain: scoreTerrain(beforeUnits, afterUnits, movedUnitIds, terrain),
+            formationApproach: scoreFormationApproach(
+                beforeUnits,
+                afterUnits,
+                activePlayerId,
+                getPlayerId,
+                movedUnitIds
+            ),
+            lateralReposition: scoreLateralReposition(opts.moveKind, {
+                fight: fightQuality.fight,
+                newContact: fightQuality.newContact
+            }, opts.forwardScore ?? null),
+            ensorcelledReturn: opts.moveKind === 'ensorcelled-return'
+                ? scoreEnsorcelledReturn(
+                    opts.ensorcelledUnit,
+                    opts.ensorcelledReturnCost ?? 0,
+                    opts.remainingMoves ?? 0
+                )
+                : 0
         };
         const total = (
             breakdown.fight * AUTO_MOVE_WEIGHTS.fight
@@ -627,6 +809,9 @@
             + breakdown.rangedOpportunity * AUTO_MOVE_WEIGHTS.rangedOpportunity
             + breakdown.cohesion * AUTO_MOVE_WEIGHTS.cohesion
             + breakdown.terrain * AUTO_MOVE_WEIGHTS.terrain
+            + breakdown.formationApproach * AUTO_MOVE_WEIGHTS.formationApproach
+            + breakdown.lateralReposition * AUTO_MOVE_WEIGHTS.lateralReposition
+            + breakdown.ensorcelledReturn * AUTO_MOVE_WEIGHTS.ensorcelledReturn
         );
         return { total, breakdown };
     }
@@ -662,7 +847,13 @@
         movedUnitIds.forEach((unitId) => {
             const before = beforeUnits.find((unit) => unit.id === unitId);
             const after = afterUnits.find((unit) => unit.id === unitId);
-            if (!before || !after) {
+            if (!after) {
+                return;
+            }
+            if (!before) {
+                const afterDistance = geometry.distance(geometry.getUnitCenter(after), enemyCentroid);
+                gains += (data.BOARD_SIZE - afterDistance) / 100;
+                counted += 1;
                 return;
             }
             const beforeDistance = geometry.distance(geometry.getUnitCenter(before), enemyCentroid);
@@ -710,9 +901,20 @@
                 return sum;
             }
             const prefersBad = Boolean(data.UNIT_TYPES[before.type]?.combat?.ignoresBadGoingPenalty);
-            const beforeSeverity = rules.severityFromTerrain(rules.sampleUnitTerrain(before, terrain));
-            const afterSeverity = rules.severityFromTerrain(rules.sampleUnitTerrain(after, terrain));
-            return sum + (prefersBad ? (afterSeverity - beforeSeverity) * 0.5 : (beforeSeverity - afterSeverity));
+            const beforeTerrain = rules.sampleUnitTerrain(before, terrain);
+            const afterTerrain = rules.sampleUnitTerrain(after, terrain);
+            const beforeSeverity = rules.severityFromTerrain(beforeTerrain);
+            const afterSeverity = rules.severityFromTerrain(afterTerrain);
+            let unitDelta = prefersBad
+                ? (afterSeverity - beforeSeverity) * 0.5
+                : (beforeSeverity - afterSeverity);
+            if (!prefersBad && beforeSeverity > rules.TERRAIN_SEVERITY.good && unitDelta > 0) {
+                unitDelta *= 1 + ((beforeSeverity - rules.TERRAIN_SEVERITY.good) * BAD_TERRAIN_ESCAPE_SCALE);
+            }
+            if (!prefersBad && beforeTerrain.has('water') && !afterTerrain.has('water')) {
+                unitDelta += WATER_ESCAPE_BONUS;
+            }
+            return sum + unitDelta;
         }, 0);
         return delta / movedUnitIds.length;
     }
@@ -729,6 +931,7 @@
         scoreStationaryShooter,
         scoreRangeBand,
         scoreRangedOpportunity,
+        scoreEnsorcelledReturn,
         formatBreakdownValue,
         getFormUpPreviewCombats,
         getActivePreviewSide,

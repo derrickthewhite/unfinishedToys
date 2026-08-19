@@ -18,6 +18,7 @@
         sideMidpoint,
         hasMeaningfulSharedEdge,
         cloneUnit,
+        isEnsorcellableType,
         buildEnsorcelledUnit,
         rotateUnitInPlace
     } = core;
@@ -737,19 +738,27 @@
     }
 
 
-    function previewMeleeCombats(units, terrain) {
+    function buildPostFacingCombatSetup(units) {
         const combatSetup = detectMeleeCombats(units);
         const facingPlans = buildCombatFacingPlans(combatSetup);
-        const adjustedCombats = combatSetup.combats.map((combat) => ({
-            ...combat,
-            edgesOnLeft: facingPlans.has(combat.leftCombatantId) ? ['front'] : combat.edgesOnLeft,
-            edgesOnRight: facingPlans.has(combat.rightCombatantId) ? ['front'] : combat.edgesOnRight
-        }));
         const facedUnits = applyCombatFacing(units, combatSetup, facingPlans);
-        const combatantsById = new Map(buildMeleeCombatants(facedUnits).map((combatant) => [combatant.id, combatant]));
-        const combatants = [...combatantsById.values()];
-        const fightingCombatantIds = new Set(adjustedCombats.flatMap((combat) => [combat.leftCombatantId, combat.rightCombatantId]));
-        return adjustedCombats.map((combat) => {
+        const postFacingSetup = detectMeleeCombats(facedUnits);
+        const combatantsById = new Map(postFacingSetup.combatants.map((combatant) => [combatant.id, combatant]));
+        const fightingCombatantIds = new Set(postFacingSetup.combats.flatMap((combat) => [combat.leftCombatantId, combat.rightCombatantId]));
+        return {
+            facedUnits,
+            combats: postFacingSetup.combats,
+            combatants: postFacingSetup.combatants,
+            combatantsById,
+            fightingCombatantIds,
+            participantIds: postFacingSetup.participantIds
+        };
+    }
+
+
+    function previewMeleeCombats(units, terrain) {
+        const { combats, combatants, combatantsById, fightingCombatantIds } = buildPostFacingCombatSetup(units);
+        return combats.map((combat) => {
             const leftCombatant = combatantsById.get(combat.leftCombatantId);
             const rightCombatant = combatantsById.get(combat.rightCombatantId);
             const left = buildMeleeCombatSide(
@@ -757,7 +766,7 @@
                 rightCombatant,
                 combat.edgesOnLeft,
                 'attacker',
-                adjustedCombats,
+                combats,
                 combatants,
                 fightingCombatantIds,
                 terrain
@@ -767,7 +776,7 @@
                 leftCombatant,
                 combat.edgesOnRight,
                 'defender',
-                adjustedCombats,
+                combats,
                 combatants,
                 fightingCombatantIds,
                 terrain
@@ -783,16 +792,7 @@
 
 
     function resolveMelee(units, terrain, rollDie) {
-        const combatSetup = detectMeleeCombats(units);
-        const facingPlans = buildCombatFacingPlans(combatSetup);
-        const adjustedCombats = combatSetup.combats.map((combat) => ({
-            ...combat,
-            edgesOnLeft: facingPlans.has(combat.leftCombatantId) ? ['front'] : combat.edgesOnLeft,
-            edgesOnRight: facingPlans.has(combat.rightCombatantId) ? ['front'] : combat.edgesOnRight
-        }));
-        const mutableStartingUnits = applyCombatFacing(units, combatSetup, facingPlans);
-        const combatantsById = new Map(buildMeleeCombatants(mutableStartingUnits).map((combatant) => [combatant.id, combatant]));
-        const fightingCombatantIds = new Set(adjustedCombats.flatMap((combat) => [combat.leftCombatantId, combat.rightCombatantId]));
+        const { facedUnits: mutableStartingUnits, combats: adjustedCombats, combatantsById, fightingCombatantIds, participantIds } = buildPostFacingCombatSetup(units);
         const results = [];
         const recoilDestructions = [];
 
@@ -956,7 +956,7 @@
             recoilDestructions,
             combats: adjustedCombats,
             combatants: [...combatantsById.values()],
-            participantIds: combatSetup.participantIds
+            participantIds
         };
     }
 

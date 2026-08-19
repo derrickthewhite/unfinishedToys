@@ -63,6 +63,11 @@
     }
 
 
+    function isEnsorcellableType(unit) {
+        return Boolean(unit && data.ENSORCELLABLE_TYPES.includes(unit.type));
+    }
+
+
     function buildEnsorcelledUnit(unit, ensorcelledByUnitId) {
         return {
             ...cloneUnit(unit),
@@ -117,6 +122,7 @@
         sideMidpoint,
         hasMeaningfulSharedEdge,
         cloneUnit,
+        isEnsorcellableType,
         buildEnsorcelledUnit,
         translateUnit,
         rotateUnitInPlace,

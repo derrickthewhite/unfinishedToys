@@ -193,6 +193,7 @@ test('computer move applies a draft in an all-computer match', async () => {
     assert.equal(result, 'moved');
     assert.equal(units[2].movedThisTurn, true);
     assert.ok(units[2].y < startY);
+    app.resetControllerRuntime();
 });
 
 test('computer move with no useful action ends the move phase', async () => {
@@ -215,6 +216,7 @@ test('computer move with no useful action ends the move phase', async () => {
 
     app.endMovePhase();
     assert.notEqual(app.state.phase, 'move');
+    app.resetControllerRuntime();
 });
 
 test('driver stays idle when the active side is local', async () => {

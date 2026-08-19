@@ -284,6 +284,117 @@ test('collectExtendedMoveCandidates includes wheel and reserve redeploy options'
     assert.ok(candidates.some((candidate) => candidate.moveKind === 'reserve-deploy'));
 });
 
+test('collectExtendedMoveCandidates skips wheel angles beyond the legal maximum', () => {
+    const blade = createBlade('u1', 20, 20);
+    const blocking = createBlade('u2', 60, 20);
+    const candidates = moveAi.collectExtendedMoveCandidates({
+        units: [blade, blocking],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 2,
+        getPlayerId
+    });
+    const wheelAngles = candidates
+        .filter((candidate) => candidate.unitIds[0] === 'u1' && candidate.moveKind === 'wheel-right')
+        .map((candidate) => Math.round(((candidate.moveParam || 0) * 180) / Math.PI));
+    assert.ok(wheelAngles.length > 0, 'expected at least one legal wheel-right candidate');
+    assert.ok(wheelAngles.every((degrees) => degrees <= 45));
+    assert.equal(wheelAngles.includes(45), false, 'expected 45° wheel to be omitted when blocked early');
+});
+
+test('collectExtendedMoveCandidates includes half forward for typical units', () => {
+    const blade = createBlade('u1', 100, 400);
+    const candidates = moveAi.collectExtendedMoveCandidates({
+        units: [blade],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 2,
+        getPlayerId
+    });
+    assert.ok(candidates.some((candidate) => (
+        candidate.unitIds[0] === 'u1'
+        && candidate.moveKind === 'forward'
+        && candidate.moveParam === 0.5
+    )));
+    assert.equal(candidates.filter((candidate) => (
+        candidate.unitIds[0] === 'u1' && candidate.moveKind === 'forward' && candidate.moveParam === 0.25
+    )).length, 0);
+});
+
+test('collectExtendedMoveCandidates includes extra partial forward fractions for Flyers', () => {
+    const flyer = {
+        id: 'f1',
+        type: 'Flyers',
+        playerId: 'player-1',
+        width: 40,
+        depth: 30,
+        x: 100,
+        y: 400,
+        rotation: 0,
+        movedThisTurn: false,
+        troopClass: 'mounted',
+        moves: { road: 1200, good: 1200, bad: 1200, water: 1200 },
+        ranged: null,
+        value: 2,
+        strength: { infantry: 2, mounted: 2 },
+        combat: { ignoresBadGoingPenalty: false },
+        movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 }
+    };
+    const fractions = moveAi.collectExtendedMoveCandidates({
+        units: [flyer],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 2,
+        getPlayerId
+    })
+        .filter((candidate) => candidate.unitIds[0] === 'f1' && candidate.moveKind === 'forward' && candidate.moveParam !== null)
+        .map((candidate) => candidate.moveParam)
+        .sort();
+    assert.deepEqual(fractions, [0.25, 0.5, 0.75]);
+});
+
+test('collectExtendedMoveCandidates includes partial forward fractions for fast Magicians', () => {
+    const mag = createMagician('m1', 100, 400);
+    const fractions = moveAi.collectExtendedMoveCandidates({
+        units: [mag],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 4,
+        getPlayerId
+    })
+        .filter((candidate) => candidate.unitIds[0] === 'm1' && candidate.moveKind === 'forward' && candidate.moveParam !== null)
+        .map((candidate) => candidate.moveParam)
+        .sort();
+    assert.deepEqual(fractions, [0.5, 0.75]);
+});
+
+test('simulateMoveCandidate applies half of the max legal forward distance', () => {
+    const blade = createBlade('u1', 100, 400);
+    const enemy = { ...createBlade('e1', 100, 80, 'player-2'), rotation: Math.PI };
+    const context = {
+        units: [blade, enemy],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 2,
+        getPlayerId
+    };
+    const full = moveAi.simulateMoveCandidate(context, {
+        unitIds: ['u1'],
+        analysis: rules.analyzeSelection([blade]),
+        moveKind: 'forward',
+        moveParam: null
+    }, new Map());
+    const half = moveAi.simulateMoveCandidate(context, {
+        unitIds: ['u1'],
+        analysis: rules.analyzeSelection([blade]),
+        moveKind: 'forward',
+        moveParam: 0.5
+    }, new Map());
+    assert.ok(full && half, 'expected full and half forward simulations to be legal');
+    assert.ok(half.distance < full.distance, 'expected half forward to travel less than full');
+    assert.ok(Math.abs(half.distance - (full.distance / 2)) <= 5, 'expected half forward to be roughly half the max distance');
+});
+
 test('findBestAutoMove can prefer reserve redeploy when a Horde lot is available', () => {
     const units = [{ ...createBlade('r1', 50, 50), playerId: 'player-2', rotation: Math.PI }];
     const reserveUnits = [{
@@ -309,6 +420,152 @@ test('findBestAutoMove can prefer reserve redeploy when a Horde lot is available
     });
     assert.ok(suggestion);
     assert.equal(suggestion.moveKind, 'reserve-deploy');
+});
+
+test('findBestAutoMove prefers reserve deploy over weak board moves when hordes are in reserve', () => {
+    const friendly = createSpear('u1', 200, 400);
+    const enemy = { ...createBlade('e1', 300, 50, 'player-2'), rotation: Math.PI };
+    const reserveUnits = [{
+        id: 'h1',
+        type: 'Horde',
+        playerId: 'player-1',
+        width: 40,
+        depth: 40,
+        inReserve: true,
+        troopClass: 'infantry',
+        moves: { road: 400, good: 200, bad: 200, water: 100 },
+        strength: { infantry: 2, mounted: 2 },
+        combat: { ignoresBadGoingPenalty: false }
+    }];
+    const suggestion = moveAi.findBestAutoMove({
+        units: [friendly, enemy],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 2,
+        getPlayerId,
+        reserveUnits,
+        getHomeEdge: () => 'bottom'
+    });
+    assert.ok(suggestion);
+    assert.equal(suggestion.moveKind, 'reserve-deploy');
+    assert.equal(suggestion.reserveUnitId, 'h1');
+});
+
+function createHero(id, x, y, playerId = 'player-1') {
+    return {
+        id,
+        type: 'Hero',
+        playerId,
+        width: 40,
+        depth: 40,
+        x,
+        y,
+        rotation: 0,
+        movedThisTurn: false,
+        troopClass: 'mounted',
+        moves: { road: 125, good: 125, bad: 50, water: 25 },
+        ranged: null,
+        value: 4,
+        strength: { infantry: 5, mounted: 5 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+}
+
+test('findBestAutoMove strongly prefers a 6-PIP ensorcelled Hero return', () => {
+    const magician = {
+        ...createMagician('mag', 280, 80, 'player-2'),
+        rotation: Math.PI
+    };
+    const reserveUnits = [{
+        ...createHero('hero', 280, 520),
+        inReserve: true,
+        ensorcelledByUnitId: 'mag'
+    }];
+    const suggestion = moveAi.findBestAutoMove({
+        units: [magician],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 6,
+        getPlayerId,
+        reserveUnits,
+        getHomeEdge: (playerId) => (playerId === 'player-2' ? 'top' : 'bottom')
+    });
+    assert.ok(suggestion);
+    assert.equal(suggestion.moveKind, 'ensorcelled-return');
+    assert.equal(suggestion.reserveUnitId, 'hero');
+    assert.equal(suggestion.returnCost, 6);
+    assert.ok(suggestion.score >= 15, `expected high ensorcelled score, got ${suggestion.score}`);
+    assert.ok(
+        suggestion.breakdown.ensorcelledReturn >= 16,
+        `expected ensorcelledReturn breakdown >= 16, got ${suggestion.breakdown.ensorcelledReturn}`
+    );
+});
+
+test('findBestAutoMove beats water escape for a 6-PIP ensorcelled Hero return', () => {
+    const magician = {
+        ...createMagician('mag', 280, 80, 'player-2'),
+        rotation: Math.PI
+    };
+    const reserveUnits = [{
+        ...createHero('hero', 280, 520),
+        inReserve: true,
+        ensorcelledByUnitId: 'mag'
+    }];
+    const wateryMagician = {
+        ...createMagician('m2', 500, 75, 'player-1'),
+        rotation: Math.PI,
+        movedThisTurn: false
+    };
+    const terrain = {
+        roads: [],
+        features: [{ kind: 'water', cx: 500, cy: 53, rx: 42.5, ry: 35, wobble: 0 }]
+    };
+    const suggestion = moveAi.findBestAutoMove({
+        units: [magician, wateryMagician],
+        terrain,
+        activePlayerId: 'player-1',
+        remainingMoves: 6,
+        getPlayerId,
+        reserveUnits,
+        getHomeEdge: (playerId) => (playerId === 'player-2' ? 'top' : 'bottom')
+    });
+    assert.ok(suggestion);
+    assert.equal(suggestion.moveKind, 'ensorcelled-return');
+});
+
+test('playComputerMove deploys a Horde from reserve onto the home edge', async () => {
+    const { createAppHarness } = require('./harness.js');
+    const data = require('../src/data.js');
+    const enemy = { ...createBlade('e1', 300, 50, 'player-2'), rotation: Math.PI };
+    const app = createAppHarness({
+        state: {
+            setupStage: 'game',
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            remainingMoves: 2,
+            units: [enemy],
+            terrain: createEmptyTerrain(),
+            homeEdgeByPlayerId: { 'player-1': 'bottom', 'player-2': 'top' }
+        }
+    });
+    app.state.players['player-1'].controller = 'computer';
+    app._skipControllerDelay = true;
+    wireDraftValidation(app);
+    const horde = data.createUnit('Horde', 'player-1', 'Undead', { x: 120, y: 660, rotation: 0 }, () => 'h1');
+    app.sendUnitToReserve(horde);
+    app.resetControllerRuntime();
+
+    const result = await app.playComputerMove();
+
+    assert.equal(result, 'moved');
+    assert.equal(app.isUnitInReserve('h1'), false);
+    const deployed = app.getUnitById('h1');
+    assert.ok(deployed);
+    assert.equal(deployed.y, data.BOARD_SIZE - deployed.depth);
+    assert.equal(deployed.movedThisTurn, true);
+    assert.equal(app.state.remainingMoves, 1);
+    app.resetControllerRuntime();
 });
 
 test('findBestAutoMove evaluates rank subsets rather than only the full rank', () => {
@@ -567,4 +824,143 @@ test('findBestAutoMove does not move a Magician that already has a target in ran
             `Magician should not be moved when it already has a target in range (got: ${JSON.stringify(suggestion.unitIds)})`
         );
     }
+});
+
+test('findBestAutoMoveAsync scores move candidates after form-up without melee preview crash', async () => {
+    const { snapshot } = require('./fixtures/melee-preview-crash-save.json');
+    const result = await moveAi.findBestAutoMoveAsync({
+        units: snapshot.units,
+        terrain: snapshot.terrain,
+        activePlayerId: snapshot.activePlayerId,
+        remainingMoves: snapshot.remainingMoves,
+        getPlayerId: (unit) => unit.playerId,
+        snapEnabled: snapshot.snapEnabled,
+        reserveUnits: snapshot.reserveUnits || [],
+        getHomeEdge: (playerId) => snapshot.homeEdgeByPlayerId[playerId]
+    });
+
+    assert.equal(result.cancelled, false);
+});
+
+test('findBestAutoMoveAsync wheels a Magician out of water when forward stays wet', async () => {
+    const { snapshot } = require('./fixtures/stuck-move-save.json');
+    const result = await moveAi.findBestAutoMoveAsync({
+        units: snapshot.units,
+        terrain: snapshot.terrain,
+        activePlayerId: snapshot.activePlayerId,
+        remainingMoves: snapshot.remainingMoves,
+        getPlayerId: (unit) => unit.playerId,
+        snapEnabled: snapshot.snapEnabled,
+        reserveUnits: snapshot.reserveUnits || [],
+        getHomeEdge: (playerId) => snapshot.homeEdgeByPlayerId[playerId]
+    });
+
+    assert.equal(result.cancelled, false);
+    assert.ok(result.suggestion, 'expected a move suggestion');
+    assert.equal(result.suggestion.unitIds.includes('unit-20'), true);
+    const rules = require('../src/rules/index.js');
+    const after = result.suggestion.afterUnits.find((unit) => unit.id === 'unit-20');
+    assert.ok(after, 'expected trial position for unit-20');
+    assert.equal(
+        rules.sampleUnitTerrain(after, snapshot.terrain).has('water'),
+        false,
+        'expected unit-20 to leave water entirely'
+    );
+    assert.ok(
+        result.suggestion.moveKind === 'sidestep-left'
+            || result.suggestion.moveKind === 'sidestep-right'
+            || result.suggestion.moveKind === 'wheel-left'
+            || result.suggestion.moveKind === 'wheel-right',
+        `expected lateral water escape, got ${result.suggestion.moveKind}`
+    );
+});
+
+test('findBestAutoMoveAsync sidesteps a Blade when forward combat is unfavorable', () => {
+    const { snapshot } = require('./fixtures/stuck-move-save.json');
+    const { collectExtendedMoveCandidates } = require('../src/ai/move-candidates.js');
+    const { simulateMoveCandidate } = require('../src/ai/move-simulate.js');
+    const context = {
+        units: snapshot.units,
+        terrain: snapshot.terrain,
+        activePlayerId: snapshot.activePlayerId,
+        remainingMoves: snapshot.remainingMoves,
+        getPlayerId: (unit) => unit.playerId,
+        snapEnabled: snapshot.snapEnabled,
+        reserveUnits: snapshot.reserveUnits || [],
+        getHomeEdge: (playerId) => snapshot.homeEdgeByPlayerId[playerId]
+    };
+    const candidate = collectExtendedMoveCandidates(context).find((entry) => (
+        entry.unitIds.length === 1
+        && entry.unitIds[0] === 'unit-11'
+        && entry.moveKind === 'sidestep-left'
+    ));
+    assert.ok(candidate, 'expected a sidestep-left candidate for the blade');
+    const scored = simulateMoveCandidate(context, candidate, new Map());
+    assert.ok(scored, 'expected sidestep to be legal');
+    assert.ok(scored.score >= 0.25, `expected sidestep score >= 0.25, got ${scored.score}`);
+    assert.ok(
+        scored.breakdown.lateralReposition >= 0.4,
+        `expected stuck-forward sidestep bonus, got lateral ${scored.breakdown.lateralReposition}`
+    );
+});
+
+test('findBestAutoMoveAsync sidesteps Panda Knights out of water', async () => {
+    const { snapshot } = require('./fixtures/stuck-move-save.json');
+    const rules = require('../src/rules/index.js');
+    const result = await moveAi.findBestAutoMoveAsync({
+        units: snapshot.units,
+        terrain: snapshot.terrain,
+        activePlayerId: 'player-1',
+        remainingMoves: 3,
+        getPlayerId: (unit) => unit.playerId,
+        snapEnabled: snapshot.snapEnabled,
+        reserveUnits: snapshot.reserveUnits || [],
+        getHomeEdge: (playerId) => snapshot.homeEdgeByPlayerId[playerId]
+    });
+
+    assert.equal(result.cancelled, false);
+    assert.ok(result.suggestion, 'expected a move suggestion');
+    assert.ok(
+        result.suggestion.unitIds.includes('unit-7') || result.suggestion.unitIds.includes('unit-8'),
+        'expected a knight to leave water first'
+    );
+    const movedId = result.suggestion.unitIds[0];
+    const after = result.suggestion.afterUnits.find((unit) => unit.id === movedId);
+    assert.equal(
+        rules.sampleUnitTerrain(after, snapshot.terrain).has('water'),
+        false,
+        'expected knight to leave water entirely'
+    );
+    assert.ok(
+        result.suggestion.moveKind.startsWith('sidestep'),
+        `expected sidestep water escape, got ${result.suggestion.moveKind}`
+    );
+});
+
+test('findBestAutoMoveAsync repositions a stuck Blade when other hordes already moved', async () => {
+    const { snapshot } = require('./fixtures/stuck-move-save.json');
+    const units = snapshot.units.map((unit) => ({ ...unit }));
+    units.forEach((unit) => {
+        if (unit.playerId === 'player-2' && unit.id !== 'unit-11') {
+            unit.movedThisTurn = true;
+        }
+    });
+    const result = await moveAi.findBestAutoMoveAsync({
+        units,
+        terrain: snapshot.terrain,
+        activePlayerId: 'player-2',
+        remainingMoves: 1,
+        getPlayerId: (unit) => unit.playerId,
+        snapEnabled: snapshot.snapEnabled,
+        reserveUnits: snapshot.reserveUnits || [],
+        getHomeEdge: (playerId) => snapshot.homeEdgeByPlayerId[playerId]
+    });
+
+    assert.equal(result.cancelled, false);
+    assert.ok(result.suggestion, 'expected a move suggestion');
+    assert.equal(result.suggestion.unitIds[0], 'unit-11');
+    assert.ok(
+        result.suggestion.moveKind.startsWith('sidestep'),
+        `expected blade sidestep, got ${result.suggestion.moveKind}`
+    );
 });

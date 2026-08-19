@@ -1,0 +1,62 @@
+{
+  "id": "save-1787158134578-le6gs2",
+  "snapshot": {
+    "mode": "game",
+    "setupStage": "game",
+    "activePlayerId": "player-1",
+    "remainingMoves": 2,
+    "phase": "move",
+    "players": {
+      "player-1": { "id": "player-1", "colorId": "blue", "faction": "Panda", "controller": "computer" },
+      "player-2": { "id": "player-2", "colorId": "red", "faction": "Undead", "controller": "computer" }
+    },
+    "units": [
+      { "id": "unit-1", "type": "Spear", "playerId": "player-1", "width": 40, "depth": 20, "x": 222.45044627247228, "y": 335.34554845217764, "rotation": -1.5707963267948966, "movedThisTurn": false, "troopClass": "infantry", "moves": { "road": 100, "good": 50, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 2, "strength": { "infantry": 4, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-2", "type": "Spear", "playerId": "player-1", "width": 40, "depth": 20, "x": 282.4504462724723, "y": 265.34554845217764, "rotation": 1.5707963267948966, "movedThisTurn": true, "troopClass": "infantry", "moves": { "road": 100, "good": 50, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 2, "strength": { "infantry": 4, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-3", "type": "Artillery", "playerId": "player-1", "width": 40, "depth": 40, "x": 262.4504462724723, "y": 345.34554845217764, "rotation": 0, "movedThisTurn": false, "troopClass": "infantry", "moves": { "road": 75, "good": 50, "bad": 0, "water": 25 }, "ranged": { "phase": "shooting", "range": 125, "width": 120, "requiresOwnTurn": true, "requiresStationary": true }, "movement": {}, "value": 3, "strength": { "infantry": 4, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-4", "type": "Artillery", "playerId": "player-1", "width": 40, "depth": 40, "x": 340, "y": 498, "rotation": 0, "movedThisTurn": false, "troopClass": "infantry", "moves": { "road": 75, "good": 50, "bad": 0, "water": 25 }, "ranged": { "phase": "shooting", "range": 125, "width": 120, "requiresOwnTurn": true, "requiresStationary": true }, "movement": {}, "value": 3, "strength": { "infantry": 4, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-5", "type": "Hero", "playerId": "player-1", "width": 40, "depth": 40, "x": 380, "y": 498, "rotation": 0, "movedThisTurn": false, "troopClass": "mounted", "moves": { "road": 125, "good": 125, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 4, "strength": { "infantry": 5, "mounted": 5 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-7", "type": "Knights", "playerId": "player-1", "width": 40, "depth": 30, "x": 460, "y": 498, "rotation": 0, "movedThisTurn": false, "troopClass": "mounted", "moves": { "road": 100, "good": 100, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 2, "strength": { "infantry": 3, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-8", "type": "Knights", "playerId": "player-1", "width": 40, "depth": 30, "x": 500, "y": 498, "rotation": 0, "movedThisTurn": false, "troopClass": "mounted", "moves": { "road": 100, "good": 100, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 2, "strength": { "infantry": 3, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-9", "type": "Shooter", "playerId": "player-1", "width": 40, "depth": 20, "x": 361.90156153753617, "y": 420, "rotation": 0, "movedThisTurn": false, "troopClass": "infantry", "moves": { "road": 100, "good": 75, "bad": 75, "water": 25 }, "ranged": { "phase": "shooting", "range": 50, "width": 120, "requiresOwnTurn": false, "requiresStationary": false }, "movement": {}, "value": 2, "strength": { "infantry": 3, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": true }, "attackedThisTurn": false },
+      { "id": "unit-10", "type": "Spear", "playerId": "player-2", "width": 40, "depth": 20, "x": 382.4504462724723, "y": 375.34554845217764, "rotation": 3.141592653589793, "movedThisTurn": true, "troopClass": "infantry", "moves": { "road": 100, "good": 50, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 2, "strength": { "infantry": 4, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-11", "type": "Blade", "playerId": "player-2", "width": 40, "depth": 20, "x": 302.4504462724723, "y": 325.34554845217764, "rotation": 3.141592653589793, "movedThisTurn": true, "troopClass": "infantry", "moves": { "road": 100, "good": 50, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 2, "strength": { "infantry": 5, "mounted": 3 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-14", "type": "Horde", "playerId": "player-2", "width": 40, "depth": 40, "x": 222.45044627247228, "y": 375.34554845217764, "rotation": 3.141592653589793, "movedThisTurn": false, "troopClass": "infantry", "moves": { "road": 100, "good": 50, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 1, "strength": { "infantry": 2, "mounted": 2 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-15", "type": "Horde", "playerId": "player-2", "width": 40, "depth": 40, "x": 182.45044627247228, "y": 375.34554845217764, "rotation": 3.141592653589793, "movedThisTurn": false, "troopClass": "infantry", "moves": { "road": 100, "good": 50, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 1, "strength": { "infantry": 2, "mounted": 2 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-16", "type": "Horde", "playerId": "player-2", "width": 40, "depth": 40, "x": 142.45044627247228, "y": 375.34554845217764, "rotation": 3.141592653589793, "movedThisTurn": false, "troopClass": "infantry", "moves": { "road": 100, "good": 50, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 1, "strength": { "infantry": 2, "mounted": 2 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-17", "type": "Horde", "playerId": "player-2", "width": 40, "depth": 40, "x": 100, "y": 275, "rotation": 3.141592653589793, "movedThisTurn": false, "troopClass": "infantry", "moves": { "road": 100, "good": 50, "bad": 50, "water": 25 }, "ranged": null, "movement": {}, "value": 1, "strength": { "infantry": 2, "mounted": 2 }, "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false },
+      { "id": "unit-18", "type": "Magician", "playerId": "player-2", "width": 40, "depth": 40, "x": 580, "y": 323, "rotation": 3.141592653589793, "movedThisTurn": false, "troopClass": "mounted", "moves": { "road": 125, "good": 125, "bad": 50, "water": 25 }, "ranged": { "phase": "shooting", "range": 150, "magician": true, "requiresOwnTurn": true, "requiresStationary": false }, "movement": {}, "value": 4, "strength": { "infantry": 4, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false, "moveCost": 2, "attackDeclareCost": 2 }, "attackedThisTurn": false },
+      { "id": "unit-19", "type": "Magician", "playerId": "player-2", "width": 40, "depth": 40, "x": 540, "y": 323, "rotation": 3.141592653589793, "movedThisTurn": false, "troopClass": "mounted", "moves": { "road": 125, "good": 125, "bad": 50, "water": 25 }, "ranged": { "phase": "shooting", "range": 150, "magician": true, "requiresOwnTurn": true, "requiresStationary": false }, "movement": {}, "value": 4, "strength": { "infantry": 4, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false, "moveCost": 2, "attackDeclareCost": 2 }, "attackedThisTurn": false },
+      { "id": "unit-20", "type": "Magician", "playerId": "player-2", "width": 40, "depth": 40, "x": 500, "y": 75, "rotation": 3.141592653589793, "movedThisTurn": false, "troopClass": "mounted", "moves": { "road": 125, "good": 125, "bad": 50, "water": 25 }, "ranged": { "phase": "shooting", "range": 150, "magician": true, "requiresOwnTurn": true, "requiresStationary": false }, "movement": {}, "value": 4, "strength": { "infantry": 4, "mounted": 4 }, "combat": { "ignoresBadGoingPenalty": false, "moveCost": 2, "attackDeclareCost": 2 }, "attackedThisTurn": false }
+    ],
+    "terrain": {
+      "roads": [],
+      "features": [
+        { "id": "terrain-4", "kind": "swamp", "cx": 179.87524589945488, "cy": 537.5964826900241, "shape": "lightbulb", "sizeMultiplier": 1.5, "rx": 114, "ry": 99, "wobble": 0.26698536072164913, "rotation": 5.4621827189844865 },
+        { "id": "terrain-5", "kind": "water", "cx": 434.9915164181009, "cy": 53.35704788605962, "shape": "kidney", "sizeMultiplier": 0.5, "rx": 42.5, "ry": 35, "wobble": 0.328529646640058, "rotation": 1.130077680960402 },
+        { "id": "terrain-6", "kind": "water", "cx": 525.0145406648197, "cy": 517.2757546353798, "shape": "lightbulb", "sizeMultiplier": 0.5, "rx": 44, "ry": 39, "wobble": 0.2007741500171129, "rotation": 1.3646024481075671 },
+        { "id": "terrain-9", "kind": "swamp", "cx": 262.4504462724723, "cy": 65.34554845217764, "shape": "lightbulb", "sizeMultiplier": 0.5, "rx": 42.5, "ry": 33, "wobble": 0.28162661365813535, "rotation": 4.603674169960215 },
+        { "id": "terrain-10", "kind": "water", "cx": 545.4713691313569, "cy": 422.1616318732045, "shape": "square", "sizeMultiplier": 0.75, "rx": 59.25, "ry": 41.25, "wobble": 0.3349422457930518, "rotation": 0.17303025418394494 },
+        { "id": "terrain-11", "kind": "forest", "cx": 419.880023825515, "cy": 166.0681717427753, "shape": "circle", "sizeMultiplier": 0.5, "rx": 43, "ry": 32, "wobble": 0.21167781801350768, "rotation": 5.0267108918762 },
+        { "id": "terrain-18", "kind": "water", "cx": 5.305179148630912, "cy": 289.7216591782091, "shape": "oval", "sizeMultiplier": 1, "rx": 79, "ry": 66, "wobble": 0.2896565057064212, "rotation": 4.333573885933547 },
+        { "id": "terrain-19", "kind": "forest", "cx": 421.90156153753617, "cy": 398.08893432467636, "shape": "rectangle", "sizeMultiplier": 0.75, "rx": 58.5, "ry": 57, "wobble": 0.25088408853102745, "rotation": 5.366759278516544 }
+      ]
+    },
+    "losses": {
+      "player-1": [{ "id": "unit-6", "type": "Hero", "value": 4 }],
+      "player-2": [{ "id": "unit-12", "type": "Warband", "value": 2 }, { "id": "unit-13", "type": "Warband", "value": 2 }]
+    },
+    "reserveUnits": [
+      {
+        "id": "unit-6", "type": "Hero", "playerId": "player-1", "width": 40, "depth": 40, "x": 170, "y": 632, "rotation": 0,
+        "movedThisTurn": false, "troopClass": "mounted", "moves": { "road": 125, "good": 125, "bad": 50, "water": 25 },
+        "ranged": null, "movement": {}, "value": 4, "strength": { "infantry": 5, "mounted": 5 },
+        "combat": { "ignoresBadGoingPenalty": false }, "attackedThisTurn": false,
+        "ensorcelledByUnitId": "unit-18", "ensorcelledFrom": { "x": 440, "y": 463, "rotation": 0 },
+        "inReserve": true, "reserveSlot": 0
+      }
+    ],
+    "homeEdgeByPlayerId": { "player-1": "bottom", "player-2": "top" },
+    "snapEnabled": true
+  }
+}
