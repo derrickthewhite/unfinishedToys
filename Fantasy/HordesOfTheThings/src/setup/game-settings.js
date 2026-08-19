@@ -207,6 +207,7 @@
                 this.closeStorageModal(false);
                 this.nextUnitId = 1;
                 this.unitAssetCache = new Map();
+                this.resetControllerRuntime();
                 this.state = this.createInitialState();
                 this.syncUiFromState();
                 this.requestRender();

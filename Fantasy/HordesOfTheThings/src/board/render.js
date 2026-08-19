@@ -150,6 +150,9 @@
 
         drawTerrain(ctx) {
             ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, data.BOARD_SIZE, data.BOARD_SIZE);
+            ctx.clip();
             this.state.terrain.roads.forEach((road) => {
                 ctx.fillStyle = road.fill;
                 ctx.beginPath();

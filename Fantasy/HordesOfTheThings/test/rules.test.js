@@ -1677,6 +1677,28 @@ test('resolveRecoil only chains through rear file support, not rank neighbors', 
     assert.equal(result.units.find((unit) => unit.id === 'b3').y, 220);
 });
 
+test('resolveRecoil destroys a unit that recoils off the board edge', () => {
+    const recoilingUnit = {
+        id: 'b1',
+        type: 'Spear',
+        playerId: 'player-1',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: data.BOARD_SIZE - 5,
+        rotation: 0,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 4, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+
+    const result = rules.resolveRecoil('b1', [recoilingUnit], data.createDefaultTerrain());
+
+    assert.deepEqual(result.destroyedIds, ['b1']);
+    assert.equal(result.destructionReasons.b1, 'recoil carries unit off the board');
+});
+
 test('resolveShooting does not make the shooting attacker lose the exchange', () => {
     const shooter = {
         id: 's1',

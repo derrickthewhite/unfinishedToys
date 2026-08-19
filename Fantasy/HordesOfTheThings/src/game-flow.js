@@ -27,6 +27,12 @@
             this.updateStatus('Single-unit move stepped.');
         }
 
+        notifyController() {
+            if (typeof this.scheduleControllerAction === 'function') {
+                this.scheduleControllerAction();
+            }
+        }
+
         finishDraft() {
             const draft = this.state.draft;
             if (!draft) {
@@ -97,6 +103,7 @@
             }
             this.syncUiFromState();
             this.updateStatus('Move finished. Remaining moves: ' + this.state.remainingMoves + '.');
+            this.notifyController();
         }
 
         endMovePhase() {
@@ -175,6 +182,10 @@
                 validTargetIds: [],
                 attacksByAttacker: {}
             };
+            this.state.computerShotsDeclared = {
+                'player-1': false,
+                'player-2': false
+            };
         }
 
         getShootingState() {
@@ -213,6 +224,13 @@
             return this.state.units.some((unit) => this.needsShootingDeclaration(unit));
         }
 
+        hasUndeclaredLocalShootingAttacks() {
+            return this.state.units.some((unit) => (
+                this.needsShootingDeclaration(unit)
+                && (typeof this.canLocallyControl !== 'function' || this.canLocallyControl(this.getUnitPlayerId(unit)))
+            ));
+        }
+
         advanceToNextTurn() {
             this.state.formUp = null;
             this.state.shooting = null;
@@ -231,6 +249,7 @@
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.updateStatus(`Turn passes to ${this.getPlayerLabel(this.state.activePlayerId)}. ${this.state.remainingMoves} moves available.`);
+            this.notifyController();
         }
 
         maybeAutoAdvanceCombatPhase() {
@@ -246,6 +265,7 @@
                 }
                 this.syncUiFromState();
                 this.updateStatus('No valid shooting attacks. Advancing to melee.');
+                this.notifyController();
                 return true;
             }
             if (this.state.phase === 'melee' && this.getMeleeState().combats.length === 0) {
@@ -344,6 +364,10 @@
                 return;
             }
             if (rules.isRangedUnit(unit)) {
+                if (typeof this.canLocallyControl === 'function' && !this.canLocallyControl(this.getUnitPlayerId(unit))) {
+                    this.updateStatus('Only you can declare shooting for your own units.');
+                    return;
+                }
                 if (unit.ranged.requiresOwnTurn && this.getUnitPlayerId(unit) !== this.state.activePlayerId) {
                     this.updateStatus('Only the active side can declare shooting attacks.');
                     return;
@@ -542,6 +566,7 @@
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.updateStatus('Shooting skipped. Melee phase: resolve all detected combats.');
+            this.notifyController();
         }
 
         openSkipShootingConfirmation() {
@@ -557,7 +582,7 @@
                 return;
             }
             const shooting = this.getShootingState();
-            if (this.hasUndeclaredShootingAttacks() && !options.skipUndeclared) {
+            if (this.hasUndeclaredLocalShootingAttacks() && !options.skipUndeclared) {
                 this.openSkipShootingConfirmation();
                 return;
             }
@@ -593,6 +618,7 @@
                 summary.push(`${ensorcelledCount} ensorcelled`);
             }
             this.updateStatus(`Shooting resolved${summary.length ? `: ${summary.join(', ')}` : ''}. Review the aftermath, then click Acknowledged.`);
+            this.notifyController();
         }
 
         resolveMeleePhase() {
@@ -611,6 +637,7 @@
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.updateStatus(`Melee resolved: ${result.destroyedUnits.length} units destroyed. Review the aftermath, then click Acknowledged.`);
+            this.notifyController();
         }
 
         getLossSummary(side) {
@@ -673,11 +700,13 @@
                 this.state.formUp = null;
                 this.setPhase('shooting');
                 if (this.maybeAutoAdvanceCombatPhase()) {
+                    this.notifyController();
                     return;
                 }
                 this.updateSelectionAnalysis();
                 this.syncUiFromState();
                 this.updateStatus('No units qualified to form up. Advancing to shooting.');
+                this.notifyController();
                 return;
             }
             this.setPhase('form-up');
@@ -689,9 +718,11 @@
             this.syncUiFromState();
             if (result.movedUnitIds.length > 0) {
                 this.updateStatus('Form up applied automatically. Review the ghosted original positions, then click Acknowledged.');
+                this.notifyController();
                 return;
             }
             this.updateStatus('No units qualified to form up. Click Acknowledged to continue to shooting.');
+            this.notifyController();
         }
 
         acknowledgePhase() {
@@ -702,10 +733,12 @@
                 this.state.formUp = null;
                 this.setPhase('shooting');
                 if (this.maybeAutoAdvanceCombatPhase()) {
+                    this.notifyController();
                     return;
                 }
                 this.syncUiFromState();
                 this.updateStatus('Shooting phase: select a ranged unit, assign valid targets, then resolve shooting.');
+                this.notifyController();
                 return;
             }
             if (this.state.phase === 'shooting') {
@@ -714,18 +747,22 @@
                     this.state.combatResolution = null;
                     this.setPhase('melee');
                     if (this.maybeAutoAdvanceCombatPhase()) {
+                        this.notifyController();
                         return;
                     }
                     this.syncUiFromState();
                     this.updateStatus('Melee phase: resolve all detected combats.');
+                    this.notifyController();
                     return;
                 }
                 this.setPhase('melee');
                 if (this.maybeAutoAdvanceCombatPhase()) {
+                    this.notifyController();
                     return;
                 }
                 this.syncUiFromState();
                 this.updateStatus('Melee phase: resolve all detected combats.');
+                this.notifyController();
                 return;
             }
             if (this.state.phase === 'melee' && this.state.combatResolution) {

@@ -28,11 +28,21 @@
                 return;
             }
 
+            if (this.state.setupStage === 'unit-deployment'
+                && typeof this.isComputerPlayer === 'function'
+                && this.isComputerPlayer(this.getDeploymentSetup()?.activePlayerId)) {
+                this.state.interaction = { type: 'click', pointerId: event.pointerId, suppressClick: true };
+                return;
+            }
+
             if (typeof this.isGameOver === 'function' && this.isGameOver() && this.state.mode === 'game') {
                 return;
             }
 
-            const handleHit = this.getHandleHit(world);
+            let handleHit = this.getHandleHit(world);
+            if (handleHit && typeof this.canManipulateSelection === 'function' && !this.canManipulateSelection()) {
+                handleHit = null;
+            }
             let unitHit = this.pickUnit(world);
             if (this.state.setupStage === 'unit-deployment') {
                 const activePlayerId = this.getDeploymentSetup()?.activePlayerId;
@@ -97,7 +107,12 @@
                 return;
             }
 
-            if (this.state.setupStage !== 'unit-deployment' && this.state.mode === 'game' && this.state.phase === 'move' && isSelectedUnit) {
+            if (this.state.setupStage !== 'unit-deployment'
+                && this.state.mode === 'game'
+                && this.state.phase === 'move'
+                && isSelectedUnit
+                && typeof this.canManipulateSelection === 'function'
+                && this.canManipulateSelection()) {
                 const analysis = this.state.selectionAnalysis;
                 if (analysis.type === 'single' || analysis.type === 'rank' || (analysis.type === 'file' && analysis.leadId === unitHit.id)) {
                     if (!this.ensureDraft(this.state.selectedIds)) {
@@ -113,7 +128,9 @@
                 }
             }
 
-            if (isSelectedUnit && (this.state.mode === 'edit' || this.state.setupStage === 'unit-deployment')) {
+            if (isSelectedUnit
+                && (this.state.mode === 'edit' || this.state.setupStage === 'unit-deployment')
+                && (typeof this.canManipulateSelection !== 'function' || this.canManipulateSelection())) {
                 const draftIds = [...this.state.selectedIds];
                 this.state.interaction.type = 'move-edit';
                 this.state.interaction.dragBase = geometry.snapshotPositions(draftIds, this.state.units);
@@ -465,8 +482,22 @@
                     }
                     return;
                 }
-                if (this.state.mode === 'game' && this.state.setupStage !== 'unit-deployment' && this.getUnitPlayerId(unitHit) !== this.state.activePlayerId) {
-                    this.updateStatus('Only the active side can be selected in game mode.');
+                const unitPlayerId = this.getUnitPlayerId(unitHit);
+                const isEnemyInGame = this.state.mode === 'game'
+                    && this.state.setupStage !== 'unit-deployment'
+                    && unitPlayerId !== this.state.activePlayerId;
+                if (isEnemyInGame) {
+                    if (interaction.shiftKey) {
+                        return;
+                    }
+                    this.toggleSelection(unitHit.id, false);
+                    return;
+                }
+                if (this.state.mode === 'game'
+                    && this.state.phase === 'move'
+                    && typeof this.canLocallyControl === 'function'
+                    && !this.canLocallyControl(unitPlayerId)
+                    && interaction.shiftKey) {
                     return;
                 }
                 this.toggleSelection(unitHit.id, interaction.shiftKey);
@@ -541,9 +572,16 @@
                 .filter((unit) => geometry.polygonInsideRect(geometry.getUnitCorners(unit), rect))
                 .filter((unit) => {
                     if (this.state.setupStage === 'unit-deployment') {
-                        return this.getUnitPlayerId(unit) === this.getDeploymentSetup()?.activePlayerId;
+                        return this.getUnitPlayerId(unit) === this.getDeploymentSetup()?.activePlayerId
+                            && (!this.isComputerPlayer || !this.isComputerPlayer(this.getDeploymentSetup()?.activePlayerId));
                     }
-                    return this.state.mode === 'edit' || this.getUnitPlayerId(unit) === this.state.activePlayerId;
+                    if (this.state.mode === 'edit') {
+                        return true;
+                    }
+                    if (typeof this.canLocallyControl === 'function' && !this.canLocallyControl(this.getUnitPlayerId(unit))) {
+                        return false;
+                    }
+                    return this.getUnitPlayerId(unit) === this.state.activePlayerId;
                 })
                 .map((unit) => unit.id);
             if (marquee.additive) {

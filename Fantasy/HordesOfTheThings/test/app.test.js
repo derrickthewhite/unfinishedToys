@@ -283,6 +283,47 @@ test('edit mode click selects a single unit without requiring a drag', () => {
     assert.equal(app.state.selectionAnalysis.type, 'single');
 });
 
+test('game mode click selects a single enemy unit for inspection', () => {
+    const friendly = createBlade('u1', 100, 220);
+    const enemy = createBlade('u2', 140, 220, 'player-2');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            units: [friendly, enemy]
+        }
+    });
+    const center = geometry.getUnitCenter(enemy);
+
+    app.onPointerDown({ pointerId: 1, button: 0, clientX: center.x, clientY: center.y, shiftKey: false });
+    app.onPointerUp({ pointerId: 1, clientX: center.x, clientY: center.y });
+
+    assert.deepEqual(app.state.selectedIds, ['u2']);
+    assert.equal(app.state.selectionAnalysis.type, 'single');
+});
+
+test('game mode shift-click ignores enemy units during multi-select', () => {
+    const friendly = createBlade('u1', 100, 220);
+    const enemy = createBlade('u2', 140, 220, 'player-2');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            units: [friendly, enemy],
+            selectedIds: ['u1']
+        }
+    });
+    app.updateSelectionAnalysis();
+    const center = geometry.getUnitCenter(enemy);
+
+    app.onPointerDown({ pointerId: 1, button: 0, clientX: center.x, clientY: center.y, shiftKey: true });
+    app.onPointerUp({ pointerId: 1, clientX: center.x, clientY: center.y, shiftKey: true });
+
+    assert.deepEqual(app.state.selectedIds, ['u1']);
+});
+
 test('edit mode delete removes selected units without recording losses', () => {
     const units = [createBlade('u1', 100, 220), createBlade('u2', 200, 220)];
     const app = createAppHarness({
@@ -888,6 +929,91 @@ test('applyMaxForwardMove advances a legal rank to its terrain-limited distance'
     const travel = geometry.distance(startCenter, endCenter);
     assert.ok(travel >= 45);
     assert.equal(app.state.draft.invalidIds.size, 0);
+});
+
+test('ensureDraft blocks movement while active player is computer-controlled', () => {
+    const unit = createBlade('u1', 100, 220);
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            units: [unit],
+            selectedIds: ['u1']
+        }
+    });
+    app.canLocallyControl = () => false;
+    app.hasLocalHuman = () => true;
+
+    const started = app.ensureDraft(['u1']);
+
+    assert.equal(started, false);
+    assert.equal(app.state.draft, null);
+    assert.equal(app.lastStatus, 'Movement is unavailable while the active side is computer-controlled.');
+});
+
+test('ensureDraft allows computer moves in an all-computer match', () => {
+    const unit = createBlade('u1', 100, 220, 'player-2');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-2',
+            remainingMoves: 4,
+            units: [unit],
+            selectedIds: ['u1'],
+            terrain: { roads: [], features: [] }
+        }
+    });
+    app.state.players['player-1'].controller = 'computer';
+    app.state.players['player-2'].controller = 'computer';
+
+    const started = app.ensureDraft(['u1']);
+
+    assert.equal(started, true);
+    assert.ok(app.state.draft);
+});
+
+test('inspect-only enemy selection does not expose move handles', () => {
+    const friendly = createBlade('u1', 100, 220, 'player-1');
+    const enemy = createBlade('u2', 100, 170, 'player-2');
+    enemy.rotation = Math.PI;
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            units: [friendly, enemy],
+            selectedIds: ['u2'],
+            terrain: { roads: [], features: [] }
+        }
+    });
+    app.state.players['player-2'].controller = 'computer';
+
+    assert.equal(app.getSelectionHandles().length, 0);
+    assert.equal(app.canManipulateSelection(), false);
+});
+
+test('setMode keeps the current selection across edit and game modes', () => {
+    const friendly = createBlade('u1', 100, 220, 'player-1');
+    const enemy = createBlade('u2', 100, 170, 'player-2');
+    enemy.rotation = Math.PI;
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            units: [friendly, enemy],
+            selectedIds: ['u2'],
+            terrain: { roads: [], features: [] }
+        }
+    });
+
+    app.setMode('edit');
+    assert.deepEqual(app.state.selectedIds, ['u2']);
+
+    app.setMode('game');
+    assert.deepEqual(app.state.selectedIds, ['u2']);
 });
 
 test('convertSelection turns a rank into a legal file without recentering the whole formation', () => {
@@ -1699,6 +1825,30 @@ test('render draws combat summaries after units', () => {
     app.render();
 
     assert.ok(order.indexOf('combat') > order.indexOf('units'));
+});
+
+test('drawTerrain clips terrain rendering to board bounds', () => {
+    const app = createAppHarness();
+    const calls = [];
+    const ctx = {
+        save() {},
+        restore() {},
+        beginPath() { calls.push('beginPath'); },
+        rect(x, y, width, height) { calls.push(`rect:${x},${y},${width},${height}`); },
+        clip() { calls.push('clip'); },
+        moveTo() {},
+        lineTo() {},
+        closePath() {},
+        roundRect() {},
+        fill() {},
+        stroke() {},
+        lineWidth: 1
+    };
+
+    app.drawTerrain(ctx);
+
+    assert.equal(calls.includes(`rect:0,0,${data.BOARD_SIZE},${data.BOARD_SIZE}`), true);
+    assert.equal(calls.includes('clip'), true);
 });
 
 test('logCombatResults includes modifiers, rolls, and outcome details', () => {

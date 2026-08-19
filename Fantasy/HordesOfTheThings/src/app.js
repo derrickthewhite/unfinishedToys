@@ -18,13 +18,15 @@
             require('./setup/unit-deployment.js'),
             require('./ai/deploy.js'),
             require('./ai/move.js'),
+            require('./ai/shooting.js'),
+            require('./controller.js'),
             require('./selection-panel.js'),
             require('./victory.js')
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesMoveAi, root.HordesSelectionPanel, root.HordesVictory);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, moveAi, selectionPanel, victory) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesMoveAi, root.HordesShootingAi, root.HordesController, root.HordesSelectionPanel, root.HordesVictory);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, moveAi, shootingAi, controller, selectionPanel, victory) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -35,6 +37,7 @@
             this.unitAssetCache = new Map();
             this.nextUnitId = 1;
             this.state = this.createInitialState();
+            this.resetControllerRuntime();
             this.renderQueued = false;
             this.bindUi();
             this.bindCanvas();
@@ -109,6 +112,12 @@
                 autoMoveProgressText: document.getElementById('autoMoveProgressText'),
                 cancelAutoMoveButton: document.getElementById('cancelAutoMoveButton'),
                 acknowledgeAutoMoveButton: document.getElementById('acknowledgeAutoMoveButton'),
+                pauseControllerButton: document.getElementById('pauseControllerButton'),
+                gamePauseControllerButton: document.getElementById('gamePauseControllerButton'),
+                controllerHud: document.getElementById('controllerHud'),
+                controllerThinkingText: document.getElementById('controllerThinkingText'),
+                gameThinkingText: document.getElementById('gameThinkingText'),
+                gameBar: document.querySelector('.game-bar'),
                 endMovePhaseButton: document.getElementById('endMovePhaseButton'),
                 stepMoveButton: document.getElementById('stepMoveButton'),
                 snapCheckbox: document.getElementById('snapCheckbox'),
@@ -213,6 +222,9 @@
                 autoMoveModalOpen: false,
                 autoMoveInProgress: false,
                 autoMoveAwaitingAck: false,
+                controllerPaused: false,
+                controllerThinking: null,
+                computerShotsDeclared: null,
                 marquee: null,
                 interaction: null,
                 camera: {
@@ -237,7 +249,7 @@
         }
 
         createArmyDrafts() {
-            return Object.fromEntries(data.PLAYER_IDS.map((playerId) => [playerId, { counts: {} }]));
+            return Object.fromEntries(data.PLAYER_IDS.map((playerId) => [playerId, { counts: {}, random: false }]));
         }
 
         isSetupActive() {
@@ -260,10 +272,21 @@
             this.syncUiFromState();
         }
 
+        confirmTerrainPlacement() {
+            if (!this.isTerrainReady()) {
+                return;
+            }
+            this.state.setup.confirmation = null;
+            this.state.setupStage = 'unit-deployment';
+            this.initializeUnitDeployment();
+            this.scheduleControllerAction();
+        }
+
         confirmSetupStage() {
             if (this.state.confirmation === 'skip-shooting') {
                 this.state.confirmation = null;
                 this.resolveShootingPhase({ skipUndeclared: true });
+                this.scheduleControllerAction();
                 return;
             }
             if (this.state.setup?.confirmation === 'new-game') {
@@ -274,15 +297,15 @@
                 if (this.state.setup.confirmation !== 'terrain' || !this.isTerrainReady()) {
                     return;
                 }
-                this.state.setup.confirmation = null;
-                this.state.setupStage = 'unit-deployment';
-                this.initializeUnitDeployment();
+                this.confirmTerrainPlacement();
                 return;
             }
+            this.resolveRandomArmySetup();
             this.state.setup.confirmation = null;
             this.initializeTerrainPlacement();
             this.state.setupStage = 'terrain-placement';
             this.updateStatus(`${this.getPlayerLabel(this.getTerrainSetup().defenderPlayerId)} is the defender and places terrain first.`);
+            this.scheduleControllerAction();
         }
 
         openTerrainConfirmation() {
@@ -306,8 +329,11 @@
         }
 
         getPlayerColors(playerId) {
-            const colorId = this.getPlayer(playerId)?.colorId || 'blue';
-            return data.PLAYER_COLORS[colorId] || data.PLAYER_COLORS.blue;
+            const colorId = this.getPlayer(playerId)?.colorId;
+            if (colorId === data.RANDOM_IDENTITY || !data.PLAYER_COLORS[colorId]) {
+                return colorId === data.RANDOM_IDENTITY ? data.RANDOM_PLAYER_COLOR : data.PLAYER_COLORS.blue;
+            }
+            return data.PLAYER_COLORS[colorId];
         }
 
         getPlayerLabel(playerId) {
@@ -427,6 +453,12 @@
             }
             if (this.ui.acknowledgeAutoMoveButton) {
                 this.ui.acknowledgeAutoMoveButton.addEventListener('click', () => this.acknowledgeAutoMoveModal());
+            }
+            if (this.ui.pauseControllerButton) {
+                this.ui.pauseControllerButton.addEventListener('click', () => this.toggleControllerPaused());
+            }
+            if (this.ui.gamePauseControllerButton) {
+                this.ui.gamePauseControllerButton.addEventListener('click', () => this.toggleControllerPaused());
             }
             this.ui.endMovePhaseButton.addEventListener('click', () => this.endMovePhase());
             this.ui.stepMoveButton.addEventListener('click', () => this.stepSingleDraft());
@@ -642,21 +674,19 @@
             if (mode !== 'game') {
                 this.state.formUp = null;
             }
+            this.state.selectedIds = this.state.selectedIds.filter((unitId) => Boolean(this.getUnitById(unitId)));
             if (mode === 'game') {
                 if (!this.state.startingArmyValueByPlayerId) {
                     this.captureStartingArmyValues();
                 }
-                this.state.selectedIds = this.state.selectedIds.filter((unitId) => {
-                    const unit = this.getUnitById(unitId);
-                    return unit && this.getUnitPlayerId(unit) === this.state.activePlayerId;
-                });
-                this.updateSelectionAnalysis();
                 this.updateStatus('Game mode: select units on the active side and draft a move.');
             } else {
                 this.updateStatus('Edit mode: place, drag, marquee-select, or rotate units.');
             }
+            this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.requestRender();
+            this.scheduleControllerAction();
         }
 
         resizeCanvas() {
@@ -786,24 +816,36 @@
             this.ui.activePlayerSelect.disabled = this.state.mode !== 'edit';
             this.ui.remainingMovesInput.disabled = this.state.mode !== 'edit';
             this.ui.phaseSelect.disabled = this.state.mode !== 'edit';
-            this.ui.finishMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
+            const localActive = this.canLocallyControl(this.state.activePlayerId);
+            this.ui.finishMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move' || !localActive;
             if (this.ui.autoMoveButton) {
-                this.ui.autoMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
+                this.ui.autoMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move' || !localActive;
             }
-            this.ui.endMovePhaseButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
-            this.ui.stepMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
+            this.ui.endMovePhaseButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move' || !localActive;
+            this.ui.stepMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move' || !localActive;
             this.ui.snapLabel.hidden = false;
             this.ui.formUpPreviewLabel.hidden = false;
             this.ui.cornerRotationLabel.hidden = false;
             this.ui.rangedAreaLabel.hidden = false;
             this.ui.moveErrorsLabel.hidden = false;
             this.ui.battleStatsLabel.hidden = false;
-            this.ui.resolveShootingButton.hidden = this.state.mode !== 'game'
-                || (this.state.phase !== 'shooting' && this.state.phase !== 'melee')
-                || Boolean(this.state.combatResolution);
-            this.ui.cancelMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move';
-            this.ui.acknowledgedButton.hidden = this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution);
-            this.ui.undoMoveButton.hidden = this.state.mode === 'game' && this.state.phase !== 'move';
+            const showShootingResolve = this.state.mode === 'game'
+                && this.state.phase === 'shooting'
+                && !this.state.combatResolution
+                && this.hasLocalHuman();
+            const showMeleeResolve = this.state.mode === 'game'
+                && this.state.phase === 'melee'
+                && !this.state.combatResolution
+                && localActive;
+            this.ui.resolveShootingButton.hidden = !showShootingResolve && !showMeleeResolve;
+            this.ui.cancelMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move' || !localActive;
+            this.ui.acknowledgedButton.hidden = this.state.mode !== 'game'
+                || this.isComputerMatch()
+                || (
+                    !(this.state.phase === 'form-up' && localActive)
+                    && !this.state.combatResolution
+                );
+            this.ui.undoMoveButton.hidden = this.state.mode === 'game' && (this.state.phase !== 'move' || !localActive);
             this.ui.finishMoveButton.disabled = this.state.mode !== 'game' || this.state.phase !== 'move' || !this.state.draft;
             if (this.ui.autoMoveButton) {
                 this.ui.autoMoveButton.disabled = this.state.mode !== 'game'
@@ -852,6 +894,10 @@
             this.ui.statusText.textContent = this.state.status;
             this.renderSelectionInfo();
             this.renderVictoryModal();
+            this.syncControllerHud();
+            if (this.ui.gameBar?.classList && typeof this.isComputerMatch === 'function') {
+                this.ui.gameBar.classList.toggle('is-computer-match', this.isComputerMatch());
+            }
             const gameOver = this.isGameOver();
             if (gameOver) {
                 this.ui.finishMoveButton.disabled = true;
@@ -887,6 +933,8 @@
     unitDeployment.install(HordesPrototype);
     ai.install(HordesPrototype);
     moveAi.install(HordesPrototype);
+    shootingAi.install(HordesPrototype);
+    controller.install(HordesPrototype);
     selectionPanel.install(HordesPrototype);
     victory.install(HordesPrototype);
     return { HordesPrototype };

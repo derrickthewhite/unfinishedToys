@@ -38,6 +38,13 @@
     }
 
 
+    function nowMs() {
+        return (typeof performance !== 'undefined' && performance.now)
+            ? performance.now()
+            : Date.now();
+    }
+
+
     function yieldToBrowser() {
         return new Promise((resolve) => {
             if (typeof requestAnimationFrame === 'function') {
@@ -46,6 +53,15 @@
             }
             setTimeout(resolve, 0);
         });
+    }
+
+
+    async function yieldIfOverBudget(lastYieldAt, budgetMs = 8) {
+        if (nowMs() - lastYieldAt >= budgetMs) {
+            await yieldToBrowser();
+            return nowMs();
+        }
+        return lastYieldAt;
     }
 
 
@@ -80,8 +96,22 @@
         const {
             shouldCancel,
             onProgress,
-            yieldEvery = 6
+            yieldEvery = 1
         } = hooks;
+        let lastYieldAt = nowMs();
+
+        onProgress?.({
+            phase: 'gathering',
+            message: 'Gathering candidate moves…',
+            current: 0,
+            total: 0
+        });
+        await yieldToBrowser();
+        lastYieldAt = nowMs();
+        if (shouldCancel?.()) {
+            return { cancelled: true, suggestion: null };
+        }
+
         const candidates = collectExtendedMoveCandidates(context);
         const forwardCache = new Map();
         let best = null;
@@ -93,6 +123,7 @@
             total: candidates.length
         });
         await yieldToBrowser();
+        lastYieldAt = nowMs();
         if (shouldCancel?.()) {
             return { cancelled: true, suggestion: null };
         }
@@ -121,6 +152,9 @@
 
             if (index % yieldEvery === yieldEvery - 1 || index === candidates.length - 1) {
                 await yieldToBrowser();
+                lastYieldAt = nowMs();
+            } else {
+                lastYieldAt = await yieldIfOverBudget(lastYieldAt);
             }
         }
 
@@ -128,18 +162,6 @@
             return { cancelled: false, suggestion: null };
         }
         return { cancelled: false, suggestion: best };
-    }
-
-
-    function describeDraftInvalidReasons(draft) {
-        if (!draft) {
-            return [];
-        }
-        return [...draft.unitIds].map((unitId) => ({
-            unitId,
-            reason: draft.reasonById?.get(unitId) || null,
-            invalid: draft.invalidIds?.has(unitId) || false
-        })).filter((entry) => entry.invalid || entry.reason);
     }
 
 
@@ -275,7 +297,134 @@
                 if (this._autoMoveCancelToken) {
                     this._autoMoveCancelToken.cancelled = true;
                 }
+                if (this._computerMoveCancelToken) {
+                    this._computerMoveCancelToken.cancelled = true;
+                }
                 this.updateAutoMoveProgress({ message: 'Cancelling…' });
+            },
+
+            applyAutoMoveSuggestion(suggestion) {
+                if (!suggestion) {
+                    return false;
+                }
+                if (suggestion.moveKind === 'reserve-deploy') {
+                    const reserveUnit = this.getReserveUnits().find((entry) => entry.id === suggestion.reserveUnitId);
+                    if (!reserveUnit || !this.beginReserveDeploy(reserveUnit, suggestion.moveParam)) {
+                        this.updateStatus('Auto Move: reserve deployment could not be started.');
+                        return false;
+                    }
+                    this.finishDraft();
+                    this.updateStatus(formatAutoMoveStatus(suggestion, this.state.units));
+                    return true;
+                }
+
+                const computerActive = typeof this.canLocallyControl === 'function'
+                    && !this.canLocallyControl(this.state.activePlayerId);
+                if (computerActive) {
+                    this.state.selectionAnalysis = suggestion.analysis || rules.analyzeSelection(
+                        suggestion.unitIds.map((unitId) => this.getUnitById(unitId)).filter(Boolean)
+                    );
+                } else {
+                    this.state.selectedIds = [...suggestion.unitIds];
+                    this.updateSelectionAnalysis();
+                }
+                if (!this.ensureDraft(suggestion.unitIds)) {
+                    this.updateStatus('Auto Move: could not start the suggested draft.');
+                    return false;
+                }
+
+                const ghostSnapshot = geometry.snapshotPositions(suggestion.unitIds, this.state.units);
+
+                if (suggestion.moveKind === 'forward') {
+                    const actualDistance = this.findMaxForwardDistance();
+                    if (actualDistance === null || actualDistance <= 0.05) {
+                        this.cancelDraft(false);
+                        this.updateStatus('Auto Move: the suggested move is not legal on the board.');
+                        return false;
+                    }
+                    const appliedDistance = Math.min(suggestion.distance, actualDistance);
+                    const applied = this.applyForwardMove(appliedDistance);
+                    if (!applied) {
+                        this.cancelDraft(false);
+                        this.updateStatus('Auto Move: the suggested move could not be applied.');
+                        return false;
+                    }
+                    suggestion.distance = appliedDistance;
+                } else {
+                    suggestion.unitIds.forEach((unitId) => {
+                        const trialUnit = suggestion.afterUnits.find((entry) => entry.id === unitId);
+                        const liveUnit = this.getUnitById(unitId);
+                        if (trialUnit && liveUnit) {
+                            liveUnit.x = trialUnit.x;
+                            liveUnit.y = trialUnit.y;
+                            liveUnit.rotation = trialUnit.rotation;
+                        }
+                    });
+                    this.evaluateDraft();
+                    if (this.state.draft.invalidIds.size > 0) {
+                        this.cancelDraft(false);
+                        this.updateStatus('Auto Move: the suggested move could not be applied.');
+                        return false;
+                    }
+                    if (suggestion.moveKind !== 'reverse' || suggestion.analysis.type !== 'single') {
+                        this.commitDraftStep();
+                    }
+                }
+
+                this.finishDraft();
+                this.state.autoMoveGhost = {
+                    unitIds: [...suggestion.unitIds],
+                    ghostSnapshot
+                };
+                this.updateStatus(formatAutoMoveStatus(suggestion, this.state.units));
+                return true;
+            },
+
+            async playComputerMove() {
+                if (this.state.mode !== 'game' || this.state.phase !== 'move') {
+                    return 'idle';
+                }
+                if (typeof this.isGameOver === 'function' && this.isGameOver()) {
+                    return 'idle';
+                }
+                if (this.state.remainingMoves <= 0) {
+                    return 'end-phase';
+                }
+
+                const cancelToken = { cancelled: false };
+                this._computerMoveCancelToken = cancelToken;
+                this.cancelDraft(false);
+
+                const searchContext = {
+                    units: this.state.units,
+                    terrain: this.state.terrain,
+                    activePlayerId: this.state.activePlayerId,
+                    remainingMoves: this.state.remainingMoves,
+                    getPlayerId: (unit) => this.getUnitPlayerId(unit),
+                    snapEnabled: this.state.snapEnabled,
+                    reserveUnits: this.getReserveUnits(),
+                    getHomeEdge: (playerId) => this.getHomeEdge(playerId)
+                };
+                const searchResult = await findBestAutoMoveAsync(searchContext, {
+                    shouldCancel: () => cancelToken.cancelled || Boolean(this.state.controllerPaused),
+                    yieldEvery: 1,
+                    onProgress: (info) => {
+                        if (typeof this.setComputerThinking === 'function') {
+                            this.setComputerThinking(this.state.activePlayerId, info.message);
+                        }
+                    }
+                });
+                this._computerMoveCancelToken = null;
+                if (searchResult.cancelled || this.state.controllerPaused) {
+                    return 'paused';
+                }
+                if (!searchResult.suggestion) {
+                    return 'end-phase';
+                }
+                const applied = this.applyAutoMoveSuggestion(searchResult.suggestion);
+                this.syncUiFromState();
+                this.requestRender();
+                return applied ? 'moved' : 'end-phase';
             },
 
             maybeClearAutoMoveGhost() {
@@ -351,6 +500,7 @@
 
                 const searchResult = await findBestAutoMoveAsync(searchContext, {
                     shouldCancel: () => cancelToken.cancelled,
+                    yieldEvery: 1,
                     onProgress: (info) => this.updateAutoMoveProgress(info)
                 });
 
@@ -411,143 +561,16 @@
                 }
 
                 this.state.autoMovePreview = null;
-
-                if (suggestion.moveKind === 'reserve-deploy') {
-                    const reserveUnit = this.getReserveUnits().find((entry) => entry.id === suggestion.reserveUnitId);
-                    if (!reserveUnit || !this.beginReserveDeploy(reserveUnit, suggestion.moveParam)) {
-                        this.closeAutoMoveModal();
-                        this.updateStatus('Auto Move: reserve deployment could not be started.');
-                        this.syncUiFromState();
-                        return;
-                    }
-                    this.finishDraft();
-                    this.closeAutoMoveModal();
-                    this.updateStatus(formatAutoMoveStatus(suggestion, this.state.units));
-                    this.syncUiFromState();
-                    this.requestRender();
-                    return;
-                }
-
-                this.state.selectedIds = [...suggestion.unitIds];
-                this.updateSelectionAnalysis();
-                if (!this.ensureDraft(suggestion.unitIds)) {
-                    console.log('[Auto Move] end', {
-                        result: 'failed',
-                        reason: 'could not start draft',
-                        planned: describeAutoMoveSuggestion(suggestion, this.state.units),
-                        elapsedMs: Math.round(searchElapsedMs)
-                    });
-                    this.closeAutoMoveModal();
-                    this.updateStatus('Auto Move: could not start the suggested draft.');
-                    this.syncUiFromState();
-                    return;
-                }
-
-                const ghostSnapshot = geometry.snapshotPositions(suggestion.unitIds, this.state.units);
-
-                if (suggestion.moveKind === 'forward') {
-                    const actualDistance = this.findMaxForwardDistance();
-                    if (actualDistance === null || actualDistance <= 0.05) {
-                        const invalidReasons = describeDraftInvalidReasons(this.state.draft);
-                        this.cancelDraft(false);
-                        console.log('[Auto Move] end', {
-                            result: 'failed',
-                            reason: 'no legal forward distance after opening draft',
-                            planned: describeAutoMoveSuggestion(suggestion, this.state.units),
-                            simulatedDistanceMm: Math.round(suggestion.distance),
-                            actualDistance,
-                            invalidReasons,
-                            elapsedMs: Math.round(searchElapsedMs)
-                        });
-                        this.closeAutoMoveModal();
-                        this.updateStatus('Auto Move: the suggested move is not legal on the board.');
-                        this.syncUiFromState();
-                        return;
-                    }
-
-                    const appliedDistance = Math.min(suggestion.distance, actualDistance);
-                    if (appliedDistance < suggestion.distance - 0.05) {
-                        console.log('[Auto Move] distance clamped', {
-                            plannedDistanceMm: Math.round(suggestion.distance),
-                            actualDistanceMm: Math.round(actualDistance),
-                            appliedDistanceMm: Math.round(appliedDistance)
-                        });
-                    }
-
-                    const applied = this.applyForwardMove(appliedDistance);
-                    if (!applied) {
-                        const invalidReasons = describeDraftInvalidReasons(this.state.draft);
-                        this.cancelDraft(false);
-                        console.log('[Auto Move] end', {
-                            result: 'failed',
-                            reason: 'applyForwardMove rejected the planned distance',
-                            planned: describeAutoMoveSuggestion(suggestion, this.state.units),
-                            simulatedDistanceMm: Math.round(suggestion.distance),
-                            actualDistanceMm: Math.round(actualDistance),
-                            appliedDistanceMm: Math.round(appliedDistance),
-                            invalidReasons,
-                            elapsedMs: Math.round(searchElapsedMs)
-                        });
-                        this.closeAutoMoveModal();
-                        this.updateStatus('Auto Move: the suggested move could not be applied.');
-                        this.syncUiFromState();
-                        return;
-                    }
-                    suggestion.distance = appliedDistance;
-                } else {
-                    suggestion.unitIds.forEach((unitId) => {
-                        const trialUnit = suggestion.afterUnits.find((entry) => entry.id === unitId);
-                        const liveUnit = this.getUnitById(unitId);
-                        if (trialUnit && liveUnit) {
-                            liveUnit.x = trialUnit.x;
-                            liveUnit.y = trialUnit.y;
-                            liveUnit.rotation = trialUnit.rotation;
-                        }
-                    });
-                    this.evaluateDraft();
-                    if (this.state.draft.invalidIds.size > 0) {
-                        const invalidReasons = describeDraftInvalidReasons(this.state.draft);
-                        this.cancelDraft(false);
-                        console.log('[Auto Move] end', {
-                            result: 'failed',
-                            reason: 'simulated alternate move rejected on apply',
-                            planned: describeAutoMoveSuggestion(suggestion, this.state.units),
-                            invalidReasons,
-                            elapsedMs: Math.round(searchElapsedMs)
-                        });
-                        this.closeAutoMoveModal();
-                        this.updateStatus('Auto Move: the suggested move could not be applied.');
-                        this.syncUiFromState();
-                        return;
-                    }
-                    if (suggestion.moveKind !== 'reverse' || suggestion.analysis.type !== 'single') {
-                        this.commitDraftStep();
-                    }
-                }
-
-                this.finishDraft();
-                this.state.autoMoveGhost = {
-                    unitIds: [...suggestion.unitIds],
-                    ghostSnapshot
-                };
+                const applied = this.applyAutoMoveSuggestion(suggestion);
                 console.log('[Auto Move] end', {
-                    result: 'success',
-                    moved: describeAutoMoveSuggestion(suggestion, this.state.units),
+                    result: applied ? 'success' : 'failed',
+                    planned: describeAutoMoveSuggestion(suggestion, this.state.units),
                     remainingMoves: this.state.remainingMoves,
                     elapsedMs: Math.round(((typeof performance !== 'undefined' && performance.now)
                         ? performance.now()
-                        : Date.now()) - startedAt),
-                    movedThisTurn: suggestion.unitIds.map((unitId) => {
-                        const unit = this.getUnitById(unitId);
-                        return {
-                            id: unitId,
-                            type: unit?.type || null,
-                            movedThisTurn: Boolean(unit?.movedThisTurn)
-                        };
-                    })
+                        : Date.now()) - startedAt)
                 });
                 this.closeAutoMoveModal();
-                this.updateStatus(formatAutoMoveStatus(suggestion, this.state.units));
                 this.syncUiFromState();
                 this.requestRender();
             }

@@ -63,8 +63,10 @@
                 <button id="resolveShootingButton" type="button" hidden>Resolve Shooting</button>
                 <button id="undoMoveButton" type="button">Undo</button>
                 <button id="acknowledgedButton" type="button" hidden>Acknowledged</button>
+                <button id="gamePauseControllerButton" type="button" hidden>Pause</button>
             </div>
             <div class="bar-group status-group">
+                <span id="gameThinkingText" class="thinking-pill thinking-pill-status" hidden></span>
                 <div id="statusText">Edit mode: place, drag, marquee-select, or rotate units.</div>
                 <div id="selectionText">No units selected.</div>
             </div>
@@ -112,6 +114,10 @@
             </aside>
         </main>
         <div class="global-utility">
+            <div id="controllerHud" class="controller-hud" hidden>
+                <span id="controllerThinkingText" class="thinking-pill" hidden></span>
+                <button id="pauseControllerButton" type="button">Pause</button>
+            </div>
             <button id="storageButton" class="icon-button" type="button" aria-label="Open save and load dialog">&#9881;</button>
         </div>
         <main id="setupShell" class="setup-shell" hidden>
@@ -119,7 +125,7 @@
                 <header class="setup-header">
                     <p class="setup-kicker">Battle Setup · 1 of 3</p>
                     <h1 id="armyBuilderTitle">Build the Armies</h1>
-                    <p>Choose each player's color, faction, and force. Both armies must total 24 AP, and they cannot share a color or faction.</p>
+                    <p>Choose who controls each army, then pick color, faction, and force — or leave any of those random. Both armies must total 24 AP (or be marked random), and they cannot share a color or faction.</p>
                 </header>
                 <div id="armyColumns" class="army-columns"></div>
                 <footer class="setup-actions">
@@ -339,6 +345,8 @@
     <script src="src/ai/move-simulate.js"></script>
     <script src="src/ai/move-apply.js"></script>
     <script src="src/ai/move.js"></script>
+    <script src="src/ai/shooting.js"></script>
+    <script src="src/controller.js"></script>
     <script src="src/selection-panel.js"></script>
     <script src="src/victory.js"></script>
     <script src="src/app.js"></script>

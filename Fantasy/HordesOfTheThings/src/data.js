@@ -43,6 +43,9 @@
     const ENSORCELLABLE_TYPES = Object.freeze(['Hero', 'Magician']);
 
     const PLAYER_IDS = Object.freeze(['player-1', 'player-2']);
+    const CONTROLLER_TYPES = Object.freeze(['local', 'computer', 'remote']);
+    const RANDOM_IDENTITY = 'random';
+    const COMPUTER_ACTION_DELAY_MS = 700;
     const ARMY_POINT_TARGET = 24;
     const FACTIONS = Object.freeze(['Panda', 'Undead', 'Goblin', 'Gunpowder', 'Dinosaurs']);
     const FACTION_ROSTERS = Object.freeze({
@@ -149,9 +152,23 @@
     });
 
     const DEFAULT_PLAYERS = Object.freeze({
-        'player-1': { id: 'player-1', colorId: 'blue', faction: 'Panda' },
-        'player-2': { id: 'player-2', colorId: 'red', faction: 'Undead' }
+        'player-1': { id: 'player-1', colorId: 'blue', faction: 'Panda', controller: 'local' },
+        'player-2': { id: 'player-2', colorId: 'red', faction: 'Undead', controller: 'local' }
     });
+
+    const RANDOM_PLAYER_COLOR = Object.freeze({
+        label: 'Random',
+        fill: '#9a9388',
+        stroke: '#5c564e',
+        glow: 'rgba(90, 86, 78, 0.24)'
+    });
+
+    function normalizeController(value) {
+        if (value === 'computer' || value === 'remote') {
+            return value;
+        }
+        return 'local';
+    }
 
     // Retained until all rendering consumers use player color configuration.
     const COLORS = PLAYER_COLORS;
@@ -411,8 +428,13 @@
         TERRAIN_ASSET_ROOT,
         TERRAIN_ASSET_WOBBLE,
         PLAYER_IDS,
+        CONTROLLER_TYPES,
+        RANDOM_IDENTITY,
+        COMPUTER_ACTION_DELAY_MS,
         PLAYER_COLORS,
         DEFAULT_PLAYERS,
+        RANDOM_PLAYER_COLOR,
+        normalizeController,
         COLORS,
         UNIT_TYPES,
         TERRAIN_STYLE,

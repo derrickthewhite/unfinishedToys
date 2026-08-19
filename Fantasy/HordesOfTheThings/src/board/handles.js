@@ -12,6 +12,37 @@
     root.HordesBoardHandles = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesFormation);
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, formation) {
     class Methods {
+        canManipulateSelection() {
+            const selectedUnits = this.getSelectedUnits();
+            if (selectedUnits.length === 0) {
+                return false;
+            }
+            if (this.state.setupStage === 'unit-deployment') {
+                const activePlayerId = this.getDeploymentSetup()?.activePlayerId;
+                if (typeof this.isComputerPlayer === 'function' && this.isComputerPlayer(activePlayerId)) {
+                    return false;
+                }
+                return selectedUnits.every((unit) => this.getUnitPlayerId(unit) === activePlayerId);
+            }
+            if (this.state.mode === 'edit') {
+                return true;
+            }
+            if (this.state.mode === 'game' && this.state.phase === 'move') {
+                return selectedUnits.every((unit) => {
+                    const playerId = this.getUnitPlayerId(unit);
+                    if (playerId !== this.state.activePlayerId) {
+                        return false;
+                    }
+                    if (unit.movedThisTurn) {
+                        return false;
+                    }
+                    return typeof this.canLocallyControl !== 'function' || this.canLocallyControl(playerId);
+                });
+            }
+            return false;
+        }
+
+
         getHandleHit(world) {
             const handles = this.getSelectionHandles();
             for (const handle of handles) {
@@ -24,6 +55,9 @@
 
 
         getSelectionHandles() {
+            if (!this.canManipulateSelection()) {
+                return [];
+            }
             if (this.isReserveDeployDraft() && !this.isEnsorcelledLocalReturnDraft()) {
                 return [];
             }

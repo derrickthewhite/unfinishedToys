@@ -84,7 +84,8 @@
             const armies = this.createArmyDrafts();
             data.PLAYER_IDS.forEach((playerId) => {
                 armies[playerId] = {
-                    counts: { ...(source.armies?.[playerId]?.counts || {}) }
+                    counts: { ...(source.armies?.[playerId]?.counts || {}) },
+                    random: Boolean(source.armies?.[playerId]?.random)
                 };
             });
             const confirmation = source.confirmation === 'armies' || source.confirmation === 'terrain'
@@ -243,7 +244,21 @@
             this.state.setup = this.normalizeSavedSetup(snapshot.setup, setupStage);
             this.state.setupCameras = {};
             this.state.players = data.PLAYER_IDS.reduce((players, playerId) => {
-                players[playerId] = { ...data.DEFAULT_PLAYERS[playerId], ...(snapshot.players?.[playerId] || {}) };
+                const saved = snapshot.players?.[playerId] || {};
+                const colorId = saved.colorId === data.RANDOM_IDENTITY || data.PLAYER_COLORS[saved.colorId]
+                    ? saved.colorId
+                    : data.DEFAULT_PLAYERS[playerId].colorId;
+                const faction = saved.faction === data.RANDOM_IDENTITY || data.FACTIONS.includes(saved.faction)
+                    ? saved.faction
+                    : data.DEFAULT_PLAYERS[playerId].faction;
+                players[playerId] = {
+                    ...data.DEFAULT_PLAYERS[playerId],
+                    ...saved,
+                    id: playerId,
+                    colorId,
+                    faction,
+                    controller: data.normalizeController(saved.controller)
+                };
                 return players;
             }, {});
             this.state.activePlayerId = snapshot.activePlayerId || (snapshot.activeSide === 'red' ? 'player-2' : 'player-1');
@@ -289,17 +304,22 @@
             if (setupStage === 'game' && this.state.phase === 'melee') {
                 this.initializeMeleePhase();
             }
+            this.state.controllerPaused = false;
+            this.state.controllerThinking = null;
+            this.resetControllerRuntime();
             this.closeStorageModal(false);
             if (setupStage === 'game' && !this.state.victory) {
                 this.ensureStartingArmyValues();
             }
             if (setupStage === 'game' && this.maybeAutoAdvanceCombatPhase()) {
+                this.scheduleControllerAction();
                 return;
             }
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.requestRender();
             this.updateStatus(`Loaded saved game ${record.name}.`);
+            this.scheduleControllerAction();
         }
 
         deleteGame(recordId) {

@@ -524,6 +524,7 @@
                     this.updateSelectionAnalysis();
                     this.updateStatus(`${this.getPlayerLabel(deployment.attackerPlayerId)} now deploys in the top quarter.`);
                     this.syncUiFromState();
+                    this.scheduleControllerAction();
                     return;
                 }
                 const firstPlayerId = deployment.defenderPlayerId;
@@ -555,6 +556,7 @@
                 this.syncUiFromState();
                 this.requestRender();
                 this.updateStatus(`Deployment complete. ${this.getPlayerLabel(firstPlayerId)} takes the first turn with ${this.state.remainingMoves} moves.`);
+                this.scheduleControllerAction();
             },
 
             paintUnitDeploymentCanvas() {
@@ -639,12 +641,18 @@
                     this.ui.deploymentStatus.textContent = 'Every deployed unit must stay on the board, fully inside its assigned quarter, and cannot overlap any other deployed unit.';
                 }
                 if (this.ui.finishDeploymentButton) {
+                    this.ui.finishDeploymentButton.hidden = typeof this.isComputerPlayer === 'function'
+                        && this.isComputerPlayer(activePlayerId);
                     this.ui.finishDeploymentButton.disabled = !this.canFinishDeploymentTurn();
                 }
                 if (this.ui.autoDeployButton) {
+                    this.ui.autoDeployButton.hidden = typeof this.isComputerPlayer === 'function'
+                        && this.isComputerPlayer(activePlayerId);
                     this.ui.autoDeployButton.disabled = false;
                 }
                 if (this.ui.returnToTrayButton) {
+                    this.ui.returnToTrayButton.hidden = typeof this.isComputerPlayer === 'function'
+                        && this.isComputerPlayer(activePlayerId);
                     const selectedCount = this.getSelectedUnits()
                         .filter((unit) => this.getUnitPlayerId(unit) === activePlayerId).length;
                     this.ui.returnToTrayButton.disabled = selectedCount === 0;

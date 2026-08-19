@@ -144,6 +144,13 @@
                 this.updateStatus('Movement is only available during the move phase.');
                 return false;
             }
+            if (typeof this.hasLocalHuman === 'function'
+                && this.hasLocalHuman()
+                && typeof this.canLocallyControl === 'function'
+                && !this.canLocallyControl(this.state.activePlayerId)) {
+                this.updateStatus('Movement is unavailable while the active side is computer-controlled.');
+                return false;
+            }
             const selectedUnits = unitIds.map((unitId) => this.getUnitById(unitId)).filter(Boolean);
             if (selectedUnits.length === 0 || selectedUnits.some((unit) => this.getUnitPlayerId(unit) !== this.state.activePlayerId)) {
                 this.updateStatus('Only units on the active side can draft a move.');

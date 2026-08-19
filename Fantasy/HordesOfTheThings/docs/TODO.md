@@ -16,5 +16,7 @@ Project work. Intended rules that are not in the prototype yet are specified in 
 - [ ] More faction artwork for types that still fall back to generic SVGs
 - [ ] Further armies once their artwork exists
 - [ ] More unit types, once they have rules in Design.md
-- [ ] Shooting and melee automation (Auto Move is move-phase only)
+- [x] Shooting and melee automation for computer players (local Auto Move remains move-phase only)
 - [ ] Opponent lookahead for Auto Move
+- [ ] AI perf spike: evaluate moving move-search/scoring to a Web Worker (off-main-thread), with benchmark targets and migration risk assessment before full cutover
+- [ ] Auto-deploy: handle "hordes do not fit" placement failure path

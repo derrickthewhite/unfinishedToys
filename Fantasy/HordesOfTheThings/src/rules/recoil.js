@@ -63,6 +63,11 @@
 
 
     function getRecoilBlockReason(unit, units, terrain, movingIds) {
+        const outsideBoard = geometry.cornersToPoints(geometry.getUnitCorners(unit))
+            .some((point) => point.x < 0 || point.x > data.BOARD_SIZE || point.y < 0 || point.y > data.BOARD_SIZE);
+        if (outsideBoard) {
+            return 'recoil carries unit off the board';
+        }
         const terrainTypes = sampleUnitTerrain(unit, terrain);
         if (terrainTypes.has('impassable') || terrainTypes.has('water')) {
             return terrainTypes.has('water')

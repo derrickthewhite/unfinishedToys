@@ -212,6 +212,10 @@
                     };
                     return;
                 }
+                if (typeof this.isComputerPlayer === 'function'
+                    && this.isComputerPlayer(this.getTerrainSetup()?.defenderPlayerId)) {
+                    return;
+                }
                 const point = this.terrainScreenToWorld(event);
                 const rotationPiece = this.getTerrainRotationHandleHit(point);
                 if (rotationPiece) {
@@ -362,11 +366,20 @@
                 });
                 this.ui.terrainCountInput.value = String(terrain.terrainCount);
                 this.ui.terrainProgress.textContent = `${this.getPlacedTerrainCount()} / ${terrain.terrainCount} placed`;
-                this.ui.terrainDefender.textContent = `${this.getPlayerLabel(terrain.defenderPlayerId)} is the defender. Place the agreed terrain, then confirm the board.`;
-                this.ui.autoPlaceTerrainButton.disabled = this.isTerrainReady();
-                this.ui.confirmTerrainButton.disabled = !this.isTerrainReady();
+                this.ui.terrainDefender.textContent = `${this.getPlayerSelectLabel(terrain.defenderPlayerId)} is the defender. Place the agreed terrain, then confirm the board.`;
+                const computerDefender = typeof this.isComputerPlayer === 'function'
+                    && this.isComputerPlayer(terrain.defenderPlayerId);
+                if (this.ui.terrainCountInput) this.ui.terrainCountInput.disabled = computerDefender;
+                if (this.ui.autoPlaceTerrainButton) {
+                    this.ui.autoPlaceTerrainButton.hidden = computerDefender;
+                    this.ui.autoPlaceTerrainButton.disabled = this.isTerrainReady();
+                }
+                if (this.ui.confirmTerrainButton) {
+                    this.ui.confirmTerrainButton.hidden = computerDefender;
+                    this.ui.confirmTerrainButton.disabled = !this.isTerrainReady();
+                }
                 this.ui.terrainOffers.innerHTML = terrain.offers.map((offer) => (`
-                    <button type="button" class="terrain-offer" data-terrain-offer="${offer.id}"${this.getPlacedTerrainCount() >= terrain.terrainCount ? ' disabled' : ''}>
+                    <button type="button" class="terrain-offer" data-terrain-offer="${offer.id}"${computerDefender || this.getPlacedTerrainCount() >= terrain.terrainCount ? ' disabled' : ''}>
                         <canvas class="terrain-offer-preview" width="200" height="200" data-terrain-preview="${offer.id}" aria-hidden="true"></canvas>
                         <span>${data.TERRAIN_STYLE[offer.kind].label}</span>
                         <span class="terrain-offer-description">${this.getTerrainOfferDescription(offer)}</span>
