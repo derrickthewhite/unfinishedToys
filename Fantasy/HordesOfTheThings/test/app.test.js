@@ -585,6 +585,30 @@ test('collectGhostUnits omits future form-up positions when preview is disabled'
     assert.equal(ghosts.length, 0);
 });
 
+test('collectGhostUnits includes future form-up positions when preview is enabled in edit mode', () => {
+    const blue = createBlade('b1', 140, 280);
+    blue.playerId = 'player-1';
+    blue.rotation = Math.PI / 2;
+    const red = { ...createBlade('r1', 190, 310), playerId: 'player-2', rotation: Math.PI };
+    const app = createAppHarness({
+        state: {
+            mode: 'edit',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            showFormUpPreview: true,
+            units: [blue, red]
+        }
+    });
+    app.getFormUpPreview = HordesPrototype.prototype.getFormUpPreview;
+    app.collectGhostUnits = HordesPrototype.prototype.collectGhostUnits;
+
+    const ghosts = app.collectGhostUnits();
+
+    assert.equal(ghosts.length, 1);
+    assert.equal(ghosts[0].id, 'b1');
+    assert.notEqual(ghosts[0].x, blue.x);
+});
+
 test('keyboard shortcut toggles form-up preview and persists the checkbox state through sync', () => {
     const app = createAppHarness({
         state: {

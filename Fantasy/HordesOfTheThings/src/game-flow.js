@@ -672,7 +672,10 @@
                     movedUnitIds: [...this.state.autoMovePreview.unitIds]
                 };
             }
-            if (this.state.mode !== 'game' || this.state.phase !== 'move' || !this.state.showFormUpPreview) {
+            if (!this.state.showFormUpPreview) {
+                return null;
+            }
+            if (this.state.mode === 'game' && this.state.phase !== 'move') {
                 return null;
             }
             const result = rules.resolveAutomaticFormUp(this.state.units, this.state.activePlayerId, this.state.terrain);
