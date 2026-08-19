@@ -19,8 +19,7 @@
         hasMeaningfulSharedEdge,
         cloneUnit,
         buildEnsorcelledUnit,
-        rotateUnitInPlace,
-        sharesFormationContact
+        rotateUnitInPlace
     } = core;
 
     const {
@@ -228,6 +227,28 @@
     }
 
 
+    function hasFileSupportContact(left, right) {
+        if (getPlayerId(left) !== getPlayerId(right)) {
+            return false;
+        }
+        if (!areSameFacing(left, right)) {
+            return false;
+        }
+        const forward = geometry.getForwardVector(left.rotation);
+        const rightVector = geometry.getRightVector(left.rotation);
+        const leftCenter = geometry.getUnitCenter(left);
+        const rightCenter = geometry.getUnitCenter(right);
+        const delta = geometry.subtract(rightCenter, leftCenter);
+        const u = geometry.dot(delta, rightVector);
+        const v = geometry.dot(delta, forward);
+        const fileGap = Math.abs(Math.abs(v) - ((left.depth + right.depth) / 2));
+        const widthOverlap = Math.min(left.width / 2, u + (right.width / 2))
+            - Math.max(-(left.width / 2), u - (right.width / 2));
+        return fileGap <= data.FORMATION_GAP_TOLERANCE
+            && widthOverlap > data.COLLISION_EPSILON;
+    }
+
+
     function buildStackGroups(units) {
         const parent = new Map();
         units.forEach((unit) => parent.set(unit.id, unit.id));
@@ -261,7 +282,9 @@
                 if (getPlayerId(left) !== getPlayerId(right) || left.type !== right.type || !isStackEligible(left) || !areSameFacing(left, right)) {
                     continue;
                 }
-                if (sharesFormationContact(left, right)) {
+                // Melee stacking support is file-only: rear support behind a front unit.
+                // Rank-adjacent units should not be merged into one stacked combatant.
+                if (hasFileSupportContact(left, right)) {
                     union(left.id, right.id);
                 }
             }

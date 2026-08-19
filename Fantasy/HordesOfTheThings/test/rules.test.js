@@ -1636,6 +1636,47 @@ test('resolveRecoil still destroys on real rear-edge contact', () => {
     assert.equal(result.destructionReasons.b1, 'recoil is blocked by rear or side enemy contact');
 });
 
+test('resolveRecoil only chains through rear file support, not rank neighbors', () => {
+    const frontSpear = {
+        id: 'b1',
+        type: 'Spear',
+        playerId: 'player-1',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 220,
+        rotation: 0,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 4, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const rearSupport = {
+        ...cloneUnit(frontSpear),
+        id: 'b2',
+        x: 100,
+        y: 240
+    };
+    const rankNeighbor = {
+        ...cloneUnit(frontSpear),
+        id: 'b3',
+        x: 140,
+        y: 220
+    };
+
+    const result = rules.resolveRecoil(
+        'b1',
+        [frontSpear, rearSupport, rankNeighbor],
+        data.createDefaultTerrain()
+    );
+
+    assert.deepEqual(result.destroyedIds, []);
+    assert.deepEqual(result.destructionReasons, {});
+    assert.equal(result.units.find((unit) => unit.id === 'b1').y, 240);
+    assert.equal(result.units.find((unit) => unit.id === 'b2').y, 260);
+    assert.equal(result.units.find((unit) => unit.id === 'b3').y, 220);
+});
+
 test('resolveShooting does not make the shooting attacker lose the exchange', () => {
     const shooter = {
         id: 's1',
@@ -1739,7 +1780,7 @@ test('detectMeleeCombats finds front-to-front enemy contacts', () => {
     assert.equal(result.combats[0].edgesOnRight.includes('front'), true);
 });
 
-test('detectMeleeCombats groups stacked spears as one combatant', () => {
+test('detectMeleeCombats groups file-stacked spears as one combatant', () => {
     const frontSpear = {
         id: 'b1',
         type: 'Spear',
@@ -1754,8 +1795,50 @@ test('detectMeleeCombats groups stacked spears as one combatant', () => {
         strength: { infantry: 4, mounted: 4 },
         combat: { ignoresBadGoingPenalty: false }
     };
-    const sideSpear = {
+    const rearSpear = {
         ...cloneUnit(frontSpear),
+        id: 'b2',
+        x: 100,
+        y: 240
+    };
+    const red = {
+        id: 'r1',
+        type: 'Blade',
+        playerId: 'player-2',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 140,
+        y: 220,
+        rotation: Math.PI,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 3 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+
+    const result = rules.detectMeleeCombats([frontSpear, rearSpear, red]);
+
+    assert.equal(result.combatants.some((combatant) => combatant.unitIds.length === 2), true);
+    assert.equal(result.combats.length, 1);
+});
+
+test('detectMeleeCombats does not group rank-adjacent spears into one combatant', () => {
+    const leftSpear = {
+        id: 'b1',
+        type: 'Spear',
+        playerId: 'player-1',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 220,
+        rotation: 0,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 4, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const rightSpear = {
+        ...cloneUnit(leftSpear),
         id: 'b2',
         x: 140,
         y: 220
@@ -1775,10 +1858,8 @@ test('detectMeleeCombats groups stacked spears as one combatant', () => {
         combat: { ignoresBadGoingPenalty: false }
     };
 
-    const result = rules.detectMeleeCombats([frontSpear, sideSpear, red]);
-
-    assert.equal(result.combatants.some((combatant) => combatant.unitIds.length === 2), true);
-    assert.equal(result.combats.length, 1);
+    const result = rules.detectMeleeCombats([leftSpear, rightSpear, red]);
+    assert.equal(result.combatants.some((combatant) => combatant.unitIds.length === 2), false);
 });
 
 test('detectMeleeCombats ignores corner-only contact even when the touched unit is already fighting', () => {
@@ -1881,8 +1962,8 @@ test('previewMeleeCombats reports factors and modifier sources without rolling d
     const support = {
         ...blue,
         id: 'b2',
-        x: 60,
-        y: 220
+        x: 100,
+        y: 240
     };
     const red = {
         id: 'r1',
@@ -1973,11 +2054,11 @@ test('resolveMelee applies stacked and flank modifiers', () => {
         strength: { infantry: 4, mounted: 4 },
         combat: { ignoresBadGoingPenalty: false }
     };
-    const sideSpear = {
+    const rearSpear = {
         ...cloneUnit(frontSpear),
         id: 'b2',
-        x: 60,
-        y: 220
+        x: 100,
+        y: 240
     };
     const red = {
         id: 'r1',
@@ -2001,7 +2082,7 @@ test('resolveMelee applies stacked and flank modifiers', () => {
         rotation: Math.PI / 2
     };
 
-    const result = rules.resolveMelee([frontSpear, sideSpear, red, redFlanker], data.createDefaultTerrain(), () => 3);
+    const result = rules.resolveMelee([frontSpear, rearSpear, red, redFlanker], data.createDefaultTerrain(), () => 3);
     const frontCombat = result.results.find((entry) => entry.rightPrimaryId === 'r1');
     const flankCombat = result.results.find((entry) => entry.rightPrimaryId === 'r2');
 

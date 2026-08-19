@@ -27,9 +27,13 @@
         recoilDeath: 2.5,
         pinchRelief: 1,
         reserveEntry: 1,
-        advance: 1,
+        advance: 0.6,
+        splitEfficiency: 0.5,
         cohesion: 2,
-        terrain: 1
+        terrain: 1,
+        stationaryShooter: 2,
+        rangeBand: 1.5,
+        rangedOpportunity: 1.5
     });
 
     const MATCHUP_SCALE = 0.25;
@@ -363,7 +367,203 @@
     }
 
 
-    function scoreCandidate(beforeUnits, afterUnits, activePlayerId, enemyPlayerId, getPlayerId, movedUnitIds, terrain) {
+    function hasValidShootingTarget(unit, allUnits, terrain, activePlayerId) {
+        return allUnits.some((other) => (
+            !other.inReserve
+            && rules.isValidShootingAttack(unit, other, allUnits, terrain, activePlayerId)
+        ));
+    }
+
+
+    /**
+     * Penalty when a candidate moves a unit that would sacrifice a live ranged attack.
+     * Only fires when the unit actually has a valid target right now — so Artillery that
+     * hasn't reached shooting range yet is free to advance.
+     */
+    function scoreStationaryShooter(beforeUnits, movedUnitIds, terrain, getPlayerId) {
+        return movedUnitIds.reduce((sum, unitId) => {
+            const unit = beforeUnits.find((entry) => entry.id === unitId);
+            if (!unit || !unit.ranged) {
+                return sum;
+            }
+            if (!unit.ranged.requiresStationary && !unit.ranged.requiresOwnTurn) {
+                return sum;
+            }
+            // Only penalise when there is actually a live target to sacrifice.
+            const hasTargets = hasValidShootingTarget(unit, beforeUnits, terrain, getPlayerId(unit));
+            return hasTargets ? sum - 1 : sum;
+        }, 0);
+    }
+
+
+    /**
+     * Scores the value of ranged attack opportunities that exist BEFORE this move.
+     * Used to reward keeping ranged units in position and to penalise moving them away.
+     *
+     * Ranged combat is asymmetric: the attacker can never lose (a defender win = no-effect),
+     * so even a matched 3v3 shot is always worth taking. The scoring reflects this:
+     * - Base advantage: attacker strength vs defender strength (like fight, but ranged).
+     * - Asymmetry bonus: a fixed positive reward whenever an attack is available at all,
+     *   because even a losing roll does nothing to the attacker.
+     *
+     * A moving candidate loses these scores because the ranged unit won't be stationary.
+     */
+    /**
+     * Scores the *quality* of the best ranged opportunity that would be lost by moving.
+     * scoreStationaryShooter already provides a flat "you're giving up a shot" penalty;
+     * this adds the quality differential so better targets (vs weak enemies, or favourable
+     * matchups) produce a stronger discouragement. Returns a negative value (opportunity cost).
+     *
+     * Also handles the positive side: Magicians (requiresOwnTurn) with an enemy in range
+     * score positively for the *candidate* that keeps them stationary — but since we score
+     * the moving candidate, we only apply the negative here.
+     */
+    function scoreRangedOpportunity(beforeUnits, movedUnitIds, activePlayerId, enemyPlayerId, getPlayerId, terrain) {
+        const meleeIds = getPlayerMeleeUnitIds(beforeUnits, activePlayerId, getPlayerId);
+        let total = 0;
+
+        movedUnitIds.forEach((unitId) => {
+            const unit = beforeUnits.find((entry) => entry.id === unitId);
+            if (!unit || !unit.ranged || meleeIds.has(unitId)) {
+                return;
+            }
+            const losesShot = unit.ranged.requiresStationary || unit.ranged.requiresOwnTurn;
+            if (!losesShot) {
+                return;
+            }
+
+            let bestScore = 0;
+            beforeUnits.forEach((enemy) => {
+                if (getPlayerId(enemy) !== enemyPlayerId || enemy.inReserve) {
+                    return;
+                }
+                if (!rules.isValidShootingAttack(unit, enemy, beforeUnits, terrain, activePlayerId)) {
+                    return;
+                }
+                const attackStrength = unit.strength
+                    ? (unit.strength[enemy.troopClass] || unit.strength.infantry || 0)
+                    : 0;
+                const defendStrength = enemy.strength
+                    ? (enemy.strength[unit.troopClass] || enemy.strength.infantry || 0)
+                    : 0;
+                // Asymmetry bonus: attacker can't lose a ranged exchange (defender win = no-effect).
+                // Even parity shots are net-positive, so any valid target has positive value.
+                const asymmetryBonus = 0.15 + (attackStrength / 50);
+                const rawAdvantage = (attackStrength - defendStrength) / 12;
+                bestScore = Math.max(bestScore, rawAdvantage + asymmetryBonus);
+            });
+
+            // Only penalise the quality delta — the flat "giving up a shot" cost
+            // is already handled by scoreStationaryShooter.
+            if (bestScore > 0) {
+                total -= bestScore;
+            }
+        });
+
+        return total;
+    }
+
+
+    /**
+     * Penalty when a ranged unit that is NOT currently in melee advances so close to an
+     * enemy that it will be within easy charge range next turn. Reward for staying inside
+     * its own shooting range but outside melee contact.
+     *
+     * "Danger distance" = largest single-turn move of any enemy unit (approximated by
+     * checking the nearest enemy's moves.good value).
+     */
+    function scoreRangeBand(beforeUnits, afterUnits, movedUnitIds, activePlayerId, enemyPlayerId, getPlayerId, terrain) {
+        const meleeAfter = getPlayerMeleeUnitIds(afterUnits, activePlayerId, getPlayerId);
+        const enemies = afterUnits.filter(
+            (unit) => getPlayerId(unit) === enemyPlayerId && !unit.inReserve
+        );
+        if (enemies.length === 0) {
+            return 0;
+        }
+
+        let total = 0;
+        movedUnitIds.forEach((unitId) => {
+            const unit = afterUnits.find((entry) => entry.id === unitId);
+            if (!unit || !unit.ranged || !unit.ranged.range) {
+                return;
+            }
+            // Only penalise/reward movement for units not already locked in melee.
+            if (meleeAfter.has(unitId)) {
+                return;
+            }
+
+            const unitCenter = geometry.getUnitCenter(unit);
+            let closestEnemy = null;
+            let closestDist = Infinity;
+            enemies.forEach((enemy) => {
+                const dist = geometry.distance(unitCenter, geometry.getUnitCenter(enemy));
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closestEnemy = enemy;
+                }
+            });
+            if (!closestEnemy) {
+                return;
+            }
+
+            const shootRange = unit.ranged.range;
+            // Approximate danger radius: the closest enemy's best single-move distance.
+            const enemyMoveRange = Math.max(
+                closestEnemy.moves.road,
+                closestEnemy.moves.good,
+                closestEnemy.moves.bad
+            );
+
+            // Unit has blundered inside a distance from which the enemy can charge next turn.
+            if (closestDist < enemyMoveRange + unit.depth) {
+                total -= 1;
+            } else if (closestDist <= shootRange) {
+                // Within own shooting range and not in danger — a mild positive.
+                total += 0.2;
+            }
+        });
+        return total;
+    }
+
+
+    /**
+     * Returns a penalty (negative) when a forward move restricts fast units to the speed of
+     * slow ones, AND the player still has moves remaining to spend on a split.
+     *
+     * actualDistance  — how far the group actually moved (from the forward probe)
+     * units           — the board state before moving
+     * movedUnitIds    — ids of units in this candidate
+     * remainingMoves  — PIPs left after this move would be spent
+     */
+    function scoreSplitEfficiency(actualDistance, units, movedUnitIds, remainingMoves) {
+        if (movedUnitIds.length <= 1 || remainingMoves < 1) {
+            return 0;
+        }
+        const perUnitMax = movedUnitIds.map((unitId) => {
+            const unit = units.find((entry) => entry.id === unitId);
+            if (!unit) {
+                return 0;
+            }
+            return Math.max(unit.moves.road, unit.moves.good, unit.moves.bad);
+        });
+        const maxPossible = Math.max(...perUnitMax);
+        if (maxPossible <= 0 || actualDistance <= 0) {
+            return 0;
+        }
+        // Fraction of movement range that is wasted by dragging slower units.
+        // Only meaningful when there is a real spread between best and worst.
+        const slowest = Math.min(...perUnitMax);
+        const throttleRatio = 1 - (slowest / maxPossible);
+        if (throttleRatio <= 0.1) {
+            return 0;
+        }
+        // Diminish penalty when we barely have a move to spare, amplify when we have many.
+        const movesBonus = Math.min(remainingMoves - 1, 2) / 2;
+        return -throttleRatio * movesBonus;
+    }
+
+
+    function scoreCandidate(beforeUnits, afterUnits, activePlayerId, enemyPlayerId, getPlayerId, movedUnitIds, terrain, opts = {}) {
         const fightQuality = scoreFightQuality(
             beforeUnits,
             afterUnits,
@@ -387,12 +587,25 @@
             movedUnitIds,
             terrain
         );
+        const splitEff = opts.moveKind === 'forward'
+            ? scoreSplitEfficiency(opts.distance ?? 0, beforeUnits, movedUnitIds, opts.remainingMoves ?? 0)
+            : 0;
         const breakdown = {
             ...fightQuality,
             ...formationQuality,
             ...recoilQuality,
             reserveEntry: scoreReserveEntry(beforeUnits, afterUnits, movedUnitIds),
             advance: scoreAdvance(beforeUnits, afterUnits, movedUnitIds, activePlayerId, enemyPlayerId, getPlayerId),
+            splitEfficiency: splitEff,
+            stationaryShooter: scoreStationaryShooter(beforeUnits, movedUnitIds, terrain, getPlayerId),
+            rangeBand: scoreRangeBand(
+                beforeUnits, afterUnits, movedUnitIds,
+                activePlayerId, enemyPlayerId, getPlayerId, terrain
+            ),
+            rangedOpportunity: scoreRangedOpportunity(
+                beforeUnits, movedUnitIds,
+                activePlayerId, enemyPlayerId, getPlayerId, terrain
+            ),
             cohesion: scoreCohesion(beforeUnits, afterUnits, activePlayerId, getPlayerId),
             terrain: scoreTerrain(beforeUnits, afterUnits, movedUnitIds, terrain)
         };
@@ -408,6 +621,10 @@
             + breakdown.pinchRelief * AUTO_MOVE_WEIGHTS.pinchRelief
             + breakdown.reserveEntry * AUTO_MOVE_WEIGHTS.reserveEntry
             + breakdown.advance * AUTO_MOVE_WEIGHTS.advance
+            + breakdown.splitEfficiency * AUTO_MOVE_WEIGHTS.splitEfficiency
+            + breakdown.stationaryShooter * AUTO_MOVE_WEIGHTS.stationaryShooter
+            + breakdown.rangeBand * AUTO_MOVE_WEIGHTS.rangeBand
+            + breakdown.rangedOpportunity * AUTO_MOVE_WEIGHTS.rangedOpportunity
             + breakdown.cohesion * AUTO_MOVE_WEIGHTS.cohesion
             + breakdown.terrain * AUTO_MOVE_WEIGHTS.terrain
         );
@@ -440,16 +657,25 @@
         if (!enemyCentroid || movedUnitIds.length === 0) {
             return 0;
         }
-        return movedUnitIds.reduce((sum, unitId) => {
+        let gains = 0;
+        let counted = 0;
+        movedUnitIds.forEach((unitId) => {
             const before = beforeUnits.find((unit) => unit.id === unitId);
             const after = afterUnits.find((unit) => unit.id === unitId);
             if (!before || !after) {
-                return sum;
+                return;
             }
             const beforeDistance = geometry.distance(geometry.getUnitCenter(before), enemyCentroid);
             const afterDistance = geometry.distance(geometry.getUnitCenter(after), enemyCentroid);
-            return sum + ((beforeDistance - afterDistance) / 100);
-        }, 0);
+            gains += (beforeDistance - afterDistance) / 100;
+            counted += 1;
+        });
+        if (counted === 0) {
+            return 0;
+        }
+        // Mean distance gained per unit × √n: rewards moving more material without letting
+        // a slow rank dominate over a smaller faster group.
+        return (gains / counted) * Math.sqrt(counted);
     }
 
 
@@ -499,6 +725,10 @@
         scoreFormationSupport,
         scoreRecoilRisk,
         scoreAdvance,
+        scoreSplitEfficiency,
+        scoreStationaryShooter,
+        scoreRangeBand,
+        scoreRangedOpportunity,
         formatBreakdownValue,
         getFormUpPreviewCombats,
         getActivePreviewSide,

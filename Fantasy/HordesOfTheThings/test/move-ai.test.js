@@ -6,6 +6,7 @@ const {
     data,
     rules,
     createBlade,
+    createArtillery,
     createAppHarness
 } = require('./harness.js');
 
@@ -75,12 +76,12 @@ test('scoreFightQuality rewards stacked support and matchup on a new contact', (
         ...createKnights('r1', 140, 220, 'player-2'),
         rotation: Math.PI
     };
-    const lead = createSpear('s1', 80, 220);
-    const support = createSpear('s2', 40, 220);
+    const lead = createSpear('s1', 60, 220);
+    const support = createSpear('s2', 60, 240);
     const before = [lead, support, knights];
     const after = [
         { ...lead, x: 100, y: 220 },
-        { ...support, x: 60, y: 220 },
+        { ...support, x: 100, y: 240 },
         knights
     ];
     const quality = moveAi.scoreFightQuality(before, after, 'player-1', terrain, ['s1', 's2']);
@@ -120,11 +121,11 @@ test('scoreFormationSupport penalizes breaking an existing stacked combat', () =
         rotation: Math.PI
     };
     const front = createSpear('s1', 100, 220);
-    const support = createSpear('s2', 60, 220);
+    const support = createSpear('s2', 100, 240);
     const before = [front, support, blade];
     const after = [
         { ...front, x: 100, y: 220 },
-        { ...support, x: 20, y: 220 },
+        { ...support, x: 60, y: 240 },
         blade
     ];
     const scored = moveAi.scoreFormationSupport(
@@ -185,7 +186,7 @@ function createStragglerScenario() {
     };
 }
 
-test('scoreAdvance sums material moved toward the enemy instead of averaging move length', () => {
+test('scoreAdvance rewards more material moved via mean × sqrt(n) scaling', () => {
     const enemy = { ...createBlade('r1', 400, 100), playerId: 'player-2', rotation: Math.PI };
     const left = createBlade('u1', 100, 400);
     const middle = createBlade('u2', 140, 400);
@@ -200,8 +201,10 @@ test('scoreAdvance sums material moved toward the enemy instead of averaging mov
     ];
     const single = moveAi.scoreAdvance(before, afterSingle, ['u2'], 'player-1', 'player-2', getPlayerId);
     const rank = moveAi.scoreAdvance(before, afterRank, ['u1', 'u2', 'u3'], 'player-1', 'player-2', getPlayerId);
+    // Moving the same distance with 3 units should score sqrt(3) times higher than 1 unit
     assert.ok(single > 0);
-    assert.ok(Math.abs(rank - (single * 3)) < 0.05);
+    assert.ok(rank > single, 'rank advance should exceed single-unit advance');
+    assert.ok(Math.abs(rank - single * Math.sqrt(3)) < 0.05, `rank ${rank} should be single × √3 = ${single * Math.sqrt(3)}`);
 });
 
 test('findBestAutoMove prefers moving a whole rank over peeling one unit from the middle', () => {
@@ -424,4 +427,144 @@ test('undoFinishedMove restores a completed move this turn', () => {
     assert.equal(units[2].movedThisTurn, false);
     assert.ok(units[2].y > movedY);
     assert.equal(app.state.moveHistory.length, 0);
+});
+
+function createRiders(id, x, y, playerId = 'player-1') {
+    return {
+        id,
+        type: 'Riders',
+        playerId,
+        width: 40,
+        depth: 30,
+        x,
+        y,
+        rotation: 0,
+        movedThisTurn: false,
+        troopClass: 'mounted',
+        moves: { road: 125, good: 125, bad: 50, water: 25 },
+        ranged: null,
+        value: 2,
+        strength: { infantry: 3, mounted: 3 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+}
+
+test('scoreStationaryShooter penalizes moving an Artillery unit with a target in range', () => {
+    const terrain = createEmptyTerrain();
+    // Enemy Blade placed directly in Artillery's shooting box (within 125mm range).
+    const art = createArtillery('a1', 100, 300);
+    const enemy = { ...createBlade('e1', 100, 200), playerId: 'player-2', rotation: Math.PI };
+    const before = [art, enemy];
+    // Now Artillery has a live target — moving it should be penalised.
+    const artMoved = moveAi.scoreStationaryShooter(before, ['a1'], terrain, getPlayerId);
+    assert.ok(artMoved < 0, 'moving Artillery with targets in range should incur a penalty');
+
+    // Artillery far from any enemy — free to advance.
+    const farEnemy = { ...createBlade('e2', 100, 50), playerId: 'player-2', rotation: Math.PI };
+    const noTarget = moveAi.scoreStationaryShooter([art, farEnemy], ['a1'], terrain, getPlayerId);
+    assert.equal(noTarget, 0, 'moving Artillery with no targets in range should not be penalized');
+
+    // Non-stationary unit is never penalised.
+    const bladeMoved = moveAi.scoreStationaryShooter(before, ['e1'], terrain, getPlayerId);
+    assert.equal(bladeMoved, 0, 'moving a non-stationary unit should not be penalized');
+});
+
+test('findBestAutoMove does not advance Artillery when it already has a target in range', () => {
+    // Artillery at y=300, enemy at y=200 (100mm apart, within 125mm range).
+    // Moving sacrifices a live shot — should stay.
+    const art = createArtillery('a1', 100, 300);
+    const enemy = { ...createBlade('e1', 100, 200), playerId: 'player-2', rotation: Math.PI };
+    const units = [art, enemy];
+    const terrain = createEmptyTerrain();
+
+    const suggestion = moveAi.findBestAutoMove({
+        units,
+        terrain,
+        activePlayerId: 'player-1',
+        remainingMoves: 3,
+        getPlayerId
+    });
+
+    // Artillery should not be the chosen unit when it has a live target.
+    if (suggestion) {
+        assert.ok(
+            !suggestion.unitIds.includes('a1'),
+            `Artillery should not move when it has a target in range (chose: ${JSON.stringify(suggestion.unitIds)})`
+        );
+    }
+});
+
+function createMagician(id, x, y, playerId = 'player-1') {
+    // Range in mm: MAGICIAN_MAX_RANGE_PACES * MM_PER_PACE = 600 * 0.25 = 150
+    return {
+        id,
+        type: 'Magician',
+        playerId,
+        width: 40,
+        depth: 40,
+        x,
+        y,
+        rotation: 0,
+        movedThisTurn: false,
+        troopClass: 'mounted',
+        moves: { road: 125, good: 125, bad: 50, water: 25 },
+        ranged: { phase: 'shooting', range: 150, magician: true, requiresOwnTurn: true },
+        value: 4,
+        strength: { infantry: 4, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: false, moveCost: 2, attackDeclareCost: 2 }
+    };
+}
+
+test('scoreStationaryShooter penalizes moving a Magician that has a target in range', () => {
+    const terrain = createEmptyTerrain();
+    const enemy = { ...createBlade('e1', 100, 200), playerId: 'player-2', rotation: Math.PI };
+    const mag = createMagician('m1', 100, 300);
+    const before = [mag, enemy];
+    // Moving the magician when it has a target should incur a penalty.
+    const withTarget = moveAi.scoreStationaryShooter(before, ['m1'], terrain, getPlayerId);
+    assert.ok(withTarget < 0, 'moving Magician with targets in range should incur a penalty');
+
+    // Moving a Magician with no targets in range should not.
+    const farEnemy = { ...createBlade('e2', 100, 900), playerId: 'player-2', rotation: Math.PI };
+    const noTarget = moveAi.scoreStationaryShooter([mag, farEnemy], ['m1'], terrain, getPlayerId);
+    assert.equal(noTarget, 0, 'moving Magician with no targets should not be penalized');
+});
+
+test('scoreRangedOpportunity penalizes moving a Magician away from a valid target', () => {
+    const terrain = createEmptyTerrain();
+    const enemy = { ...createBlade('e1', 100, 200), playerId: 'player-2', rotation: Math.PI };
+    const mag = createMagician('m1', 100, 300);
+    const before = [mag, enemy];
+
+    const opp = moveAi.scoreRangedOpportunity(before, ['m1'], 'player-1', 'player-2', getPlayerId, terrain);
+    assert.ok(opp < 0, 'moving a Magician away from a valid target should have a negative opportunity score');
+
+    // A Blade unit (no ranged) should not be affected.
+    const bladeOpp = moveAi.scoreRangedOpportunity(before, ['e1'], 'player-2', 'player-1', getPlayerId, terrain);
+    assert.equal(bladeOpp, 0, 'non-ranged units should have zero ranged opportunity score');
+});
+
+test('findBestAutoMove does not move a Magician that already has a target in range', () => {
+    // Magician at y=300 facing up; enemy Blade at y=200 (100mm away, within 150mm range).
+    // The AI has 4 moves. Moving the Magician costs 2 PIPs and wastes the attack.
+    const mag = createMagician('m1', 100, 300);
+    const enemy = { ...createBlade('e1', 100, 200), playerId: 'player-2', rotation: Math.PI };
+    const units = [mag, enemy];
+    const terrain = createEmptyTerrain();
+
+    const suggestion = moveAi.findBestAutoMove({
+        units,
+        terrain,
+        activePlayerId: 'player-1',
+        remainingMoves: 4,
+        getPlayerId
+    });
+
+    // Either no move, or the Magician was not moved.
+    if (suggestion) {
+        assert.ok(
+            !suggestion.unitIds.includes('m1'),
+            `Magician should not be moved when it already has a target in range (got: ${JSON.stringify(suggestion.unitIds)})`
+        );
+    }
 });

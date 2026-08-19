@@ -284,7 +284,8 @@
                 enemyPlayerId,
                 getPlayerId,
                 [posed.id],
-                terrain
+                terrain,
+                { moveKind: 'reserve-deploy', distance: 0, remainingMoves }
             );
             return {
                 unitIds: [posed.id],
@@ -374,7 +375,8 @@
             enemyPlayerId,
             getPlayerId,
             unitIds,
-            terrain
+            terrain,
+            { moveKind, distance, remainingMoves }
         );
         return {
             unitIds,
