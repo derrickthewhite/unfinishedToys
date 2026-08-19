@@ -804,6 +804,7 @@
 
         updateSelectionAnalysis() {
             this.state.selectionAnalysis = rules.analyzeSelection(this.getSelectedUnits());
+            this.refreshAiEvaluationIfEnabled();
             this.syncUiFromState();
         }
 

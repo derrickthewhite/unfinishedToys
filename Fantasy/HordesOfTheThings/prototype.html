@@ -258,8 +258,12 @@
             <section class="game-settings-section" aria-labelledby="playSettingsTitle">
                 <h3 id="playSettingsTitle">Play</h3>
                 <p>Edit mode bypasses turn rules so you can freely place, move, and adjust units.</p>
-                <button id="editModeSettingsButton" class="settings-action-button" type="button">Enter Edit Mode</button>
+                <div class="settings-action-row">
+                    <button id="editModeSettingsButton" class="settings-action-button" type="button">Enter Edit Mode</button>
+                    <button id="aiEvaluationButton" class="settings-action-button settings-action-button-secondary" type="button" title="Show AI move scores for the selected unit">AI Evaluation</button>
+                </div>
                 <p id="editModeSettingsHint" class="settings-hint" hidden>Edit mode is active. Use Game Mode in the toolbar to return to normal play.</p>
+                <p id="aiEvaluationSettingsHint" class="settings-hint" hidden>AI Evaluation is active. Select one friendly unmoved unit during the move phase to see scored candidate shadows on the board.</p>
             </section>
             <section class="game-settings-section" aria-labelledby="armySettingsTitle">
                 <h3 id="armySettingsTitle">Armies</h3>
@@ -346,6 +350,7 @@
     <script src="src/ai/move-apply.js"></script>
     <script src="src/ai/move.js"></script>
     <script src="src/ai/shooting.js"></script>
+    <script src="src/ai-evaluation.js"></script>
     <script src="src/controller.js"></script>
     <script src="src/selection-panel.js"></script>
     <script src="src/victory.js"></script>

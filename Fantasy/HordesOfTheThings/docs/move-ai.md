@@ -128,6 +128,16 @@ Conservative behavior (Artillery holding, spears not blundering into shooters) i
 
 Use the Auto Move modal or console logs (`[Auto Move] planned`) to see the chosen move, distance, and full breakdown.
 
+### AI Eval mode (in-game)
+
+Open **Game Settings** and click **AI Evaluation** next to **Enter Edit Mode**. With one friendly unmoved unit selected during the move phase:
+
+- Every scored candidate for that unit is drawn as a **shadow unit** at its destination
+- A **label bubble** above each shadow shows the move name, score (✓ if ≥ `MIN_BENEFIT`), and per-candidate scoring time
+- The status line summarizes total candidates and wall-clock search time
+
+Implementation: `src/ai-evaluation.js`, `scoreAllMoveCandidatesAsync()` in `move-apply.js`, overlays in `src/board/render.js`.
+
 Fixture saves for regression:
 
 - `test/fixtures/stuck-move-save.json` — Undead turn, Magician in water, scattered Hordes, center Blade; also Panda Knights in water on player-1's turn

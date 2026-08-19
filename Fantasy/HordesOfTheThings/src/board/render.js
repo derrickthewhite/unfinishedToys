@@ -9,6 +9,8 @@
     }
     root.HordesBoardRender = factory(root.HordesData, root.HordesGeometry, root.HordesRules);
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules) {
+    const EVAL_MIN_BENEFIT = 0.25;
+
     const UNIT_ASSET_PATHS = Object.freeze({
         Blade: 'assets/Blade.svg',
         Spear: 'assets/Spear.svg',
@@ -65,6 +67,7 @@
             this.drawCornerTravelViolations(ctx);
             this.drawSelectionHandles(ctx);
             this.drawBattleStatOverlays(ctx);
+            this.drawMoveEvaluationOverlays(ctx);
             if (this.state.combatResolution) {
                 this.drawCombatResolutionOverlays(ctx);
             }
@@ -379,6 +382,171 @@
                 ctx.fillText(marker.label, marker.position.x, marker.position.y);
                 ctx.restore();
             });
+        }
+
+        getMoveEvaluationMarkers() {
+            if (!this.state.aiEvaluationMode || !this.state.moveEvaluation || this.state.moveEvaluation.loading) {
+                return [];
+            }
+            const evaluation = this.state.moveEvaluation;
+            const stackCounts = new Map();
+            return evaluation.candidates.map((entry, rank) => {
+                const center = geometry.getUnitCenter(entry.afterUnit);
+                const stackKey = `${center.x.toFixed(0)}:${center.y.toFixed(0)}`;
+                const stackIndex = stackCounts.get(stackKey) || 0;
+                stackCounts.set(stackKey, stackIndex + 1);
+                const lines = this.formatEvaluationBubbleLines(entry);
+                return {
+                    entry,
+                    rank,
+                    center,
+                    stackIndex,
+                    lines,
+                    score: entry.score
+                };
+            });
+        }
+
+        getEvaluationBubbleMetrics(lines) {
+            const scale = this.state.camera.scale;
+            const titleFont = `${9 / scale}px Georgia`;
+            const detailFont = `${10 / scale}px Georgia`;
+            const paddingX = 6 / scale;
+            const paddingY = 4 / scale;
+            const lineGap = 2 / scale;
+            const measure = (font, text) => {
+                this.ctx.save();
+                this.ctx.font = font;
+                const width = this.ctx.measureText(text).width;
+                this.ctx.restore();
+                return width;
+            };
+            const titleWidth = measure(titleFont, lines.title);
+            const scoreWidth = measure(detailFont, lines.scoreLine);
+            const timingWidth = measure(detailFont, lines.timingLine);
+            const width = Math.max(titleWidth, scoreWidth, timingWidth) + paddingX * 2;
+            const height = (9 / scale) + (10 / scale) + (10 / scale) + lineGap * 2 + paddingY * 2;
+            return { width, height, titleFont, detailFont, paddingX, paddingY, lineGap };
+        }
+
+        getEvaluationScoreColors(score, rank) {
+            if (score >= EVAL_MIN_BENEFIT) {
+                return {
+                    fill: rank === 0 ? 'rgba(214, 245, 214, 0.96)' : 'rgba(232, 248, 232, 0.94)',
+                    stroke: 'rgba(44, 110, 44, 0.65)',
+                    text: '#1f4d1f'
+                };
+            }
+            if (score > 0) {
+                return {
+                    fill: 'rgba(255, 244, 210, 0.94)',
+                    stroke: 'rgba(128, 95, 29, 0.55)',
+                    text: '#6e231c'
+                };
+            }
+            return {
+                fill: 'rgba(245, 232, 232, 0.92)',
+                stroke: 'rgba(120, 54, 54, 0.45)',
+                text: '#6e231c'
+            };
+        }
+
+        drawMoveEvaluationOverlays(ctx) {
+            if (!this.state.aiEvaluationMode) {
+                return;
+            }
+            const evaluation = this.state.moveEvaluation;
+            if (evaluation?.loading) {
+                const unit = this.getAiEvaluationFocusUnit?.();
+                if (unit) {
+                    const center = geometry.getUnitCenter(unit);
+                    this.drawEvaluationBubble(ctx, {
+                        x: center.x,
+                        y: center.y - unit.depth - 18 / this.state.camera.scale
+                    }, {
+                        title: 'Scoring…',
+                        scoreLine: evaluation.progressTotal
+                            ? `${evaluation.progressCurrent}/${evaluation.progressTotal}`
+                            : '…',
+                        timingLine: 'AI Eval'
+                    }, {
+                        fill: 'rgba(255, 249, 236, 0.94)',
+                        stroke: 'rgba(55, 45, 36, 0.35)',
+                        text: '#6e231c'
+                    }, false);
+                }
+                return;
+            }
+            const markers = this.getMoveEvaluationMarkers();
+            markers.forEach((marker) => {
+                this.drawEvaluationGhostUnit(ctx, marker.entry.afterUnit, marker.score, marker.rank);
+            });
+            markers.forEach((marker) => {
+                const unit = marker.entry.afterUnit;
+                const baseY = geometry.getUnitCenter(unit).y - unit.depth / 2 - 8 / this.state.camera.scale;
+                const stackOffset = marker.stackIndex * (42 / this.state.camera.scale);
+                const colors = this.getEvaluationScoreColors(marker.score, marker.rank);
+                this.drawEvaluationBubble(
+                    ctx,
+                    { x: marker.center.x, y: baseY - stackOffset },
+                    marker.lines,
+                    colors,
+                    marker.rank === 0
+                );
+            });
+        }
+
+        drawEvaluationGhostUnit(ctx, unit, score, rank) {
+            const corners = geometry.getUnitCorners(unit);
+            const colors = this.getPlayerColors(this.getUnitPlayerId(unit));
+            ctx.save();
+            ctx.globalAlpha = rank === 0 ? 0.42 : 0.28;
+            ctx.beginPath();
+            geometry.tracePolygon(ctx, corners);
+            if (score >= EVAL_MIN_BENEFIT) {
+                ctx.fillStyle = 'rgba(120, 196, 120, 0.55)';
+            } else if (score > 0) {
+                ctx.fillStyle = 'rgba(220, 196, 120, 0.5)';
+            } else {
+                ctx.fillStyle = 'rgba(196, 140, 140, 0.45)';
+            }
+            ctx.fill();
+            ctx.lineWidth = (rank === 0 ? 2.4 : 1.6) / this.state.camera.scale;
+            ctx.setLineDash([5 / this.state.camera.scale, 4 / this.state.camera.scale]);
+            ctx.strokeStyle = colors.stroke;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        drawEvaluationBubble(ctx, anchor, lines, colors, emphasized) {
+            const metrics = this.getEvaluationBubbleMetrics(lines);
+            const x = anchor.x - metrics.width / 2;
+            const y = anchor.y - metrics.height;
+            ctx.save();
+            ctx.fillStyle = colors.fill;
+            ctx.strokeStyle = colors.stroke;
+            ctx.lineWidth = (emphasized ? 1.8 : 1.2) / this.state.camera.scale;
+            ctx.beginPath();
+            ctx.roundRect(x, y, metrics.width, metrics.height, 5 / this.state.camera.scale);
+            ctx.fill();
+            ctx.stroke();
+            ctx.textAlign = 'center';
+            ctx.fillStyle = colors.text;
+            ctx.font = metrics.titleFont;
+            ctx.textBaseline = 'top';
+            ctx.fillText(lines.title, anchor.x, y + metrics.paddingY);
+            ctx.font = metrics.detailFont;
+            ctx.fillText(
+                lines.scoreLine,
+                anchor.x,
+                y + metrics.paddingY + (9 / this.state.camera.scale) + metrics.lineGap
+            );
+            ctx.fillText(
+                lines.timingLine,
+                anchor.x,
+                y + metrics.paddingY + (9 / this.state.camera.scale) + metrics.lineGap + (10 / this.state.camera.scale) + metrics.lineGap
+            );
+            ctx.restore();
         }
 
         drawShootingArrow(ctx, attacker, target) {

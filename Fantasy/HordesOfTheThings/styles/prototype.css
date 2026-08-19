@@ -219,6 +219,18 @@ button:disabled {
     box-shadow: none;
 }
 
+.settings-action-button.is-active {
+    background: linear-gradient(180deg, #dce9ff 0%, #8eb0e8 100%);
+    border-color: rgba(36, 72, 128, 0.55);
+    color: #1a2f4d;
+}
+
+.settings-action-button-secondary {
+    border-color: #4a648c;
+    background: linear-gradient(180deg, #edf3ff 0%, #b8cae8 100%);
+    color: #1a2f4d;
+}
+
 .mode-button.is-active {
     background: linear-gradient(180deg, #fff2ce 0%, #d3b56a 100%);
     border-color: rgba(128, 95, 29, 0.6);
@@ -439,8 +451,15 @@ button:disabled {
     font-size: 1rem;
 }
 
-.settings-action-button {
+.settings-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
     margin-top: 0.65rem;
+}
+
+.settings-action-button {
+    margin-top: 0;
     padding: 0.55rem 1rem;
     border: 1px solid #285d3a;
     border-radius: 0.55rem;

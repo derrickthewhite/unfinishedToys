@@ -168,6 +168,7 @@
                     showRangedArea: this.state.showRangedArea,
                     showMoveErrors: this.state.showMoveErrors,
                     showBattleStats: this.state.showBattleStats,
+                    aiEvaluationMode: this.state.aiEvaluationMode,
                     showFormUpPreview: this.state.showFormUpPreview,
                     nextUnitId: this.nextUnitId
                 }
@@ -281,6 +282,8 @@
             this.state.showRangedArea = Boolean(snapshot.showRangedArea);
             this.state.showMoveErrors = Boolean(snapshot.showMoveErrors);
             this.state.showBattleStats = Boolean(snapshot.showBattleStats);
+            this.state.aiEvaluationMode = Boolean(snapshot.aiEvaluationMode);
+            this.state.moveEvaluation = null;
             this.state.selectedBattleId = null;
             this.state.selectedIds = [];
             this.state.selectionAnalysis = { type: 'none', invalid: false, reason: '' };

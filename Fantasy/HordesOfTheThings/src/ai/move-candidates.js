@@ -19,7 +19,10 @@
     const REVERSE_MIN_DISADVANTAGE = 0.5;
 
     function getWheelProbe() {
-        return require('./move-simulate.js');
+        if (typeof module !== 'undefined' && module.exports) {
+            return require('./move-simulate.js');
+        }
+        return (typeof globalThis !== 'undefined' ? globalThis : this).HordesMoveAiSimulate;
     }
 
 

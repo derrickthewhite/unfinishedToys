@@ -317,7 +317,12 @@
     function describeAutoMoveAction(suggestion) {
         const moveKind = suggestion.moveKind || 'forward';
         if (moveKind === 'forward') {
-            return `forward ${Math.round(suggestion.distance || 0)} mm`;
+            const distance = Math.round(suggestion.distance || 0);
+            if (suggestion.moveParam !== null && suggestion.moveParam !== undefined) {
+                const percent = Math.round(suggestion.moveParam * 100);
+                return `forward ${percent}% (${distance} mm)`;
+            }
+            return `forward ${distance} mm`;
         }
         if (moveKind === 'reverse') {
             return 'reverse';
@@ -339,6 +344,104 @@
             return 'ensorcelled return';
         }
         return moveKind;
+    }
+
+
+    function describeMoveEvaluationLabel(scored) {
+        const formation = scored.analysis?.type || 'group';
+        const count = scored.unitIds.length;
+        const formationLabel = count > 1 ? `${formation}×${count}` : formation;
+        return `${formationLabel} · ${describeAutoMoveAction(scored)}`;
+    }
+
+
+    function scoreAllMoveCandidates(context, { unitId } = {}, forwardCache = new Map()) {
+        const candidates = collectExtendedMoveCandidates(context);
+        const filtered = unitId
+            ? candidates.filter((candidate) => (
+                candidate.unitIds.includes(unitId) || candidate.reserveUnitId === unitId
+            ))
+            : candidates;
+        return filtered
+            .map((candidate) => {
+                const scored = simulateMoveCandidate(context, candidate, forwardCache);
+                if (!scored) {
+                    return null;
+                }
+                return {
+                    ...scored,
+                    label: describeMoveEvaluationLabel(scored)
+                };
+            })
+            .filter(Boolean)
+            .sort((left, right) => right.score - left.score);
+    }
+
+
+    async function scoreAllMoveCandidatesAsync(context, { unitId } = {}, hooks = {}) {
+        const {
+            shouldCancel,
+            onProgress,
+            yieldEvery = 1
+        } = hooks;
+        const forwardCache = new Map();
+        const candidates = collectExtendedMoveCandidates(context);
+        const filtered = unitId
+            ? candidates.filter((candidate) => (
+                candidate.unitIds.includes(unitId) || candidate.reserveUnitId === unitId
+            ))
+            : candidates;
+        const timing = typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance
+            : Date;
+        const startedAt = timing.now();
+        const results = [];
+        let lastYieldAt = startedAt;
+
+        for (let index = 0; index < filtered.length; index += 1) {
+            if (shouldCancel?.()) {
+                return {
+                    cancelled: true,
+                    candidates: results.sort((left, right) => right.score - left.score),
+                    elapsedMs: timing.now() - startedAt,
+                    evaluatedCount: results.length,
+                    totalCount: filtered.length
+                };
+            }
+
+            const candidate = filtered[index];
+            const candidateStartedAt = timing.now();
+            onProgress?.({
+                current: index + 1,
+                total: filtered.length,
+                candidate
+            });
+
+            const scored = simulateMoveCandidate(context, candidate, forwardCache);
+            if (scored) {
+                results.push({
+                    ...scored,
+                    label: describeMoveEvaluationLabel(scored),
+                    elapsedMs: timing.now() - candidateStartedAt
+                });
+            }
+
+            if (index % yieldEvery === yieldEvery - 1 || index === filtered.length - 1) {
+                await yieldToBrowser();
+                lastYieldAt = timing.now();
+            } else {
+                lastYieldAt = await yieldIfOverBudget(lastYieldAt);
+            }
+        }
+
+        results.sort((left, right) => right.score - left.score);
+        return {
+            cancelled: false,
+            candidates: results,
+            elapsedMs: timing.now() - startedAt,
+            evaluatedCount: results.length,
+            totalCount: filtered.length
+        };
     }
 
 
@@ -732,6 +835,10 @@
         MIN_BENEFIT,
         findBestAutoMove,
         findBestAutoMoveAsync,
+        scoreAllMoveCandidates,
+        scoreAllMoveCandidatesAsync,
+        describeAutoMoveAction,
+        describeMoveEvaluationLabel,
         install,
         formatAutoMoveStatus
     };

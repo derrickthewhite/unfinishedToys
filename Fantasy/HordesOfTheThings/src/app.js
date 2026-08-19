@@ -19,14 +19,15 @@
             require('./ai/deploy.js'),
             require('./ai/move.js'),
             require('./ai/shooting.js'),
+            require('./ai-evaluation.js'),
             require('./controller.js'),
             require('./selection-panel.js'),
             require('./victory.js')
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesMoveAi, root.HordesShootingAi, root.HordesController, root.HordesSelectionPanel, root.HordesVictory);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, moveAi, shootingAi, controller, selectionPanel, victory) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesMoveAi, root.HordesShootingAi, root.HordesAiEvaluation, root.HordesController, root.HordesSelectionPanel, root.HordesVictory);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, moveAi, shootingAi, aiEvaluation, controller, selectionPanel, victory) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -59,6 +60,8 @@
                 editModeSettingsButton: document.getElementById('editModeSettingsButton'),
                 editModeSettingsHint: document.getElementById('editModeSettingsHint'),
                 gameModeButton: document.getElementById('gameModeButton'),
+                aiEvaluationButton: document.getElementById('aiEvaluationButton'),
+                aiEvaluationSettingsHint: document.getElementById('aiEvaluationSettingsHint'),
                 turnGroup: document.querySelector('.turn-group'),
                 editGroup: document.querySelector('.edit-group'),
                 actionGroup: document.querySelector('.action-group'),
@@ -209,6 +212,8 @@
                 showRangedArea: false,
                 showMoveErrors: false,
                 showBattleStats: false,
+                aiEvaluationMode: false,
+                moveEvaluation: null,
                 selectedBattleId: null,
                 losses: { 'player-1': [], 'player-2': [] },
                 startingArmyValueByPlayerId: null,
@@ -382,6 +387,9 @@
             window.addEventListener('resize', () => this.resizeCanvas());
             window.addEventListener('keydown', (event) => this.onKeyDown(event));
             this.ui.gameModeButton.addEventListener('click', () => this.setMode('game'));
+            if (this.ui.aiEvaluationButton) {
+                this.ui.aiEvaluationButton.addEventListener('click', () => this.toggleAiEvaluationMode());
+            }
             if (this.ui.editModeSettingsButton) {
                 this.ui.editModeSettingsButton.addEventListener('click', () => {
                     this.setMode('edit');
@@ -415,6 +423,7 @@
             });
             this.ui.remainingMovesInput.addEventListener('change', () => {
                 this.state.remainingMoves = geometry.clamp(Number(this.ui.remainingMovesInput.value) || 0, 0, 9);
+                this.refreshAiEvaluationIfEnabled();
                 this.syncUiFromState();
                 this.requestRender();
             });
@@ -797,6 +806,16 @@
             if (this.ui.gameModeButton) {
                 this.ui.gameModeButton.classList.toggle('is-active', this.state.mode === 'edit');
             }
+            if (this.ui.aiEvaluationButton) {
+                this.ui.aiEvaluationButton.textContent = this.state.aiEvaluationMode
+                    ? 'Disable AI Evaluation'
+                    : 'AI Evaluation';
+                this.ui.aiEvaluationButton.classList.toggle('is-active', this.state.aiEvaluationMode);
+                this.ui.aiEvaluationButton.disabled = this.state.setupStage !== 'game';
+            }
+            if (this.ui.aiEvaluationSettingsHint) {
+                this.ui.aiEvaluationSettingsHint.hidden = !this.state.aiEvaluationMode;
+            }
             this.ui.editGroup.hidden = this.state.mode !== 'edit';
             this.ui.actionGroup.hidden = false;
             this.syncPlayerSelect(this.ui.activePlayerSelect, this.state.activePlayerId);
@@ -893,6 +912,10 @@
             this.syncLossPill(this.ui.playerTwoLosses, 'player-2');
             this.ui.statusText.textContent = this.state.status;
             this.renderSelectionInfo();
+            const evalStatus = aiEvaluation.formatEvaluationStatus(this.state, this.getAiEvaluationFocusUnit?.());
+            if (evalStatus && this.state.aiEvaluationMode && this.ui.selectionText) {
+                this.ui.selectionText.textContent = evalStatus;
+            }
             this.renderVictoryModal();
             this.syncControllerHud();
             if (this.ui.gameBar?.classList && typeof this.isComputerMatch === 'function') {
@@ -933,6 +956,7 @@
     unitDeployment.install(HordesPrototype);
     ai.install(HordesPrototype);
     moveAi.install(HordesPrototype);
+    aiEvaluation.install(HordesPrototype);
     shootingAi.install(HordesPrototype);
     controller.install(HordesPrototype);
     selectionPanel.install(HordesPrototype);
