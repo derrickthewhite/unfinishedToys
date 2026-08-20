@@ -581,6 +581,105 @@ test('rank wheel pivot stays on the outermost unit even if that unit is slightly
     assert.ok(geometry.distance(analysis.leftPivot, expectedPivot) < 0.001);
 });
 
+function getRankDressGap(leftUnit, rightUnit) {
+    const leftCorners = geometry.getUnitCorners(leftUnit);
+    const rightCorners = geometry.getUnitCorners(rightUnit);
+    return geometry.distance(leftCorners.frontRight, rightCorners.frontLeft);
+}
+
+test('rank formation dress aligns a slightly skewed rank within the dress travel limit', () => {
+    const terrain = data.createDefaultTerrain();
+    const units = [
+        {
+            id: 'b1', type: 'Blade', playerId: 'player-1', width: 40, depth: 20,
+            x: 100, y: 200, rotation: 0.05, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b2', type: 'Blade', playerId: 'player-1', width: 40, depth: 20,
+            x: 141, y: 202, rotation: -0.04, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b3', type: 'Blade', playerId: 'player-1', width: 40, depth: 20,
+            x: 182, y: 199, rotation: 0.03, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        }
+    ];
+
+    const result = rules.resolveRankFormationDress(units, ['b1', 'b2', 'b3'], 'player-1', terrain);
+    const dressed = result.units.filter((unit) => ['b1', 'b2', 'b3'].includes(unit.id));
+    const analysis = rules.analyzeSelection(dressed);
+
+    assert.ok(result.movedUnitIds.length > 0);
+    assert.equal(analysis.type, 'rank');
+    assert.ok(getRankDressGap(dressed[0], dressed[1]) <= data.FORMATION_GAP_TOLERANCE + 0.01);
+    assert.ok(getRankDressGap(dressed[1], dressed[2]) <= data.FORMATION_GAP_TOLERANCE + 0.01);
+    dressed.forEach((unit, index) => {
+        const origin = units[index];
+        const corners = ['frontLeft', 'frontRight', 'backLeft', 'backRight'];
+        const maxTravel = Math.max(...corners.map((name) => (
+            geometry.distance(
+                geometry.getUnitCorners(origin)[name],
+                geometry.getUnitCorners(unit)[name]
+            )
+        )));
+        assert.ok(maxTravel <= data.RANK_DRESS_MAX_TRAVEL + 0.01);
+    });
+});
+
+test('rank formation dress uses the largest shared angle when it reaches forty percent', () => {
+    const terrain = data.createDefaultTerrain();
+    const units = [
+        {
+            id: 'b1', type: 'Blade', playerId: 'player-1', width: 40, depth: 20,
+            x: 100, y: 200, rotation: 0.04, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b2', type: 'Blade', playerId: 'player-1', width: 40, depth: 20,
+            x: 140, y: 200, rotation: -0.03, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b3', type: 'Blade', playerId: 'player-1', width: 40, depth: 20,
+            x: 183, y: 200, rotation: 0.15, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        }
+    ];
+
+    const result = rules.resolveRankFormationDress(units, ['b1', 'b2', 'b3'], 'player-1', terrain);
+    const dressed = result.units.filter((unit) => ['b1', 'b2', 'b3'].includes(unit.id));
+
+    dressed.forEach((unit) => {
+        assert.ok(Math.abs(unit.rotation) <= data.RANK_DRESS_ANGLE_TOLERANCE + 0.01);
+    });
+});
+
+test('rank formation dress does not pass through enemies or non-rank units', () => {
+    const terrain = data.createDefaultTerrain();
+    const units = [
+        {
+            id: 'b1', type: 'Blade', playerId: 'player-1', width: 40, depth: 20,
+            x: 100, y: 200, rotation: 0, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'b2', type: 'Blade', playerId: 'player-1', width: 40, depth: 20,
+            x: 145, y: 205, rotation: 0, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        },
+        {
+            id: 'blocker', type: 'Blade', playerId: 'player-2', width: 40, depth: 20,
+            x: 100, y: 222, rotation: 0, moves: { road: 100, good: 50, bad: 50, water: 25 }
+        }
+    ];
+
+    const result = rules.resolveRankFormationDress(units, ['b1', 'b2'], 'player-1', terrain);
+    const blockerOverlap = geometry.polygonsOverlap(
+        geometry.getUnitCorners(result.units.find((unit) => unit.id === 'blocker')),
+        geometry.getUnitCorners(result.units.find((unit) => unit.id === 'b1'))
+    )
+        || geometry.polygonsOverlap(
+            geometry.getUnitCorners(result.units.find((unit) => unit.id === 'blocker')),
+            geometry.getUnitCorners(result.units.find((unit) => unit.id === 'b2'))
+        );
+
+    assert.equal(blockerOverlap, false);
+});
+
 test('automatic form up translates a unit to enemy corner contact within the configured distance', () => {
     const blue = {
         id: 'b1',

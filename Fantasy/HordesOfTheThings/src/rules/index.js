@@ -7,7 +7,8 @@
             require('./melee.js'),
             require('./shooting.js'),
             require('./form-up.js'),
-            require('./movement.js')
+            require('./movement.js'),
+            require('./rank-dress.js')
         );
         return;
     }
@@ -18,8 +19,9 @@
         root.HordesRulesMelee,
         root.HordesRulesShooting,
         root.HordesRulesFormUp,
-        root.HordesRulesMovement
+        root.HordesRulesMovement,
+        root.HordesRulesRankDress
     );
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (core, terrain, recoil, melee, shooting, formUp, movement) {
-    return Object.assign({}, core, terrain, recoil, melee, shooting, formUp, movement);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (core, terrain, recoil, melee, shooting, formUp, movement, rankDress) {
+    return Object.assign({}, core, terrain, recoil, melee, shooting, formUp, movement, rankDress);
 }));

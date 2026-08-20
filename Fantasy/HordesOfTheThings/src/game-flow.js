@@ -95,7 +95,20 @@
                     unit.movedThisTurn = true;
                 }
             });
+            const moveAnalysis = this.state.selectionAnalysis;
+            const movedRankUnitIds = [...draft.unitIds];
+            const wasReserveDeploy = draft.kind === 'reserve-deploy';
+            const wasEnsorcelledReturn = draft.kind === 'ensorcelled-return';
             this.state.draft = null;
+            if (!wasReserveDeploy && !wasEnsorcelledReturn && moveAnalysis.type === 'rank') {
+                const dressResult = rules.resolveRankFormationDress(
+                    this.state.units,
+                    movedRankUnitIds,
+                    this.state.activePlayerId,
+                    this.state.terrain
+                );
+                this.state.units = dressResult.units;
+            }
             this.updateSelectionAnalysis();
             if (this.state.phase === 'move' && this.state.remainingMoves === 0) {
                 this.beginFormUpPhase();
