@@ -155,7 +155,6 @@ Space4x.takePopsForMove = function (settlement, count) {
 	}
 	takeJob("idle");
 	takeJob("industry");
-	takeJob("roboIndustry");
 	takeJob("research");
 	for (let i = settlement.pops.length - 1; i >= 0 && taken.length < count; i--) {
 		const job = settlement.pops[i].job;
@@ -171,7 +170,7 @@ Space4x.popHaulers = function (state, empireId) {
 	const out = [];
 	for (let i = 0; i < state.units.length; i++) {
 		const u = state.units[i];
-		if (u.defId !== "popHauler") continue;
+		if (!Space4x.isPopHauler(state, u)) continue;
 		if (empireId && u.empireId !== empireId) continue;
 		out.push(u);
 	}
@@ -218,7 +217,8 @@ Space4x.queuePopMove = function (state, fromId, toId, count) {
 	const destStar = Space4x.starById(state, to.location.starId);
 	state.units.push({
 		id: Space4x.nextId(state, "u"),
-		defId: "popHauler",
+		defId: Space4x.UNIT_ROLES.popHauler,
+		role: Space4x.UNIT_ROLES.popHauler,
 		empireId: from.empireId,
 		location: {
 			kind: "orbit",
@@ -238,7 +238,7 @@ Space4x.queuePopMove = function (state, fromId, toId, count) {
 };
 
 Space4x.unloadPopHauler = function (state, unit) {
-	if (!unit || unit.defId !== "popHauler") return;
+	if (!unit || !Space4x.isPopHauler(state, unit)) return;
 	const starId = unit.location.starId;
 	let dest = Space4x.settlementById(state, unit.destSettlementId);
 	if (!dest || dest.location.starId !== starId) dest = Space4x.settlementById(state, unit.originSettlementId);
@@ -266,7 +266,7 @@ Space4x.unloadPopHauler = function (state, unit) {
 
 Space4x.cancelPopMove = function (state, unitId) {
 	const unit = Space4x.unitById(state, unitId);
-	if (!unit || unit.defId !== "popHauler") return;
+	if (!unit || !Space4x.isPopHauler(state, unit)) return;
 	const origin = Space4x.settlementById(state, unit.originSettlementId);
 	if (origin) {
 		unit.destSettlementId = origin.id;

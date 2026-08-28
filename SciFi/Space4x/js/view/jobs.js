@@ -9,25 +9,24 @@ Space4x.JOB_COLORS = {
 	money: "#e6c35c"
 };
 
-Space4x._jobSel = { ids: [], fromJob: null };
-Space4x._jobDrag = null;
-
-Space4x.clearJobDrag = function () {
-	const drag = Space4x._jobDrag;
+Space4x.clearJobDrag = function (state) {
+	if (!state || !state.ui) return;
+	const drag = state.ui.jobDrag;
 	if (!drag) return;
 	if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
-	Space4x._jobDrag = null;
+	state.ui.jobDrag = null;
 };
 
-Space4x.jobSelHas = function (popId) {
-	const ids = Space4x._jobSel && Space4x._jobSel.ids;
+Space4x.jobSelHas = function (state, popId) {
+	const ids = state && state.ui && state.ui.jobSel && state.ui.jobSel.ids;
 	if (!ids) return false;
 	for (let i = 0; i < ids.length; i++) if (ids[i] === popId) return true;
 	return false;
 };
 
-Space4x.clearJobSel = function () {
-	Space4x._jobSel = { ids: [], fromJob: null };
+Space4x.clearJobSel = function (state) {
+	if (!state || !state.ui) return;
+	state.ui.jobSel = { ids: [], fromJob: null };
 };
 
 Space4x.makePopToken = function (state, pop, job) {
@@ -220,7 +219,8 @@ Space4x.bindJobBoard = function (app) {
 	function paintSelected() {
 		const tokens = board.querySelectorAll(".pop-token");
 		for (let i = 0; i < tokens.length; i++) {
-			tokens[i].classList.toggle("is-selected", Space4x.jobSelHas(tokens[i].getAttribute("data-pop-id")));
+			tokens[i].classList.toggle("is-selected",
+				Space4x.jobSelHas(app.state, tokens[i].getAttribute("data-pop-id")));
 		}
 	}
 
@@ -230,7 +230,7 @@ Space4x.bindJobBoard = function (app) {
 	}
 
 	function laneUnder(ev) {
-		const drag = Space4x._jobDrag;
+		const drag = app.state.ui.jobDrag;
 		if (drag && drag.ghost) drag.ghost.style.visibility = "hidden";
 		const el = document.elementFromPoint(ev.clientX, ev.clientY);
 		if (drag && drag.ghost) drag.ghost.style.visibility = "";
@@ -255,22 +255,23 @@ Space4x.bindJobBoard = function (app) {
 			if (!after) continue;
 			ids.push(tokens[i].getAttribute("data-pop-id"));
 		}
-		Space4x._jobSel = { ids: ids, fromJob: lane.getAttribute("data-id") };
+		Space4x.ensureUiInteraction(app.state);
+		app.state.ui.jobSel = { ids: ids, fromJob: lane.getAttribute("data-id") };
 		paintSelected();
 	}
 
 	function assignToJob(job) {
-		const ids = Space4x._jobSel && Space4x._jobSel.ids;
+		const ids = app.state.ui.jobSel && app.state.ui.jobSel.ids;
 		if (!ids || !ids.length || !job || job === "money") return false;
-		Space4x.clearJobSel();
-		Space4x.clearJobDrag();
+		Space4x.clearJobSel(app.state);
+		Space4x.clearJobDrag(app.state);
 		clearLaneOver();
 		app.cmds.setPopJobs(ids, job);
 		return true;
 	}
 
 	function onMove(ev) {
-		const drag = Space4x._jobDrag;
+		const drag = app.state.ui.jobDrag;
 		if (!drag) return;
 		const dx = ev.clientX - drag.startX;
 		const dy = ev.clientY - drag.startY;
@@ -292,18 +293,18 @@ Space4x.bindJobBoard = function (app) {
 		window.removeEventListener("pointermove", onMove);
 		window.removeEventListener("pointerup", onUp);
 		window.removeEventListener("pointercancel", onUp);
-		const drag = Space4x._jobDrag;
+		const drag = app.state.ui.jobDrag;
 		if (!drag) return;
 		if (drag.moved) {
 			const over = paintOver(ev);
 			const job = over ? over.getAttribute("data-id") : null;
-			Space4x.clearJobDrag();
+			Space4x.clearJobDrag(app.state);
 			clearLaneOver();
 			if (job) assignToJob(job);
 			else paintSelected();
 			return;
 		}
-		Space4x.clearJobDrag();
+		Space4x.clearJobDrag(app.state);
 		clearLaneOver();
 		paintSelected();
 	}
@@ -311,13 +312,13 @@ Space4x.bindJobBoard = function (app) {
 	function onLaneUp(ev) {
 		window.removeEventListener("pointerup", onLaneUp);
 		window.removeEventListener("pointercancel", onLaneUp);
-		const job = Space4x._pendingLaneJob;
-		Space4x._pendingLaneJob = null;
+		const job = app.state.ui.pendingLaneJob;
+		app.state.ui.pendingLaneJob = null;
 		if (!job) return;
 		const over = laneUnder(ev);
 		if (!over || over.getAttribute("data-id") !== job) return;
-		if (job === Space4x._jobSel.fromJob) {
-			Space4x.clearJobSel();
+		if (job === app.state.ui.jobSel.fromJob) {
+			Space4x.clearJobSel(app.state);
 			paintSelected();
 			return;
 		}
@@ -333,9 +334,10 @@ Space4x.bindJobBoard = function (app) {
 		if (token && board.contains(token)) {
 			ev.preventDefault();
 			selectFromToken(token);
-			Space4x._jobDrag = {
-				ids: Space4x._jobSel.ids.slice(),
-				fromJob: Space4x._jobSel.fromJob,
+			Space4x.ensureUiInteraction(app.state);
+			app.state.ui.jobDrag = {
+				ids: app.state.ui.jobSel.ids.slice(),
+				fromJob: app.state.ui.jobSel.fromJob,
 				startX: ev.clientX,
 				startY: ev.clientY,
 				moved: false,
@@ -346,9 +348,9 @@ Space4x.bindJobBoard = function (app) {
 			window.addEventListener("pointercancel", onUp);
 			return;
 		}
-		if (lane && Space4x._jobSel.ids.length) {
+		if (lane && app.state.ui.jobSel.ids.length) {
 			ev.preventDefault();
-			Space4x._pendingLaneJob = lane.getAttribute("data-id");
+			app.state.ui.pendingLaneJob = lane.getAttribute("data-id");
 			window.addEventListener("pointerup", onLaneUp);
 			window.addEventListener("pointercancel", onLaneUp);
 		}
@@ -356,7 +358,8 @@ Space4x.bindJobBoard = function (app) {
 };
 
 Space4x.syncJobBoard = function (ui, state, cmds) {
-	if (Space4x._jobDrag && Space4x._jobDrag.moved) return;
+	Space4x.ensureUiInteraction(state);
+	if (state.ui.jobDrag && state.ui.jobDrag.moved) return;
 	const st = Space4x.settlementById(state, state.ui.selectedSettlementId);
 	const lanes = [];
 	if (st) {
@@ -451,7 +454,7 @@ Space4x.syncJobBoard = function (ui, state, cmds) {
 					token.style.borderColor = Space4x.JOB_COLORS[lane.id] || "#888";
 					const img = token.querySelector("img");
 					if (img) Space4x.setCultureImg(img, state, pop.culture);
-					token.classList.toggle("is-selected", Space4x.jobSelHas(pop.id));
+					token.classList.toggle("is-selected", Space4x.jobSelHas(state, pop.id));
 					const who = Space4x.cultureName(state, pop.culture);
 					const loy = st && Space4x.loyaltyRules(state) ? Space4x.groupLoyalty(state, st, lane.id, pop.culture) + "% loyal" : "";
 					token.title = [who, loy, peopleTip].filter(Boolean).join(" · ");

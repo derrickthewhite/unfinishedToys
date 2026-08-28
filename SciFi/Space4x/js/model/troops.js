@@ -162,7 +162,7 @@ Space4x.troopHaulers = function (state, empireId) {
 	const out = [];
 	for (let i = 0; i < state.units.length; i++) {
 		const u = state.units[i];
-		if (u.defId !== "troopHauler") continue;
+		if (!Space4x.isTroopHauler(state, u)) continue;
 		if (empireId && u.empireId !== empireId) continue;
 		out.push(u);
 	}
@@ -215,7 +215,8 @@ Space4x.queueTroopMove = function (state, fromId, toId, defId, count, culture) {
 	const destStar = Space4x.starById(state, to.location.starId);
 	state.units.push({
 		id: Space4x.nextId(state, "u"),
-		defId: "troopHauler",
+		defId: Space4x.UNIT_ROLES.troopHauler,
+		role: Space4x.UNIT_ROLES.troopHauler,
 		empireId: from.empireId,
 		location: {
 			kind: "orbit",
@@ -235,7 +236,7 @@ Space4x.queueTroopMove = function (state, fromId, toId, defId, count, culture) {
 };
 
 Space4x.unloadTroopHauler = function (state, unit) {
-	if (!unit || unit.defId !== "troopHauler") return;
+	if (!unit || !Space4x.isTroopHauler(state, unit)) return;
 	const starId = unit.location.starId;
 	let dest = Space4x.settlementById(state, unit.destSettlementId);
 	if (!dest || dest.location.starId !== starId) dest = Space4x.settlementById(state, unit.originSettlementId);
@@ -260,7 +261,7 @@ Space4x.unloadTroopHauler = function (state, unit) {
 
 Space4x.cancelTroopMove = function (state, unitId) {
 	const unit = Space4x.unitById(state, unitId);
-	if (!unit || unit.defId !== "troopHauler") return;
+	if (!unit || !Space4x.isTroopHauler(state, unit)) return;
 	const origin = Space4x.settlementById(state, unit.originSettlementId);
 	if (origin) {
 		unit.destSettlementId = origin.id;
@@ -278,6 +279,6 @@ Space4x.cancelTroopMove = function (state, unitId) {
 Space4x.cancelHauler = function (state, unitId) {
 	const unit = Space4x.unitById(state, unitId);
 	if (!unit) return;
-	if (unit.defId === "popHauler") Space4x.cancelPopMove(state, unitId);
-	if (unit.defId === "troopHauler") Space4x.cancelTroopMove(state, unitId);
+	if (Space4x.isPopHauler(state, unit)) Space4x.cancelPopMove(state, unitId);
+	if (Space4x.isTroopHauler(state, unit)) Space4x.cancelTroopMove(state, unitId);
 };

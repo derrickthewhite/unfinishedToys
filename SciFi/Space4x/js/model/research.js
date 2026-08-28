@@ -36,7 +36,7 @@ Space4x.fitShipModules = function (state, empire) {
 	if (!empire) return;
 	for (let i = 0; i < state.units.length; i++) {
 		const unit = state.units[i];
-		if (unit.empireId !== empire.id || Space4x.isHauler(unit)) continue;
+		if (unit.empireId !== empire.id || Space4x.isHauler(state, unit)) continue;
 		unit.modules = mods.slice();
 	}
 };

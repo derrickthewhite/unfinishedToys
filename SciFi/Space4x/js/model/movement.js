@@ -95,7 +95,7 @@ Space4x.phaseMovement = function (state) {
 	for (let i = 0; i < state.units.length; i++) foundIds.push(state.units[i].id);
 	for (let i = 0; i < foundIds.length; i++) {
 		const unit = Space4x.unitById(state, foundIds[i]);
-		if (!unit || unit.defId !== "colonyShip") continue;
+		if (!unit || !Space4x.unitCanFound(state, unit)) continue;
 		const empire = Space4x.empireById(state, unit.empireId);
 		if (empire.isPlayer) continue;
 		if (unit.location.kind !== "orbit") continue;
@@ -114,19 +114,19 @@ Space4x.arriveAtStar = function (state, unit, star, already) {
 	const empire = Space4x.empireById(state, unit.empireId);
 	if (!already && empire && empire.isPlayer && state.turnEvents) {
 		state.turnEvents.playerShipArrived = true;
-		if (unit.defId === "colonyShip") {
+		if (Space4x.unitCanFound(state, unit)) {
 			if (!state.turnEvents.arrivedColonyIds) state.turnEvents.arrivedColonyIds = [];
 			state.turnEvents.arrivedColonyIds.push(unit.id);
 		}
 	}
-	if (unit.defId === "popHauler") Space4x.unloadPopHauler(state, unit);
-	if (unit.defId === "troopHauler") Space4x.unloadTroopHauler(state, unit);
+	if (Space4x.isPopHauler(state, unit)) Space4x.unloadPopHauler(state, unit);
+	if (Space4x.isTroopHauler(state, unit)) Space4x.unloadTroopHauler(state, unit);
 };
 
 Space4x.setShipTarget = function (state, unitId, starId) {
 	const unit = Space4x.unitById(state, unitId);
 	if (!unit || !starId) return false;
-	if (!Space4x.shipCanTakeOrders(unit)) return false;
+	if (!Space4x.shipCanTakeOrders(state, unit)) return false;
 	const dest = Space4x.starById(state, starId);
 	if (!dest) return false;
 	if (Space4x.unitStarId(state, unit) === dest.id) return false;
@@ -143,7 +143,7 @@ Space4x.setShipTarget = function (state, unitId, starId) {
 
 Space4x.clearShipTarget = function (state, unitId) {
 	const unit = Space4x.unitById(state, unitId);
-	if (!unit || !Space4x.shipCanTakeOrders(unit)) return false;
+	if (!unit || !Space4x.shipCanTakeOrders(state, unit)) return false;
 	if (!unit.targetStarId) return false;
 	unit.targetStarId = null;
 	return true;

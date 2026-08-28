@@ -194,7 +194,7 @@ Jobs are a setting table. Scratch-empire’s table:
 | `agriculture` | food | 3 food + biome modifier + 1 money | Size table |
 | `industry` | industry | 3 industry + 1 money | Uncapped |
 | `research` | research | 3 research + 1 money | Uncapped |
-| `roboIndustry` | industry | 5 industry + 1 money | Robotic Factory count |
+| `greenhouse` | food | 3 food + 1 money | From Greenhouse buildings |
 
 SOW and Solar System will add or replace jobs (soldiers, mining, etc.) in their own tables.
 
@@ -363,7 +363,7 @@ These are the three things that should feel like “this setting.” More entrie
 | Build | Cost | Kind | Effect |
 | --- | ---: | --- | --- |
 | **Colony ship** | 100 | unit | Phase 1: move with current speed/range. Empty grid stops allowed. Human: on ending at a star, **Do-this** pick a legal empty body. AI: first legal body. Founding consumes the ship and spawns **one idle pop from nowhere**. |
-| **Robotic factory** | 25 | structure | `+1 roboIndustry` slot (5 industry + 1 money). Cap = factory count. |
+| **Robotic factory** | 25 | structure | `jobYieldCover`: +2 industry to one Industry worker per copy. |
 | **Space freighter** | 25 | abstract | `+1` empire freighter. Carries **1 food**. Hauls this turn if completed this construction phase. |
 
 New-colony pop: empire default species/loyalty, idle, no structures, `industryPool` 0, `starveAcc` 0. It eats 1 food that same turn’s phase 6; without a farmer or one incoming freighter it starts the 10-turn starve fuse.

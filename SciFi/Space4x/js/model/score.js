@@ -31,7 +31,7 @@ Space4x.empireScore = function (state, empire) {
 		pop += (unit.cargoPops || []).length;
 		const cargo = unit.cargoTroops || [];
 		for (let t = 0; t < cargo.length; t++) ground.push(cargo[t]);
-		if (Space4x.isHauler(unit)) continue;
+		if (Space4x.isHauler(state, unit)) continue;
 		const def = builds[unit.defId];
 		if (def && def.kind === "unit") ships += Space4x.baseDefCost(def);
 	}

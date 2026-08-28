@@ -38,6 +38,9 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			policePenalty: 10,
 			popsPerPolice: 5
 		},
+		revolt: {
+			rebelTroopDefId: "militia"
+		},
 		richness: [
 			{ id: "veryRich", name: "Very rich", industryPerPop: 2, weight: 1 },
 			{ id: "rich", name: "Rich", industryPerPop: 1, weight: 2 },
@@ -58,10 +61,10 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 		jobOrder: ["idle", "agriculture", "greenhouse", "industry", "research"],
 		jobs: {
 			idle: { label: "Idle", product: null, base: 0, money: 0, cap: "uncapped" },
-			agriculture: { label: "Agriculture", product: "food", base: 3, money: 1, cap: "agri" },
-			greenhouse: { label: "Greenhouse", product: "food", base: 3, money: 1, cap: "fromBuildings" },
-			industry: { label: "Industry", product: "industry", base: 3, money: 1, cap: "uncapped" },
-			research: { label: "Research", product: "research", base: 3, money: 1, cap: "uncapped" }
+			agriculture: { label: "Agriculture", product: "food", base: 3, money: 1, cap: "agri", yield: "farmerBiome" },
+			greenhouse: { label: "Greenhouse", product: "food", base: 3, money: 1, cap: "fromBuildings", yield: "foodBase" },
+			industry: { label: "Industry", product: "industry", base: 3, money: 1, cap: "uncapped", yield: "industryRichness" },
+			research: { label: "Research", product: "research", base: 3, money: 1, cap: "uncapped", yield: "workerBase" }
 		},
 		cultures: (function () {
 			const wet = ["ocean", "swamp", "tundra"];
@@ -197,13 +200,13 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				cost: { industry: 50 }, upkeep: 1,
 				summary: "Trains an agent for the Spies screen. Assigned instantly. Upkeep 1. Idle spies do nothing."
 			},
-			police: { id: "police", name: "Police", kind: "troop", cost: { industry: 10 }, upkeep: 1, ts: 15, tags: ["Infantry", "Police"], summary: "Local security. Stations at this world. 1 freighter to move. Combat later." },
-			militia: { id: "militia", name: "Militia", kind: "troop", cost: { industry: 10 }, upkeep: 0.2, ts: 20, tags: ["Infantry", "Defensive"], summary: "Cheap garrison. Stations at this world. 1 freighter to move. Combat later." },
-			infantry: { id: "infantry", name: "Infantry", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 50, tags: ["Infantry"], summary: "Line infantry. Stations at this world. 1 freighter to move. Combat later." },
-			elites: { id: "elites", name: "Elites", kind: "troop", cost: { industry: 40 }, upkeep: 2, ts: 120, tags: ["Infantry"], summary: "Heavy infantry. Stations at this world. 1 freighter to move. Combat later." },
-			armor: { id: "armor", name: "Armor", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 50, tags: ["Armor"], summary: "Ground armor. Stations at this world. 1 freighter to move. Combat later." },
-			mechs: { id: "mechs", name: "Mechs", kind: "troop", cost: { industry: 40 }, upkeep: 2, ts: 120, tags: ["Armor"], requireTech: "rx2mh", summary: "Heavy walkers. Stations at this world. 1 freighter to move. Troop strength 120, Armor." },
-			air: { id: "air", name: "Air", kind: "troop", cost: { industry: 100 }, upkeep: 4, ts: 100, tags: ["Air"], summary: "Air wing. Stations at this world. 1 freighter to move. Combat later." },
+			police: { id: "police", name: "Police", kind: "troop", cost: { industry: 10 }, upkeep: 1, ts: 15, tags: ["Infantry", "Police"], glyph: { color: "#5b8def", shape: "shield" }, summary: "Local security. Stations at this world. 1 freighter to move. Combat later." },
+			militia: { id: "militia", name: "Militia", kind: "troop", cost: { industry: 10 }, upkeep: 0.2, ts: 20, tags: ["Infantry", "Defensive"], glyph: { color: "#8a9070", shape: "square" }, summary: "Cheap garrison. Stations at this world. 1 freighter to move. Combat later." },
+			infantry: { id: "infantry", name: "Infantry", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 50, tags: ["Infantry"], glyph: { color: "#6b8f3d", shape: "square" }, summary: "Line infantry. Stations at this world. 1 freighter to move. Combat later." },
+			elites: { id: "elites", name: "Elites", kind: "troop", cost: { industry: 40 }, upkeep: 2, ts: 120, tags: ["Infantry"], glyph: { color: "#d4a017", shape: "star" }, summary: "Heavy infantry. Stations at this world. 1 freighter to move. Combat later." },
+			armor: { id: "armor", name: "Armor", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 50, tags: ["Armor"], glyph: { color: "#a0652a", shape: "rect" }, summary: "Ground armor. Stations at this world. 1 freighter to move. Combat later." },
+			mechs: { id: "mechs", name: "Mechs", kind: "troop", cost: { industry: 40 }, upkeep: 2, ts: 120, tags: ["Armor"], requireTech: "rx2mh", glyph: { color: "#7a8a9a", shape: "hex" }, summary: "Heavy walkers. Stations at this world. 1 freighter to move. Troop strength 120, Armor." },
+			air: { id: "air", name: "Air", kind: "troop", cost: { industry: 100 }, upkeep: 4, ts: 100, tags: ["Air"], glyph: { color: "#4ec4d4", shape: "tri" }, summary: "Air wing. Stations at this world. 1 freighter to move. Combat later." },
 			spaceFreighter: {
 				id: "spaceFreighter", name: "Space freighters (×5)", kind: "abstract",
 				cost: { industry: 25 }, requireTech: "rx0ip",
@@ -213,8 +216,7 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			scout: {
 				id: "scout", name: "Scout", kind: "unit",
 				cost: { industry: 25 }, upkeep: 1, requireTech: "rx0ip", requireStructure: "spaceDock",
-				effects: [{ type: "explore" }],
-				summary: "Fast survey ship. Visits stars and reveals hidden systems. Needs a Space Dock. Needs Warp Drive to leave this star."
+				summary: "Cheap hull. Any ship reveals a system on arrival; this is the early survey option. Needs a Space Dock. Needs Warp Drive to leave this star."
 			},
 			colonyShip: {
 				id: "colonyShip", name: "Colony ship", kind: "unit",
@@ -255,7 +257,7 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			tech("wp4", "Ansible", "warpPhysics", 4, [{ type: "commsRange", n: 5 }], "Instant signaling. Contact range is ship range plus 5."),
 			tech("wp5", "High Warp", "warpPhysics", 5, [{ type: "speed", n: 1 }], "Cruise speed up again."),
 			tech("wp6", "Warp Spine", "warpPhysics", 6, [{ type: "speed", n: 2 }], "Late-game engines. +2 speed."),
-			tech("rx0ip", "Interplanetary Movement", "reactors", 0, [{ type: "unlockBuild", id: "spaceFreighter" }, { type: "unlockBuild", id: "scout" }], "In-system hulls. Unlocks scouts and freighter fleets. Colony ships come from Contained Ecology. A Space Dock is still required to build ships."),
+			tech("rx0ip", "Interplanetary Movement", "reactors", 0, [{ type: "unlockBuild", id: "spaceFreighter" }, { type: "unlockBuild", id: "scout" }], "In-system hulls. Unlocks freighter fleets and the Scout hull. Colony ships come from Contained Ecology. A Space Dock is still required to build ships."),
 			tech("rx1", "Extended Coils", "reactors", 1, [{ type: "range", n: 2 }], "Ships may operate 2 hexes farther from a friendly colony."),
 			tech("rx1cr", "Community Reactors", "reactors", 1, [{ type: "unlockBuild", id: "communityReactor" }], "Shared power. Unlocks Community Reactors: each building gives +1 industry to 5 Industry workers."),
 			tech("rx2mh", "Mechs", "reactors", 2, [{ type: "unlockBuild", id: "mechs" }], "Unlocks Mechs: ground unit, 40 industry, upkeep 2, troop strength 120, Armor."),
@@ -269,7 +271,7 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			tech("so1ec", "Economics", "sociology", 1, [{ type: "unlockBuild", id: "monetaryAgent" }], "Unlocks Monetary Agent: unique 100-industry building, upkeep 2. Working pops on that world earn +0.5 money."),
 			tech("so2pb", "Patriot Board", "sociology", 2, [{ type: "unlockBuild", id: "patriotBoard" }], "Unlocks Patriot Board: unique 100-industry building, upkeep 1. +10 settlement loyalty, −25 unit loyalty."),
 			tech("so2mp", "Military Privilege", "sociology", 2, [{ type: "unlockBuild", id: "grandBarracks" }], "Unlocks Grand Barracks: 100 industry, upkeep 2. −5 settlement loyalty. +50 unit loyalty for five garrison units; extra copies cover five more."),
-			tech("so2ap", "Armed Populace", "sociology", 2, [{ type: "militiaAsPolice" }, { type: "unitLoyalty", defId: "militia", n: -10 }], "Militia count as police for settlement loyalty. Militia loyalty −10."),
+			tech("so2ap", "Armed Populace", "sociology", 2, [{ type: "militiaAsPolice", defId: "militia" }, { type: "unitLoyalty", defId: "militia", n: -10 }], "Militia count as police for settlement loyalty. Militia loyalty −10."),
 			tech("so3", "Peer Review", "sociology", 3, [{ type: "researchPerPop", n: 1 }], "Scientists produce +1 research."),
 			tech("so4", "Assimilation", "sociology", 4, [{ type: "stub", n: 1 }], "Culture capture. Not in this slice."),
 			tech("so5", "Bureau", "sociology", 5, [{ type: "researchPerPop", n: 1 }], "Scientists produce +1 research."),

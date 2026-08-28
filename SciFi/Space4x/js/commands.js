@@ -400,7 +400,7 @@ Space4x.createCommands = function (app) {
 		const st = Space4x.settlementById(app.state, id);
 		if (!st) return;
 		if (app.state.ui.selectedSettlementId !== id) {
-			if (Space4x.clearJobSel) Space4x.clearJobSel();
+			if (Space4x.clearJobSel) Space4x.clearJobSel(app.state);
 			app.state.ui.inspect = null;
 		}
 		app.state.ui.selectedSettlementId = id;
@@ -573,7 +573,7 @@ Space4x.createCommands = function (app) {
 
 	cmds.sendShipTo = function (unitId, starId) {
 		const unit = Space4x.unitById(app.state, unitId);
-		if (unit && Space4x.shipCanTakeOrders(unit)) Space4x.addSelectedUnit(app.state, unit.id);
+		if (unit && Space4x.shipCanTakeOrders(app.state, unit)) Space4x.addSelectedUnit(app.state, unit.id);
 		cmds.sendSelectedToStar(starId);
 	};
 

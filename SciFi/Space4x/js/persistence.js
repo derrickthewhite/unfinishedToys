@@ -8,7 +8,12 @@ Space4x.SAVE_AUTOSAVE_EVERY = 4;
 
 Space4x.snapshotState = function (state) {
 	const copy = JSON.parse(JSON.stringify(state));
-	if (copy.ui) copy.ui.autoPlaying = false;
+	if (copy.ui) {
+		copy.ui.autoPlaying = false;
+		const d = Space4x.emptyUiInteraction();
+		const keys = Object.keys(d);
+		for (let i = 0; i < keys.length; i++) copy.ui[keys[i]] = d[keys[i]];
+	}
 	return copy;
 };
 
@@ -62,6 +67,7 @@ Space4x.applySave = function (live, envelope) {
 	for (let i = 0; i < oldKeys.length; i++) delete live[oldKeys[i]];
 	const names = Object.keys(incoming);
 	for (let i = 0; i < names.length; i++) live[names[i]] = incoming[names[i]];
+	Space4x.ensureUiInteraction(live);
 	return { ok: true, envelope: envelope };
 };
 

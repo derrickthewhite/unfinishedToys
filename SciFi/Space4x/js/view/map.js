@@ -118,14 +118,14 @@ Space4x.drawMap = function (ui, state) {
 			ctx.strokeRect(f.px - 7, f.py - 7, 14, 14);
 		}
 		let mark = f.units.length;
-		if (f.units[0].defId === "popHauler") {
-			mark = 0;
-			for (let u = 0; u < f.units.length; u++) mark += (f.units[u].cargoPops || []).length;
+		let popCargo = 0;
+		let troopCargo = 0;
+		for (let u = 0; u < f.units.length; u++) {
+			if (Space4x.isPopHauler(state, f.units[u])) popCargo += (f.units[u].cargoPops || []).length;
+			if (Space4x.isTroopHauler(state, f.units[u])) troopCargo += (f.units[u].cargoTroops || []).length;
 		}
-		if (f.units[0].defId === "troopHauler") {
-			mark = 0;
-			for (let u = 0; u < f.units.length; u++) mark += (f.units[u].cargoTroops || []).length;
-		}
+		if (popCargo) mark = popCargo;
+		else if (troopCargo) mark = troopCargo;
 		if (mark > 1) {
 			ctx.fillStyle = "#e8eef8";
 			ctx.font = "10px sans-serif";
@@ -147,7 +147,7 @@ Space4x.fleetMarkers = function (state, layout) {
 		let gy = unit.location.y;
 		let kind = unit.location.kind;
 		if (kind === "space") {
-			key = "space:" + unit.empireId + ":" + unit.defId + ":" + Space4x.fmtCoord(gx) + ":" + Space4x.fmtCoord(gy);
+			key = "space:" + unit.empireId + ":" + Space4x.fmtCoord(gx) + ":" + Space4x.fmtCoord(gy);
 		} else {
 			starId = Space4x.unitStarId(state, unit);
 			const star = Space4x.starById(state, starId);
@@ -155,7 +155,7 @@ Space4x.fleetMarkers = function (state, layout) {
 				gx = star.x;
 				gy = star.y;
 			}
-			key = "star:" + unit.empireId + ":" + unit.defId + ":" + (starId || gx + ":" + gy);
+			key = "star:" + unit.empireId + ":" + (starId || gx + ":" + gy);
 			kind = "star";
 		}
 		if (!groups[key]) {
@@ -171,9 +171,7 @@ Space4x.fleetMarkers = function (state, layout) {
 		if (g.kind === "star") {
 			const emp = Space4x.empireById(state, g.units[0].empireId);
 			const idx = Math.max(0, state.empires.indexOf(emp));
-			const types = { colonyShip: 0, scout: 1, cruiser: 2, battleship: 3, popHauler: 4, troopHauler: 5 };
-			const t = types[g.units[0].defId] || 0;
-			const ang = -0.35 + idx * 0.9 + t * 0.45;
+			const ang = -0.35 + idx * 0.9;
 			g.px = c.x + Math.cos(ang) * off;
 			g.py = c.y + Math.sin(ang) * off * 0.7;
 		} else {

@@ -420,7 +420,7 @@ Space4x.syncSystem = function (ui, state, cmds) {
 	const unit = Space4x.unitById(state, state.ui.selectedUnitId);
 	let inspectOnly = picked.length > 0;
 	for (let i = 0; i < picked.length; i++) {
-		if (Space4x.shipCanTakeOrders(picked[i])) inspectOnly = false;
+		if (Space4x.shipCanTakeOrders(state, picked[i])) inspectOnly = false;
 	}
 	const inspectNote = inspectOnly ? " Cannot be given orders." : "";
 	if (selectedIds.length > 1) {
@@ -440,7 +440,7 @@ Space4x.syncSystem = function (ui, state, cmds) {
 	let cancelable = 0;
 	for (let i = 0; i < selectedIds.length; i++) {
 		const u = Space4x.unitById(state, selectedIds[i]);
-		if (u && u.targetStarId && Space4x.shipCanTakeOrders(u)) cancelable += 1;
+		if (u && u.targetStarId && Space4x.shipCanTakeOrders(state, u)) cancelable += 1;
 	}
 	if (ui.btnCancelShipOrder) {
 		ui.btnCancelShipOrder.hidden = cancelable === 0;
@@ -643,7 +643,7 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 	if (ui.settleQueueEmpty) ui.settleQueueEmpty.hidden = st.buildQueue.length > 0;
 	const queueEtas = Space4x.queueBuildEtas(state, st);
 	const queueBlocked = Space4x.queueItemStates(state, st);
-	if (!(Space4x._queueDrag && Space4x._queueDrag.moved)) {
+	if (!(state.ui.queueDrag && state.ui.queueDrag.moved)) {
 	Space4x.syncKeyedList(ui.settleQueue, st.buildQueue, function (q) { return q.id; },
 		function () {
 			const li = document.createElement("li");

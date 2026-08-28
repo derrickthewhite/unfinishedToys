@@ -223,8 +223,61 @@ Space4x.kindPhrase = function (kinds) {
 	return kinds.join("/");
 };
 
-Space4x.structureEffectText = function (state, def, fx) {
+Space4x.describeEffect = function (state, fx) {
 	const n = fx.n;
+	if (fx.type === "speed") return "+" + n + " ship speed";
+	if (fx.type === "range") return "+" + n + " ship range from friendly colonies";
+	if (fx.type === "commsRange") return "+" + n + " contact range beyond ship range";
+	if (fx.type === "industryPerPop") return "+" + n + " industry per industry worker";
+	if (fx.type === "researchPerPop") return "+" + n + " research per scientist";
+	if (fx.type === "foodPerFarmer") return "+" + n + " food per farmer";
+	if (fx.type === "growthRatePercent") return "+" + n + "% population growth";
+	if (fx.type === "loyalty") return "+" + n + " population loyalty";
+	if (fx.type === "spySkill") return "+" + n + " spy skill";
+	if (fx.type === "militiaAsPolice") {
+		const who = fx.defId ? Space4x.structureName(state, fx.defId) : "some troops";
+		return who + " count as police for settlement loyalty.";
+	}
+	if (fx.type === "unitLoyalty") {
+		const who = fx.defId ? Space4x.structureName(state, fx.defId) : "unit";
+		const sign = (fx.n || 0) > 0 ? "+" : "";
+		return sign + (fx.n || 0) + " " + who + " loyalty";
+	}
+	if (fx.type === "weapon") return "+" + n + " weapons (combat not in this slice)";
+	if (fx.type === "shield") return "+" + n + " shields (combat not in this slice)";
+	if (fx.type === "armor") return "+" + n + " armor (combat not in this slice)";
+	if (fx.type === "shipSize") return "+" + n + " ship size (not used yet)";
+	if (fx.type === "unlockBuild") {
+		let name = fx.id || "a building";
+		if (state && fx.id) {
+			const def = Space4x.settingOf(state).builds[fx.id];
+			if (def) name = def.name;
+		}
+		return "Unlocks " + name + ".";
+	}
+	if (fx.type === "unlockSettle") {
+		if (fx.kind === "asteroidBelt") return "Allows founding settlements on asteroid belts.";
+		if (fx.kind === "gasGiant") return "Allows founding settlements on gas giants.";
+		return "Allows founding on " + (fx.kind || "new worlds") + ".";
+	}
+	if (fx.type === "stub" || fx.type === "stubUnit" || fx.type === "unitBonus") {
+		return "No mechanical effect in this slice yet.";
+	}
+	if (fx.type === "warpDrive") return "Ships may leave their star.";
+	if (fx.type === "diplomacy") return "Talk to other empires in contact range. Unlocks the Diplomacy screen.";
+	if (fx.type === "shipModule") {
+		const names = { radioScanner: "a Radio Scanner", autoRepair: "Auto Repair" };
+		return "Fits " + (names[fx.id] || fx.id || "a module") + " on every ship. No effect yet.";
+	}
+	if (fx.type === "afterdrive") return "Combat speed option. Not used on the map yet.";
+	if (fx.type === "troopArmorPct") {
+		const who = fx.tags && fx.tags.length ? fx.tags.join("/") : "all troops";
+		return "+" + (fx.pct || 0) + "% troop strength (" + who + ")";
+	}
+	if (fx.type === "troopWeapon") {
+		const who = fx.tags && fx.tags.length ? fx.tags.join("/") : "all troops";
+		return "+" + (fx.n || 0) + " troop strength (" + who + "). Weapons do not stack; use the best.";
+	}
 	if (fx.type === "jobSlots") {
 		return "+" + n + " " + Space4x.jobLabel(state, fx.job) + " job slot" + (n === 1 ? "" : "s");
 	}
@@ -247,11 +300,6 @@ Space4x.structureEffectText = function (state, def, fx) {
 		const sign = n > 0 ? "+" : "";
 		return sign + n + " settlement loyalty";
 	}
-	if (fx.type === "unitLoyalty") {
-		const who = fx.defId ? Space4x.structureName(state, fx.defId) : "unit";
-		const sign = n > 0 ? "+" : "";
-		return sign + n + " " + who + " loyalty";
-	}
 	if (fx.type === "unitLoyaltyCover") {
 		const cover = fx.cover || 0;
 		return "+" + (fx.n || 0) + " unit loyalty to " + cover + " garrison unit" + (cover === 1 ? "" : "s");
@@ -273,10 +321,17 @@ Space4x.structureEffectText = function (state, def, fx) {
 	}
 	if (fx.type === "grantFreighters") return "Adds " + n + " freighter" + (n === 1 ? "" : "s") + " to the empire pool";
 	if (fx.type === "foundSettlement") return "Founds a settlement on a legal empty world";
-	if (fx.type === "explore") return "Reveals unvisited systems";
 	if (fx.type === "galaxyScan") return "Reveals every planet and ship";
 	if (fx.type === "combatStub") return "Combat is a stub in this slice";
-	return fx.type;
+	return fx.type + " +" + n;
+};
+
+Space4x.effectText = function (fx, state) {
+	return Space4x.describeEffect(state, fx);
+};
+
+Space4x.structureEffectText = function (state, def, fx) {
+	return Space4x.describeEffect(state, fx);
 };
 
 Space4x.pushStructureInspectStats = function (state, settlement, def, stats) {

@@ -1,17 +1,13 @@
 var Space4x = Space4x || {};
 
-Space4x.TROOP_GLYPH = {
-	police: { color: "#5b8def", shape: "shield" },
-	militia: { color: "#8a9070", shape: "square" },
-	infantry: { color: "#6b8f3d", shape: "square" },
-	elites: { color: "#d4a017", shape: "star" },
-	armor: { color: "#a0652a", shape: "rect" },
-	mechs: { color: "#7a8a9a", shape: "hex" },
-	air: { color: "#4ec4d4", shape: "tri" }
+Space4x.troopGlyphSpec = function (state, defId) {
+	const def = Space4x.settingOf(state).builds[defId];
+	if (def && def.glyph) return def.glyph;
+	return { color: "#9aa7c2", shape: "square" };
 };
 
-Space4x.makeTroopGlyph = function (defId) {
-	const spec = Space4x.TROOP_GLYPH[defId] || { color: "#9aa7c2", shape: "square" };
+Space4x.makeTroopGlyph = function (state, defId) {
+	const spec = Space4x.troopGlyphSpec(state, defId);
 	const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 	svg.setAttribute("class", "troop-glyph");
 	svg.setAttribute("viewBox", "0 0 16 16");
@@ -84,7 +80,7 @@ Space4x.syncGarrison = function (ui, state, cmds, st, mine) {
 			const btn = document.createElement("button");
 			btn.type = "button";
 			btn.className = "garrison-btn";
-			const glyph = Space4x.makeTroopGlyph(item.defId);
+			const glyph = Space4x.makeTroopGlyph(state, item.defId);
 			glyph.setAttribute("data-def", item.defId);
 			const art = document.createElement("img");
 			art.className = "garrison-art";
@@ -108,7 +104,7 @@ Space4x.syncGarrison = function (ui, state, cmds, st, mine) {
 			const btn = row.querySelector("button");
 			const old = row.querySelector(".troop-glyph");
 			if (old && old.getAttribute("data-def") !== item.defId) {
-				const next = Space4x.makeTroopGlyph(item.defId);
+				const next = Space4x.makeTroopGlyph(state, item.defId);
 				next.setAttribute("data-def", item.defId);
 				btn.replaceChild(next, old);
 			} else if (old) {

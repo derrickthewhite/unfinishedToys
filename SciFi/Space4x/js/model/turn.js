@@ -80,7 +80,7 @@ Space4x.rebuildTodos = function (state) {
 	const arrivedColonies = state.turnEvents && state.turnEvents.arrivedColonyIds;
 	for (let i = 0; i < state.units.length; i++) {
 		const unit = state.units[i];
-		if (unit.empireId !== player.id || unit.defId !== "colonyShip") continue;
+		if (unit.empireId !== player.id || !Space4x.unitCanFound(state, unit)) continue;
 		if (unit.location.kind !== "orbit" || unit.targetStarId) continue;
 		if (!arrivedColonies || arrivedColonies.indexOf(unit.id) === -1) continue;
 		const star = Space4x.starById(state, unit.location.starId);
@@ -100,13 +100,15 @@ Space4x.rebuildTodos = function (state) {
 	if (crushed) {
 		for (let i = 0; i < crushed.length; i++) {
 			const ev = crushed[i];
-			const dead = ev.dead || 0;
+			const unitsLost = ev.unitsLost != null ? ev.unitsLost : (ev.dead || 0);
+			let text = "Revolt crushed at " + ev.name + ".";
+			if (unitsLost > 0) text += " " + unitsLost + " rebel " + (unitsLost === 1 ? "unit" : "units") + " destroyed.";
 			todos.push({
 				id: "revolt-" + ev.settlementId + "-" + i,
 				type: "crushedRevolt",
 				settlementId: ev.settlementId,
 				blocking: false,
-				text: "Revolt crushed at " + ev.name + ". " + dead + " " + Space4x.peopleWord(dead) + " died."
+				text: text
 			});
 		}
 	}

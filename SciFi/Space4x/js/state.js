@@ -1,5 +1,33 @@
 var Space4x = Space4x || {};
 
+Space4x.emptyUiInteraction = function () {
+	return {
+		jobSel: { ids: [], fromJob: null },
+		jobDrag: null,
+		pendingLaneJob: null,
+		spySel: { ids: [], fromLane: null },
+		spyDrag: null,
+		pendingSpyLane: null,
+		queueDrag: null
+	};
+};
+
+Space4x.ensureUiInteraction = function (state) {
+	const d = Space4x.emptyUiInteraction();
+	if (!state.ui) state.ui = {};
+	const keys = Object.keys(d);
+	for (let i = 0; i < keys.length; i++) {
+		if (state.ui[keys[i]] === undefined) state.ui[keys[i]] = d[keys[i]];
+	}
+};
+
+Space4x.clearUiInteraction = function (state) {
+	if (!state.ui) return;
+	const d = Space4x.emptyUiInteraction();
+	const keys = Object.keys(d);
+	for (let i = 0; i < keys.length; i++) state.ui[keys[i]] = d[keys[i]];
+};
+
 Space4x.emptyModifiers = function () {
 	return {
 		speed: 0,
@@ -119,7 +147,14 @@ Space4x.createInitialState = function () {
 			inspect: null,
 			genFocus: null,
 			diploRivalId: null,
-			diploDraft: null
+			diploDraft: null,
+			jobSel: { ids: [], fromJob: null },
+			jobDrag: null,
+			pendingLaneJob: null,
+			spySel: { ids: [], fromLane: null },
+			spyDrag: null,
+			pendingSpyLane: null,
+			queueDrag: null
 		},
 		galaxy: { width: 30, height: 30, stars: [] },
 		empires: [],

@@ -352,7 +352,7 @@ Space4x.queueFrontSummary = function (state, settlement) {
 
 Space4x.foundSettlement = function (state, unitId, bodyId) {
 	const unit = Space4x.unitById(state, unitId);
-	if (!unit || unit.defId !== "colonyShip") return false;
+	if (!unit || !Space4x.unitCanFound(state, unit)) return false;
 	const star = Space4x.starById(state, unit.location.starId) || Space4x.starAt(state, unit.location.x, unit.location.y);
 	if (!star || unit.location.kind === "space") return false;
 	const bodies = Space4x.emptyLegalBodies(state, star, unit.empireId);

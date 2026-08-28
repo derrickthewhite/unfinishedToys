@@ -275,7 +275,7 @@ Space4x.dumbChoose = function (state, empireId) {
 	Space4x.aiSendSettlers(state, empireId);
 	for (let u = 0; u < state.units.length; u++) {
 		const unit = state.units[u];
-		if (unit.empireId !== empireId || unit.defId !== "colonyShip") continue;
+		if (unit.empireId !== empireId || !Space4x.unitCanFound(state, unit)) continue;
 		if (unit.targetStarId) continue;
 		const here = Space4x.starAt(state, unit.location.x, unit.location.y) ||
 			Space4x.nearestFriendlyStar(state, empireId, unit.location.x, unit.location.y);

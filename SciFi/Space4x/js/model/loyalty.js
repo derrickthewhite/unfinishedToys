@@ -4,19 +4,39 @@ Space4x.loyaltyRules = function (state) {
 	return Space4x.settingOf(state).loyalty || null;
 };
 
+Space4x.revoltRules = function (state) {
+	return Space4x.settingOf(state).revolt || null;
+};
+
+Space4x.troopCountsAsPolice = function (state, empire, def, altEffects) {
+	if (!def) return false;
+	if (Space4x.defMatchesTags(def, ["Police"])) return true;
+	const list = altEffects || [];
+	for (let i = 0; i < list.length; i++) {
+		const fx = list[i];
+		if (fx.defId && def.id === fx.defId) return true;
+		if (fx.tags && Space4x.defMatchesTags(def, fx.tags)) return true;
+	}
+	return false;
+};
+
+Space4x.policeAltEffects = function (state, empire) {
+	const out = [];
+	Space4x.eachEmpireTechEffect(state, empire, function (tech, fx) {
+		if (fx.type === "militiaAsPolice") out.push(fx);
+	});
+	return out;
+};
+
 Space4x.countPolice = function (state, settlement) {
 	if (!settlement || !settlement.troops) return 0;
 	const empire = Space4x.empireById(state, settlement.empireId);
-	let militiaPolice = false;
-	Space4x.eachEmpireTechEffect(state, empire, function (tech, fx) {
-		if (fx.type === "militiaAsPolice") militiaPolice = true;
-	});
+	const altEffects = Space4x.policeAltEffects(state, empire);
 	let n = 0;
 	const builds = Space4x.settingOf(state).builds;
 	for (let i = 0; i < settlement.troops.length; i++) {
 		const def = builds[settlement.troops[i].defId];
-		if (Space4x.defMatchesTags(def, ["Police"])) n += 1;
-		else if (militiaPolice && def && def.id === "militia") n += 1;
+		if (Space4x.troopCountsAsPolice(state, empire, def, altEffects)) n += 1;
 	}
 	return n;
 };
@@ -127,11 +147,16 @@ Space4x.loyaltyExplain = function (state, settlement, cultureId, job) {
 		if (fx.type !== "settlementLoyalty" || !fx.n) return;
 		lines.push((fx.n > 0 ? "+" : "") + fx.n + " " + def.name);
 	});
-	let militiaPolice = false;
-	Space4x.eachEmpireTechEffect(state, empire, function (tech, fx) {
-		if (fx.type === "militiaAsPolice") militiaPolice = true;
-	});
-	if (militiaPolice) lines.push("Militia count as police");
+	const altEffects = Space4x.policeAltEffects(state, empire);
+	if (altEffects.length) {
+		const names = [];
+		for (let i = 0; i < altEffects.length; i++) {
+			const fx = altEffects[i];
+			if (fx.defId) names.push(Space4x.structureName(state, fx.defId));
+			else if (fx.tags && fx.tags.length) names.push(fx.tags.join("/"));
+		}
+		if (names.length) lines.push(names.join(", ") + " count as police");
+	}
 	if (job) {
 		const spy = Space4x.groupSpyDelta(settlement, job, cultureId);
 		if (spy) lines.push((spy > 0 ? "+" : "") + spy + " spies");
@@ -394,18 +419,24 @@ Space4x.resolveRevolt = function (state, settlement) {
 		Space4x.peopleWord(rebelPops.length) + ", loyalty " + avg + "%).");
 
 	const rebelTroops = [];
-	let militia = 0;
-	for (let i = 0; i < rebelPops.length; i++) {
-		if (!Space4x.loyaltyRoll(state, Space4x.groupLoyalty(state, settlement, rebelPops[i].job || "idle", rebelPops[i].culture))) continue;
-		rebelTroops.push({
-			id: Space4x.nextId(state, "t"),
-			defId: "militia",
-			culture: rebelPops[i].culture
-		});
-		militia += 1;
-	}
-	if (militia) {
-		state.turnLog.push(militia + " Militia form at " + settlement.name + ".");
+	const revoltRules = Space4x.revoltRules(state);
+	const rebelTroopDefId = revoltRules && revoltRules.rebelTroopDefId;
+	let rebelTroopSpawned = 0;
+	if (rebelTroopDefId) {
+		const rebelTroopDef = Space4x.settingOf(state).builds[rebelTroopDefId];
+		for (let i = 0; i < rebelPops.length; i++) {
+			if (!Space4x.loyaltyRoll(state, Space4x.groupLoyalty(state, settlement, rebelPops[i].job || "idle", rebelPops[i].culture))) continue;
+			rebelTroops.push({
+				id: Space4x.nextId(state, "t"),
+				defId: rebelTroopDefId,
+				culture: rebelPops[i].culture
+			});
+			rebelTroopSpawned += 1;
+		}
+		if (rebelTroopSpawned) {
+			const troopName = rebelTroopDef ? rebelTroopDef.name : rebelTroopDefId;
+			state.turnLog.push(rebelTroopSpawned + " " + troopName + " form at " + settlement.name + ".");
+		}
 	}
 
 	const loyalTroops = [];
@@ -428,11 +459,12 @@ Space4x.resolveRevolt = function (state, settlement) {
 		Space4x.markStarExplored(state, empire.id, settlement.location.starId);
 	}
 
-	function crush(loyalLeft) {
-		const dead = Space4x.removeListedPops(settlement, rebelPops);
+	function crush(loyalLeft, rebelUnitsLost) {
 		giveTo(parent, loyalLeft);
 		let line = "The revolt at " + settlement.name + " is crushed.";
-		if (dead) line += " " + dead + " " + Space4x.peopleWord(dead) + " died.";
+		if (rebelUnitsLost > 0) {
+			line += " " + rebelUnitsLost + " rebel " + Space4x.unitsWord(rebelUnitsLost) + " destroyed.";
+		}
 		state.turnLog.push(line);
 		if (parent.isPlayer) {
 			if (!state.turnEvents) state.turnEvents = {};
@@ -440,7 +472,7 @@ Space4x.resolveRevolt = function (state, settlement) {
 			state.turnEvents.crushedRevolts.push({
 				settlementId: settlement.id,
 				name: settlement.name,
-				dead: dead
+				unitsLost: rebelUnitsLost || 0
 			});
 		}
 		Space4x.removeEmpireIfEmpty(state, rebel.id);
@@ -452,7 +484,7 @@ Space4x.resolveRevolt = function (state, settlement) {
 		return;
 	}
 	if (!rebelTroops.length) {
-		crush(loyalTroops);
+		crush(loyalTroops, 0);
 		return;
 	}
 	if (!loyalTroops.length) {
@@ -487,7 +519,8 @@ Space4x.resolveRevolt = function (state, settlement) {
 		giveTo(rebel, fight.atkTroops);
 		state.turnLog.push(settlement.name + " falls to " + rebel.name + ".");
 	} else {
-		crush(fight.defTroops);
+		const rebelUnitsLost = rebelTroops.length - fight.atkTroops.length;
+		crush(fight.defTroops, rebelUnitsLost);
 	}
 };
 

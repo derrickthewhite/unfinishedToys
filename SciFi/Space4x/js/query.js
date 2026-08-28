@@ -19,15 +19,59 @@ Space4x.fmtMoney = function (n) {
 	return (Math.abs(r % 1) < 1e-9) ? String(Math.round(r)) : r.toFixed(1);
 };
 
-Space4x.isHauler = function (unit) {
-	return !!(unit && (unit.defId === "popHauler" || unit.defId === "troopHauler"));
+Space4x.UNIT_ROLES = {
+	popHauler: "popHauler",
+	troopHauler: "troopHauler"
+};
+
+Space4x.unitRole = function (state, unit) {
+	if (!unit) return null;
+	if (unit.role) return unit.role;
+	const def = unit.defId && Space4x.settingOf(state).builds[unit.defId];
+	return def && def.role ? def.role : null;
+};
+
+Space4x.unitHasRole = function (state, unit, role) {
+	if (!unit) return false;
+	if (unit.role === role || unit.defId === role) return true;
+	const def = unit.defId && Space4x.settingOf(state).builds[unit.defId];
+	return !!(def && def.role === role);
+};
+
+Space4x.isPopHauler = function (state, unit) {
+	return Space4x.unitHasRole(state, unit, Space4x.UNIT_ROLES.popHauler);
+};
+
+Space4x.isTroopHauler = function (state, unit) {
+	return Space4x.unitHasRole(state, unit, Space4x.UNIT_ROLES.troopHauler);
+};
+
+Space4x.isHauler = function (state, unit) {
+	return Space4x.isPopHauler(state, unit) || Space4x.isTroopHauler(state, unit);
+};
+
+Space4x.defHasEffect = function (state, defId, type) {
+	const def = defId && Space4x.settingOf(state).builds[defId];
+	if (!def || !def.effects) return false;
+	for (let i = 0; i < def.effects.length; i++) {
+		if (def.effects[i].type === type) return true;
+	}
+	return false;
+};
+
+Space4x.unitHasEffect = function (state, unit, type) {
+	return !!(unit && Space4x.defHasEffect(state, unit.defId, type));
+};
+
+Space4x.unitCanFound = function (state, unit) {
+	return Space4x.unitHasEffect(state, unit, "foundSettlement");
 };
 
 Space4x.inTransitFreighterHulls = function (state, empireId) {
 	let n = 0;
 	for (let i = 0; i < state.units.length; i++) {
 		const u = state.units[i];
-		if (!Space4x.isHauler(u)) continue;
+		if (!Space4x.isHauler(state, u)) continue;
 		if (empireId && u.empireId !== empireId) continue;
 		n += u.hulls || 0;
 	}
@@ -148,6 +192,10 @@ Space4x.peopleWord = function (n) {
 	return n === 1 ? "person" : "people";
 };
 
+Space4x.unitsWord = function (n) {
+	return n === 1 ? "unit" : "units";
+};
+
 Space4x.techsInCategory = function (state, categoryId) {
 	const techs = Space4x.settingOf(state).techs;
 	const out = [];
@@ -233,8 +281,8 @@ Space4x.canSettleBody = function (state, empire, body) {
 };
 
 Space4x.unitLabel = function (state, unit) {
-	if (unit.defId === "popHauler") return "Freighter";
-	if (unit.defId === "troopHauler") return "Troop transport";
+	if (Space4x.isPopHauler(state, unit)) return "Freighter";
+	if (Space4x.isTroopHauler(state, unit)) return "Troop transport";
 	const def = Space4x.settingOf(state).builds[unit.defId];
 	return def ? def.name : unit.defId;
 };
@@ -248,12 +296,12 @@ Space4x.unitModuleNames = function (unit) {
 
 Space4x.unitPlaceLabel = function (state, unit) {
 	let cargo = "";
-	if (unit.defId === "popHauler") {
+	if (Space4x.isPopHauler(state, unit)) {
 		const n = (unit.cargoPops || []).length;
 		const to = Space4x.settlementById(state, unit.destSettlementId);
 		cargo = n + " " + Space4x.peopleWord(n) + (to ? " → " + to.name : "") + " — ";
 	}
-	if (unit.defId === "troopHauler") {
+	if (Space4x.isTroopHauler(state, unit)) {
 		const n = (unit.cargoTroops || []).length;
 		const to = Space4x.settlementById(state, unit.destSettlementId);
 		cargo = n + " troop" + (n === 1 ? "" : "s") + (to ? " → " + to.name : "") + " — ";
@@ -383,8 +431,8 @@ Space4x.shipHasLeft = function (unit) {
 	return !!(unit && unit.location && unit.location.kind === "space");
 };
 
-Space4x.shipCanTakeOrders = function (unit) {
-	return !!(unit && !Space4x.isHauler(unit) && !Space4x.shipHasLeft(unit));
+Space4x.shipCanTakeOrders = function (state, unit) {
+	return !!(unit && !Space4x.isHauler(state, unit) && !Space4x.shipHasLeft(unit));
 };
 
 Space4x.unitIsSelected = function (state, id) {
@@ -446,7 +494,7 @@ Space4x.orderableSelectedIds = function (state) {
 	const out = [];
 	for (let i = 0; i < ids.length; i++) {
 		const unit = Space4x.unitById(state, ids[i]);
-		if (unit && Space4x.shipCanTakeOrders(unit)) out.push(unit.id);
+		if (unit && Space4x.shipCanTakeOrders(state, unit)) out.push(unit.id);
 	}
 	return out;
 };
@@ -483,20 +531,24 @@ Space4x.emptyLegalBodies = function (state, star, empireId) {
 	return out;
 };
 
-Space4x.countEmpireStructure = function (state, empireId, defId) {
-	let n = 0;
+Space4x.eachEmpireStructureEffect = function (state, empireId, fn) {
 	const homes = Space4x.settlementsOf(state, empireId);
-	for (let i = 0; i < homes.length; i++) n += Space4x.countStructure(homes[i], defId);
-	return n;
+	for (let i = 0; i < homes.length; i++) {
+		Space4x.eachStructureEffect(state, homes[i], fn);
+	}
 };
 
-Space4x.empireHasSurveyNet = function (state, empireId) {
-	return Space4x.countEmpireStructure(state, empireId, "surveyDish") > 0;
+Space4x.empireHasGalaxyScan = function (state, empireId) {
+	let found = false;
+	Space4x.eachEmpireStructureEffect(state, empireId, function (def, fx) {
+		if (fx.type === "galaxyScan") found = true;
+	});
+	return found;
 };
 
 Space4x.starIsExplored = function (state, empireId, starId) {
 	if (!state.hideUnvisitedSystems) return true;
-	if (Space4x.empireHasSurveyNet(state, empireId)) return true;
+	if (Space4x.empireHasGalaxyScan(state, empireId)) return true;
 	const empire = Space4x.empireById(state, empireId);
 	if (!empire) return false;
 	const ids = empire.exploredStarIds || [];
@@ -546,7 +598,7 @@ Space4x.foundingShipsAtStar = function (state, empireId, starId) {
 	const out = [];
 	for (let i = 0; i < state.units.length; i++) {
 		const u = state.units[i];
-		if (u.empireId !== empireId || u.defId !== "colonyShip") continue;
+		if (u.empireId !== empireId || !Space4x.unitCanFound(state, u)) continue;
 		if (u.location.kind === "orbit" && u.location.starId === starId) {
 			out.push(u);
 			continue;
@@ -583,7 +635,7 @@ Space4x.shipsAtStar = function (state, starId) {
 Space4x.unitVisibleTo = function (state, viewerId, unit) {
 	if (!unit || !viewerId) return false;
 	if (unit.empireId === viewerId) return true;
-	if (Space4x.empireHasSurveyNet(state, viewerId)) return true;
+	if (Space4x.empireHasGalaxyScan(state, viewerId)) return true;
 	const starId = Space4x.unitStarId(state, unit);
 	if (starId && Space4x.starIsExplored(state, viewerId, starId)) return true;
 	return Space4x.inRangeOfEmpire(state, viewerId, unit.location.x, unit.location.y);

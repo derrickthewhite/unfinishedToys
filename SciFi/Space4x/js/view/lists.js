@@ -1,6 +1,12 @@
 var Space4x = Space4x || {};
 
-Space4x._queueDrag = null;
+Space4x.clearQueueDrag = function (state) {
+	if (!state || !state.ui) return;
+	const drag = state.ui.queueDrag;
+	if (!drag) return;
+	if (drag.row) drag.row.classList.remove("is-dragging");
+	state.ui.queueDrag = null;
+};
 
 Space4x.setText = function (node, text) {
 	if (!node) return;
@@ -33,13 +39,6 @@ Space4x.syncKeyedList = function (root, items, keyFn, makeRow, updateRow) {
 	for (let i = 0; i < remove.length; i++) root.removeChild(remove[i]);
 };
 
-Space4x.clearQueueDrag = function () {
-	const drag = Space4x._queueDrag;
-	if (!drag) return;
-	if (drag.row) drag.row.classList.remove("is-dragging");
-	Space4x._queueDrag = null;
-};
-
 Space4x.bindSettleQueue = function (app) {
 	const root = app.ui.settleQueue;
 	if (!root) return;
@@ -68,7 +67,7 @@ Space4x.bindSettleQueue = function (app) {
 	}
 
 	function onMove(ev) {
-		const drag = Space4x._queueDrag;
+		const drag = app.state.ui.queueDrag;
 		if (!drag) return;
 		const dx = ev.clientX - drag.startX;
 		const dy = ev.clientY - drag.startY;
@@ -86,7 +85,7 @@ Space4x.bindSettleQueue = function (app) {
 		window.removeEventListener("pointermove", onMove);
 		window.removeEventListener("pointerup", onUp);
 		window.removeEventListener("pointercancel", onUp);
-		const drag = Space4x._queueDrag;
+		const drag = app.state.ui.queueDrag;
 		if (!drag) return;
 		const moved = drag.moved;
 		const onName = drag.onName;
@@ -94,7 +93,7 @@ Space4x.bindSettleQueue = function (app) {
 		const defId = drag.row.getAttribute("data-def");
 		const ids = [];
 		for (let i = 0; i < root.children.length; i++) ids.push(root.children[i].getAttribute("data-id"));
-		Space4x.clearQueueDrag();
+		Space4x.clearQueueDrag(app.state);
 		if (moved) app.cmds.reorderQueue(ids);
 		else if (onName) app.cmds.inspectBuild("queue", defId, queueId);
 	}
@@ -106,7 +105,8 @@ Space4x.bindSettleQueue = function (app) {
 		const row = ev.target.closest("li");
 		if (!row || !root.contains(row)) return;
 		ev.preventDefault();
-		Space4x._queueDrag = {
+		Space4x.ensureUiInteraction(app.state);
+		app.state.ui.queueDrag = {
 			row: row,
 			startX: ev.clientX,
 			startY: ev.clientY,

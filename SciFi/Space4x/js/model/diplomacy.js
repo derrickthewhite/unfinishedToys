@@ -339,7 +339,7 @@ Space4x.giftableShips = function (state, empireId) {
 	const out = [];
 	for (let i = 0; i < state.units.length; i++) {
 		const u = state.units[i];
-		if (u.empireId !== empireId || Space4x.isHauler(u)) continue;
+		if (u.empireId !== empireId || Space4x.isHauler(state, u)) continue;
 		out.push(u);
 	}
 	return out;
@@ -399,7 +399,7 @@ Space4x.clauseValid = function (state, giver, receiver, clause) {
 	}
 	if (clause.type === "ship") {
 		const u = Space4x.unitById(state, clause.unitId);
-		return !!(u && u.empireId === giver.id && !Space4x.isHauler(u));
+		return !!(u && u.empireId === giver.id && !Space4x.isHauler(state, u));
 	}
 	if (clause.type === "troops") {
 		const st = Space4x.settlementById(state, clause.settlementId);
@@ -624,7 +624,7 @@ Space4x.empirePower = function (state, empire) {
 	const homes = Space4x.settlementsOf(state, empire.id);
 	for (let i = 0; i < homes.length; i++) n += 8 + homes[i].pops.length;
 	for (let i = 0; i < state.units.length; i++) {
-		if (state.units[i].empireId === empire.id && !Space4x.isHauler(state.units[i])) n += 12;
+		if (state.units[i].empireId === empire.id && !Space4x.isHauler(state, state.units[i])) n += 12;
 	}
 	n += (empire.stockpiles.money || 0) / 20;
 	n += ((empire.research && empire.research.completedTechIds) || []).length * 4;

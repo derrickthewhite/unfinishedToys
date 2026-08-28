@@ -9,6 +9,35 @@ Space4x.foodPerFarmer = function (state, body, empire, settlement) {
 	return n < 0 ? 0 : n;
 };
 
+Space4x.YIELD_READERS = {
+	farmerBiome: function (state, settlement, pop, empire) {
+		const body = Space4x.bodyById(state, settlement.location.bodyId);
+		return { food: Space4x.foodPerFarmer(state, body, empire, settlement) };
+	},
+	foodBase: function (state, settlement, pop, empire, spec) {
+		return {
+			food: spec.base + (empire.modifiers.foodPerFarmer || 0) +
+				Space4x.structureJobYield(state, settlement, pop.job)
+		};
+	},
+	industryRichness: function (state, settlement, pop, empire, spec) {
+		const body = Space4x.bodyById(state, settlement.location.bodyId);
+		const rich = Space4x.richnessOf(state, body);
+		return {
+			industry: spec.base + (empire.modifiers.industryPerPop || 0) + (rich.industryPerPop || 0) +
+				Space4x.structureJobYield(state, settlement, pop.job)
+		};
+	},
+	workerBase: function (state, settlement, pop, empire, spec) {
+		const product = spec.product;
+		const modKey = product === "research" ? "researchPerPop" : "industryPerPop";
+		const out = { food: 0, industry: 0, research: 0 };
+		out[product] = spec.base + (empire.modifiers[modKey] || 0) +
+			Space4x.structureJobYield(state, settlement, pop.job);
+		return out;
+	}
+};
+
 Space4x.jobYield = function (state, settlement, pop, empire) {
 	const set = Space4x.settingOf(state);
 	const job = pop.job;
@@ -17,18 +46,12 @@ Space4x.jobYield = function (state, settlement, pop, empire) {
 	const spec = set.jobs[job];
 	if (!spec) return out;
 	out.money = (spec.money || 0) + Space4x.structureMoneyPerPop(state, settlement);
-	if (job === "agriculture") {
-		const body = Space4x.bodyById(state, settlement.location.bodyId);
-		out.food = Space4x.foodPerFarmer(state, body, empire, settlement);
-	} else if (job === "greenhouse") {
-		out.food = spec.base + (empire.modifiers.foodPerFarmer || 0) + Space4x.structureJobYield(state, settlement, job);
-	} else if (job === "industry" || job === "roboIndustry") {
-		const body = Space4x.bodyById(state, settlement.location.bodyId);
-		const rich = Space4x.richnessOf(state, body);
-		out.industry = spec.base + (empire.modifiers.industryPerPop || 0) + (rich.industryPerPop || 0) +
-			Space4x.structureJobYield(state, settlement, job);
-	} else if (job === "research") {
-		out.research = spec.base + (empire.modifiers.researchPerPop || 0) + Space4x.structureJobYield(state, settlement, job);
+	const reader = spec.yield && Space4x.YIELD_READERS[spec.yield];
+	if (reader) {
+		const y = reader(state, settlement, pop, empire, spec);
+		out.food += y.food || 0;
+		out.industry += y.industry || 0;
+		out.research += y.research || 0;
 	}
 	Space4x.applyCultureYield(state, settlement, pop, out);
 	if (out.food < 0) out.food = 0;
@@ -156,7 +179,7 @@ Space4x.outputExplain = function (state, settlement, job) {
 		}
 		return { amount: amount, tip: lines.join("\n") };
 	}
-	if (job === "industry" || job === "roboIndustry") {
+	if (job === "industry") {
 		const body = Space4x.bodyById(state, settlement.location.bodyId);
 		const rich = Space4x.richnessOf(state, body);
 		let workerOut = 0;
@@ -264,7 +287,7 @@ Space4x.structureUpkeep = function (state, settlement) {
 };
 
 Space4x.shipUpkeep = function (state, unit) {
-	if (!unit || Space4x.isHauler(unit)) return 0;
+	if (!unit || Space4x.isHauler(state, unit)) return 0;
 	const base = Space4x.defUpkeep(state, unit.defId);
 	if (!base) return 0;
 	if (unit.location.kind === "space") return base * 2;

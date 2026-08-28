@@ -1,58 +1,5 @@
 var Space4x = Space4x || {};
 
-Space4x.effectText = function (fx, state) {
-	const n = fx.n;
-	if (fx.type === "speed") return "+" + n + " ship speed";
-	if (fx.type === "range") return "+" + n + " ship range from friendly colonies";
-	if (fx.type === "commsRange") return "+" + n + " contact range beyond ship range";
-	if (fx.type === "industryPerPop") return "+" + n + " industry per industry worker";
-	if (fx.type === "researchPerPop") return "+" + n + " research per scientist";
-	if (fx.type === "foodPerFarmer") return "+" + n + " food per farmer";
-	if (fx.type === "growthRatePercent") return "+" + n + "% population growth";
-	if (fx.type === "loyalty") return "+" + n + " population loyalty";
-	if (fx.type === "spySkill") return "+" + n + " spy skill";
-	if (fx.type === "militiaAsPolice") return "Militia count as police for settlement loyalty.";
-	if (fx.type === "unitLoyalty") {
-		const who = fx.defId ? Space4x.structureName(state, fx.defId) : "unit";
-		const sign = (fx.n || 0) > 0 ? "+" : "";
-		return sign + (fx.n || 0) + " " + who + " loyalty";
-	}
-	if (fx.type === "weapon") return "+" + n + " weapons (combat not in this slice)";
-	if (fx.type === "shield") return "+" + n + " shields (combat not in this slice)";
-	if (fx.type === "armor") return "+" + n + " armor (combat not in this slice)";
-	if (fx.type === "shipSize") return "+" + n + " ship size (not used yet)";
-	if (fx.type === "unlockBuild") {
-		let name = fx.id || "a building";
-		if (state && fx.id) {
-			const def = Space4x.settingOf(state).builds[fx.id];
-			if (def) name = def.name;
-		}
-		return "Unlocks " + name + ".";
-	}
-	if (fx.type === "unlockSettle") {
-		if (fx.kind === "asteroidBelt") return "Allows founding settlements on asteroid belts.";
-		if (fx.kind === "gasGiant") return "Allows founding settlements on gas giants.";
-		return "Allows founding on " + (fx.kind || "new worlds") + ".";
-	}
-	if (fx.type === "stub" || fx.type === "stubUnit" || fx.type === "unitBonus") return "No mechanical effect in this slice yet.";
-	if (fx.type === "warpDrive") return "Ships may leave their star.";
-	if (fx.type === "diplomacy") return "Talk to other empires in contact range. Unlocks the Diplomacy screen.";
-	if (fx.type === "shipModule") {
-		const names = { radioScanner: "a Radio Scanner", autoRepair: "Auto Repair" };
-		return "Fits " + (names[fx.id] || fx.id || "a module") + " on every ship. No effect yet.";
-	}
-	if (fx.type === "afterdrive") return "Combat speed option. Not used on the map yet.";
-	if (fx.type === "troopArmorPct") {
-		const who = fx.tags && fx.tags.length ? fx.tags.join("/") : "all troops";
-		return "+" + (fx.pct || 0) + "% troop strength (" + who + ")";
-	}
-	if (fx.type === "troopWeapon") {
-		const who = fx.tags && fx.tags.length ? fx.tags.join("/") : "all troops";
-		return "+" + (fx.n || 0) + " troop strength (" + who + "). Weapons do not stack; use the best.";
-	}
-	return fx.type + " +" + n;
-};
-
 Space4x.techStatus = function (empire, tech) {
 	if (Space4x.empireHasTech(empire, tech.id)) return "done";
 	const tier = Space4x.categoryTierOf(empire, tech.categoryId);
@@ -94,7 +41,7 @@ Space4x.fillTechDetail = function (ui, state, player, tech, catObj) {
 			return li;
 		},
 		function (row, item) {
-			row.querySelector("span").textContent = Space4x.effectText(item.fx, state);
+			row.querySelector("span").textContent = Space4x.describeEffect(state, item.fx);
 		}
 	);
 	if (ui.researchDetailBlurb) {

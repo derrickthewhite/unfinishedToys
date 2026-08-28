@@ -1,24 +1,23 @@
 var Space4x = Space4x || {};
 
-Space4x._spySel = { ids: [], fromLane: null };
-Space4x._spyDrag = null;
-
-Space4x.spySelHas = function (id) {
-	const ids = Space4x._spySel && Space4x._spySel.ids;
+Space4x.spySelHas = function (state, id) {
+	const ids = state && state.ui && state.ui.spySel && state.ui.spySel.ids;
 	if (!ids) return false;
 	for (let i = 0; i < ids.length; i++) if (ids[i] === id) return true;
 	return false;
 };
 
-Space4x.clearSpySel = function () {
-	Space4x._spySel = { ids: [], fromLane: null };
+Space4x.clearSpySel = function (state) {
+	if (!state || !state.ui) return;
+	state.ui.spySel = { ids: [], fromLane: null };
 };
 
-Space4x.clearSpyDrag = function () {
-	const drag = Space4x._spyDrag;
+Space4x.clearSpyDrag = function (state) {
+	if (!state || !state.ui) return;
+	const drag = state.ui.spyDrag;
 	if (!drag) return;
 	if (drag.ghost && drag.ghost.parentNode) drag.ghost.parentNode.removeChild(drag.ghost);
-	Space4x._spyDrag = null;
+	state.ui.spyDrag = null;
 };
 
 Space4x.makeSpyToken = function (state, spy) {
@@ -42,7 +41,8 @@ Space4x.bindSpyBoard = function (app) {
 	function paintSelected() {
 		const tokens = board.querySelectorAll(".pop-token");
 		for (let i = 0; i < tokens.length; i++) {
-			tokens[i].classList.toggle("is-selected", Space4x.spySelHas(tokens[i].getAttribute("data-spy-id")));
+			tokens[i].classList.toggle("is-selected",
+				Space4x.spySelHas(app.state, tokens[i].getAttribute("data-spy-id")));
 		}
 	}
 
@@ -52,7 +52,7 @@ Space4x.bindSpyBoard = function (app) {
 	}
 
 	function laneUnder(ev) {
-		const drag = Space4x._spyDrag;
+		const drag = app.state.ui.spyDrag;
 		if (drag && drag.ghost) drag.ghost.style.visibility = "hidden";
 		const el = document.elementFromPoint(ev.clientX, ev.clientY);
 		if (drag && drag.ghost) drag.ghost.style.visibility = "";
@@ -77,21 +77,22 @@ Space4x.bindSpyBoard = function (app) {
 			if (!after) continue;
 			ids.push(tokens[i].getAttribute("data-spy-id"));
 		}
-		Space4x._spySel = { ids: ids, fromLane: lane.getAttribute("data-id") };
+		Space4x.ensureUiInteraction(app.state);
+		app.state.ui.spySel = { ids: ids, fromLane: lane.getAttribute("data-id") };
 		paintSelected();
 	}
 
 	function assignToLane(laneId) {
-		const ids = Space4x._spySel && Space4x._spySel.ids;
+		const ids = app.state.ui.spySel && app.state.ui.spySel.ids;
 		if (!ids || !ids.length || !laneId) return false;
-		Space4x.clearSpySel();
-		Space4x.clearSpyDrag();
+		Space4x.clearSpySel(app.state);
+		Space4x.clearSpyDrag(app.state);
 		app.cmds.setSpyPosts(ids, laneId);
 		return true;
 	}
 
 	function onMove(ev) {
-		const drag = Space4x._spyDrag;
+		const drag = app.state.ui.spyDrag;
 		if (!drag) return;
 		const dx = ev.clientX - drag.startX;
 		const dy = ev.clientY - drag.startY;
@@ -113,18 +114,18 @@ Space4x.bindSpyBoard = function (app) {
 		window.removeEventListener("pointermove", onMove);
 		window.removeEventListener("pointerup", onUp);
 		window.removeEventListener("pointercancel", onUp);
-		const drag = Space4x._spyDrag;
+		const drag = app.state.ui.spyDrag;
 		if (!drag) return;
 		if (drag.moved) {
 			const over = paintOver(ev);
 			const laneId = over ? over.getAttribute("data-id") : null;
-			Space4x.clearSpyDrag();
+			Space4x.clearSpyDrag(app.state);
 			clearLaneOver();
 			if (laneId) assignToLane(laneId);
 			else paintSelected();
 			return;
 		}
-		Space4x.clearSpyDrag();
+		Space4x.clearSpyDrag(app.state);
 		clearLaneOver();
 		paintSelected();
 	}
@@ -132,13 +133,13 @@ Space4x.bindSpyBoard = function (app) {
 	function onLaneUp(ev) {
 		window.removeEventListener("pointerup", onLaneUp);
 		window.removeEventListener("pointercancel", onLaneUp);
-		const laneId = Space4x._pendingSpyLane;
-		Space4x._pendingSpyLane = null;
+		const laneId = app.state.ui.pendingSpyLane;
+		app.state.ui.pendingSpyLane = null;
 		if (!laneId) return;
 		const over = laneUnder(ev);
 		if (!over || over.getAttribute("data-id") !== laneId) return;
-		if (laneId === Space4x._spySel.fromLane) {
-			Space4x.clearSpySel();
+		if (laneId === app.state.ui.spySel.fromLane) {
+			Space4x.clearSpySel(app.state);
 			paintSelected();
 			return;
 		}
@@ -152,9 +153,10 @@ Space4x.bindSpyBoard = function (app) {
 		if (token && board.contains(token)) {
 			ev.preventDefault();
 			selectFromToken(token);
-			Space4x._spyDrag = {
-				ids: Space4x._spySel.ids.slice(),
-				fromLane: Space4x._spySel.fromLane,
+			Space4x.ensureUiInteraction(app.state);
+			app.state.ui.spyDrag = {
+				ids: app.state.ui.spySel.ids.slice(),
+				fromLane: app.state.ui.spySel.fromLane,
 				startX: ev.clientX,
 				startY: ev.clientY,
 				moved: false,
@@ -165,9 +167,9 @@ Space4x.bindSpyBoard = function (app) {
 			window.addEventListener("pointercancel", onUp);
 			return;
 		}
-		if (lane && Space4x._spySel.ids.length) {
+		if (lane && app.state.ui.spySel.ids.length) {
 			ev.preventDefault();
-			Space4x._pendingSpyLane = lane.getAttribute("data-id");
+			app.state.ui.pendingSpyLane = lane.getAttribute("data-id");
 			window.addEventListener("pointerup", onLaneUp);
 			window.addEventListener("pointercancel", onLaneUp);
 		}
@@ -176,7 +178,8 @@ Space4x.bindSpyBoard = function (app) {
 
 Space4x.syncSpyStage = function (ui, state, cmds) {
 	if (!ui.spyBoard) return;
-	if (Space4x._spyDrag && Space4x._spyDrag.moved) return;
+	Space4x.ensureUiInteraction(state);
+	if (state.ui.spyDrag && state.ui.spyDrag.moved) return;
 	const player = Space4x.playerEmpire(state);
 	if (ui.spySkill) {
 		const skill = player ? Space4x.spySkill(state, player) : 0;
@@ -220,7 +223,7 @@ Space4x.syncSpyStage = function (ui, state, cmds) {
 				function (token, spy) {
 					const img = token.querySelector("img");
 					if (img) Space4x.setCultureImg(img, state, spy.culture);
-					token.classList.toggle("is-selected", Space4x.spySelHas(spy.id));
+					token.classList.toggle("is-selected", Space4x.spySelHas(state, spy.id));
 					const who = Space4x.cultureName(state, spy.culture);
 					token.title = (who ? who + " spy" : "Spy") + " · click then click a lane";
 				}

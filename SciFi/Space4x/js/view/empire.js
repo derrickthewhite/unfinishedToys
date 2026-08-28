@@ -166,7 +166,7 @@ Space4x.syncEmpireStage = function (ui, state, cmds) {
 			const to = Space4x.settlementById(state, unit.destSettlementId);
 			let label;
 			let hulls;
-			if (unit.defId === "troopHauler") {
+			if (Space4x.isTroopHauler(state, unit)) {
 				const cargo = unit.cargoTroops || [];
 				label = Space4x.troopCargoLabel(state, cargo);
 				hulls = unit.hulls || cargo.length;
