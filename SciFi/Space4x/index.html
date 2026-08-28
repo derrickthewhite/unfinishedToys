@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Space4x</title>
+	<link rel="stylesheet" href="css/space4x.css">
+</head>
+<body>
+	<section id="screen-generation">
+		<h1>Space4x</h1>
+		<p class="sub">Working title. Empire from scratch.</p>
+		<form id="generation-form">
+			<label>Game type
+				<select id="gen-setting">
+					<option value="scratch-empire">Empire from scratch</option>
+					<option value="sow" disabled>Space opera war (later)</option>
+					<option value="solar" disabled>Solar system (later)</option>
+				</select>
+			</label>
+			<label>Seed
+				<input id="gen-seed" type="text" placeholder="random" autocomplete="off">
+			</label>
+			<label>Map width
+				<input id="gen-width" type="number" min="8" max="60" value="30">
+			</label>
+			<label>Map height
+				<input id="gen-height" type="number" min="8" max="60" value="30">
+			</label>
+			<label>Star systems
+				<input id="gen-stars" type="number" min="2" max="80" value="25">
+			</label>
+			<label class="check">
+				<input id="gen-auto-jobs" type="checkbox">
+				Auto-assign jobs
+			</label>
+			<label class="check">
+				<input id="gen-hide-unvisited" type="checkbox" checked>
+				Hide unexplored systems until a ship visits
+			</label>
+			<fieldset id="gen-player-species">
+				<legend>Your species</legend>
+				<ul id="gen-player-cultures" class="gen-culture-grid"></ul>
+				<div id="gen-player-blurb" class="gen-culture-blurb">
+					<img id="gen-player-blurb-art" class="gen-blurb-art" alt="" hidden>
+					<div>
+						<h3 id="gen-player-blurb-name">Species</h3>
+						<p id="gen-player-blurb-text" class="muted"></p>
+					</div>
+				</div>
+			</fieldset>
+			<fieldset>
+				<legend>Opponents</legend>
+				<ul id="gen-opponents"></ul>
+				<button type="button" id="gen-add-opponent">Add opponent slot</button>
+			</fieldset>
+			<button type="submit" id="gen-start">Start game</button>
+		</form>
+		<div id="gen-saves">
+			<h2>Saves</h2>
+			<p id="gen-save-status" class="muted" hidden></p>
+			<button type="button" id="btn-continue" hidden>Continue</button>
+			<p id="gen-saves-empty" class="muted">No saved games.</p>
+			<ul id="gen-save-list"></ul>
+			<button type="button" id="btn-load-file">Load file</button>
+			<input id="save-file-input" type="file" accept="application/json" hidden>
+		</div>
+	</section>
+
+	<section id="screen-play" hidden>
+		<header id="chrome">
+			<div id="chrome-left">
+				<span id="chrome-setting"></span>
+				<span>Turn <span id="chrome-turn">1</span></span>
+				<button type="button" id="btn-end-turn">End Turn</button>
+				<button type="button" id="btn-auto-play">Auto Play</button>
+				<button type="button" id="btn-todos">Attention (<span id="chrome-todo-count">0</span>)</button>
+				<button type="button" id="btn-save-slot">Save</button>
+				<button type="button" id="btn-save-file">Save file</button>
+				<button type="button" id="btn-chrome-new-game">New game</button>
+				<label id="chrome-play-as-wrap" title="Debug: take control of this empire">Play as
+					<select id="chrome-play-as"></select>
+				</label>
+				<span id="chrome-save-status" class="muted" hidden></span>
+			</div>
+			<div id="chrome-right">
+				<span id="chrome-money-line">Money <span id="chrome-money">0</span></span>
+				<span>Food <span id="chrome-food-prod">0</span> / <span id="chrome-food-need">0</span></span>
+				<span title="Empire freighter pool. Hauls food (1 each), population (5 each), and ground units (1 each). In-transit hulls count as used, not gone. Not map warships.">Freighters <span id="chrome-freighters-used">0</span> / <span id="chrome-freighters">0</span></span>
+				<span id="chrome-research" class="chrome-link">Research —</span>
+			</div>
+		</header>
+		<div id="play-layout">
+			<div id="main-stage">
+				<canvas id="map-canvas" width="720" height="720"></canvas>
+				<div id="stage-settlement" hidden>
+					<div id="settle-head">
+						<button type="button" id="btn-back-galaxy">Galaxy</button>
+						<div>
+							<h2 id="settle-name">Settlement</h2>
+							<p id="settle-meta" class="muted"></p>
+							<p>Stored industry <span id="settle-industry">0</span>
+								· <span id="settle-pop-line">0 people</span></p>
+							<p id="settle-growth"></p>
+							<p id="settle-loyalty" class="muted"></p>
+							<button type="button" id="btn-settle-get-settlers">Get more settlers</button>
+						</div>
+						<img id="settle-culture" class="settle-culture-art" alt="" hidden>
+						<div id="settle-planet-wrap">
+							<canvas id="settle-planet" width="280" height="280"></canvas>
+						</div>
+					</div>
+					<div id="job-board"></div>
+					<div id="settle-garrison-wrap">
+						<h3>Garrison</h3>
+						<p id="settle-garrison-empty" class="muted">None stationed.</p>
+						<ul id="settle-garrison"></ul>
+						<div id="settle-troop-move">
+							<label>Move
+								<select id="settle-troop-def"></select>
+							</label>
+							<label>Count
+								<input id="settle-troop-count" type="number" min="1" value="1">
+							</label>
+							<label>To
+								<select id="settle-troop-to"></select>
+							</label>
+							<span id="settle-troop-cost" class="muted"></span>
+							<button type="button" id="btn-settle-troop-move">Send</button>
+						</div>
+						<p id="settle-troop-moves-empty" class="muted">No troops in transit.</p>
+						<ul id="settle-troop-moves"></ul>
+					</div>
+					<div id="settle-structures-wrap">
+						<h3>Structures</h3>
+						<p id="settle-structures-empty" class="muted">None built.</p>
+						<ul id="settle-structures"></ul>
+					</div>
+					<div id="settle-build-stub">
+						<h3>Construction</h3>
+						<p id="settle-build-stub-line" class="muted">Nothing in the queue.</p>
+						<button type="button" id="btn-settle-open-build">Build</button>
+					</div>
+					<h3>Fleets here</h3>
+					<p id="settle-fleets-empty" class="muted">None docked.</p>
+					<ul id="settle-fleets"></ul>
+				</div>
+				<div id="stage-build" hidden>
+					<div id="build-head">
+						<button type="button" id="btn-back-settlement">Settlement</button>
+						<div>
+							<h2 id="build-title">Build</h2>
+							<p id="build-meta" class="muted"></p>
+						</div>
+					</div>
+					<div id="settle-build-row">
+						<div id="settle-queue-col">
+							<h3>Queue</h3>
+							<p id="settle-queue-empty" class="muted">Empty</p>
+							<ul id="settle-queue"></ul>
+						</div>
+						<div id="settle-catalog">
+							<h3>Build</h3>
+							<ul id="settle-catalog-list"></ul>
+						</div>
+						<div id="settle-inspect">
+							<div id="settle-inspect-copy">
+								<h3 id="settle-inspect-name">Project</h3>
+								<p id="settle-inspect-meta" class="muted"></p>
+								<p id="settle-inspect-summary"></p>
+								<p id="settle-inspect-empty" class="muted">Select a building or a construction project.</p>
+								<button type="button" id="btn-settle-inspect-queue" hidden>Add to queue</button>
+							</div>
+							<div id="settle-inspect-stats-box" hidden>
+								<h4>Stats</h4>
+								<ul id="settle-inspect-stats"></ul>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="stage-research" hidden>
+					<div id="research-head">
+						<button type="button" id="btn-back-galaxy-research">Galaxy</button>
+						<div>
+							<h2>Research</h2>
+							<p id="research-current" class="muted">No project.</p>
+						</div>
+					</div>
+					<div id="research-layout">
+						<ul id="research-cat-list"></ul>
+						<div id="research-detail">
+							<div id="research-ladder"></div>
+							<h3 id="research-detail-name">Select a field</h3>
+							<p id="research-detail-meta" class="muted"></p>
+							<div id="research-detail-blurb">
+								<p id="research-detail-summary"></p>
+								<ul id="research-detail-effects"></ul>
+							</div>
+							<button type="button" id="btn-research-select">Research this</button>
+						</div>
+					</div>
+					<div id="research-overview-wrap">
+						<h3>All fields</h3>
+						<div id="research-overview"></div>
+					</div>
+				</div>
+				<div id="stage-empire" hidden>
+					<div id="empire-head">
+						<button type="button" id="btn-back-galaxy-empire">Galaxy</button>
+						<div>
+							<h2>Settlements</h2>
+							<p id="empire-freighters"></p>
+							<p id="empire-freighter-note" class="muted"></p>
+							<p id="empire-rivals-stage" class="muted"></p>
+						</div>
+					</div>
+					<ul id="empire-settlement-rows"></ul>
+					<div id="empire-move">
+						<h3>Move population</h3>
+						<p class="muted">Queued transfers launch as map fleets and travel like other ships. Each person uses 5 freighters until they arrive.</p>
+						<label>From
+							<select id="empire-move-from"></select>
+						</label>
+						<label>To
+							<select id="empire-move-to"></select>
+						</label>
+						<label>People
+							<input id="empire-move-count" type="number" min="1" value="1">
+						</label>
+						<span id="empire-move-cost" class="muted"></span>
+						<button type="button" id="btn-empire-move">Queue transfer</button>
+						<p id="empire-moves-empty" class="muted">No transfers in transit.</p>
+						<ul id="empire-moves"></ul>
+					</div>
+				</div>
+				<div id="stage-spies" hidden>
+					<div id="spies-head">
+						<button type="button" id="btn-back-galaxy-spies">Galaxy</button>
+						<div>
+							<h2>Spies</h2>
+							<p id="spy-skill" class="muted"></p>
+							<p class="muted">Click a spy, then click a lane. Same as jobs: the spy you click and everyone after them in that lane move together. You can only post spies on rivals you can reach by ship.</p>
+						</div>
+					</div>
+					<div id="spy-board"></div>
+				</div>
+				<div id="stage-diplomacy" hidden>
+					<div id="diplo-head">
+						<button type="button" id="btn-back-galaxy-diplomacy">Galaxy</button>
+						<div>
+							<h2>Diplomacy</h2>
+							<p id="diplo-gate" class="muted"></p>
+						</div>
+					</div>
+					<div id="diplo-layout">
+						<ul id="diplo-rivals"></ul>
+						<div id="diplo-detail">
+							<div id="diplo-rival-head">
+								<img id="diplo-rival-art" class="settle-culture-art" alt="" hidden>
+								<div>
+									<h3 id="diplo-rival-name">Select an empire</h3>
+									<p id="diplo-rival-meta" class="muted"></p>
+									<p id="diplo-treaties"></p>
+								</div>
+							</div>
+							<div id="diplo-inbox" hidden>
+								<h3>Incoming offer</h3>
+								<p id="diplo-inbox-text"></p>
+								<button type="button" id="btn-diplo-accept">Accept</button>
+								<button type="button" id="btn-diplo-refuse">Refuse</button>
+							</div>
+							<div id="diplo-actions">
+								<button type="button" id="btn-diplo-war">Declare war</button>
+							</div>
+							<div id="diplo-deal">
+								<div>
+									<h3>Agreements</h3>
+									<ul id="diplo-pacts"></ul>
+									<div id="diplo-pact-btns">
+										<button type="button" id="btn-diplo-pact-peace">Peace</button>
+										<button type="button" id="btn-diplo-pact-trade">Trade</button>
+										<button type="button" id="btn-diplo-pact-research">Research</button>
+										<button type="button" id="btn-diplo-pact-passage" title="Each side may use the other's colonies as ship bases.">Free passage</button>
+										<button type="button" id="btn-diplo-pact-spies">Stop spying</button>
+									</div>
+								</div>
+								<div class="diplo-cols">
+									<div class="diplo-col">
+										<h3>You offer</h3>
+										<ul id="diplo-give"></ul>
+									</div>
+									<div class="diplo-col">
+										<h3>You want</h3>
+										<ul id="diplo-want"></ul>
+									</div>
+								</div>
+								<div id="diplo-add">
+									<label>Money
+										<input id="diplo-money-n" type="number" min="1" value="10">
+									</label>
+									<button type="button" id="btn-diplo-give-money">Offer money</button>
+									<button type="button" id="btn-diplo-want-money">Demand money</button>
+									<label>Your world
+										<select id="diplo-give-world"></select>
+									</label>
+									<button type="button" id="btn-diplo-give-world-btn">Offer world</button>
+									<label>Their world
+										<select id="diplo-want-world"></select>
+									</label>
+									<button type="button" id="btn-diplo-want-world-btn">Demand world</button>
+									<label>Your ship
+										<select id="diplo-give-ship"></select>
+									</label>
+									<button type="button" id="btn-diplo-give-ship-btn">Offer ship</button>
+									<label>Their ship
+										<select id="diplo-want-ship"></select>
+									</label>
+									<button type="button" id="btn-diplo-want-ship-btn">Demand ship</button>
+									<label>Your troops
+										<select id="diplo-give-troop"></select>
+									</label>
+									<label>Count
+										<input id="diplo-give-troop-n" type="number" min="1" value="1">
+									</label>
+									<button type="button" id="btn-diplo-give-troop-btn">Offer troops</button>
+									<label>Their troops
+										<select id="diplo-want-troop"></select>
+									</label>
+									<label>Count
+										<input id="diplo-want-troop-n" type="number" min="1" value="1">
+									</label>
+									<button type="button" id="btn-diplo-want-troop-btn">Demand troops</button>
+								</div>
+								<button type="button" id="btn-diplo-send">Send offer</button>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div id="stage-report" hidden>
+					<div id="report-head">
+						<button type="button" id="btn-back-galaxy-report">Galaxy</button>
+						<div>
+							<h2>Report</h2>
+							<p class="muted">Relative standing over time. Each chart is scaled to the leader in that category.</p>
+						</div>
+					</div>
+					<ul id="report-legend"></ul>
+					<div id="report-charts">
+						<figure>
+							<figcaption>Population</figcaption>
+							<canvas data-score="pop"></canvas>
+						</figure>
+						<figure>
+							<figcaption>Structures</figcaption>
+							<canvas data-score="structures"></canvas>
+						</figure>
+						<figure>
+							<figcaption>Research</figcaption>
+							<canvas data-score="research"></canvas>
+						</figure>
+						<figure>
+							<figcaption>Ships</figcaption>
+							<canvas data-score="ships"></canvas>
+						</figure>
+						<figure>
+							<figcaption>Ground TS</figcaption>
+							<canvas data-score="troops"></canvas>
+						</figure>
+					</div>
+					<div id="report-log">
+						<h3>Turn report</h3>
+						<ul id="report-list"></ul>
+					</div>
+				</div>
+			</div>
+			<aside id="side">
+				<nav id="side-nav">
+					<button type="button" data-stage="galaxy">Galaxy</button>
+					<button type="button" data-panel="todo">Attention</button>
+					<button type="button" data-panel="system">System</button>
+					<button type="button" data-stage="research">Research</button>
+					<button type="button" data-stage="spies">Spies</button>
+					<button type="button" data-stage="diplomacy">Diplomacy</button>
+					<button type="button" data-stage="empire">Settlements</button>
+					<button type="button" data-stage="report">Report</button>
+				</nav>
+
+				<div id="panel-todo" class="panel">
+					<h2>Attention</h2>
+					<p id="todo-empty" class="muted">Nothing waiting.</p>
+					<ul id="todo-list"></ul>
+				</div>
+
+				<div id="panel-system" class="panel" hidden>
+					<h2 id="system-name">System</h2>
+					<p id="system-pos" class="muted"></p>
+					<p id="system-survey" class="muted" hidden></p>
+					<ul id="system-bodies"></ul>
+					<h3>Fleets</h3>
+					<p id="system-selected" class="muted">No ship selected.</p>
+					<ul id="system-fleets"></ul>
+					<div id="system-ship-orders">
+						<button type="button" id="btn-done-ship-select" hidden>Done</button>
+						<button type="button" id="btn-cancel-ship-order" hidden>Cancel order</button>
+					</div>
+				</div>
+			</aside>
+		</div>
+	</section>
+
+	<div id="win-banner" hidden>
+		<p id="win-text"></p>
+		<button type="button" id="btn-new-game">New game</button>
+	</div>
+
+	<script src="config/settings/scratch-empire.js"></script>
+	<script src="js/rng.js"></script>
+	<script src="js/query.js"></script>
+	<script src="js/model/effects.js"></script>
+	<script src="js/model/culture.js"></script>
+	<script src="js/state.js"></script>
+	<script src="js/persistence.js"></script>
+	<script src="js/gen/galaxy.js"></script>
+	<script src="js/gen/start.js"></script>
+	<script src="js/model/economy.js"></script>
+	<script src="js/model/food.js"></script>
+	<script src="js/model/population.js"></script>
+	<script src="js/model/troops.js"></script>
+	<script src="js/model/research.js"></script>
+	<script src="js/model/combat.js"></script>
+	<script src="js/model/loyalty.js"></script>
+	<script src="js/model/spies.js"></script>
+	<script src="js/model/diplomacy.js"></script>
+	<script src="js/model/construction.js"></script>
+	<script src="js/model/movement.js"></script>
+	<script src="js/model/turn.js"></script>
+	<script src="js/model/score.js"></script>
+	<script src="js/commands.js"></script>
+	<script src="js/ai/dumb.js"></script>
+	<script src="js/view/ui.js"></script>
+	<script src="js/view/lists.js"></script>
+	<script src="js/view/planet.js"></script>
+	<script src="js/view/jobs.js"></script>
+	<script src="js/view/spies.js"></script>
+	<script src="js/view/diplomacy.js"></script>
+	<script src="js/view/garrison.js"></script>
+	<script src="js/view/research.js"></script>
+	<script src="js/view/empire.js"></script>
+	<script src="js/view/map.js"></script>
+	<script src="js/view/report.js"></script>
+	<script src="js/view/sync.js"></script>
+	<script src="js/boot.js"></script>
+</body>
+</html>
