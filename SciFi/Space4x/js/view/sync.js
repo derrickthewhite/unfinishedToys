@@ -336,9 +336,9 @@ Space4x.syncChrome = function (ui, state) {
 		return;
 	}
 	if (!player) return;
-	Space4x.setText(ui.chromeMoney, Space4x.fmtMoney(player.stockpiles.money));
+	const f = Space4x.empireMoneyForecast(state, player.id);
+	Space4x.setText(ui.chromeMoney, (f.net >= 0 ? "+" : "") + Space4x.fmtMoney(f.net) + "/" + Space4x.fmtMoney(player.stockpiles.money));
 	if (ui.chromeMoneyLine) {
-		const f = Space4x.empireMoneyForecast(state, player.id);
 		const bits = ["Stockpile " + Space4x.fmtMoney(f.stockpile), "Income +" + Space4x.fmtMoney(f.income)];
 		if (f.trade) bits.push("Trade +" + Space4x.fmtMoney(f.trade));
 		for (let i = 0; i < f.lines.length; i++) bits.push(f.lines[i]);

@@ -3,7 +3,7 @@ var Space4x = Space4x || {};
 /* Mix of bright and deep tones so neighboring empires stay separable on the map. */
 Space4x.EMPIRE_COLORS = [
 	"#3b82f6", "#dc2626", "#16a34a", "#facc15", "#5b21b6",
-	"#f8fafc", "#94a3b8", "#78350f", "#6b7c3a", "#ea580c",
+	"#f8cacc", "#94a3b8", "#78350f", "#6b7c3a", "#ea580c",
 	"#0891b2", "#be123c", "#1e3a8a", "#db2777", "#365314",
 	"#f97316", "#7c3aed", "#0f766e", "#e11d48", "#a16207",
 	"#2563eb", "#86198f", "#15803d", "#c2410c", "#312e81",
