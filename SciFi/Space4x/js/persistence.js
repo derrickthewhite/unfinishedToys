@@ -3,6 +3,7 @@ var Space4x = Space4x || {};
 Space4x.SAVE_SCHEMA_VERSION = 1;
 Space4x.SAVE_SLOTS_KEY = "space4x-saves";
 Space4x.SAVE_AUTOSAVE_KEY = "space4x-autosave";
+Space4x.SAVE_CHECKPOINT_KEY = "space4x-autosave-checkpoint";
 Space4x.SAVE_SLOT_CAP = 12;
 Space4x.SAVE_AUTOSAVE_EVERY = 4;
 
@@ -10,6 +11,7 @@ Space4x.snapshotState = function (state) {
 	const copy = JSON.parse(JSON.stringify(state));
 	if (copy.ui) {
 		copy.ui.autoPlaying = false;
+		copy.ui.spaceCombatAuto = false;
 		const d = Space4x.emptyUiInteraction();
 		const keys = Object.keys(d);
 		for (let i = 0; i < keys.length; i++) copy.ui[keys[i]] = d[keys[i]];
@@ -20,7 +22,7 @@ Space4x.snapshotState = function (state) {
 Space4x.defaultSaveLabel = function (state) {
 	const player = Space4x.playerEmpire(state);
 	const homes = player ? Space4x.settlementsOf(state, player.id) : [];
-	const home = homes[0] ? homes[0].name : "";
+	const home = homes[0] ? Space4x.settlementLabel(state, homes[0]) : "";
 	const day = new Date().toISOString().slice(0, 10);
 	const bits = ["Turn " + (state.turn || 0)];
 	if (home) bits.push(home);
@@ -62,13 +64,70 @@ Space4x.applySave = function (live, envelope) {
 	if (!check.ok) return check;
 	const incoming = Space4x.snapshotState(envelope.state);
 	incoming.screen = "play";
-	if (incoming.ui) incoming.ui.autoPlaying = false;
+	if (incoming.ui) {
+		incoming.ui.autoPlaying = false;
+		incoming.ui.spaceCombatAuto = false;
+	}
 	const oldKeys = Object.keys(live);
 	for (let i = 0; i < oldKeys.length; i++) delete live[oldKeys[i]];
 	const names = Object.keys(incoming);
 	for (let i = 0; i < names.length; i++) live[names[i]] = incoming[names[i]];
 	Space4x.ensureUiInteraction(live);
+	Space4x.migrateState(live);
 	return { ok: true, envelope: envelope };
+};
+
+Space4x.migrateState = function (state) {
+	if (!state) return;
+	if (state.galaxy && Space4x.ensureGalaxyBgSeed) Space4x.ensureGalaxyBgSeed(state);
+	if (state.turnEvents && state.turnEvents.spaceBattles && Space4x.ensureAllCombatBgSeeds) {
+		Space4x.ensureAllCombatBgSeeds(state);
+	} else if (state.turnEvents && state.turnEvents.spaceBattles && Space4x.ensureCombatBgSeed) {
+		for (let i = 0; i < state.turnEvents.spaceBattles.length; i++) {
+			Space4x.ensureCombatBgSeed(state, state.turnEvents.spaceBattles[i]);
+		}
+	}
+	if (state.empires) {
+		Space4x.ensureEmpireColors(state);
+		for (let e = 0; e < state.empires.length; e++) {
+			Space4x.ensureEmpireDesigns(state, state.empires[e]);
+			if (state.empires[e].modifiers && state.empires[e].modifiers.combatSpeed == null) {
+				state.empires[e].modifiers.combatSpeed = 0;
+			}
+			if (state.empires[e].modifiers) {
+				const m = state.empires[e].modifiers;
+				if (m.structure == null) m.structure = 0;
+				if (m.fighterDamage == null) m.fighterDamage = 0;
+				if (m.fighterRange == null) m.fighterRange = 0;
+				if (m.fighterStructure == null) m.fighterStructure = 0;
+			}
+			if (Space4x.ensureEmpireDesigns) Space4x.ensureEmpireDesigns(state, state.empires[e]);
+		}
+	}
+	if (!state.settlements) return;
+	if (state.turnHold == null) state.turnHold = null;
+	if (state.turnHold === "afterSpace" && Space4x.playerOpenSpaceBattles &&
+		!Space4x.playerOpenSpaceBattles(state).length) {
+		state.turnHold = null;
+	}
+	if (state.ui) {
+		if (state.ui.designHullId == null) state.ui.designHullId = "cruiser";
+		if (state.ui.selectedSpaceBattleId === undefined) state.ui.selectedSpaceBattleId = null;
+		if (state.ui.spaceEnemyTokenId === undefined) state.ui.spaceEnemyTokenId = null;
+	}
+	for (let i = 0; i < state.settlements.length; i++) {
+		const st = state.settlements[i];
+		const pops = st.pops || [];
+		for (let p = 0; p < pops.length; p++) {
+			if (pops[p].noResearch) delete pops[p].noResearch;
+		}
+		if (!st.growthAccByCulture && (st.growthAcc || st.starveAcc)) {
+			const empire = Space4x.empireById(state, st.empireId);
+			st.growthAccByCulture = {};
+			const cid = empire && empire.cultureId;
+			if (cid) st.growthAccByCulture[cid] = (st.growthAcc || 0) - (st.starveAcc || 0);
+		}
+	}
 };
 
 Space4x.readStorageJson = function (key) {
@@ -147,29 +206,46 @@ Space4x.deleteSaveSlot = function (id) {
 	return Space4x.writeSaveSlots(slots);
 };
 
-Space4x.readAutosave = function () {
-	const envelope = Space4x.readStorageJson(Space4x.SAVE_AUTOSAVE_KEY);
+Space4x.readAutosave = function (key) {
+	const envelope = Space4x.readStorageJson(key || Space4x.SAVE_AUTOSAVE_KEY);
 	const check = Space4x.validateSaveEnvelope(envelope);
 	return check.ok ? check.envelope : null;
 };
 
-Space4x.writeAutosave = function (state) {
+Space4x.writeAutosave = function (state, opts) {
+	opts = opts || {};
 	if (!state || state.screen !== "play") return { ok: false, reason: "Nothing to save yet." };
-	const envelope = Space4x.makeSaveEnvelope(state, { id: "autosave", label: Space4x.defaultSaveLabel(state) });
+	const key = opts.key || Space4x.SAVE_AUTOSAVE_KEY;
+	const id = opts.id || "autosave";
+	const label = opts.label || ("Autosave · " + Space4x.defaultSaveLabel(state));
+	const envelope = Space4x.makeSaveEnvelope(state, { id: id, label: label });
 	const check = Space4x.validateSaveEnvelope(envelope);
 	if (!check.ok) return check;
-	const wrote = Space4x.writeStorageJson(Space4x.SAVE_AUTOSAVE_KEY, envelope);
+	const wrote = Space4x.writeStorageJson(key, envelope);
 	if (!wrote.ok) return wrote;
 	return { ok: true, envelope: envelope };
 };
 
-Space4x.shouldAutosaveAfterTurn = function (state) {
-	return !!(state && state.screen === "play" && state.turn && state.turn % Space4x.SAVE_AUTOSAVE_EVERY === 0);
+Space4x.listAutosaves = function () {
+	const out = [];
+	const latest = Space4x.readAutosave();
+	const checkpoint = Space4x.readAutosave(Space4x.SAVE_CHECKPOINT_KEY);
+	if (latest) out.push(latest);
+	if (checkpoint) out.push(checkpoint);
+	return out;
 };
 
 Space4x.maybeAutosaveAfterTurn = function (state) {
-	if (!Space4x.shouldAutosaveAfterTurn(state)) return { ok: false, skipped: true };
-	return Space4x.writeAutosave(state);
+	if (!state || state.screen !== "play") return { ok: false, skipped: true };
+	const latest = Space4x.writeAutosave(state);
+	if (state.turn % Space4x.SAVE_AUTOSAVE_EVERY === 0) {
+		Space4x.writeAutosave(state, {
+			key: Space4x.SAVE_CHECKPOINT_KEY,
+			id: "autosave-checkpoint",
+			label: "Checkpoint · " + Space4x.defaultSaveLabel(state)
+		});
+	}
+	return latest;
 };
 
 Space4x.toSaveFileBlob = function (envelope) {
@@ -179,6 +255,11 @@ Space4x.toSaveFileBlob = function (envelope) {
 Space4x.saveFileName = function (envelope) {
 	const turn = envelope && envelope.turn != null ? envelope.turn : 0;
 	return "space4x-turn-" + turn + ".json";
+};
+
+Space4x.snapshotFileName = function (envelope) {
+	const turn = envelope && envelope.turn != null ? envelope.turn : 0;
+	return "space4x-snapshot-turn-" + turn + ".json";
 };
 
 Space4x.fromSaveFileText = function (text) {

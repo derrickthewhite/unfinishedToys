@@ -1,0 +1,473 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deep Space Battlefield Background Generator</title>
+<style>
+    :root {
+        --panel: #11151d;
+        --panel2: #191f2a;
+        --text: #dce3ee;
+        --muted: #8994a5;
+        --accent: #7ea7ff;
+        --border: #2b3442;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #080a0e; color: var(--text); font-family: system-ui, sans-serif; }
+    body { display: flex; flex-direction: column; }
+    header {
+        padding: 14px 18px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+    }
+    h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    .subtitle { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .layout {
+        display: grid;
+        grid-template-columns: 280px minmax(400px, 1fr);
+        min-height: calc(100vh - 65px);
+    }
+    aside {
+        padding: 15px;
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        overflow-y: auto;
+    }
+    main {
+        min-width: 0;
+        padding: 15px;
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        background: #080a0e;
+    }
+    .canvas-wrap {
+        width: 100%;
+        max-width: 1400px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    canvas {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16 / 9;
+        display: block;
+        background: #000;
+        border: 1px solid var(--border);
+        image-rendering: auto;
+    }
+    .status {
+        color: var(--muted);
+        font-size: 11px;
+        display: flex;
+        justify-content: space-between;
+    }
+    .section {
+        margin-bottom: 18px;
+    }
+    .section-title {
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        margin-bottom: 9px;
+    }
+    .control { margin: 10px 0; }
+    .control-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 12px;
+        margin-bottom: 5px;
+    }
+    .value { color: var(--accent); font-variant-numeric: tabular-nums; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    input[type="number"], select {
+        width: 100%;
+        background: var(--panel2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 7px;
+    }
+    .button-row { display: flex; gap: 7px; margin-bottom: 8px; }
+    button {
+        border: 1px solid var(--border);
+        background: var(--panel2);
+        color: var(--text);
+        border-radius: 5px;
+        padding: 8px 10px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    button:hover { background: #222b39; }
+    button.primary { background: #263c65; border-color: #466aa5; }
+    button.primary:hover { background: #304b7d; }
+    .seed-row { display: flex; gap: 6px; }
+    .seed-row input { flex: 1; }
+    .size-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin-top: 8px;
+    }
+    .size-row label {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 11px;
+        color: var(--muted);
+    }
+    .check { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+    .hint {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+        margin-top: 5px;
+    }
+    @media (max-width: 800px) {
+        .layout { grid-template-columns: 1fr; }
+        aside { border-right: 0; border-bottom: 1px solid var(--border); }
+    }
+</style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>Deep Space Battlefield Background Generator</h1>
+        <div class="subtitle">Subtle galactic structure, varied star fields, and restrained color â€” designed to sit behind a space battle.</div>
+    </div>
+</header>
+
+<div class="layout">
+<aside>
+    <div class="section">
+        <div class="section-title">Generation</div>
+
+        <div class="button-row">
+            <button class="primary" id="randomize">Randomize</button>
+            <button id="copySeed">Copy Seed</button>
+        </div>
+
+        <div class="seed-row">
+            <input id="seed" type="number" step="1" value="18427">
+            <button id="applySeed">Apply</button>
+        </div>
+        <div class="hint">The seed makes a background reproducible.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Stars</div>
+
+        <div class="control">
+            <div class="control-head"><span>Density</span><span class="value" id="starDensityValue"></span></div>
+            <input id="starDensity" type="range" min="0" max="100" value="58">
+        </div>
+
+        <div class="control">
+            <div class="control-head"><span>Brightness</span><span class="value" id="starBrightnessValue"></span></div>
+            <input id="starBrightness" type="range" min="0" max="100" value="48">
+        </div>
+
+        <div class="control">
+            <div class="control-head"><span>Color variation</span><span class="value" id="starColorValue"></span></div>
+            <input id="starColor" type="range" min="0" max="100" value="22">
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Galactic Haze</div>
+
+        <div class="control">
+            <div class="control-head"><span>Haze amount</span><span class="value" id="hazeAmountValue"></span></div>
+            <input id="hazeAmount" type="range" min="0" max="100" value="24">
+        </div>
+
+        <div class="control">
+            <div class="control-head"><span>Haze scale</span><span class="value" id="hazeScaleValue"></span></div>
+            <input id="hazeScale" type="range" min="10" max="100" value="48">
+        </div>
+
+        <div class="control">
+            <div class="control-head"><span>Dust amount</span><span class="value" id="dustAmountValue"></span></div>
+            <input id="dustAmount" type="range" min="0" max="100" value="14">
+        </div>
+
+        <div class="control">
+            <div class="control-head"><span>Color</span><span class="value" id="hazeColorValue"></span></div>
+            <select id="hazeColor">
+                <option value="blue">Blue / violet</option>
+                <option value="cyan">Cyan / blue</option>
+                <option value="purple">Purple / magenta</option>
+                <option value="red">Red / orange</option>
+                <option value="mixed">Mixed</option>
+                <option value="neutral">Neutral</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Composition</div>
+
+        <div class="control">
+            <div class="control-head"><span>Feature count</span><span class="value" id="featureCountValue"></span></div>
+            <input id="featureCount" type="range" min="0" max="5" value="2">
+        </div>
+
+        <div class="control">
+            <div class="control-head"><span>Feature strength</span><span class="value" id="featureStrengthValue"></span></div>
+            <input id="featureStrength" type="range" min="0" max="100" value="30">
+        </div>
+
+        <div class="control">
+            <div class="control-head"><span>Center quietness</span><span class="value" id="centerQuietValue"></span></div>
+            <input id="centerQuiet" type="range" min="0" max="100" value="62">
+        </div>
+
+        <label class="check">
+            <input id="avoidCenter" type="checkbox" checked>
+            Keep major features away from center
+        </label>
+        <div class="hint">Useful when the center of the image contains ships, units, or combat effects.</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Output</div>
+        <div class="control">
+            <div class="control-head"><span>Resolution</span></div>
+            <select id="resolution">
+                <option value="1280x720">1280 Ã— 720</option>
+                <option value="1600x900" selected>1600 Ã— 900</option>
+                <option value="1920x1080">1920 Ã— 1080</option>
+                <option value="2560x1440">2560 Ã— 1440</option>
+                <option value="3840x2160">3840 Ã— 2160</option>
+                <option value="custom">Custom</option>
+            </select>
+            <div class="size-row">
+                <label>Width <input id="outWidth" type="number" min="256" max="8192" step="1" value="1600"></label>
+                <label>Height <input id="outHeight" type="number" min="256" max="8192" step="1" value="900"></label>
+            </div>
+            <div class="hint">256â€“8192 per side. Presets fill the fields; edit them for any size.</div>
+        </div>
+
+        <div class="control">
+            <div class="control-head"><span>Pixel scale</span><span class="value" id="pixelScaleValue"></span></div>
+            <input id="pixelScale" type="range" min="1" max="8" step="0.05" value="1">
+        </div>
+        <div class="hint">Renders at a lower internal resolution, then upscales. That is render scale â€” why a 720p canvas looks punchier than 1440p at the same size.</div>
+
+        <label class="check">
+            <input id="crispPixels" type="checkbox">
+            Crisp pixels (nearest-neighbor)
+        </label>
+        <div class="hint">Off = smooth upscale. On = chunky pixels, no blending.</div>
+
+        <button id="download" style="width:100%; margin-top:10px">Export PNG</button>
+    </div>
+</aside>
+
+<main>
+    <div class="canvas-wrap">
+        <canvas id="space" width="1600" height="900"></canvas>
+        <div class="status">
+            <span id="status">Seed 18427</span>
+            <span>Procedural â€¢ reproducible</span>
+        </div>
+    </div>
+</main>
+</div>
+
+<script src="deep-space-background.js"></script>
+<script>
+"use strict";
+
+const generateSpaceBackground = DeepSpaceBackground.generateSpaceBackground;
+const randomSeed = DeepSpaceBackground.randomSeed;
+const clamp = DeepSpaceBackground.clamp;
+const internalSize = DeepSpaceBackground.internalSize;
+const formatPixelScale = DeepSpaceBackground.formatPixelScale;
+const MIN_SIZE = DeepSpaceBackground.MIN_SIZE;
+const MAX_SIZE = DeepSpaceBackground.MAX_SIZE;
+
+const canvas = document.getElementById("space");
+
+const controls = [
+    ["starDensity", "starDensityValue", function(v) { return Math.round(v) + "%"; }],
+    ["starBrightness", "starBrightnessValue", function(v) { return Math.round(v) + "%"; }],
+    ["starColor", "starColorValue", function(v) { return Math.round(v) + "%"; }],
+    ["hazeAmount", "hazeAmountValue", function(v) { return Math.round(v) + "%"; }],
+    ["hazeScale", "hazeScaleValue", function(v) { return Math.round(v); }],
+    ["dustAmount", "dustAmountValue", function(v) { return Math.round(v) + "%"; }],
+    ["featureCount", "featureCountValue", function(v) { return Math.round(v); }],
+    ["featureStrength", "featureStrengthValue", function(v) { return Math.round(v) + "%"; }],
+    ["centerQuiet", "centerQuietValue", function(v) { return Math.round(v) + "%"; }],
+    ["pixelScale", "pixelScaleValue", function(v) {
+        return formatPixelScale(v, canvas.width, canvas.height);
+    }]
+];
+
+function getOptions() {
+    return {
+        seed: Number(document.getElementById("seed").value) || 1,
+        starDensity: Number(document.getElementById("starDensity").value),
+        starBrightness: Number(document.getElementById("starBrightness").value),
+        starColor: Number(document.getElementById("starColor").value),
+        hazeAmount: Number(document.getElementById("hazeAmount").value),
+        hazeScale: Number(document.getElementById("hazeScale").value),
+        dustAmount: Number(document.getElementById("dustAmount").value),
+        hazeColor: document.getElementById("hazeColor").value,
+        featureCount: Number(document.getElementById("featureCount").value),
+        featureStrength: Number(document.getElementById("featureStrength").value),
+        centerQuiet: Number(document.getElementById("centerQuiet").value),
+        avoidCenter: document.getElementById("avoidCenter").checked,
+        pixelScale: Number(document.getElementById("pixelScale").value),
+        crispPixels: document.getElementById("crispPixels").checked
+    };
+}
+
+function updateLabels() {
+    for (let i = 0; i < controls.length; i++) {
+        const input = document.getElementById(controls[i][0]);
+        document.getElementById(controls[i][1]).textContent = controls[i][2](input.value);
+    }
+    const hazeSel = document.getElementById("hazeColor");
+    document.getElementById("hazeColorValue").textContent = hazeSel.options[hazeSel.selectedIndex].text;
+}
+
+function regenerate() {
+    const options = getOptions();
+    const start = performance.now();
+    try {
+        generateSpaceBackground(canvas, options);
+        const elapsed = Math.round(performance.now() - start);
+        const inner = internalSize(canvas.width, canvas.height, options.pixelScale);
+        document.getElementById("status").textContent =
+            "Seed " + options.seed + " â€¢ " + canvas.width + " Ã— " + canvas.height +
+            " â€¢ " + inner.w + " Ã— " + inner.h + " internal â€¢ generated in " + elapsed + " ms";
+    } catch (err) {
+        document.getElementById("status").textContent =
+            "Seed " + options.seed + " â€¢ error: " + err.message;
+        throw err;
+    }
+    updateLabels();
+}
+
+let regenTimer = 0;
+function scheduleRegen() {
+    updateLabels();
+    clearTimeout(regenTimer);
+    regenTimer = setTimeout(regenerate, 40);
+}
+
+for (let i = 0; i < controls.length; i++) {
+    document.getElementById(controls[i][0]).addEventListener("input", scheduleRegen);
+}
+
+document.getElementById("hazeColor").addEventListener("change", regenerate);
+document.getElementById("avoidCenter").addEventListener("change", regenerate);
+document.getElementById("crispPixels").addEventListener("change", regenerate);
+
+document.getElementById("randomize").addEventListener("click", function() {
+    document.getElementById("seed").value = randomSeed();
+    regenerate();
+});
+
+document.getElementById("applySeed").addEventListener("click", regenerate);
+
+document.getElementById("seed").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") regenerate();
+});
+
+document.getElementById("copySeed").addEventListener("click", async function() {
+    const value = document.getElementById("seed").value;
+    try {
+        await navigator.clipboard.writeText(value);
+        document.getElementById("status").textContent = "Seed " + value + " â€¢ copied";
+    } catch (e) {
+        document.getElementById("seed").select();
+    }
+});
+
+function clampSize(v) {
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n)) return MIN_SIZE;
+    return clamp(n, MIN_SIZE, MAX_SIZE);
+}
+
+function syncPresetSelect(w, h) {
+    const sel = document.getElementById("resolution");
+    const key = w + "x" + h;
+    let found = false;
+    for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === key) {
+            sel.value = key;
+            found = true;
+            break;
+        }
+    }
+    if (!found) sel.value = "custom";
+}
+
+function applyCanvasSize(w, h) {
+    w = clampSize(w);
+    h = clampSize(h);
+    document.getElementById("outWidth").value = w;
+    document.getElementById("outHeight").value = h;
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    canvas.style.aspectRatio = w + " / " + h;
+    syncPresetSelect(w, h);
+}
+
+function commitSize() {
+    applyCanvasSize(
+        document.getElementById("outWidth").value,
+        document.getElementById("outHeight").value
+    );
+    regenerate();
+}
+
+document.getElementById("resolution").addEventListener("change", function() {
+    const value = document.getElementById("resolution").value;
+    if (value === "custom") {
+        document.getElementById("outWidth").focus();
+        document.getElementById("outWidth").select();
+        return;
+    }
+    const parts = value.split("x");
+    applyCanvasSize(parts[0], parts[1]);
+    regenerate();
+});
+
+["outWidth", "outHeight"].forEach(function(id) {
+    const el = document.getElementById(id);
+    el.addEventListener("change", commitSize);
+    el.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            commitSize();
+        }
+    });
+});
+
+document.getElementById("download").addEventListener("click", function() {
+    const a = document.createElement("a");
+    a.download = "space-background-" + getOptions().seed + ".png";
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+});
+
+applyCanvasSize(canvas.width, canvas.height);
+updateLabels();
+regenerate();
+</script>
+</body>
+</html>

@@ -268,7 +268,7 @@ Space4x.applySpyMission = function (state, mission, net) {
 			defId = home ? home.empireId : null;
 		}
 		const victimEmp = Space4x.empireById(state, defId);
-		if (victimEmp && post.task !== "attitude") Space4x.addAttitude(victimEmp, atk.id, -1);
+		if (victimEmp && post.task !== "attitude") Space4x.addAttitude(state, victimEmp, atk.id, -1);
 	}
 	if (post.kind === "settlement") {
 		const st = Space4x.settlementById(state, post.settlementId);
@@ -286,7 +286,7 @@ Space4x.applySpyMission = function (state, mission, net) {
 		return;
 	}
 	if (post.task === "attitude") {
-		Space4x.addAttitude(victim, atk.id, -2 * net);
+		Space4x.addAttitude(state, victim, atk.id, -2 * net);
 		state.turnLog.push(atk.name + " spies soured " + victim.name + "'s attitude by " + (2 * net) + ".");
 		return;
 	}
@@ -360,23 +360,54 @@ Space4x.phaseSpies = function (state) {
 
 Space4x.spyLaneLabel = function (state, viewer, lane) {
 	if (lane.kind === "idle") return "Idle";
-	if (lane.kind === "defend") return "Defend · " + viewer.name;
+	if (lane.kind === "defend") return "Defend";
 	if (lane.kind === "empire") {
-		const other = Space4x.empireById(state, lane.empireId);
-		const name = other ? other.name : "Unknown";
-		if (lane.task === "tech") return name + " · Technology";
-		if (lane.task === "attitude") return name + " · Attitude";
-		return name + " · Loyalty";
+		if (lane.task === "tech") return "Technology";
+		if (lane.task === "attitude") return "Attitude";
+		return "Loyalty";
 	}
 	if (lane.kind === "settlement") {
 		const st = Space4x.settlementById(state, lane.settlementId);
-		const where = st ? st.name : "Unknown";
 		const job = Space4x.jobLabel(state, lane.job);
 		const who = Space4x.cultureName(state, lane.culture) || "Pops";
 		const L = st ? Space4x.groupLoyalty(state, st, lane.job, lane.culture) : "?";
-		return where + " · " + job + " · " + who + " · " + L + "%";
+		return job + " · " + who + " · " + L + "%";
 	}
 	return lane.id;
+};
+
+Space4x.groupSpyBoardItems = function (lanes) {
+	const items = [];
+	let buf = [];
+	function flush() {
+		if (!buf.length) return;
+		const id = "row:" + buf.map(function (l) { return l.id; }).join("|");
+		items.push({ id: id, kind: "row", lanes: buf });
+		buf = [];
+	}
+	for (let i = 0; i < (lanes || []).length; i++) {
+		const lane = lanes[i];
+		if (lane.kind === "head") {
+			flush();
+			items.push({ id: lane.id, kind: "head", lane: lane });
+			continue;
+		}
+		buf.push(lane);
+		if (buf.length === 3) flush();
+	}
+	flush();
+	return items;
+};
+
+Space4x.spySettlementHeadLabel = function (state, settlement) {
+	if (!settlement) return "Unknown";
+	const body = Space4x.bodyById(state, settlement.location.bodyId);
+	const bits = [Space4x.settlementLabel(state, settlement)];
+	if (body) bits.push(Space4x.bodyCaption(body, state));
+	bits.push(settlement.pops.length + " " + Space4x.peopleWord(settlement.pops.length));
+	const species = Space4x.settlementCultureLabel(state, settlement);
+	if (species) bits.push(species);
+	return bits.join(" · ");
 };
 
 Space4x.spyLanes = function (state, viewer) {
@@ -395,7 +426,7 @@ Space4x.spyLanes = function (state, viewer) {
 	rivals.sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); });
 	for (let r = 0; r < rivals.length; r++) {
 		const e = rivals[r];
-		lanes.push({ id: "head-e-" + e.id, kind: "head", label: e.name });
+			lanes.push({ id: "head-e-" + e.id, kind: "head", label: e.name, empireId: e.id });
 		lanes.push({ id: "e:" + e.id + ":loyalty", kind: "empire", empireId: e.id, task: "loyalty" });
 		lanes.push({ id: "e:" + e.id + ":tech", kind: "empire", empireId: e.id, task: "tech" });
 		lanes.push({ id: "e:" + e.id + ":attitude", kind: "empire", empireId: e.id, task: "attitude" });
@@ -404,7 +435,13 @@ Space4x.spyLanes = function (state, viewer) {
 		for (let h = 0; h < homes.length; h++) {
 			const st = homes[h];
 			if (!Space4x.settlementDiscoveredBy(state, viewer.id, st)) continue;
-			lanes.push({ id: "head-s-" + st.id, kind: "head", label: st.name });
+			lanes.push({
+				id: "head-s-" + st.id,
+				kind: "head",
+				label: Space4x.spySettlementHeadLabel(state, st),
+				settlementId: st.id,
+				empireId: e.id
+			});
 			const groups = Space4x.loyaltyGroups(state, st);
 			const posted = {};
 			const spies = Space4x.empireSpies(viewer);
@@ -443,4 +480,79 @@ Space4x.spyLanes = function (state, viewer) {
 		}
 	}
 	return lanes;
+};
+
+Space4x.spyCountAtSettlement = function (empire, settlementId) {
+	let n = 0;
+	const spies = Space4x.empireSpies(empire);
+	for (let i = 0; i < spies.length; i++) {
+		const post = Space4x.parseSpyPost(spies[i].post);
+		if (post.kind === "settlement" && post.settlementId === settlementId) n += 1;
+	}
+	return n;
+};
+
+Space4x.removeSpyAtSettlement = function (empire, settlementId) {
+	const spies = Space4x.empireSpies(empire);
+	for (let i = 0; i < spies.length; i++) {
+		const post = Space4x.parseSpyPost(spies[i].post);
+		if (post.kind === "settlement" && post.settlementId === settlementId) {
+			spies.splice(i, 1);
+			return true;
+		}
+	}
+	return false;
+};
+
+Space4x.inciteRevoltCost = function (state, settlement) {
+	const rules = Space4x.revoltRules(state);
+	const per = rules && rules.inciteCostPerPop != null ? rules.inciteCostPerPop : 5;
+	const pops = settlement && settlement.pops ? settlement.pops.length : 0;
+	return Space4x.moneyRound(per * pops);
+};
+
+Space4x.inciteRevoltTargets = function (state, empire) {
+	const out = [];
+	if (!empire) return out;
+	const seen = {};
+	const spies = Space4x.empireSpies(empire);
+	for (let i = 0; i < spies.length; i++) {
+		const post = Space4x.parseSpyPost(spies[i].post);
+		if (post.kind !== "settlement" || !post.settlementId || seen[post.settlementId]) continue;
+		const st = Space4x.settlementById(state, post.settlementId);
+		if (!st || st.empireId === empire.id) continue;
+		if (!Space4x.inContactWithEmpire(state, empire.id, st.empireId)) continue;
+		if (!Space4x.settlementDiscoveredBy(state, empire.id, st)) continue;
+		seen[post.settlementId] = true;
+		out.push(st);
+	}
+	out.sort(function (a, b) {
+		return Space4x.settlementLabel(state, a).localeCompare(Space4x.settlementLabel(state, b));
+	});
+	return out;
+};
+
+Space4x.inciteRevolt = function (state, empireId, settlementId) {
+	const empire = Space4x.empireById(state, empireId);
+	const settlement = Space4x.settlementById(state, settlementId);
+	if (!empire || !settlement) return { ok: false, reason: "Invalid target." };
+	if (settlement.empireId === empireId) return { ok: false, reason: "Cannot incite your own world." };
+	if (!Space4x.spyCountAtSettlement(empire, settlementId)) {
+		return { ok: false, reason: "Post a spy on that world first." };
+	}
+	const cost = Space4x.inciteRevoltCost(state, settlement);
+	const wallet = Space4x.moneyRound(empire.stockpiles.money || 0);
+	if (wallet < cost) return { ok: false, reason: "Need " + Space4x.fmtMoney(cost) + "." };
+	empire.stockpiles.money = Space4x.moneyRound(wallet - cost);
+	if (!Space4x.removeSpyAtSettlement(empire, settlementId)) {
+		return { ok: false, reason: "No spy found at that world." };
+	}
+	const owner = Space4x.empireById(state, settlement.empireId);
+	state.turnLog.push(empire.name + " incites revolt at " + Space4x.settlementLabel(state, settlement) +
+		(owner ? " (" + owner.name + ")" : "") + " for " + Space4x.fmtMoney(cost) + ".");
+	const rebel = Space4x.resolveRevolt(state, settlement, { sponsorEmpireId: empireId });
+	if (rebel) {
+		state.turnLog.push(rebel.name + " favors " + empire.name + " (+10 attitude).");
+	}
+	return { ok: true, rebel: rebel || null };
 };

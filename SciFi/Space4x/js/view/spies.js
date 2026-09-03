@@ -189,45 +189,134 @@ Space4x.syncSpyStage = function (ui, state, cmds) {
 	}
 	const lanes = player ? Space4x.spyLanes(state, player) : [];
 	const spies = player ? Space4x.empireSpies(player) : [];
-	Space4x.syncKeyedList(ui.spyBoard, lanes, function (lane) { return lane.id; },
-		function (lane) {
-			if (lane.kind === "head") {
+	const items = Space4x.groupSpyBoardItems(lanes);
+
+	function syncTrack(row, lane) {
+		row.className = "job-lane spy-track";
+		row.setAttribute("data-id", lane.id);
+		const title = row.querySelector(".job-lane-title");
+		const box = row.querySelector(".job-lane-pops");
+		if (lane.kind === "settlement") {
+			title.className = "job-lane-title spy-track-title is-group";
+			while (title.firstChild) title.removeChild(title.firstChild);
+			const badge = document.createElement("span");
+			badge.className = "spy-group-badge";
+			const color = (Space4x.JOB_COLORS && Space4x.JOB_COLORS[lane.job]) || "#888";
+			badge.style.boxShadow = "0 0 0 2px " + color;
+			const img = document.createElement("img");
+			img.className = "spy-group-badge-art";
+			img.alt = "";
+			Space4x.setCultureImg(img, state, lane.culture);
+			badge.appendChild(img);
+			const meta = document.createElement("span");
+			meta.className = "spy-track-meta";
+			const L = lane.loyalty != null ? lane.loyalty : "?";
+			meta.textContent = L + "%" + (lane.n ? " · " + lane.n : "");
+			title.appendChild(badge);
+			title.appendChild(meta);
+			title.title = Space4x.spyLaneLabel(state, player, lane);
+		} else {
+			title.className = "job-lane-title spy-track-title";
+			title.textContent = Space4x.spyLaneLabel(state, player, lane);
+			title.title = "";
+		}
+		const here = [];
+		for (let i = 0; i < spies.length; i++) {
+			if ((spies[i].post || "idle") === lane.id) here.push(spies[i]);
+		}
+		Space4x.syncKeyedList(box, here, function (s) { return s.id; },
+			function (spy) { return Space4x.makeSpyToken(state, spy); },
+			function (token, spy) {
+				const img = token.querySelector("img");
+				if (img) Space4x.setCultureImg(img, state, spy.culture);
+				token.classList.toggle("is-selected", Space4x.spySelHas(state, spy.id));
+				const who = Space4x.cultureName(state, spy.culture);
+				token.title = (who ? who + " spy" : "Spy") + " · click then click a lane";
+			}
+		);
+	}
+
+	Space4x.syncKeyedList(ui.spyBoard, items, function (item) { return item.id; },
+		function (item) {
+			if (item.kind === "head") {
 				const h = document.createElement("div");
 				h.className = "spy-lane-head";
+				const swatch = document.createElement("span");
+				swatch.className = "spy-lane-swatch";
+				const label = document.createElement("span");
+				label.className = "spy-lane-head-label";
+				h.appendChild(swatch);
+				h.appendChild(label);
 				return h;
 			}
 			const row = document.createElement("div");
-			row.className = "job-lane";
-			const title = document.createElement("div");
-			title.className = "job-lane-title";
-			const pops = document.createElement("div");
-			pops.className = "job-lane-pops";
-			row.appendChild(title);
-			row.appendChild(pops);
+			row.className = "spy-track-row";
 			return row;
 		},
-		function (row, lane) {
-			if (lane.kind === "head") {
-				row.textContent = lane.label || "";
+		function (node, item) {
+			if (item.kind === "head") {
+				const lane = item.lane;
+				const swatch = node.querySelector(".spy-lane-swatch");
+				const label = node.querySelector(".spy-lane-head-label");
+				if (label) label.textContent = lane.label || "";
+				if (swatch) {
+					if (lane.empireId) {
+						swatch.hidden = false;
+						swatch.style.background = Space4x.empireColor(state, lane.empireId);
+					} else {
+						swatch.hidden = true;
+					}
+				}
 				return;
 			}
-			row.setAttribute("data-id", lane.id);
-			row.querySelector(".job-lane-title").textContent = Space4x.spyLaneLabel(state, player, lane);
-			const here = [];
-			for (let i = 0; i < spies.length; i++) {
-				if ((spies[i].post || "idle") === lane.id) here.push(spies[i]);
-			}
-			const box = row.querySelector(".job-lane-pops");
-			Space4x.syncKeyedList(box, here, function (s) { return s.id; },
-				function (spy) { return Space4x.makeSpyToken(state, spy); },
-				function (token, spy) {
-					const img = token.querySelector("img");
-					if (img) Space4x.setCultureImg(img, state, spy.culture);
-					token.classList.toggle("is-selected", Space4x.spySelHas(state, spy.id));
-					const who = Space4x.cultureName(state, spy.culture);
-					token.title = (who ? who + " spy" : "Spy") + " · click then click a lane";
-				}
+			Space4x.syncKeyedList(node, item.lanes, function (lane) { return lane.id; },
+				function () {
+					const track = document.createElement("div");
+					track.className = "job-lane spy-track";
+					const title = document.createElement("div");
+					title.className = "job-lane-title spy-track-title";
+					const pops = document.createElement("div");
+					pops.className = "job-lane-pops";
+					track.appendChild(title);
+					track.appendChild(pops);
+					return track;
+				},
+				syncTrack
 			);
 		}
 	);
+
+	const popRows = ui.spyBoard.querySelectorAll(".job-lane-pops");
+	for (let i = 0; i < popRows.length; i++) {
+		if (Space4x.fitOverlappingRow) Space4x.fitOverlappingRow(popRows[i], 22, 6);
+	}
+
+	const targets = player ? Space4x.inciteRevoltTargets(state, player) : [];
+	if (ui.spyIncite) ui.spyIncite.hidden = !targets.length;
+	if (ui.spyInciteTarget && targets.length) {
+		const prev = ui.spyInciteTarget.value;
+		while (ui.spyInciteTarget.firstChild) ui.spyInciteTarget.removeChild(ui.spyInciteTarget.firstChild);
+		for (let t = 0; t < targets.length; t++) {
+			const opt = document.createElement("option");
+			opt.value = targets[t].id;
+			opt.textContent = Space4x.settlementLabel(state, targets[t]);
+			ui.spyInciteTarget.appendChild(opt);
+		}
+		if (prev) ui.spyInciteTarget.value = prev;
+		if (!ui.spyInciteTarget.value && targets[0]) ui.spyInciteTarget.value = targets[0].id;
+	}
+	if (ui.spyInciteCost && targets.length) {
+		const pick = Space4x.settlementById(state, ui.spyInciteTarget ? ui.spyInciteTarget.value : null);
+		if (pick) {
+			const cost = Space4x.inciteRevoltCost(state, pick);
+			const posted = Space4x.spyCountAtSettlement(player, pick.id);
+			Space4x.setText(ui.spyInciteCost, "Costs " + Space4x.fmtMoney(cost) + " and " +
+				posted + " posted " + (posted === 1 ? "spy" : "spies") + " (one is lost).");
+		}
+	}
+	if (ui.btnSpyIncite && targets.length) {
+		const pick = Space4x.settlementById(state, ui.spyInciteTarget ? ui.spyInciteTarget.value : null);
+		const cost = pick ? Space4x.inciteRevoltCost(state, pick) : 0;
+		ui.btnSpyIncite.disabled = !pick || (player.stockpiles.money || 0) < cost;
+	}
 };

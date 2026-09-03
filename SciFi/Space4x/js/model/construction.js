@@ -18,14 +18,27 @@ Space4x.spawnUnit = function (state, settlement, defId) {
 		targetStarId: null,
 		modules: Space4x.empireShipModules(state, empire)
 	};
+	if (Space4x.isStationHull(state, defId)) {
+		unit.homeSettlementId = settlement.id;
+	} else {
+		Space4x.enterOrbit(unit, star);
+	}
+	if (Space4x.hullCombatBase(state, defId) > 0) {
+		Space4x.ensureEmpireDesigns(state, empire);
+		unit.combatFit = Space4x.snapshotCombatFit(state, empire, defId, Space4x.activeDesign(empire, defId));
+	}
 	state.units.push(unit);
 	state.turnLog.push(settlement.name + " completed a " + (def ? def.name : defId) + ".");
 	return unit;
 };
 
-Space4x.completeBuild = function (state, settlement, defId) {
+Space4x.completeBuild = function (state, settlement, defId, queueItem) {
 	const empire = Space4x.empireById(state, settlement.empireId);
 	const def = Space4x.settingOf(state).builds[defId];
+	if (queueItem && queueItem.heldUnit && defId === "shipRefit") {
+		Space4x.completeShipRefit(state, settlement, queueItem);
+		return;
+	}
 	if (def && def.kind === "unit") {
 		if (empire.isPlayer && state.turnEvents) state.turnEvents.playerShipBuilt = true;
 		Space4x.spawnUnit(state, settlement, defId);
@@ -70,10 +83,10 @@ Space4x.phaseConstruction = function (state) {
 				keep.push(item);
 				continue;
 			}
-			const cost = Space4x.buildCost(state, st, def);
+			const cost = Space4x.queueItemCost(state, st, item);
 			const need = cost - (item.progress || 0);
 			if (need <= 0) {
-				Space4x.completeBuild(state, st, def.id);
+				Space4x.completeBuild(state, st, def.id, item);
 				continue;
 			}
 			if (st.industryPool <= 0) {
@@ -84,7 +97,7 @@ Space4x.phaseConstruction = function (state) {
 			const spend = Math.min(need, st.industryPool);
 			st.industryPool -= spend;
 			item.progress = (item.progress || 0) + spend;
-			if (item.progress >= cost) Space4x.completeBuild(state, st, def.id);
+			if (item.progress >= cost) Space4x.completeBuild(state, st, def.id, item);
 			else {
 				keep.push(item);
 				stop = true;
@@ -145,6 +158,7 @@ Space4x.canFinishBuild = function (state, settlement, def, extra) {
 	const empire = Space4x.empireById(state, settlement.empireId);
 	if (def.requireTech && !Space4x.empireHasTech(empire, def.requireTech)) return false;
 	if (def.requireStructure && Space4x.buildCountWithExtra(settlement, def.requireStructure, extra) <= 0) return false;
+	if (def.kind === "refit") return true;
 	if (!Space4x.buildSiteOk(state, settlement, def)) return false;
 	const cap = Space4x.buildCap(state, settlement, def);
 	if (cap !== Infinity && Space4x.buildCountWithExtra(settlement, def.id, extra) >= cap) return false;
@@ -196,6 +210,8 @@ Space4x.countQueuedBuild = function (settlement, defId) {
 Space4x.canQueueBuild = function (state, settlement, defId) {
 	const def = Space4x.settingOf(state).builds[defId];
 	if (!def || !settlement) return false;
+	if (def.npc) return false;
+	if (def.stub || def.kind === "stub" || def.kind === "refit") return false;
 	const empire = Space4x.empireById(state, settlement.empireId);
 	if (def.requireTech && !Space4x.empireHasTech(empire, def.requireTech)) return false;
 	if (!Space4x.buildSiteOk(state, settlement, def)) return false;
@@ -206,6 +222,118 @@ Space4x.canQueueBuild = function (state, settlement, defId) {
 		if (settlement.buildQueue[i].defId === defId) n += 1;
 	}
 	return n < cap;
+};
+
+Space4x.queueItemCost = function (state, settlement, item) {
+	if (!item) return 0;
+	if (item.refitCost != null) return item.refitCost;
+	const def = Space4x.settingOf(state).builds[item.defId];
+	return Space4x.buildCost(state, settlement, def);
+};
+
+Space4x.queueItemLabel = function (state, item) {
+	if (!item) return "";
+	const def = Space4x.settingOf(state).builds[item.defId];
+	if (item.heldUnit) {
+		const shipName = Space4x.unitLabel(state, item.heldUnit);
+		const design = item.designName ? (" → " + item.designName) : "";
+		return "Refit " + shipName + design;
+	}
+	return def ? def.name : item.defId;
+};
+
+Space4x.refitCostForHull = function (state, settlement, hullDefId) {
+	const hull = Space4x.settingOf(state).builds[hullDefId];
+	if (!hull) return 1;
+	const full = Space4x.buildCost(state, settlement, hull);
+	return Math.max(1, Math.round(full / 4));
+};
+
+Space4x.shipScrapValue = function (state, unit) {
+	if (!unit) return 0;
+	const def = Space4x.settingOf(state).builds[unit.defId];
+	return Space4x.baseDefCost(def);
+};
+
+Space4x.canRefitShip = function (state, unit) {
+	if (!unit || Space4x.isHauler(state, unit)) return false;
+	if (unit.fleetMode) return false;
+	return Space4x.hullCombatBase(state, unit.defId) > 0;
+};
+
+Space4x.queueShipRefit = function (state, settlementId, unitId, designId) {
+	const st = Space4x.settlementById(state, settlementId);
+	const unit = Space4x.unitById(state, unitId);
+	if (!st || !unit || unit.empireId !== st.empireId) return false;
+	if (!Space4x.canRefitShip(state, unit)) return false;
+	if (Space4x.countStructure(st, "spaceDock") <= 0) return false;
+	const empire = Space4x.empireById(state, st.empireId);
+	Space4x.ensureEmpireDesigns(state, empire);
+	const design = Space4x.designById(empire, unit.defId, designId) || Space4x.activeDesign(empire, unit.defId);
+	if (!design) return false;
+	const cost = Space4x.refitCostForHull(state, st, unit.defId);
+	const held = JSON.parse(JSON.stringify(unit));
+	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
+	st.buildQueue.push({
+		id: Space4x.nextId(state, "q"),
+		defId: "shipRefit",
+		progress: 0,
+		refitCost: cost,
+		designId: design.id,
+		designName: design.name,
+		heldUnit: held
+	});
+	state.turnLog.push(st.name + " began refitting " + Space4x.unitLabel(state, held) + ".");
+	return true;
+};
+
+Space4x.completeShipRefit = function (state, settlement, item) {
+	const unit = item && item.heldUnit;
+	if (!unit) return;
+	const empire = Space4x.empireById(state, settlement.empireId);
+	const star = Space4x.starById(state, settlement.location.starId);
+	Space4x.ensureEmpireDesigns(state, empire);
+	const design = Space4x.designById(empire, unit.defId, item.designId) || Space4x.activeDesign(empire, unit.defId);
+	if (Space4x.hullCombatBase(state, unit.defId) > 0) {
+		unit.combatFit = Space4x.snapshotCombatFit(state, empire, unit.defId, design);
+	}
+	unit.targetStarId = null;
+	if (Space4x.isStationHull(state, unit)) {
+		unit.homeSettlementId = unit.homeSettlementId || settlement.id;
+		unit.location = {
+			kind: "settlement",
+			x: star.x,
+			y: star.y,
+			starId: star.id,
+			settlementId: settlement.id
+		};
+	} else {
+		unit.location = {
+			kind: "orbit",
+			x: star.x,
+			y: star.y,
+			starId: star.id,
+			settlementId: null
+		};
+	}
+	state.units.push(unit);
+	state.turnLog.push(settlement.name + " finished refitting " + Space4x.unitLabel(state, unit) +
+		(design ? (" to " + design.name) : "") + ".");
+};
+
+Space4x.scrapShip = function (state, settlementId, unitId) {
+	const st = Space4x.settlementById(state, settlementId);
+	const unit = Space4x.unitById(state, unitId);
+	if (!st || !unit || unit.empireId !== st.empireId) return false;
+	if (Space4x.isHauler(state, unit) || unit.fleetMode) return false;
+	const empire = Space4x.empireById(state, st.empireId);
+	if (!empire) return false;
+	const value = Space4x.shipScrapValue(state, unit);
+	empire.stockpiles.money = Space4x.moneyRound((empire.stockpiles.money || 0) + value);
+	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
+	state.turnLog.push(st.name + " scrapped " + Space4x.unitLabel(state, unit) +
+		" for " + Space4x.fmtMoney(value) + ".");
+	return true;
 };
 
 Space4x.queueBuild = function (state, settlementId, defId) {
@@ -222,7 +350,13 @@ Space4x.cancelBuild = function (state, settlementId, queueId) {
 	if (!st) return;
 	for (let i = 0; i < st.buildQueue.length; i++) {
 		if (st.buildQueue[i].id === queueId) {
-			st.industryPool += st.buildQueue[i].progress || 0;
+			const item = st.buildQueue[i];
+			if (item.heldUnit) {
+				state.turnLog.push(st.name + " cancelled a refit — " +
+					Space4x.unitLabel(state, item.heldUnit) + " was destroyed.");
+			} else {
+				st.industryPool += item.progress || 0;
+			}
 			st.buildQueue.splice(i, 1);
 			return;
 		}
@@ -278,7 +412,7 @@ Space4x.queueBuildEtas = function (state, settlement) {
 			continue;
 		}
 		const def = Space4x.settingOf(state).builds[queue[i].defId];
-		let remaining = Space4x.buildCost(state, settlement, def) - (queue[i].progress || 0);
+		let remaining = Space4x.queueItemCost(state, settlement, queue[i]) - (queue[i].progress || 0);
 		if (remaining <= 0) {
 			etas.push({ turns: 0, own: 0, stalled: false });
 			continue;
@@ -350,6 +484,55 @@ Space4x.queueFrontSummary = function (state, settlement) {
 	return { text: text, title: title };
 };
 
+Space4x.rushBuildMultiplier = function (progress, cost) {
+	if (!(cost > 0)) return 1;
+	const pct = (progress || 0) / cost;
+	if (pct < 0.25) return 4;
+	if (pct < 0.5) return 3;
+	if (pct < 0.75) return 2;
+	return 1;
+};
+
+Space4x.rushBuildQuote = function (state, settlement, item) {
+	if (!settlement || !item) return null;
+	const def = Space4x.settingOf(state).builds[item.defId];
+	if (!def) return null;
+	if (!Space4x.canFinishBuild(state, settlement, def)) return { blocked: true };
+	const cost = Space4x.queueItemCost(state, settlement, item);
+	const progress = item.progress || 0;
+	const remain = Math.max(0, cost - progress);
+	if (remain <= 0) return { blocked: false, remain: 0, cost: 0, multiplier: 1 };
+	const mult = Space4x.rushBuildMultiplier(progress, cost);
+	return {
+		blocked: false,
+		remain: remain,
+		cost: Space4x.moneyRound(remain * mult),
+		multiplier: mult,
+		pct: progress / cost
+	};
+};
+
+Space4x.rushBuild = function (state, settlementId, queueId) {
+	const st = Space4x.settlementById(state, settlementId);
+	if (!st || !st.buildQueue.length) return false;
+	const item = st.buildQueue[0];
+	if (queueId && item.id !== queueId) return false;
+	const def = Space4x.settingOf(state).builds[item.defId];
+	if (!def || !Space4x.canFinishBuild(state, st, def)) return false;
+	const quote = Space4x.rushBuildQuote(state, st, item);
+	if (!quote || quote.blocked || !(quote.remain > 0)) return false;
+	const empire = Space4x.empireById(state, st.empireId);
+	if (!empire) return false;
+	const wallet = Space4x.moneyRound(empire.stockpiles.money || 0);
+	if (wallet < quote.cost) return false;
+	empire.stockpiles.money = Space4x.moneyRound(wallet - quote.cost);
+	item.progress = Space4x.queueItemCost(state, st, item);
+	Space4x.completeBuild(state, st, def.id, item);
+	st.buildQueue.shift();
+	state.turnLog.push(st.name + " rushed " + Space4x.queueItemLabel(state, item) + " for " + Space4x.fmtMoney(quote.cost) + ".");
+	return true;
+};
+
 Space4x.foundSettlement = function (state, unitId, bodyId) {
 	const unit = Space4x.unitById(state, unitId);
 	if (!unit || !Space4x.unitCanFound(state, unit)) return false;
@@ -361,9 +544,10 @@ Space4x.foundSettlement = function (state, unitId, bodyId) {
 		if (bodies[i].id === bodyId) body = bodies[i];
 	}
 	if (!body) return false;
-	if (!Space4x.inRangeOfEmpire(state, unit.empireId, star.x, star.y)) return false;
-	const name = star.name + " " + body.name;
+	if (!Space4x.inRangeOfEmpireAtCell(state, unit.empireId, star.x, star.y)) return false;
+	const name = star.name + " " + Space4x.bodyLabel(state, body);
 	const home = Space4x.createSettlement(state, unit.empireId, star.id, body.id, name, 1);
+	Space4x.absorbBodyNatives(state, home, body);
 	Space4x.assignNewPop(state, home, home.pops[0]);
 	state.settlements.push(home);
 	state.units = state.units.filter(function (u) { return u.id !== unitId; });
@@ -378,13 +562,30 @@ Space4x.buildKindLabel = function (def) {
 	if (def.kind === "troop") return "Ground unit";
 	if (def.kind === "abstract") return "Empire project";
 	if (def.kind === "spy") return "Agent";
+	if (def.kind === "stub") return "Future project";
+	if (def.kind === "refit") return "Yard project";
 	return Space4x.titleCase(def.kind);
 };
 
 Space4x.buildInspectInfo = function (state, settlement, defId) {
 	const def = Space4x.settingOf(state).builds[defId];
 	if (!def) {
-		return { name: defId, meta: "", summary: "", stats: [], canQueue: false };
+		return { name: defId, meta: "", summary: "", stats: [], canQueue: false, openRefit: false };
+	}
+	if (def.kind === "refit") {
+		const dockOk = !!(settlement && Space4x.countStructure(settlement, "spaceDock") > 0);
+		return {
+			name: def.name,
+			meta: "Yard · open retrofit",
+			summary: def.summary || "",
+			stats: [
+				"Refit cost is ¼ of a new hull of the same class",
+				"Cancelling a refit destroys the ship",
+				"Scrap returns the hull's built industry value as money"
+			],
+			canQueue: false,
+			openRefit: dockOk
+		};
 	}
 	const stats = [];
 	const cost = Space4x.buildCost(state, settlement, def);
@@ -397,7 +598,11 @@ Space4x.buildInspectInfo = function (state, settlement, defId) {
 		stats.push("No upkeep");
 	}
 	if (def.kind === "structure") stats.push("Stays on this world");
-	if (def.kind === "unit") stats.push("Launches as a map ship");
+	if (def.kind === "unit") {
+		if (def.station || def.immobile) stats.push("Bound to this world; cannot leave");
+		else stats.push("Launches as a map ship");
+	}
+	if (def.kind === "stub") stats.push("Not buildable yet");
 	if (def.kind === "spy") stats.push("Joins the Spies screen. Assigned anywhere you are in contact.");
 	if (def.requireStructure) {
 		const yard = Space4x.structureName(state, def.requireStructure);
@@ -461,7 +666,8 @@ Space4x.buildInspectInfo = function (state, settlement, defId) {
 		meta: Space4x.buildKindLabel(def) + " · " + cost + " industry",
 		summary: def.summary || "",
 		stats: stats,
-		canQueue: canQueue
+		canQueue: canQueue,
+		openRefit: false
 	};
 };
 

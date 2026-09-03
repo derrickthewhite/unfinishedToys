@@ -133,6 +133,7 @@ Space4x.phaseTransport = function (state) {
 		Space4x.allocateEmpireFood(list, pools, present, hulls);
 		for (let i = 0; i < list.length; i++) {
 			list[i].lastFoodPresent = present[list[i].id];
+			list[i].lastFoodProduced = pools[list[i].id] || 0;
 			list[i].foodPresent = present[list[i].id];
 		}
 		hullsUsed += startHulls - hulls.n;
@@ -167,12 +168,49 @@ Space4x.foodSituation = function (state, settlement) {
 	const produced = preview.produced[settlement.id] || 0;
 	const present = preview.present[settlement.id] || 0;
 	const imported = Math.max(0, present - produced);
+	const fed = Math.min(present, need);
 	return {
 		produced: produced,
 		present: present,
 		imported: imported,
 		need: need,
+		fed: fed,
 		deficit: Math.max(0, need - present),
 		surplus: Math.max(0, produced - need)
+	};
+};
+
+Space4x.empireFoodSummary = function (state, empireId) {
+	const set = Space4x.settingOf(state);
+	const perPop = set.foodPerPop || 1;
+	const homes = Space4x.settlementsOf(state, empireId);
+	const preview = Space4x.previewEmpireFood(state, empireId);
+	let pops = 0;
+	let need = 0;
+	let produced = 0;
+	let present = 0;
+	let fed = 0;
+	let imported = 0;
+	for (let i = 0; i < homes.length; i++) {
+		const st = homes[i];
+		const n = st.pops.length;
+		const prod = preview.produced[st.id] || 0;
+		const here = preview.present[st.id] || 0;
+		pops += n;
+		need += n * perPop;
+		produced += prod;
+		present += here;
+		fed += Math.min(here, n * perPop);
+		imported += Math.max(0, here - prod);
+	}
+	return {
+		pops: pops,
+		need: need,
+		produced: produced,
+		present: present,
+		fed: fed,
+		imported: imported,
+		surplus: Math.max(0, produced - need),
+		deficit: Math.max(0, need - present)
 	};
 };

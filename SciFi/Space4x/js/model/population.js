@@ -17,6 +17,42 @@ Space4x.removePops = function (settlement, deaths) {
 	}
 };
 
+Space4x.removePopsOfCulture = function (settlement, cultureId, deaths, state, empire) {
+	let left = deaths;
+	function matches(pop) {
+		return (Space4x.popCultureId(pop, empire) || Space4x.defaultCultureId(state)) === cultureId;
+	}
+	function killJob(job) {
+		for (let i = settlement.pops.length - 1; i >= 0 && left > 0; i--) {
+			const pop = settlement.pops[i];
+			if (!matches(pop)) continue;
+			if (job && pop.job !== job) continue;
+			settlement.pops.splice(i, 1);
+			left -= 1;
+		}
+	}
+	killJob("idle");
+	for (let i = settlement.pops.length - 1; i >= 0 && left > 0; i--) {
+		if (!matches(settlement.pops[i])) continue;
+		settlement.pops.splice(i, 1);
+		left -= 1;
+	}
+};
+
+Space4x.popCultureId = function (pop, empire) {
+	return (pop && pop.culture) || (empire && empire.cultureId) || null;
+};
+
+Space4x.ensureGrowthAccByCulture = function (state, st, empire) {
+	if (st.growthAccByCulture) return;
+	st.growthAccByCulture = {};
+	const legacy = Space4x.popAccOf(st);
+	if (legacy) {
+		const cid = empire && empire.cultureId;
+		if (cid) st.growthAccByCulture[cid] = legacy;
+	}
+};
+
 Space4x.popGrowthRates = function (state, empire) {
 	const set = Space4x.settingOf(state);
 	return {
@@ -26,6 +62,12 @@ Space4x.popGrowthRates = function (state, empire) {
 };
 
 Space4x.popAccOf = function (st) {
+	if (st.growthAccByCulture) {
+		let n = 0;
+		const ids = Object.keys(st.growthAccByCulture);
+		for (let i = 0; i < ids.length; i++) n += st.growthAccByCulture[ids[i]] || 0;
+		return n;
+	}
 	return (st.growthAcc || 0) - (st.starveAcc || 0);
 };
 
@@ -33,12 +75,13 @@ Space4x.phasePopulation = function (state) {
 	for (let i = 0; i < state.settlements.length; i++) {
 		const st = state.settlements[i];
 		const empire = Space4x.empireById(state, st.empireId);
-		st.growthAcc = Space4x.popAccOf(st);
+		Space4x.ensureGrowthAccByCulture(state, st, empire);
 		st.starveAcc = 0;
 		st.starvedThisTurn = 0;
 		st.foodShort = false;
 		const pops = st.pops.length;
 		if (pops === 0) {
+			st.growthAccByCulture = {};
 			st.growthAcc = 0;
 			continue;
 		}
@@ -46,35 +89,85 @@ Space4x.phasePopulation = function (state) {
 		const fed = Math.min(present, pops);
 		const unfed = Math.max(0, pops - present);
 		if (unfed > 0) st.foodShort = true;
-		const grow = Space4x.settlementGrowRate(state, st, empire);
-		const starve = Space4x.settingOf(state).starvationRatePercent || 0;
-		const net = fed * grow - unfed * starve;
-		st.growthAcc += net;
+		let fedLeft = fed;
+		const acc = st.growthAccByCulture;
 		let births = 0;
 		let deaths = 0;
-		if (st.growthAcc >= 100) {
-			births = Math.floor(st.growthAcc / 100);
-			st.growthAcc -= births * 100;
-		} else if (st.growthAcc <= -100) {
-			deaths = Math.min(pops, Math.floor(-st.growthAcc / 100));
-			st.growthAcc += deaths * 100;
+		const birthByCulture = {};
+		const deathByCulture = {};
+		for (let p = 0; p < st.pops.length; p++) {
+			const pop = st.pops[p];
+			const cid = Space4x.popCultureId(pop, empire) || Space4x.defaultCultureId(state);
+			const grow = Space4x.popGrowRate(state, empire, pop);
+			const starve = Space4x.popStarveRate(state, pop);
+			let net = 0;
+			if (fedLeft > 0) {
+				net = grow;
+				fedLeft -= 1;
+			} else {
+				net = -starve;
+			}
+			acc[cid] = (acc[cid] || 0) + net;
+		}
+		if (fed === 0) {
+			const ids = Object.keys(acc);
+			for (let c = 0; c < ids.length; c++) {
+				if (acc[ids[c]] > 0) acc[ids[c]] = 0;
+			}
+		}
+		const cultureIds = Object.keys(acc);
+		for (let c = 0; c < cultureIds.length; c++) {
+			const cid = cultureIds[c];
+			let cultureBirths = 0;
+			let cultureDeaths = 0;
+			while (acc[cid] >= 100) {
+				cultureBirths += 1;
+				acc[cid] -= 100;
+			}
+			while (acc[cid] <= -100) {
+				const left = st.pops.filter(function (pop) {
+					return (Space4x.popCultureId(pop, empire) || Space4x.defaultCultureId(state)) === cid;
+				}).length;
+				if (!left) {
+					acc[cid] = 0;
+					break;
+				}
+				cultureDeaths += 1;
+				acc[cid] += 100;
+			}
+			if (cultureBirths) {
+				birthByCulture[cid] = cultureBirths;
+				births += cultureBirths;
+			}
+			if (cultureDeaths) {
+				deathByCulture[cid] = cultureDeaths;
+				deaths += cultureDeaths;
+			}
 		}
 		if (deaths > 0) {
-			Space4x.removePops(st, deaths);
-			if (st.pops.length === 0) st.growthAcc = 0;
+			const deadIds = Object.keys(deathByCulture);
+			for (let d = 0; d < deadIds.length; d++) {
+				Space4x.removePopsOfCulture(st, deadIds[d], deathByCulture[deadIds[d]], state, empire);
+			}
+			if (st.pops.length === 0) st.growthAccByCulture = {};
 			st.lastStarveTurn = state.turn;
 			st.starvedThisTurn = deaths;
 			state.turnLog.push(st.name + " lost " + deaths + " " + Space4x.peopleWord(deaths) + " to starvation.");
 		}
-		for (let b = 0; b < births; b++) {
-			const pop = Space4x.createPop(state, empire);
-			st.pops.push(pop);
-			Space4x.assignNewPop(state, st, pop);
+		const birthIds = Object.keys(birthByCulture);
+		for (let b = 0; b < birthIds.length; b++) {
+			const cid = birthIds[b];
+			const n = birthByCulture[cid];
+			for (let k = 0; k < n; k++) {
+				const pop = Space4x.createPop(state, empire, cid);
+				st.pops.push(pop);
+				Space4x.assignNewPop(state, st, pop);
+			}
+			const who = Space4x.cultureName(state, cid) || "colonists";
+			state.turnLog.push(st.name + " grew by " + n + " " + who + " (" + n + " " + Space4x.peopleWord(n) + ").");
 		}
-		if (births > 0) {
-			st.lastGrowthTurn = state.turn;
-			state.turnLog.push(st.name + " grew by " + births + " " + Space4x.peopleWord(births) + ".");
-		}
+		if (births > 0) st.lastGrowthTurn = state.turn;
+		st.growthAcc = Space4x.popAccOf(st);
 	}
 };
 
@@ -95,19 +188,80 @@ Space4x.turnsUntilPopChange = function (acc, netPer) {
 	return null;
 };
 
+Space4x.culturePopOutlook = function (state, st, empire, cultureId, fedLeftRef) {
+	const pops = st.pops || [];
+	let count = 0;
+	let fed = 0;
+	let unfed = 0;
+	let growSum = 0;
+	let starveSum = 0;
+	for (let i = 0; i < pops.length; i++) {
+		const pop = pops[i];
+		if ((Space4x.popCultureId(pop, empire) || Space4x.defaultCultureId(state)) !== cultureId) continue;
+		count += 1;
+		const grow = Space4x.popGrowRate(state, empire, pop);
+		const starve = Space4x.popStarveRate(state, pop);
+		growSum += grow;
+		starveSum += starve;
+		if (fedLeftRef.left > 0) {
+			fed += 1;
+			fedLeftRef.left -= 1;
+		} else {
+			unfed += 1;
+		}
+	}
+	const growRate = count ? growSum / count : 0;
+	const starveRate = count ? starveSum / count : 0;
+	const fedContrib = fed * growRate;
+	const unfedContrib = unfed * starveRate;
+	const netPer = fedContrib - unfedContrib;
+	Space4x.ensureGrowthAccByCulture(state, st, empire);
+	const acc = (st.growthAccByCulture && st.growthAccByCulture[cultureId]) || 0;
+	const combinedRate = count ? netPer / count : 0;
+	let changeThisTurn = 0;
+	if (netPer > 0) changeThisTurn = Math.floor((acc + netPer) / 100);
+	else if (netPer < 0) changeThisTurn = Math.min(count, Math.floor(-(acc + netPer) / 100));
+	return {
+		cultureId: cultureId,
+		pops: count,
+		fed: fed,
+		unfed: unfed,
+		growRate: growRate,
+		starveRate: starveRate,
+		fedContrib: fedContrib,
+		unfedContrib: unfedContrib,
+		netPer: netPer,
+		combinedRate: combinedRate,
+		acc: acc,
+		changeTurns: Space4x.turnsUntilPopChange(acc, netPer),
+		changeThisTurn: changeThisTurn
+	};
+};
+
 Space4x.settlementPopOutlook = function (state, st) {
 	const empire = Space4x.empireById(state, st.empireId);
 	const pops = st.pops.length;
-	let present = st.lastFoodPresent || 0;
-	if (state.turn <= 1 && present === 0) {
-		present = Math.min(pops, Space4x.produceSettlement(state, st, empire).food);
+	const sit = Space4x.foodSituation(state, st);
+	const present = sit.present;
+	const fed = sit.fed;
+	const fedLeftRef = { left: fed };
+	const cultures = {};
+	for (let i = 0; i < (st.pops || []).length; i++) {
+		const cid = Space4x.popCultureId(st.pops[i], empire) || Space4x.defaultCultureId(state);
+		cultures[cid] = true;
 	}
-	const fed = Math.min(present, pops);
-	const unfed = Math.max(0, pops - present);
-	const grow = Space4x.settlementGrowRate(state, st, empire);
-	const starve = Space4x.settingOf(state).starvationRatePercent || 0;
-	const netPer = fed * grow - unfed * starve;
-	const acc = Space4x.popAccOf(st);
+	const cultureIds = Object.keys(cultures);
+	const rows = [];
+	for (let i = 0; i < cultureIds.length; i++) {
+		rows.push(Space4x.culturePopOutlook(state, st, empire, cultureIds[i], fedLeftRef));
+	}
+	rows.sort(function (a, b) { return b.pops - a.pops; });
+	let netPer = 0;
+	let acc = 0;
+	for (let i = 0; i < rows.length; i++) {
+		netPer += rows[i].netPer;
+		acc += rows[i].acc;
+	}
 	const combinedRate = pops ? netPer / pops : 0;
 	let changeThisTurn = 0;
 	if (netPer > 0) changeThisTurn = Math.floor((acc + netPer) / 100);
@@ -115,23 +269,56 @@ Space4x.settlementPopOutlook = function (state, st) {
 	return {
 		pops: pops,
 		fed: fed,
-		unfed: unfed,
-		growRate: grow,
-		starveRate: starve,
-		fedContrib: fed * grow,
-		unfedContrib: unfed * starve,
+		unfed: Math.max(0, pops - present),
+		produced: sit.produced,
+		need: sit.need,
+		imported: sit.imported,
+		surplus: sit.surplus,
+		growRate: rows.length === 1 ? rows[0].growRate : 0,
+		starveRate: rows.length === 1 ? rows[0].starveRate : 0,
+		fedContrib: rows.reduce(function (n, r) { return n + r.fedContrib; }, 0),
+		unfedContrib: rows.reduce(function (n, r) { return n + r.unfedContrib; }, 0),
 		netPer: netPer,
 		combinedRate: combinedRate,
 		changeTurns: Space4x.turnsUntilPopChange(acc, netPer),
-		changeThisTurn: changeThisTurn
+		changeThisTurn: changeThisTurn,
+		cultures: rows
 	};
 };
 
-Space4x.popOutlookText = function (o) {
+Space4x.popOutlookFoodLine = function (o) {
+	if (!o || !o.pops) return "";
+	let line = "Food " + o.produced + "/" + o.need + " produced";
+	line += " · " + o.fed + "/" + o.pops + " fed";
+	if (o.imported > 0) line += " · " + o.imported + " imported";
+	if (o.surplus > 0) line += " · " + o.surplus + " surplus";
+	return line;
+};
+
+Space4x.popOutlookText = function (o, state) {
 	if (!o || o.pops === 0) return "No population.";
+	const foodLine = Space4x.popOutlookFoodLine(o);
+	if (o.cultures && o.cultures.length > 1) {
+		const parts = [];
+		for (let i = 0; i < o.cultures.length; i++) {
+			const row = o.cultures[i];
+			if (!row.pops) continue;
+			const name = Space4x.cultureName(state, row.cultureId) || row.cultureId;
+			const word = row.netPer < 0 ? "decline" : "growth";
+			parts.push(row.pops + " " + name + ": " + Space4x.fmtPercent(Math.abs(row.combinedRate)) + "% " + word);
+		}
+		let line = parts.join(" · ");
+		line += " · " + foodLine;
+		if (o.changeThisTurn > 0) {
+			line += " · " + o.changeThisTurn + " population this turn";
+		} else if (o.changeTurns) {
+			line += " · 1 population in " + o.changeTurns + (o.changeTurns === 1 ? " turn" : " turns");
+		}
+		return line;
+	}
 	const word = o.netPer < 0 ? "decline" : "growth";
 	let line = Space4x.fmtPercent(Math.abs(o.combinedRate)) + "% " + word;
-	line += " · " + o.fed + "/" + o.pops + " fed";
+	line += " · " + foodLine;
 	if (o.changeThisTurn > 0) {
 		line += " · " + o.changeThisTurn + " population this turn";
 	} else if (o.changeTurns) {
@@ -140,10 +327,25 @@ Space4x.popOutlookText = function (o) {
 	return line;
 };
 
-Space4x.popOutlookTip = function (o) {
-	if (!o || o.pops === 0 || !(o.fed > 0 && o.unfed > 0)) return "";
-	return o.fed + " fed +" + Space4x.fmtPercent(o.fedContrib) +
-		"% · " + o.unfed + " short −" + Space4x.fmtPercent(o.unfedContrib) + "%";
+Space4x.popOutlookTip = function (o, state) {
+	if (!o || o.pops === 0) return "";
+	const lines = [Space4x.popOutlookFoodLine(o)];
+	if (o.cultures && o.cultures.length > 1) {
+		for (let i = 0; i < o.cultures.length; i++) {
+			const row = o.cultures[i];
+			if (!row.pops) continue;
+			const name = Space4x.cultureName(state, row.cultureId) || row.cultureId;
+			let bit = name + ": " + row.fed + " fed +" + Space4x.fmtPercent(row.fedContrib) + "%";
+			if (row.unfed) bit += ", " + row.unfed + " short −" + Space4x.fmtPercent(row.unfedContrib) + "%";
+			lines.push(bit);
+		}
+		return lines.join("\n");
+	}
+	if (o.fed > 0 && o.unfed > 0) {
+		lines.push(o.fed + " fed +" + Space4x.fmtPercent(o.fedContrib) +
+			"% · " + o.unfed + " short −" + Space4x.fmtPercent(o.unfedContrib) + "%");
+	}
+	return lines.join("\n");
 };
 
 Space4x.takePopsForMove = function (settlement, count) {

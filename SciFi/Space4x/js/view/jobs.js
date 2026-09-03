@@ -136,6 +136,56 @@ Space4x.makeProdTotal = function (n) {
 	return span;
 };
 
+Space4x.fitOverlappingRow = function (box, itemWidth, minStep) {
+	if (!box) return;
+	const items = [];
+	let totalEl = null;
+	for (let i = 0; i < box.children.length; i++) {
+		const el = box.children[i];
+		if (el.classList.contains("prod-total")) {
+			totalEl = el;
+			continue;
+		}
+		items.push(el);
+	}
+	const n = items.length;
+	if (n <= 1) {
+		for (let i = 0; i < items.length; i++) {
+			items[i].style.marginLeft = "";
+			items[i].style.zIndex = "";
+			items[i].style.position = "";
+		}
+		if (totalEl) totalEl.style.marginLeft = "";
+		return;
+	}
+	let itemW = itemWidth;
+	if (!itemW && items[0].offsetWidth) itemW = items[0].offsetWidth;
+	if (!itemW) itemW = 22;
+	const min = minStep || 4;
+	let w = box.clientWidth;
+	if (!w && box.parentElement) w = box.parentElement.clientWidth;
+	if (!w) w = 400;
+	if (totalEl) w = Math.max(itemW, w - 48);
+	const step = Math.min(itemW - 2, Math.max(min, (w - itemW) / (n - 1)));
+	const overlap = itemW - step;
+	for (let i = 0; i < n; i++) {
+		items[i].style.position = "relative";
+		items[i].style.marginLeft = i === 0 ? "" : (-overlap) + "px";
+		items[i].style.zIndex = String(i + 1);
+	}
+	if (totalEl) totalEl.style.marginLeft = "0.35em";
+};
+
+Space4x.clearOverlappingRow = function (box) {
+	if (!box) return;
+	for (let i = 0; i < box.children.length; i++) {
+		const el = box.children[i];
+		el.style.marginLeft = "";
+		el.style.zIndex = "";
+		el.style.position = "";
+	}
+};
+
 Space4x.jobPrimaryOutput = function (y) {
 	return (y.food || 0) + (y.industry || 0) + (y.research || 0);
 };
@@ -507,4 +557,8 @@ Space4x.syncJobBoard = function (ui, state, cmds) {
 			);
 		}
 	);
+	const popRows = ui.jobBoard.querySelectorAll(".job-lane-pops");
+	for (let i = 0; i < popRows.length; i++) Space4x.fitOverlappingRow(popRows[i], 22, 6);
+	const outRows = ui.jobBoard.querySelectorAll(".job-lane-out");
+	for (let i = 0; i < outRows.length; i++) Space4x.clearOverlappingRow(outRows[i]);
 };

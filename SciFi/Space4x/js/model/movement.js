@@ -46,21 +46,28 @@ Space4x.stepToward = function (state, unit, tx, ty, speed, requireRange) {
 Space4x.canReachThisTurn = function (state, unit, tx, ty, speed, requireRange) {
 	const d = Space4x.dist(unit.location.x, unit.location.y, tx, ty);
 	if (d > speed + 1e-9) return false;
-	if (requireRange && !Space4x.inRangeOfEmpire(state, unit.empireId, tx, ty)) return false;
+	if (requireRange && !Space4x.inRangeOfEmpireAtCell(state, unit.empireId, tx, ty)) return false;
 	return true;
 };
 
 Space4x.phaseMovement = function (state) {
+	for (let i = 0; i < state.units.length; i++) state.units[i].arrivedThisTurn = false;
 	const ids = [];
 	for (let i = 0; i < state.units.length; i++) ids.push(state.units[i].id);
 	for (let i = 0; i < ids.length; i++) {
 		const unit = Space4x.unitById(state, ids[i]);
 		if (!unit) continue;
+		if (unit.location && unit.location.kind === "refit") continue;
+		if (Space4x.isStationHull(state, unit)) {
+			unit.targetStarId = null;
+			continue;
+		}
 		const empire = Space4x.empireById(state, unit.empireId);
 		const stats = Space4x.shipStats(state, empire);
-		const home = Space4x.nearestFriendlyStar(state, unit.empireId, unit.location.x, unit.location.y);
+		const pos = Space4x.unitRangePos(unit);
+		const home = Space4x.nearestFriendlyStar(state, unit.empireId, pos.x, pos.y);
 		if (!home) continue;
-		const inRange = Space4x.inRangeOfEmpire(state, unit.empireId, unit.location.x, unit.location.y);
+		const inRange = Space4x.inRangeOfEmpire(state, unit.empireId, pos.x, pos.y);
 		if (!inRange) {
 			unit.walkingHome = true;
 			const already = unit.location.kind === "orbit" && unit.location.starId === home.id;
@@ -101,8 +108,7 @@ Space4x.phaseMovement = function (state) {
 		if (unit.location.kind !== "orbit") continue;
 		const star = Space4x.starById(state, unit.location.starId);
 		if (!star) continue;
-		if (Space4x.starHasEmpireSettlement(state, star.id, unit.empireId)) continue;
-	const bodies = Space4x.emptyLegalBodies(state, star, unit.empireId);
+		const bodies = Space4x.emptyLegalBodies(state, star, unit.empireId);
 		if (bodies.length) Space4x.foundSettlement(state, unit.id, bodies[0].id);
 	}
 };
@@ -119,8 +125,12 @@ Space4x.arriveAtStar = function (state, unit, star, already) {
 			state.turnEvents.arrivedColonyIds.push(unit.id);
 		}
 	}
+	if (!already) unit.arrivedThisTurn = true;
 	if (Space4x.isPopHauler(state, unit)) Space4x.unloadPopHauler(state, unit);
-	if (Space4x.isTroopHauler(state, unit)) Space4x.unloadTroopHauler(state, unit);
+	if (Space4x.isTroopHauler(state, unit) && !unit.fleetMode) Space4x.unloadTroopHauler(state, unit);
+	if (Space4x.isTroopHauler(state, unit) && unit.fleetMode && !(unit.cargoTroops || []).length) {
+		Space4x.finishTroopFleet(state, unit);
+	}
 };
 
 Space4x.setShipTarget = function (state, unitId, starId) {
@@ -132,7 +142,7 @@ Space4x.setShipTarget = function (state, unitId, starId) {
 	if (Space4x.unitStarId(state, unit) === dest.id) return false;
 	const empire = Space4x.empireById(state, unit.empireId);
 	if (!Space4x.canLeaveSystem(state, empire, Space4x.unitStarId(state, unit), dest.id)) return false;
-	if (!Space4x.inRangeOfEmpire(state, unit.empireId, dest.x, dest.y)) return false;
+	if (!Space4x.inRangeOfEmpireAtCell(state, unit.empireId, dest.x, dest.y)) return false;
 	unit.targetStarId = starId;
 	if (unit.location.kind === "settlement") {
 		unit.location.kind = "orbit";

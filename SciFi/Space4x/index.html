@@ -3,6 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Space4x</title>
+	<link rel="icon" href="favicon.svg" type="image/svg+xml">
 	<link rel="stylesheet" href="css/space4x.css">
 </head>
 <body>
@@ -19,6 +20,15 @@
 			</label>
 			<label>Seed
 				<input id="gen-seed" type="text" placeholder="random" autocomplete="off">
+			</label>
+			<label>Galaxy size
+				<select id="gen-size-preset">
+					<option value="standard">Standard game (30×30 · 25 stars)</option>
+					<option value="small">Small game (10×10 · 10 stars)</option>
+					<option value="medium">Medium game (15×15 · 15 stars)</option>
+					<option value="huge">Huge game (40×40 · 35 stars)</option>
+					<option value="custom">Custom</option>
+				</select>
 			</label>
 			<label>Map width
 				<input id="gen-width" type="number" min="8" max="60" value="30">
@@ -44,8 +54,14 @@
 					<img id="gen-player-blurb-art" class="gen-blurb-art" alt="" hidden>
 					<div>
 						<h3 id="gen-player-blurb-name">Species</h3>
-						<p id="gen-player-blurb-text" class="muted"></p>
+						<p id="gen-player-blurb-text" class="gen-blurb-text"></p>
+						<ul id="gen-player-blurb-bonuses" class="gen-blurb-bonuses muted" hidden></ul>
 					</div>
+				</div>
+				<div class="gen-color-block">
+					<span class="gen-color-label">Map color</span>
+					<p class="muted gen-color-hint">Unique when chosen. AI defaults to random (rolled at start).</p>
+					<div id="gen-player-colors"></div>
 				</div>
 			</fieldset>
 			<fieldset>
@@ -58,7 +74,10 @@
 		<div id="gen-saves">
 			<h2>Saves</h2>
 			<p id="gen-save-status" class="muted" hidden></p>
-			<button type="button" id="btn-continue" hidden>Continue</button>
+			<div id="gen-continue" class="save-continue" hidden>
+				<h3>Continue</h3>
+				<ul id="gen-continue-list"></ul>
+			</div>
 			<p id="gen-saves-empty" class="muted">No saved games.</p>
 			<ul id="gen-save-list"></ul>
 			<button type="button" id="btn-load-file">Load file</button>
@@ -74,13 +93,6 @@
 				<button type="button" id="btn-end-turn">End Turn</button>
 				<button type="button" id="btn-auto-play">Auto Play</button>
 				<button type="button" id="btn-todos">Attention (<span id="chrome-todo-count">0</span>)</button>
-				<button type="button" id="btn-save-slot">Save</button>
-				<button type="button" id="btn-save-file">Save file</button>
-				<button type="button" id="btn-chrome-new-game">New game</button>
-				<label id="chrome-play-as-wrap" title="Debug: take control of this empire">Play as
-					<select id="chrome-play-as"></select>
-				</label>
-				<span id="chrome-save-status" class="muted" hidden></span>
 			</div>
 			<div id="chrome-right">
 				<span id="chrome-money-line">Money <span id="chrome-money">0</span></span>
@@ -113,7 +125,10 @@
 					<div id="settle-garrison-wrap">
 						<h3>Garrison</h3>
 						<p id="settle-garrison-empty" class="muted">None stationed.</p>
-						<ul id="settle-garrison"></ul>
+						<div id="settle-garrison" class="troop-lane-board"></div>
+						<div id="settle-troop-fleet">
+							<button type="button" id="btn-settle-troop-fleet">Send to fleet</button>
+						</div>
 						<div id="settle-troop-move">
 							<label>Move
 								<select id="settle-troop-def"></select>
@@ -157,6 +172,8 @@
 							<h3>Queue</h3>
 							<p id="settle-queue-empty" class="muted">Empty</p>
 							<ul id="settle-queue"></ul>
+							<button type="button" id="btn-rush-build" hidden>Rush current project</button>
+							<p id="rush-build-hint" class="muted" hidden></p>
 						</div>
 						<div id="settle-catalog">
 							<h3>Build</h3>
@@ -239,6 +256,13 @@
 							<h2>Spies</h2>
 							<p id="spy-skill" class="muted"></p>
 							<p class="muted">Click a spy, then click a lane. Same as jobs: the spy you click and everyone after them in that lane move together. You can only post spies on rivals you can reach by ship.</p>
+							<div id="spy-incite" class="spy-incite" hidden>
+								<label>Incite revolt at
+									<select id="spy-incite-target"></select>
+								</label>
+								<button type="button" id="btn-spy-incite">Incite revolt</button>
+								<p id="spy-incite-cost" class="muted"></p>
+							</div>
 						</div>
 					</div>
 					<div id="spy-board"></div>
@@ -252,14 +276,26 @@
 						</div>
 					</div>
 					<div id="diplo-layout">
-						<ul id="diplo-rivals"></ul>
+						<div id="diplo-rivals-bar">
+							<ul id="diplo-rivals"></ul>
+						</div>
 						<div id="diplo-detail">
 							<div id="diplo-rival-head">
 								<img id="diplo-rival-art" class="settle-culture-art" alt="" hidden>
 								<div>
 									<h3 id="diplo-rival-name">Select an empire</h3>
 									<p id="diplo-rival-meta" class="muted"></p>
-									<p id="diplo-treaties"></p>
+									<div id="diplo-attitude" class="diplo-attitude" hidden>
+										<div class="diplo-attitude-head">
+											<span>Attitude <strong id="diplo-attitude-num">0</strong></span>
+											<span id="diplo-attitude-mood" class="muted"></span>
+										</div>
+										<div class="diplo-attitude-bar" aria-hidden="true">
+											<div id="diplo-attitude-fill" class="diplo-attitude-fill"></div>
+											<div class="diplo-attitude-mid"></div>
+										</div>
+									</div>
+									<p id="diplo-welcome" class="diplo-welcome" hidden></p>
 								</div>
 							</div>
 							<div id="diplo-inbox" hidden>
@@ -269,70 +305,362 @@
 								<button type="button" id="btn-diplo-refuse">Refuse</button>
 							</div>
 							<div id="diplo-actions">
+								<button type="button" id="btn-diplo-report">Report</button>
 								<button type="button" id="btn-diplo-war">Declare war</button>
 							</div>
 							<div id="diplo-deal">
-								<div>
-									<h3>Agreements</h3>
-									<ul id="diplo-pacts"></ul>
-									<div id="diplo-pact-btns">
-										<button type="button" id="btn-diplo-pact-peace">Peace</button>
-										<button type="button" id="btn-diplo-pact-trade">Trade</button>
-										<button type="button" id="btn-diplo-pact-research">Research</button>
-										<button type="button" id="btn-diplo-pact-passage" title="Each side may use the other's colonies as ship bases.">Free passage</button>
-										<button type="button" id="btn-diplo-pact-spies">Stop spying</button>
+								<div id="diplo-proposal">
+									<h3>Propose a deal</h3>
+									<p class="muted">Nothing takes effect until you send the offer and they accept next turn.</p>
+									<div id="diplo-active-treaties">
+										<h4>Active treaties with you</h4>
+										<p id="diplo-treaties"></p>
+									</div>
+									<div id="diplo-outbox" hidden>
+										<h4>Sent offers</h4>
+										<ul id="diplo-outbox-list"></ul>
+									</div>
+									<div id="diplo-pact-proposals">
+										<h4>Treaties to request</h4>
+										<label class="diplo-pact-opt" id="diplo-pact-peace-wrap" hidden>
+											<input type="checkbox" id="diplo-pact-peace" data-pact="peace">
+											<span>Propose peace (end the war)</span>
+										</label>
+										<label class="diplo-pact-opt" id="diplo-pact-trade-wrap">
+											<input type="checkbox" id="diplo-pact-trade" data-pact="trade">
+											<span>Propose mutual trade treaty</span>
+										</label>
+										<label class="diplo-pact-opt" id="diplo-pact-research-wrap">
+											<input type="checkbox" id="diplo-pact-research" data-pact="research">
+											<span>Propose mutual research treaty</span>
+										</label>
+										<label class="diplo-pact-opt" id="diplo-pact-passage-wrap">
+											<input type="checkbox" id="diplo-pact-passage" data-pact="passage">
+											<span>Propose mutual free passage</span>
+										</label>
+										<label class="diplo-pact-opt" id="diplo-pact-spies-wrap">
+											<input type="checkbox" id="diplo-pact-spies" data-pact="stopSpies">
+											<span>Propose mutual spy ban</span>
+										</label>
+										<p id="diplo-pact-none" class="muted" hidden>All treaties are already in force.</p>
+									</div>
+									<div class="diplo-cols">
+										<div class="diplo-col">
+											<h4>You offer</h4>
+											<ul id="diplo-give"></ul>
+										</div>
+										<div class="diplo-col">
+											<h4>You want</h4>
+											<ul id="diplo-want"></ul>
+										</div>
+									</div>
+									<h4>Add assets</h4>
+									<div id="diplo-add">
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Money
+													<input id="diplo-money-n" type="number" min="1" value="10">
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-give-money">Offer</button>
+												<button type="button" id="btn-diplo-want-money">Demand</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Your world
+													<select id="diplo-give-world"></select>
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-give-world-btn">Offer</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Their world
+													<select id="diplo-want-world"></select>
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-want-world-btn">Demand</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Your ship
+													<select id="diplo-give-ship"></select>
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-give-ship-btn">Offer</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Their ship
+													<select id="diplo-want-ship"></select>
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-want-ship-btn">Demand</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Your troops
+													<select id="diplo-give-troop"></select>
+												</label>
+												<label>Count
+													<input id="diplo-give-troop-n" type="number" min="1" value="1">
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-give-troop-btn">Offer</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Their troops
+													<select id="diplo-want-troop"></select>
+												</label>
+												<label>Count
+													<input id="diplo-want-troop-n" type="number" min="1" value="1">
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-want-troop-btn">Demand</button>
+											</div>
+										</div>
+									</div>
+									<p id="diplo-pending-note" class="muted" hidden></p>
+									<div class="diplo-send-row">
+										<button type="button" id="btn-diplo-balance">Balance offer</button>
+										<button type="button" id="btn-diplo-send">Send offer</button>
 									</div>
 								</div>
-								<div class="diplo-cols">
-									<div class="diplo-col">
-										<h3>You offer</h3>
-										<ul id="diplo-give"></ul>
-									</div>
-									<div class="diplo-col">
-										<h3>You want</h3>
-										<ul id="diplo-want"></ul>
-									</div>
-								</div>
-								<div id="diplo-add">
-									<label>Money
-										<input id="diplo-money-n" type="number" min="1" value="10">
-									</label>
-									<button type="button" id="btn-diplo-give-money">Offer money</button>
-									<button type="button" id="btn-diplo-want-money">Demand money</button>
-									<label>Your world
-										<select id="diplo-give-world"></select>
-									</label>
-									<button type="button" id="btn-diplo-give-world-btn">Offer world</button>
-									<label>Their world
-										<select id="diplo-want-world"></select>
-									</label>
-									<button type="button" id="btn-diplo-want-world-btn">Demand world</button>
-									<label>Your ship
-										<select id="diplo-give-ship"></select>
-									</label>
-									<button type="button" id="btn-diplo-give-ship-btn">Offer ship</button>
-									<label>Their ship
-										<select id="diplo-want-ship"></select>
-									</label>
-									<button type="button" id="btn-diplo-want-ship-btn">Demand ship</button>
-									<label>Your troops
-										<select id="diplo-give-troop"></select>
-									</label>
-									<label>Count
-										<input id="diplo-give-troop-n" type="number" min="1" value="1">
-									</label>
-									<button type="button" id="btn-diplo-give-troop-btn">Offer troops</button>
-									<label>Their troops
-										<select id="diplo-want-troop"></select>
-									</label>
-									<label>Count
-										<input id="diplo-want-troop-n" type="number" min="1" value="1">
-									</label>
-									<button type="button" id="btn-diplo-want-troop-btn">Demand troops</button>
-								</div>
-								<button type="button" id="btn-diplo-send">Send offer</button>
 							</div>
 						</div>
+					</div>
+				</div>
+				<div id="stage-combat" hidden>
+					<div id="combat-head">
+						<button type="button" id="btn-back-galaxy-combat">Galaxy</button>
+						<div id="combat-hero" class="combat-hero">
+							<div id="combat-result-icon" class="combat-result-icon" hidden aria-hidden="true"></div>
+							<div id="combat-emblem" class="combat-emblem" aria-hidden="true"></div>
+							<div class="combat-hero-copy">
+								<h2 id="combat-title">Ground combat</h2>
+								<p id="combat-location-line" class="combat-location-line">
+									<button type="button" id="combat-location-link" class="combat-location-link" hidden>Go to battle site</button>
+									<button type="button" id="combat-revolt-link" class="combat-location-link" hidden>View revolt summary</button>
+								</p>
+								<p id="combat-meta" class="muted"></p>
+								<p id="combat-summary"></p>
+							</div>
+						</div>
+					</div>
+					<div id="combat-battlefield" class="combat-battlefield">
+						<div class="combat-col combat-col-attacker">
+							<header id="combat-attacker-banner" class="combat-banner combat-banner-attacker">
+								<div id="combat-attacker-icon" class="combat-side-icon"></div>
+								<div>
+									<h3 id="combat-attacker-head">Attackers</h3>
+									<p id="combat-attacker-ts" class="combat-side-ts muted"></p>
+								</div>
+							</header>
+							<ul id="combat-attacker-forces" class="combat-units"></ul>
+							<section class="combat-losses-panel">
+								<h4>Losses</h4>
+								<ul id="combat-attacker-lost" class="combat-units combat-losses"></ul>
+							</section>
+						</div>
+						<div class="combat-col combat-col-defender">
+							<header id="combat-defender-banner" class="combat-banner combat-banner-defender">
+								<div id="combat-defender-icon" class="combat-side-icon"></div>
+								<div>
+									<h3 id="combat-defender-head">Defenders</h3>
+									<p id="combat-defender-ts" class="combat-side-ts muted"></p>
+								</div>
+							</header>
+							<ul id="combat-defender-forces" class="combat-units"></ul>
+							<section class="combat-losses-panel">
+								<h4>Losses</h4>
+								<ul id="combat-defender-lost" class="combat-units combat-losses"></ul>
+							</section>
+						</div>
+					</div>
+					<section class="combat-rounds-wrap">
+						<h3>Combat rounds <span class="combat-debug-note muted">(temporary debug view)</span></h3>
+						<ul id="combat-rounds" class="combat-rounds"></ul>
+					</section>
+					<section class="combat-effects-wrap">
+						<h3>Other effects</h3>
+						<ul id="combat-effects" class="combat-effects"></ul>
+					</section>
+				</div>
+				<div id="stage-revolt" hidden>
+					<div id="revolt-head">
+						<button type="button" id="btn-back-galaxy-revolt">Galaxy</button>
+						<div class="revolt-hero">
+							<h2 id="revolt-title">Revolt summary</h2>
+							<p id="revolt-meta" class="muted"></p>
+							<p id="revolt-summary"></p>
+							<p class="revolt-actions">
+								<button type="button" id="revolt-location-link" class="combat-location-link" hidden>Go to colony</button>
+								<button type="button" id="revolt-combat-link" class="combat-location-link" hidden>View ground combat report</button>
+							</p>
+						</div>
+					</div>
+					<div class="revolt-grid">
+						<section class="revolt-panel">
+							<h3>Rebel citizens</h3>
+							<ul id="revolt-rebel-pops" class="revolt-lines"></ul>
+						</section>
+						<section class="revolt-panel">
+							<h3>Loyal citizens</h3>
+							<ul id="revolt-loyal-pops" class="revolt-lines"></ul>
+						</section>
+						<section class="revolt-panel revolt-panel-wide">
+							<h3>Militia raised</h3>
+							<p id="revolt-militia" class="muted"></p>
+							<ul id="revolt-militia-units" class="combat-units"></ul>
+						</section>
+						<section class="revolt-panel">
+							<h3>Units that revolted</h3>
+							<ul id="revolt-defected-troops" class="combat-units"></ul>
+						</section>
+						<section class="revolt-panel">
+							<h3>Units that stayed loyal</h3>
+							<ul id="revolt-loyal-troops" class="combat-units"></ul>
+						</section>
+					</div>
+				</div>
+				<div id="stage-space-combat" hidden>
+					<div id="space-combat-head">
+						<button type="button" id="btn-back-galaxy-space">Galaxy</button>
+						<button type="button" id="btn-space-ok" hidden>OK</button>
+						<div>
+							<h2 id="space-combat-title">Space combat</h2>
+							<p id="space-combat-meta" class="muted"></p>
+						</div>
+					</div>
+					<div id="space-combat-layout">
+						<canvas id="space-canvas" width="720" height="480"></canvas>
+						<div id="space-combat-side">
+							<h3>Your force</h3>
+							<ul id="space-ship-list"></ul>
+							<h3>Load</h3>
+							<ul id="space-weapon-list"></ul>
+							<div id="space-combat-actions">
+								<button type="button" id="btn-space-autocombat">Autocombat</button>
+								<button type="button" id="btn-space-retreat">Retreat</button>
+								<button type="button" id="btn-space-end-ship">Done with this ship</button>
+								<button type="button" id="btn-space-end-side">End side</button>
+							</div>
+							<p class="muted">Ships move straight ahead; turning costs 2 speed per 15°. Blue = reachable cells. Select a weapon group for orange range (brighter = enemy targets). Identical weapons fire together; each still rolls its own hit chance. Click an enemy to inspect it. Pan and zoom the grid.</p>
+							<ul id="space-combat-log"></ul>
+						</div>
+					</div>
+					<div id="space-combat-status">
+						<article id="space-status-friendly" class="space-status-card">
+							<canvas id="space-status-friendly-art" class="space-status-art" width="96" height="72"></canvas>
+							<div id="space-status-friendly-stats" class="space-status-stats muted">Select one of your ships.</div>
+							<ul id="space-status-friendly-load" class="space-status-load"></ul>
+						</article>
+						<article id="space-status-enemy" class="space-status-card is-enemy">
+							<ul id="space-status-enemy-load" class="space-status-load"></ul>
+							<div id="space-status-enemy-stats" class="space-status-stats muted">Click an enemy ship to inspect.</div>
+							<canvas id="space-status-enemy-art" class="space-status-art" width="96" height="72"></canvas>
+						</article>
+					</div>
+				</div>
+				<div id="stage-design" hidden>
+					<div id="design-head">
+						<button type="button" id="btn-back-galaxy-design">Galaxy</button>
+						<div>
+							<h2>Ship designs</h2>
+							<p id="design-meta" class="muted"></p>
+						</div>
+					</div>
+					<div id="design-layout">
+						<div>
+							<div id="design-hulls">
+								<button type="button" id="design-hull-cruiser">Cruiser</button>
+								<button type="button" id="design-hull-battleship">Battleship</button>
+								<button type="button" id="design-hull-station">Defense station</button>
+							</div>
+							<h3>Named classes</h3>
+							<ul id="design-class-list"></ul>
+							<div id="design-class-actions">
+								<button type="button" id="btn-design-new">New class</button>
+								<button type="button" id="btn-design-default">Make default</button>
+								<button type="button" id="btn-design-auto">Auto-update</button>
+								<button type="button" id="btn-design-export" hidden>Export</button>
+							</div>
+							<label>Name
+								<input id="design-name-input" type="text" maxlength="32">
+							</label>
+							<canvas id="design-ship-art" class="design-ship-art" width="400" height="220" aria-label="Class silhouette preview" title="Click to cycle silhouette"></canvas>
+							<div id="design-ship-art-controls" class="design-ship-art-controls">
+								<button type="button" id="btn-design-art-prev" aria-label="Previous silhouette">◀</button>
+								<span id="design-ship-art-label" class="muted">Silhouette</span>
+								<button type="button" id="btn-design-art-next" aria-label="Next silhouette">▶</button>
+							</div>
+						</div>
+						<div>
+							<h3>Fitted load</h3>
+							<ul id="design-load-list"></ul>
+						</div>
+						<div>
+							<h3>Add component</h3>
+							<ul id="design-catalog"></ul>
+						</div>
+					</div>
+				</div>
+				<div id="stage-empire-report" hidden>
+					<div id="empire-report-head">
+						<button type="button" id="btn-back-diplomacy-report">Diplomacy</button>
+						<div>
+							<h2 id="empire-report-title">Empire report</h2>
+							<p id="empire-report-meta" class="muted"></p>
+						</div>
+					</div>
+					<div id="empire-report-body">
+						<section class="empire-report-block">
+							<div id="empire-report-identity">
+								<img id="empire-report-art" class="settle-culture-art" alt="" hidden>
+								<div>
+									<div id="empire-report-attitude" class="diplo-attitude" hidden>
+										<div class="diplo-attitude-head">
+											<span>Attitude toward you <strong id="empire-report-attitude-num">0</strong></span>
+											<span id="empire-report-attitude-mood" class="muted"></span>
+										</div>
+										<div class="diplo-attitude-bar" aria-hidden="true">
+											<div id="empire-report-attitude-fill" class="diplo-attitude-fill"></div>
+											<div class="diplo-attitude-mid"></div>
+										</div>
+									</div>
+									<div id="empire-report-threat" class="diplo-threat muted"></div>
+								</div>
+							</div>
+						</section>
+						<section class="empire-report-block">
+							<h3>Research</h3>
+							<ul id="empire-report-techs"></ul>
+							<p id="empire-report-techs-empty" class="muted" hidden>No completed research known.</p>
+						</section>
+						<section class="empire-report-block">
+							<h3>Spies working against you</h3>
+							<div id="empire-report-spies" class="empire-report-spies"></div>
+							<p id="empire-report-spies-empty" class="muted" hidden>None detected.</p>
+						</section>
+						<section class="empire-report-block">
+							<h3>Other contacts</h3>
+							<ul id="empire-report-foreign"></ul>
+							<p id="empire-report-foreign-empty" class="muted" hidden>No other contacted empires.</p>
+						</section>
 					</div>
 				</div>
 				<div id="stage-report" hidden>
@@ -376,13 +704,42 @@
 				<nav id="side-nav">
 					<button type="button" data-stage="galaxy">Galaxy</button>
 					<button type="button" data-panel="todo">Attention</button>
+					<button type="button" data-panel="combat">Combat</button>
 					<button type="button" data-panel="system">System</button>
 					<button type="button" data-stage="research">Research</button>
 					<button type="button" data-stage="spies">Spies</button>
 					<button type="button" data-stage="diplomacy">Diplomacy</button>
 					<button type="button" data-stage="empire">Settlements</button>
+					<button type="button" data-stage="design">Designs</button>
 					<button type="button" data-stage="report">Report</button>
+					<button type="button" data-panel="menu">Menu</button>
 				</nav>
+
+				<div id="panel-menu" class="panel" hidden>
+					<h2>Menu</h2>
+					<div id="menu-actions">
+						<button type="button" id="btn-save-slot">Save</button>
+						<button type="button" id="btn-load-game">Load game</button>
+						<button type="button" id="btn-save-file">Save file</button>
+						<button type="button" id="btn-export-snapshot">Export snapshot</button>
+						<button type="button" id="btn-chrome-new-game">New game</button>
+						<label id="chrome-play-as-wrap" title="Debug: take control of this empire">Play as
+							<select id="chrome-play-as"></select>
+						</label>
+					</div>
+					<p id="chrome-save-status" class="muted" hidden></p>
+				</div>
+
+				<div id="panel-load" class="panel" hidden>
+					<button type="button" id="btn-menu-back">Menu</button>
+					<h2>Load game</h2>
+					<div id="menu-continue" class="save-continue" hidden>
+						<h3>Continue</h3>
+						<ul id="menu-continue-list"></ul>
+					</div>
+					<p id="menu-saves-empty" class="muted">No saved games.</p>
+					<ul id="menu-load-list"></ul>
+				</div>
 
 				<div id="panel-todo" class="panel">
 					<h2>Attention</h2>
@@ -390,9 +747,21 @@
 					<ul id="todo-list"></ul>
 				</div>
 
+				<div id="panel-combat" class="panel" hidden>
+					<h2>Combat</h2>
+					<p id="combat-empty" class="muted">No combats this turn.</p>
+					<ul id="combat-list"></ul>
+				</div>
+
 				<div id="panel-system" class="panel" hidden>
 					<h2 id="system-name">System</h2>
+					<form id="system-rename" class="system-rename" hidden>
+						<input id="system-rename-input" type="text" maxlength="48" aria-label="Star name">
+						<button type="submit" id="btn-system-rename">Rename</button>
+					</form>
 					<p id="system-pos" class="muted"></p>
+					<p id="system-combat-line" class="system-combat-line muted" hidden></p>
+					<button type="button" id="btn-engage-space" hidden>Send to Space</button>
 					<p id="system-survey" class="muted" hidden></p>
 					<ul id="system-bodies"></ul>
 					<h3>Fleets</h3>
@@ -412,14 +781,54 @@
 		<button type="button" id="btn-new-game">New game</button>
 	</div>
 
+	<div id="game-modal" class="game-modal" hidden>
+		<div id="game-modal-card" class="game-modal-card">
+			<p id="game-modal-text"></p>
+			<form id="game-modal-form" class="game-modal-form" hidden>
+				<label id="game-modal-label" for="game-modal-input">Name</label>
+				<input id="game-modal-input" type="text" maxlength="48">
+				<div class="game-modal-actions">
+					<button type="submit" id="game-modal-ok">OK</button>
+					<button type="button" id="game-modal-cancel">Cancel</button>
+				</div>
+			</form>
+		</div>
+	</div>
+	<div id="refit-modal" class="game-modal" hidden>
+		<div id="refit-modal-card" class="game-modal-card refit-modal-card">
+			<h2>Retrofit</h2>
+			<p id="refit-modal-meta" class="muted">Select a ship in orbit, then a design. Refit costs ¼ of a new build. Cancel destroys the ship. Scrap pays hull value.</p>
+			<div class="refit-layout">
+				<div class="refit-col">
+					<h3>Designs</h3>
+					<ul id="refit-design-list"></ul>
+					<p id="refit-design-empty" class="muted">Select a combat hull to see designs.</p>
+				</div>
+				<div class="refit-col">
+					<h3>Ships in orbit</h3>
+					<ul id="refit-ship-list"></ul>
+					<p id="refit-ship-empty" class="muted">No ships here.</p>
+				</div>
+			</div>
+			<div class="refit-actions game-modal-actions">
+				<button type="button" id="btn-refit-build">Build</button>
+				<button type="button" id="btn-refit-scrap">Scrap</button>
+				<button type="button" id="btn-refit-close">Close</button>
+			</div>
+		</div>
+	</div>
+
+	<script src="js/lib/deep-space-background.js"></script>
 	<script src="config/settings/scratch-empire.js"></script>
 	<script src="js/rng.js"></script>
 	<script src="js/query.js"></script>
 	<script src="js/model/effects.js"></script>
 	<script src="js/model/culture.js"></script>
+	<script src="js/model/planetcolor.js"></script>
 	<script src="js/state.js"></script>
 	<script src="js/persistence.js"></script>
 	<script src="js/gen/galaxy.js"></script>
+	<script src="js/gen/polity.js"></script>
 	<script src="js/gen/start.js"></script>
 	<script src="js/model/economy.js"></script>
 	<script src="js/model/food.js"></script>
@@ -427,9 +836,13 @@
 	<script src="js/model/troops.js"></script>
 	<script src="js/model/research.js"></script>
 	<script src="js/model/combat.js"></script>
+	<script src="js/model/groundcombat.js"></script>
 	<script src="js/model/loyalty.js"></script>
 	<script src="js/model/spies.js"></script>
 	<script src="js/model/diplomacy.js"></script>
+	<script src="js/model/shipdesign.js"></script>
+	<script src="js/model/beamweapons.js"></script>
+	<script src="js/model/spacecombat.js"></script>
 	<script src="js/model/construction.js"></script>
 	<script src="js/model/movement.js"></script>
 	<script src="js/model/turn.js"></script>
@@ -442,11 +855,20 @@
 	<script src="js/view/jobs.js"></script>
 	<script src="js/view/spies.js"></script>
 	<script src="js/view/diplomacy.js"></script>
+	<script src="js/view/empirereport.js"></script>
 	<script src="js/view/garrison.js"></script>
 	<script src="js/view/research.js"></script>
 	<script src="js/view/empire.js"></script>
+	<script src="js/view/shipart.js"></script>
 	<script src="js/view/map.js"></script>
+	<script src="js/view/spacebg.js"></script>
+	<script src="js/view/modal.js"></script>
+	<script src="js/view/refit.js"></script>
 	<script src="js/view/report.js"></script>
+	<script src="js/view/combat.js"></script>
+	<script src="js/view/revolt.js"></script>
+	<script src="js/view/spacecombat.js"></script>
+	<script src="js/view/design.js"></script>
 	<script src="js/view/sync.js"></script>
 	<script src="js/boot.js"></script>
 </body>

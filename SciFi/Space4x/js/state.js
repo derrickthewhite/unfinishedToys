@@ -8,6 +8,8 @@ Space4x.emptyUiInteraction = function () {
 		spySel: { ids: [], fromLane: null },
 		spyDrag: null,
 		pendingSpyLane: null,
+		empirePopSel: { settlementId: null, ids: [], fromJob: null },
+		empireTroopSel: { settlementId: null, ids: [] },
 		queueDrag: null
 	};
 };
@@ -34,6 +36,7 @@ Space4x.emptyModifiers = function () {
 		range: 0,
 		commsRange: 0,
 		shipSize: 0,
+		combatSpeed: 0,
 		industryPerPop: 0,
 		researchPerPop: 0,
 		foodPerFarmer: 0,
@@ -41,6 +44,10 @@ Space4x.emptyModifiers = function () {
 		weapon: 0,
 		shield: 0,
 		armor: 0,
+		structure: 0,
+		fighterDamage: 0,
+		fighterRange: 0,
+		fighterStructure: 0,
 		loyalty: 0,
 		spySkill: 0
 	};
@@ -58,12 +65,14 @@ Space4x.createEmpire = function (state, opts) {
 		isPlayer: !!opts.isPlayer,
 		aiId: opts.aiId || null,
 		cultureId: opts.cultureId || Space4x.defaultCultureId(state),
+		colorId: opts.colorId != null ? opts.colorId : null,
 		stockpiles: { money: 0 },
 		transport: { freighters: 0 },
 		modifiers: Space4x.emptyModifiers(),
 		exploredStarIds: [],
 		spies: [],
 		relations: {},
+		shipDesigns: {},
 		research: {
 			model: "category",
 			currentProjectId: null,
@@ -76,11 +85,11 @@ Space4x.createEmpire = function (state, opts) {
 	};
 };
 
-Space4x.createPop = function (state, empire) {
+Space4x.createPop = function (state, empire, cultureId) {
 	return {
 		id: Space4x.nextId(state, "p"),
 		job: "idle",
-		culture: empire && empire.cultureId ? empire.cultureId : Space4x.defaultCultureId(state)
+		culture: cultureId || (empire && empire.cultureId) || Space4x.defaultCultureId(state)
 	};
 };
 
@@ -103,12 +112,40 @@ Space4x.createSettlement = function (state, empireId, starId, bodyId, name, popC
 		growthAcc: 0,
 		lastFoodPresent: 0,
 		lastFoodProduced: 0,
+		foodPresent: 0,
 		lastStarveTurn: null,
 		lastGrowthTurn: null,
 		foodShort: false,
 		starvedThisTurn: 0,
 		loyaltyMods: {}
 	};
+};
+
+Space4x.GALAXY_PRESETS = {
+	standard: { width: 30, height: 30, starCount: 25 },
+	small: { width: 10, height: 10, starCount: 10 },
+	medium: { width: 15, height: 15, starCount: 15 },
+	huge: { width: 40, height: 40, starCount: 35 }
+};
+
+Space4x.matchGalaxyPreset = function (gen) {
+	if (!gen) return "standard";
+	const keys = Object.keys(Space4x.GALAXY_PRESETS);
+	for (let i = 0; i < keys.length; i++) {
+		const p = Space4x.GALAXY_PRESETS[keys[i]];
+		if (gen.width === p.width && gen.height === p.height && gen.starCount === p.starCount) {
+			return keys[i];
+		}
+	}
+	return "custom";
+};
+
+Space4x.applyGalaxyPreset = function (gen, id) {
+	const p = Space4x.GALAXY_PRESETS[id];
+	if (!gen || !p) return;
+	gen.width = p.width;
+	gen.height = p.height;
+	gen.starCount = p.starCount;
 };
 
 Space4x.createInitialState = function () {
@@ -129,7 +166,7 @@ Space4x.createInitialState = function () {
 			autoAssignJobs: false,
 			hideUnvisitedSystems: true,
 			playerCultureId: playerCultureId,
-			opponents: [{ id: "slot-1", aiId: "dumb", enabled: true, cultureId: Space4x.RANDOM_CULTURE }]
+			opponents: [{ id: "slot-1", aiId: "dumb", enabled: true, cultureId: Space4x.RANDOM_CULTURE, colorId: "random" }]
 		},
 		ui: {
 			panel: "todo",
@@ -154,20 +191,34 @@ Space4x.createInitialState = function () {
 			spySel: { ids: [], fromLane: null },
 			spyDrag: null,
 			pendingSpyLane: null,
-			queueDrag: null
+			empirePopSel: { settlementId: null, ids: [], fromJob: null },
+			empireTroopSel: { settlementId: null, ids: [] },
+			queueDrag: null,
+			selectedCombatId: null,
+			selectedRevoltId: null,
+			selectedSpaceBattleId: null,
+			spaceTokenId: null,
+			spaceEnemyTokenId: null,
+			spaceWeaponId: null,
+			spaceCombatAuto: false,
+			designHullId: "cruiser",
+			designId: null
 		},
 		galaxy: { width: 30, height: 30, stars: [] },
 		empires: [],
 		settlements: [],
 		units: [],
 		popMoves: [],
+		pendingInvasions: [],
 		todos: [],
 		turnLog: [],
 		offers: [],
-		turnEvents: { playerShipBuilt: false, playerShipArrived: false, firstContactIds: [], arrivedColonyIds: [], finishedTechName: null, crushedRevolts: [] },
+		turnHold: null,
+		turnEvents: { playerShipBuilt: false, playerShipArrived: false, firstContactIds: [], arrivedColonyIds: [], finishedTechName: null, crushedRevolts: [], revoltSummaries: [], revoltJoins: [], groundCombats: [], spaceBattles: [], spaceLosses: [] },
 		scoreHistory: [],
 		winnerEmpireId: null,
 		autoAssignJobs: false,
-		hideUnvisitedSystems: true
+		hideUnvisitedSystems: true,
+		observerMode: false
 	};
 };

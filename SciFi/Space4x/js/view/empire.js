@@ -1,5 +1,141 @@
 var Space4x = Space4x || {};
 
+Space4x.empirePopSelHas = function (state, popId) {
+	const ids = state && state.ui && state.ui.empirePopSel && state.ui.empirePopSel.ids;
+	if (!ids) return false;
+	for (let i = 0; i < ids.length; i++) if (ids[i] === popId) return true;
+	return false;
+};
+
+Space4x.empireTroopSelHas = function (state, troopId) {
+	const ids = state && state.ui && state.ui.empireTroopSel && state.ui.empireTroopSel.ids;
+	if (!ids) return false;
+	for (let i = 0; i < ids.length; i++) if (ids[i] === troopId) return true;
+	return false;
+};
+
+Space4x.clearEmpirePopSel = function (state) {
+	if (!state || !state.ui) return;
+	state.ui.empirePopSel = { settlementId: null, ids: [], fromJob: null };
+};
+
+Space4x.clearEmpireTroopSel = function (state) {
+	if (!state || !state.ui) return;
+	state.ui.empireTroopSel = { settlementId: null, ids: [] };
+};
+
+Space4x.bindEmpireTransfers = function (app) {
+	const rows = app.ui.empireSettlementRows;
+	if (!rows || rows._empireBound) return;
+	rows._empireBound = true;
+	rows.addEventListener("click", function (ev) {
+		if (app.state.ui.stage !== "empire") return;
+		const player = Space4x.playerEmpire(app.state);
+		if (!player) return;
+		if (ev.target.closest("button")) return;
+
+		const row = ev.target.closest(".empire-row");
+		if (!row) return;
+		const settlementId = row.getAttribute("data-id");
+		const st = Space4x.settlementById(app.state, settlementId);
+		if (!st || st.empireId !== player.id) return;
+
+		Space4x.ensureUiInteraction(app.state);
+		const sel = app.state.ui.empirePopSel;
+		const troopSel = app.state.ui.empireTroopSel;
+
+		const token = ev.target.closest(".empire-row .pop-token");
+		if (token) {
+			ev.stopPropagation();
+			Space4x.clearEmpireTroopSel(app.state);
+			const lane = token.closest(".empire-lane-mini");
+			const lanePops = lane ? lane.querySelectorAll(".pop-token") : [];
+			const ids = [];
+			let after = false;
+			for (let i = 0; i < lanePops.length; i++) {
+				if (lanePops[i] === token) after = true;
+				if (!after) continue;
+				ids.push(lanePops[i].getAttribute("data-pop-id"));
+			}
+			app.state.ui.empirePopSel = {
+				settlementId: settlementId,
+				ids: ids,
+				fromJob: lane ? lane.getAttribute("data-job") : null
+			};
+			app.sync();
+			return;
+		}
+
+		const troopToken = ev.target.closest(".empire-row .troop-glyph-token");
+		if (troopToken) {
+			ev.stopPropagation();
+			Space4x.clearEmpirePopSel(app.state);
+			const troopLane = troopToken.closest(".troop-lane");
+			const tokens = troopLane ? troopLane.querySelectorAll(".troop-glyph-token") : [];
+			const ids = [];
+			let after = false;
+			for (let i = 0; i < tokens.length; i++) {
+				if (tokens[i] === troopToken) after = true;
+				if (!after) continue;
+				ids.push(tokens[i].getAttribute("data-troop-id"));
+			}
+			app.state.ui.empireTroopSel = { settlementId: settlementId, ids: ids };
+			app.sync();
+			return;
+		}
+
+		const lane = ev.target.closest(".empire-lane-mini");
+		if (lane && sel.ids.length && sel.settlementId === settlementId) {
+			const job = lane.getAttribute("data-job");
+			if (job && job !== "money") {
+				if (job !== sel.fromJob) Space4x.setPopJobs(app.state, st, sel.ids, job);
+				Space4x.clearEmpirePopSel(app.state);
+				app.sync();
+			}
+			return;
+		}
+
+		if (troopSel.ids.length && troopSel.settlementId && troopSel.settlementId !== settlementId) {
+			Space4x.queueTroopMoveByIds(app.state, troopSel.settlementId, settlementId, troopSel.ids);
+			Space4x.clearEmpireTroopSel(app.state);
+			app.sync();
+			return;
+		}
+
+		if (sel.ids.length && sel.settlementId && sel.settlementId !== settlementId) {
+			Space4x.queuePopMove(app.state, sel.settlementId, settlementId, sel.ids.length);
+			Space4x.clearEmpirePopSel(app.state);
+			app.sync();
+			return;
+		}
+
+		if (ev.target.closest(".empire-row-lanes") || ev.target.closest(".empire-row-garrison")) {
+			if (troopSel.ids.length && troopSel.settlementId && troopSel.settlementId !== settlementId) {
+				Space4x.queueTroopMoveByIds(app.state, troopSel.settlementId, settlementId, troopSel.ids);
+				Space4x.clearEmpireTroopSel(app.state);
+				app.sync();
+				return;
+			}
+			if (sel.ids.length) Space4x.clearEmpirePopSel(app.state);
+			if (troopSel.ids.length) Space4x.clearEmpireTroopSel(app.state);
+			if (sel.ids.length || troopSel.ids.length) app.sync();
+			return;
+		}
+
+		if (sel.ids.length) {
+			Space4x.clearEmpirePopSel(app.state);
+			app.sync();
+			return;
+		}
+		if (troopSel.ids.length) {
+			Space4x.clearEmpireTroopSel(app.state);
+			app.sync();
+			return;
+		}
+		app.cmds.selectSettlement(settlementId);
+	});
+};
+
 Space4x.syncEmpireMoveCost = function (ui, state) {
 	const player = Space4x.playerEmpire(state);
 	const factor = Space4x.settingOf(state).popMoveFreighterFactor || 5;
@@ -27,13 +163,81 @@ Space4x.syncEmpireMoveCost = function (ui, state) {
 	if (ui.btnEmpireMove) ui.btnEmpireMove.disabled = disabled;
 };
 
+Space4x.syncEmpireSettlementGraphic = function (state, row, st) {
+	const garrisonEl = row.querySelector(".empire-row-garrison");
+	const lanesEl = row.querySelector(".empire-row-lanes");
+	const troopSel = state.ui.empireTroopSel || { ids: [] };
+	Space4x.syncTroopLaneBoard(garrisonEl, state, st, {
+		inline: true,
+		selectedIds: troopSel.settlementId === st.id ? troopSel.ids : [],
+		transferTip: "click to select, then click another colony"
+	});
+
+	const jobs = Space4x.visibleJobs(state, st).filter(function (lane) { return lane.id !== "money"; });
+	const popSel = state.ui.empirePopSel || { settlementId: null, ids: [] };
+	Space4x.syncKeyedList(lanesEl, jobs, function (lane) { return lane.id; },
+		function (lane) {
+			const mini = document.createElement("div");
+			mini.className = "empire-lane-mini";
+			mini.setAttribute("data-job", lane.id);
+			const pops = document.createElement("div");
+			pops.className = "empire-lane-pops";
+			mini.appendChild(pops);
+			return mini;
+		},
+		function (mini, lane) {
+			const color = Space4x.JOB_COLORS[lane.id] || "#888";
+			let title = lane.label;
+			if (lane.cap !== Infinity) title = lane.count + "/" + lane.cap + " " + lane.label;
+			mini.title = title;
+			mini.style.borderBottomColor = color;
+			mini.classList.toggle("is-job-target",
+				popSel.ids.length > 0 && popSel.settlementId === st.id && lane.id !== popSel.fromJob && lane.id !== "money");
+			const popsHere = [];
+			for (let i = 0; i < st.pops.length; i++) {
+				if (st.pops[i].job === lane.id) popsHere.push(st.pops[i]);
+			}
+			const popsBox = mini.querySelector(".empire-lane-pops");
+			Space4x.syncKeyedList(popsBox, popsHere, function (p) { return p.id; },
+				function (pop) {
+					return Space4x.makePopToken(state, pop, lane.id);
+				},
+				function (token, pop) {
+					token.style.borderColor = color;
+					const img = token.querySelector("img");
+					if (img) Space4x.setCultureImg(img, state, pop.culture);
+					token.classList.toggle("is-selected", Space4x.empirePopSelHas(state, pop.id));
+					const who = Space4x.cultureName(state, pop.culture);
+					token.title = (who || "Pop") + " · " + title +
+						" · click to select workers, another lane for jobs, another colony to move";
+				}
+			);
+			Space4x.fitOverlappingRow(popsBox, 0, 4);
+		}
+	);
+};
+
 Space4x.syncEmpireStage = function (ui, state, cmds) {
+	Space4x.ensureUiInteraction(state);
 	const player = Space4x.playerEmpire(state);
-	if (!player) return;
+	if (!player) {
+		Space4x.setText(ui.empireFreighters, "Observer — settlements and transfers are player-only.");
+		Space4x.setText(ui.empireFreighterNote, "");
+		Space4x.setText(ui.empireRivalsStage, "");
+		if (ui.empireSettlementRows) {
+			Space4x.syncKeyedList(ui.empireSettlementRows, [], function () { return ""; },
+				function () { return document.createElement("li"); }, function () {});
+		}
+		if (ui.empireMove) ui.empireMove.hidden = true;
+		return;
+	}
+	if (ui.empireMove) ui.empireMove.hidden = false;
 	const list = Space4x.settlementsOf(state, player.id);
 	const factor = Space4x.settingOf(state).popMoveFreighterFactor || 5;
 	const use = Space4x.empireFreighterUse(state, player.id);
 	const canMove = Math.floor(use.idle / factor);
+	const popSel = state.ui.empirePopSel || { settlementId: null, ids: [] };
+	const troopSel = state.ui.empireTroopSel || { settlementId: null, ids: [] };
 	Space4x.setText(ui.empireFreighters,
 		"Freighters: " + use.owned +
 		" · food last turn: " + use.food +
@@ -41,7 +245,9 @@ Space4x.syncEmpireStage = function (ui, state, cmds) {
 		" · idle: " + use.idle +
 		" (can move " + canMove + " " + Space4x.peopleWord(canMove) + ")"
 	);
-	Space4x.setText(ui.empireFreighterNote, "Food uses the empire pool (not map fleets). Moving people launches freighters on the map — 5 hulls per person. Those hulls stay in the pool as in transit until they arrive. Ground units use 1 hull each.");
+	Space4x.setText(ui.empireFreighterNote,
+		"Click workers to reassign jobs within a colony or move people between colonies. " +
+		"Click troop glyphs in a lane, then click another colony to send them.");
 	const names = [];
 	for (let i = 0; i < state.empires.length; i++) {
 		if (!state.empires[i].isPlayer) {
@@ -56,31 +262,40 @@ Space4x.syncEmpireStage = function (ui, state, cmds) {
 		function () {
 			const li = document.createElement("li");
 			li.className = "empire-row";
+			const top = document.createElement("div");
+			top.className = "empire-row-top";
 			const body = document.createElement("div");
 			body.className = "empire-row-body";
-			const name = document.createElement("div");
+			const head = document.createElement("div");
+			head.className = "empire-row-head";
+			const name = document.createElement("span");
 			name.className = "empire-row-name";
-			const meta = document.createElement("div");
-			meta.className = "empire-row-meta muted";
-			body.appendChild(name);
-			body.appendChild(meta);
+			const meta = document.createElement("span");
+			meta.className = "empire-row-meta";
+			head.appendChild(name);
+			head.appendChild(meta);
+			body.appendChild(head);
 			const open = document.createElement("button");
 			open.type = "button";
 			open.textContent = "Open";
-			li.appendChild(body);
-			li.appendChild(open);
-			function go() {
+			top.appendChild(body);
+			top.appendChild(open);
+			const garrison = document.createElement("div");
+			garrison.className = "empire-row-garrison";
+			const lanes = document.createElement("div");
+			lanes.className = "empire-row-lanes";
+			li.appendChild(top);
+			li.appendChild(lanes);
+			li.appendChild(garrison);
+			open.addEventListener("click", function () {
 				cmds.selectSettlement(li.getAttribute("data-id"));
-			}
-			body.addEventListener("click", go);
-			open.addEventListener("click", go);
+			});
 			return li;
 		},
 		function (row, st) {
-			const star = Space4x.starById(state, st.location.starId);
 			const idle = Space4x.countJob(st, "idle");
 			const n = st.pops.length;
-			row.querySelector(".empire-row-name").textContent = st.name;
+			row.querySelector(".empire-row-name").textContent = Space4x.settlementLabel(state, st);
 			let queue = "queue empty";
 			if (st.buildQueue.length) {
 				const def = Space4x.settingOf(state).builds[st.buildQueue[0].defId];
@@ -90,16 +305,21 @@ Space4x.syncEmpireStage = function (ui, state, cmds) {
 			const rich = Space4x.richnessOf(state, body);
 			const outlook = Space4x.settlementPopOutlook(state, st);
 			row.querySelector(".empire-row-meta").textContent =
-				(star ? star.name : "?") +
-				" · " + (rich && rich.name ? rich.name + " · " : "") +
+				(rich && rich.name ? rich.name + " · " : "") +
 				n + " " + Space4x.peopleWord(n) +
 				(idle ? ", " + idle + " idle" : "") +
-				" · food " + (st.lastFoodPresent || 0) + "/" + n +
+				" · food " + outlook.produced + "/" + outlook.need +
+				" (" + outlook.fed + " fed)" +
 				" · " + Space4x.fmtPercent(Math.abs(outlook.combinedRate)) + "% " +
 				(outlook.netPer < 0 ? "decline" : "growth") +
 				" · industry " + st.industryPool +
 				" · " + queue;
 			row.classList.toggle("is-selected", state.ui.selectedSettlementId === st.id);
+			row.classList.toggle("is-pop-source", popSel.settlementId === st.id && popSel.ids.length > 0);
+			row.classList.toggle("is-troop-source", troopSel.settlementId === st.id && troopSel.ids.length > 0);
+			row.classList.toggle("is-pop-target", popSel.ids.length > 0 && popSel.settlementId && popSel.settlementId !== st.id);
+			row.classList.toggle("is-troop-target", troopSel.ids.length > 0 && troopSel.settlementId && troopSel.settlementId !== st.id);
+			Space4x.syncEmpireSettlementGraphic(state, row, st);
 		}
 	);
 
@@ -108,14 +328,14 @@ Space4x.syncEmpireStage = function (ui, state, cmds) {
 		function () { return document.createElement("option"); },
 		function (opt, st) {
 			opt.value = st.id;
-			opt.textContent = st.name + " (" + st.pops.length + ")";
+			opt.textContent = Space4x.settlementLabel(state, st) + " (" + st.pops.length + ")";
 		}
 	);
 	Space4x.syncKeyedList(ui.empireMoveTo, list, function (s) { return s.id; },
 		function () { return document.createElement("option"); },
 		function (opt, st) {
 			opt.value = st.id;
-			opt.textContent = st.name + " (" + st.pops.length + ")";
+			opt.textContent = Space4x.settlementLabel(state, st) + " (" + st.pops.length + ")";
 		}
 	);
 	if (focus !== ui.empireMoveFrom) {
@@ -165,20 +385,21 @@ Space4x.syncEmpireStage = function (ui, state, cmds) {
 			const from = Space4x.settlementById(state, unit.originSettlementId);
 			const to = Space4x.settlementById(state, unit.destSettlementId);
 			let label;
-			let hulls;
 			if (Space4x.isTroopHauler(state, unit)) {
 				const cargo = unit.cargoTroops || [];
 				label = Space4x.troopCargoLabel(state, cargo);
-				hulls = unit.hulls || cargo.length;
+				if (unit.fleetMode) label += " (fleet)";
 			} else {
 				const n = (unit.cargoPops || []).length;
 				label = n + " " + Space4x.peopleWord(n);
-				hulls = unit.hulls || n * factor;
 			}
+			const hulls = Space4x.unitFreighterHulls(state, unit);
+			const destLabel = unit.fleetMode ? "fleet" : (to ? Space4x.settlementLabel(state, to) : "?");
 			row.querySelector("span").textContent =
 				label +
-				" · " + (from ? from.name : "?") + " → " + (to ? to.name : "?") +
-				" · " + hulls + " freighters · " + Space4x.unitPlaceLabel(state, unit);
+				" · " + hulls + " freighters in use" +
+				" · " + (from ? Space4x.settlementLabel(state, from) : "?") + " → " + destLabel +
+				" · " + Space4x.unitPlaceLabel(state, unit);
 		}
 	);
 };

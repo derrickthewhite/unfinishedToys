@@ -1,5 +1,35 @@
 var Space4x = Space4x || {};
 
+Space4x.researchViewEmpire = function (state) {
+	if (!Space4x.isObserver(state)) return Space4x.playerEmpire(state);
+	if (!state.observerResearch) {
+		const set = Space4x.settingOf(state);
+		const cats = set.categories || [];
+		const techs = set.techs || [];
+		const tier = {};
+		const maxT = Space4x.maxTechTier(state) + 1;
+		for (let i = 0; i < cats.length; i++) tier[cats[i].id] = maxT;
+		const ids = [];
+		for (let i = 0; i < techs.length; i++) ids.push(techs[i].id);
+		state.observerResearch = {
+			id: Space4x.OBSERVER_ID,
+			name: "Observer",
+			isObserverDraft: true,
+			modifiers: Space4x.emptyModifiers(),
+			research: {
+				model: "category",
+				currentProjectId: null,
+				progress: 0,
+				cost: 0,
+				categoryTier: tier,
+				completedTechIds: ids,
+				savedProgress: {}
+			}
+		};
+	}
+	return state.observerResearch;
+};
+
 Space4x.techStatus = function (empire, tech) {
 	if (Space4x.empireHasTech(empire, tech.id)) return "done";
 	const tier = Space4x.categoryTierOf(empire, tech.categoryId);
@@ -24,9 +54,13 @@ Space4x.fillTechDetail = function (ui, state, player, tech, catObj) {
 	}
 	const status = Space4x.techStatus(player, tech);
 	const opts = Space4x.availableTechs(state, player, tech.categoryId);
+	const browsing = !!(player && player.isObserverDraft) || Space4x.isObserver(state);
 	Space4x.setText(ui.researchDetailName, tech.name);
 	let meta = (catObj ? catObj.name : "") + " · tier " + tech.tier + " · cost " + tech.cost + " · " + status;
+	const tags = Space4x.techTags(state, tech);
+	if (tags.length) meta += " · " + tags.join(", ");
 	if (status === "available" && opts.length > 1) meta += " · " + opts.length + " choices at this tier";
+	if (browsing) meta += " · observer browse";
 	Space4x.setText(ui.researchDetailMeta, meta);
 	Space4x.setText(ui.researchDetailSummary, tech.summary || "");
 	if (ui.researchDetailSummary) ui.researchDetailSummary.hidden = !tech.summary;
@@ -48,6 +82,11 @@ Space4x.fillTechDetail = function (ui, state, player, tech, catObj) {
 		ui.researchDetailBlurb.hidden = !(tech.summary || fxItems.length);
 	}
 	if (ui.researchDetailEffects) ui.researchDetailEffects.hidden = !fxItems.length;
+	if (browsing) {
+		ui.btnResearchSelect.disabled = true;
+		Space4x.setText(ui.btnResearchSelect, "Observer — browse only");
+		return;
+	}
 	if (status === "current") {
 		ui.btnResearchSelect.disabled = true;
 		Space4x.setText(ui.btnResearchSelect, "Current project");
@@ -67,20 +106,26 @@ Space4x.fillTechDetail = function (ui, state, player, tech, catObj) {
 };
 
 Space4x.syncResearchStage = function (ui, state, cmds) {
-	const player = Space4x.playerEmpire(state);
+	const player = Space4x.researchViewEmpire(state);
 	if (!player) return;
-	if (!player.research.currentProjectId) {
+	const browsing = !!player.isObserverDraft || Space4x.isObserver(state);
+	if (browsing) {
+		Space4x.setText(ui.researchCurrent, "Observer browse — all techs unlocked for viewing.");
+		if (ui.researchCurrent) ui.researchCurrent.title = "";
+	} else if (!player.research.currentProjectId) {
 		Space4x.setText(ui.researchCurrent, "No project selected.");
 		if (ui.researchCurrent) ui.researchCurrent.title = "";
 	} else {
 		const cur = Space4x.techById(state, player.research.currentProjectId);
 		const pct = cur && cur.cost ? Math.floor(100 * player.research.progress / cur.cost) : 0;
 		let line = "Current: " + cur.name + " — " + player.research.progress + " / " + cur.cost + " (" + pct + "%)";
+		const income = Space4x.researchIncomePreview(state, player);
 		const sci = Space4x.researchTreatyPreview(state, player);
-		if (sci.total) line += " · treaties +" + sci.total + "/turn";
+		if (income.shipTech) line += " · species +" + income.shipTech;
+		if (income.treaties) line += " · treaties +" + income.treaties;
 		if (sci.overlap) line += " (aligned)";
 		Space4x.setText(ui.researchCurrent, line);
-		if (ui.researchCurrent) ui.researchCurrent.title = sci.lines.join("\n");
+		if (ui.researchCurrent) ui.researchCurrent.title = income.lines.join("\n");
 	}
 	const cats = Space4x.settingOf(state).categories;
 	let selected = state.ui.selectedCategoryId;
@@ -142,12 +187,6 @@ Space4x.syncResearchStage = function (ui, state, cmds) {
 		if (!preview && fieldTiers.length) {
 			const last = fieldTiers[fieldTiers.length - 1];
 			preview = last.techs[last.techs.length - 1];
-		}
-	} else {
-		const st = Space4x.techStatus(player, preview);
-		if (st === "done" || st === "skipped") {
-			const avail = Space4x.availableTechs(state, player, selected);
-			if (avail[0]) preview = avail[0];
 		}
 	}
 	const catObj = (function () {

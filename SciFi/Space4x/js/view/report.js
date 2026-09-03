@@ -1,6 +1,42 @@
 var Space4x = Space4x || {};
 
-Space4x.drawScoreChart = function (canvas, history, empires, key) {
+Space4x.reportLineNoise = function (seed, along, axis) {
+	const h = Math.sin(seed * 12.9898 + along * 0.417 + axis * 78.233) * 43758.5453;
+	return (h - Math.floor(h) - 0.5) * 1.6;
+};
+
+Space4x.reportEmpires = function (state) {
+	if (!state.scoreEmpireMeta) state.scoreEmpireMeta = {};
+	const byId = {};
+	const out = [];
+	for (let i = 0; i < state.empires.length; i++) {
+		const e = state.empires[i];
+		byId[e.id] = true;
+		out.push(e);
+		state.scoreEmpireMeta[e.id] = { name: e.name, colorId: e.colorId, isPlayer: !!e.isPlayer };
+	}
+	const history = state.scoreHistory || [];
+	for (let t = 0; t < history.length; t++) {
+		const scores = history[t].scores || {};
+		const ids = Object.keys(scores);
+		for (let i = 0; i < ids.length; i++) {
+			const id = ids[i];
+			if (byId[id]) continue;
+			byId[id] = true;
+			const meta = state.scoreEmpireMeta[id] || {};
+			out.push({
+				id: id,
+				name: meta.name || "Fallen empire",
+				colorId: meta.colorId,
+				isPlayer: !!meta.isPlayer,
+				fallen: true
+			});
+		}
+	}
+	return out;
+};
+
+Space4x.drawScoreChart = function (canvas, history, empires, key, state) {
 	if (!canvas) return;
 	const cssW = canvas.clientWidth || 280;
 	const cssH = canvas.clientHeight || 140;
@@ -45,36 +81,46 @@ Space4x.drawScoreChart = function (canvas, history, empires, key) {
 	for (let e = 0; e < drawOrder.length; e++) {
 		const empire = drawOrder[e];
 		const idx = empires.indexOf(empire);
-		const color = Space4x.EMPIRE_COLORS[idx] || "#fff";
+		const color = state
+			? Space4x.empireColor(state, empire.id)
+			: (Space4x.EMPIRE_COLORS[empire.colorId != null ? empire.colorId : idx] || "#fff");
 		const pts = [];
+		let stopped = false;
 		for (let t = 0; t < history.length; t++) {
 			const row = (history[t].scores || {})[empire.id];
-			if (!row) continue;
+			if (!row) {
+				if (pts.length) stopped = true;
+				continue;
+			}
+			if (stopped) continue;
 			const x = history.length === 1
 				? padX
 				: padX + t * innerW / (history.length - 1);
 			const v = row[key] || 0;
 			const y = padY + innerH - (max > 0 ? (v / max) * innerH : 0);
-			pts.push({ x: x, y: y });
+			pts.push({
+				x: x + Space4x.reportLineNoise(idx + 1, t, 0),
+				y: y + Space4x.reportLineNoise(idx + 1, t, 1)
+			});
 		}
 		if (!pts.length) continue;
 		ctx.strokeStyle = color;
 		ctx.fillStyle = color;
 		ctx.lineWidth = empire.isPlayer ? 2.6 : 2;
+		ctx.lineJoin = "round";
+		ctx.lineCap = "round";
+		ctx.shadowColor = color;
+		ctx.shadowBlur = 0.65;
 		ctx.beginPath();
 		if (pts.length === 1) {
-			ctx.moveTo(padX, pts[0].y);
-			ctx.lineTo(padX + innerW, pts[0].y);
+			ctx.moveTo(pts[0].x, pts[0].y);
+			ctx.lineTo(Math.min(padX + innerW, pts[0].x + 8), pts[0].y);
 		} else {
 			ctx.moveTo(pts[0].x, pts[0].y);
 			for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
 		}
 		ctx.stroke();
-		for (let i = 0; i < pts.length; i++) {
-			ctx.beginPath();
-			ctx.arc(pts[i].x, pts[i].y, empire.isPlayer ? 3 : 2.5, 0, Math.PI * 2);
-			ctx.fill();
-		}
+		ctx.shadowBlur = 0;
 	}
 };
 
@@ -83,8 +129,9 @@ Space4x.syncReportStage = function (ui, state) {
 	if (!state.scoreHistory.length && state.empires && state.empires.length) {
 		Space4x.recordScoreSnapshot(state);
 	}
+	const empires = Space4x.reportEmpires(state);
 	if (ui.reportLegend) {
-		Space4x.syncKeyedList(ui.reportLegend, state.empires, function (e) { return e.id; },
+		Space4x.syncKeyedList(ui.reportLegend, empires, function (e) { return e.id; },
 			function () {
 				const li = document.createElement("li");
 				const swatch = document.createElement("span");
@@ -95,15 +142,15 @@ Space4x.syncReportStage = function (ui, state) {
 				return li;
 			},
 			function (row, empire) {
-				const idx = state.empires.indexOf(empire);
-				row.querySelector(".report-swatch").style.background = Space4x.EMPIRE_COLORS[idx] || "#fff";
-				row.querySelector("span:last-child").textContent = empire.name;
+				row.querySelector(".report-swatch").style.background = Space4x.empireColor(state, empire.id);
+				row.querySelector("span:last-child").textContent =
+					empire.name + (empire.fallen ? " (fallen)" : "");
 			}
 		);
 	}
 	const canvases = ui.reportCharts ? ui.reportCharts.querySelectorAll("canvas") : [];
 	for (let i = 0; i < canvases.length; i++) {
 		const key = canvases[i].getAttribute("data-score");
-		if (key) Space4x.drawScoreChart(canvases[i], state.scoreHistory, state.empires, key);
+		if (key) Space4x.drawScoreChart(canvases[i], state.scoreHistory, empires, key, state);
 	}
 };

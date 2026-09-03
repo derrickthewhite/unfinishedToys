@@ -1,5 +1,16 @@
 var Space4x = Space4x || {};
 
+Space4x.syncCultureBonusList = function (listEl, lines) {
+	if (!listEl) return;
+	while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+	for (let i = 0; i < (lines || []).length; i++) {
+		const li = document.createElement("li");
+		li.textContent = lines[i];
+		listEl.appendChild(li);
+	}
+	listEl.hidden = !lines || !lines.length;
+};
+
 Space4x.syncCultureBlurb = function (uiBits, state, cultureId) {
 	const blurb = Space4x.cultureBlurb(state, cultureId);
 	if (uiBits.art) {
@@ -11,7 +22,8 @@ Space4x.syncCultureBlurb = function (uiBits, state, cultureId) {
 		}
 	}
 	Space4x.setText(uiBits.name, blurb.name);
-	Space4x.setText(uiBits.text, blurb.text);
+	Space4x.setText(uiBits.text, blurb.blurb || "");
+	Space4x.syncCultureBonusList(uiBits.bonuses, blurb.bonuses);
 };
 
 Space4x.syncCulturePicker = function (root, state, selectedId, onPick) {
@@ -54,16 +66,33 @@ Space4x.syncCulturePicker = function (root, state, selectedId, onPick) {
 			const c = item.kind === "random" ? null : Space4x.cultureById(state, item.id);
 			btn.title = item.kind === "random" ?
 				"A species is chosen when the game starts." :
-				item.name + " — " + Space4x.cultureSummary(c);
+				item.name + " — " + Space4x.cultureSummary(state, c);
 			btn.classList.toggle("is-selected", selectedId === item.id);
 		}
 	);
 };
 
+Space4x.pullGenerationForm = function (ui, gen, skipFocused) {
+	const focus = skipFocused ? document.activeElement : null;
+	if (!skipFocused || focus !== ui.genSeed) gen.seed = ui.genSeed.value;
+	if (!skipFocused || focus !== ui.genWidth) gen.width = parseInt(ui.genWidth.value, 10) || 30;
+	if (!skipFocused || focus !== ui.genHeight) gen.height = parseInt(ui.genHeight.value, 10) || 30;
+	if (!skipFocused || focus !== ui.genStars) gen.starCount = parseInt(ui.genStars.value, 10) || 25;
+	if (!skipFocused || focus !== ui.genSetting) gen.settingId = ui.genSetting.value;
+	if (!skipFocused || focus !== ui.genAutoJobs) gen.autoAssignJobs = ui.genAutoJobs.checked;
+	if (ui.genHideUnvisited && (!skipFocused || focus !== ui.genHideUnvisited)) {
+		gen.hideUnvisitedSystems = ui.genHideUnvisited.checked;
+	}
+};
+
 Space4x.syncGeneration = function (ui, state, cmds) {
 	const gen = state.gen;
+	Space4x.pullGenerationForm(ui, gen, true);
 	const focus = document.activeElement;
 	if (focus !== ui.genSeed) ui.genSeed.value = gen.seed;
+	if (ui.genSizePreset && focus !== ui.genSizePreset) {
+		ui.genSizePreset.value = Space4x.matchGalaxyPreset(gen);
+	}
 	if (focus !== ui.genWidth) ui.genWidth.value = String(gen.width);
 	if (focus !== ui.genHeight) ui.genHeight.value = String(gen.height);
 	if (focus !== ui.genStars) ui.genStars.value = String(gen.starCount);
@@ -76,6 +105,7 @@ Space4x.syncGeneration = function (ui, state, cmds) {
 	const cultures = Space4x.culturesOf(state);
 	if (ui.genPlayerSpecies) ui.genPlayerSpecies.hidden = !cultures.length;
 	if (!gen.playerCultureId) gen.playerCultureId = Space4x.RANDOM_CULTURE;
+	Space4x.ensureGenColors(gen);
 	Space4x.syncCulturePicker(ui.genPlayerCultures, state, gen.playerCultureId, function (id) {
 		cmds.setPlayerCulture(id);
 	});
@@ -83,8 +113,20 @@ Space4x.syncGeneration = function (ui, state, cmds) {
 		Space4x.syncCultureBlurb({
 			art: ui.genPlayerBlurbArt,
 			name: ui.genPlayerBlurbName,
-			text: ui.genPlayerBlurbText
+			text: ui.genPlayerBlurbText,
+			bonuses: ui.genPlayerBlurbBonuses
 		}, state, gen.playerCultureId);
+	}
+	const takenColors = {};
+	if (!Space4x.isRandomColor(gen.playerColorId)) takenColors[gen.playerColorId] = "player";
+	for (let i = 0; i < gen.opponents.length; i++) {
+		const cid = gen.opponents[i].colorId;
+		if (!Space4x.isRandomColor(cid)) takenColors[cid] = gen.opponents[i].id;
+	}
+	if (ui.genPlayerColors) {
+		Space4x.syncColorDropdown(ui.genPlayerColors, gen.playerColorId, takenColors, function (colorId) {
+			cmds.setPlayerColor(colorId);
+		});
 	}
 
 	Space4x.syncKeyedList(ui.genOpponents, gen.opponents, function (s) { return s.id; },
@@ -120,14 +162,27 @@ Space4x.syncGeneration = function (ui, state, cmds) {
 			const blurbName = document.createElement("h3");
 			blurbName.className = "gen-blurb-name";
 			const blurbText = document.createElement("p");
-			blurbText.className = "gen-blurb-text muted";
+			blurbText.className = "gen-blurb-text";
+			const blurbBonuses = document.createElement("ul");
+			blurbBonuses.className = "gen-blurb-bonuses muted";
 			blurbCopy.appendChild(blurbName);
 			blurbCopy.appendChild(blurbText);
+			blurbCopy.appendChild(blurbBonuses);
 			blurb.appendChild(blurbArt);
 			blurb.appendChild(blurbCopy);
+			const colors = document.createElement("div");
+			colors.className = "gen-color-block";
+			const colorLab = document.createElement("span");
+			colorLab.className = "gen-color-label";
+			colorLab.textContent = "Map color";
+			const swatches = document.createElement("div");
+			swatches.className = "gen-opp-colors";
+			colors.appendChild(colorLab);
+			colors.appendChild(swatches);
 			li.appendChild(head);
 			li.appendChild(grid);
 			li.appendChild(blurb);
+			li.appendChild(colors);
 			pick.addEventListener("click", function () {
 				cmds.chooseOpponentSpecies(li.getAttribute("data-id"));
 			});
@@ -159,34 +214,48 @@ Space4x.syncGeneration = function (ui, state, cmds) {
 				Space4x.syncCultureBlurb({
 					art: blurb.querySelector(".gen-blurb-art"),
 					name: blurb.querySelector(".gen-blurb-name"),
-					text: blurb.querySelector(".gen-blurb-text")
+					text: blurb.querySelector(".gen-blurb-text"),
+					bonuses: blurb.querySelector(".gen-blurb-bonuses")
 				}, state, slot.cultureId);
+			}
+			const swatches = row.querySelector(".gen-opp-colors");
+			if (swatches) {
+				Space4x.syncColorDropdown(swatches, slot.colorId, takenColors, function (colorId) {
+					cmds.setOpponentColor(row.getAttribute("data-id"), colorId);
+				});
 			}
 		}
 	);
 };
 
-Space4x.syncSaveUi = function (ui, app) {
-	const msg = app.persistMessage || "";
-	function status(node) {
-		if (!node) return;
-		Space4x.setText(node, msg);
-		node.hidden = !msg;
-	}
-	status(ui.genSaveStatus);
-	status(ui.chromeSaveStatus);
-	const autosave = Space4x.readAutosave();
-	if (ui.btnContinue) {
-		ui.btnContinue.hidden = !autosave;
-		if (autosave) {
-			ui.btnContinue.textContent = "Continue · " + (autosave.label || ("Turn " + autosave.turn));
+Space4x.syncAutosaveList = function (wrapEl, listEl, autosaves, cmds) {
+	if (wrapEl) wrapEl.hidden = !autosaves.length;
+	if (!listEl) return;
+	Space4x.syncKeyedList(listEl, autosaves, function (s) { return s.id; },
+		function () {
+			const li = document.createElement("li");
+			li.className = "gen-save-row";
+			const name = document.createElement("span");
+			const load = document.createElement("button");
+			load.type = "button";
+			load.textContent = "Continue";
+			li.appendChild(name);
+			li.appendChild(load);
+			load.addEventListener("click", function () {
+				cmds.continueAutosave(li.getAttribute("data-id"));
+			});
+			return li;
+		},
+		function (row, item) {
+			row.querySelector("span").textContent = item.label || ("Turn " + item.turn);
 		}
-	}
-	if (!ui.genSaveList) return;
-	const slots = Space4x.listSaveSlots();
-	if (ui.genSavesEmpty) ui.genSavesEmpty.hidden = slots.length > 0;
-	const cmds = app.cmds;
-	Space4x.syncKeyedList(ui.genSaveList, slots, function (s) { return s.id; },
+	);
+};
+
+Space4x.syncSaveSlotList = function (listEl, emptyEl, slots, cmds) {
+	if (emptyEl) emptyEl.hidden = slots.length > 0;
+	if (!listEl) return;
+	Space4x.syncKeyedList(listEl, slots, function (s) { return s.id; },
 		function () {
 			const li = document.createElement("li");
 			li.className = "gen-save-row";
@@ -214,6 +283,26 @@ Space4x.syncSaveUi = function (ui, app) {
 	);
 };
 
+Space4x.syncSaveUi = function (ui, app) {
+	const msg = app.persistMessage || "";
+	function status(node) {
+		if (!node) return;
+		Space4x.setText(node, msg);
+		node.hidden = !msg;
+	}
+	status(ui.genSaveStatus);
+	status(ui.chromeSaveStatus);
+	const autosaves = Space4x.listAutosaves();
+	const cmds = app.cmds;
+	Space4x.syncAutosaveList(ui.genContinue, ui.genContinueList, autosaves, cmds);
+	Space4x.syncAutosaveList(ui.menuContinue, ui.menuContinueList, autosaves, cmds);
+	if (ui.btnContinue) ui.btnContinue.hidden = true;
+	if (ui.btnMenuContinue) ui.btnMenuContinue.hidden = true;
+	const slots = Space4x.listSaveSlots();
+	Space4x.syncSaveSlotList(ui.genSaveList, ui.genSavesEmpty, slots, cmds);
+	Space4x.syncSaveSlotList(ui.menuLoadList, ui.menuSavesEmpty, slots, cmds);
+};
+
 Space4x.syncChrome = function (ui, state) {
 	const player = Space4x.playerEmpire(state);
 	Space4x.setText(ui.chromeSetting, Space4x.settingOf(state).name);
@@ -221,7 +310,7 @@ Space4x.syncChrome = function (ui, state) {
 	if (ui.chromePlayAs) {
 		const ids = [];
 		for (let i = 0; i < state.empires.length; i++) ids.push(state.empires[i].id);
-		const key = ids.join(",");
+		const key = ids.join(",") + ":obs";
 		if (ui.chromePlayAs.getAttribute("data-ids") !== key) {
 			while (ui.chromePlayAs.firstChild) ui.chromePlayAs.removeChild(ui.chromePlayAs.firstChild);
 			for (let i = 0; i < state.empires.length; i++) {
@@ -230,11 +319,21 @@ Space4x.syncChrome = function (ui, state) {
 				opt.textContent = state.empires[i].name;
 				ui.chromePlayAs.appendChild(opt);
 			}
+			const obs = document.createElement("option");
+			obs.value = Space4x.OBSERVER_ID;
+			obs.textContent = "Observer";
+			ui.chromePlayAs.appendChild(obs);
 			ui.chromePlayAs.setAttribute("data-ids", key);
 		}
 		if (document.activeElement !== ui.chromePlayAs) {
-			ui.chromePlayAs.value = player ? player.id : "";
+			ui.chromePlayAs.value = state.observerMode ? Space4x.OBSERVER_ID : (player ? player.id : Space4x.OBSERVER_ID);
 		}
+	}
+	if (state.observerMode) {
+		Space4x.setText(ui.chromeMoney, "—");
+		if (ui.chromeMoneyLine) Space4x.setText(ui.chromeMoneyLine, "Observer mode");
+		Space4x.setText(ui.chromeResearch, "Research");
+		return;
 	}
 	if (!player) return;
 	Space4x.setText(ui.chromeMoney, Space4x.fmtMoney(player.stockpiles.money));
@@ -246,18 +345,24 @@ Space4x.syncChrome = function (ui, state) {
 		bits.push("Net " + (f.net >= 0 ? "+" : "") + Space4x.fmtMoney(f.net) + " this turn");
 		ui.chromeMoneyLine.title = bits.join("\n");
 	}
-	const homes = Space4x.settlementsOf(state, player.id);
-	let food = 0;
-	let pops = 0;
-	for (let i = 0; i < homes.length; i++) {
-		food += Space4x.produceSettlement(state, homes[i], player).food;
-		pops += homes[i].pops.length;
+	const food = Space4x.empireFoodSummary(state, player.id);
+	Space4x.setText(ui.chromeFoodProd, food.produced);
+	Space4x.setText(ui.chromeFoodNeed, food.need);
+	if (ui.chromeFoodProd && ui.chromeFoodProd.parentElement) {
+		const bits = [food.fed + " fed this turn"];
+		if (food.imported > 0) bits.push(food.imported + " imported");
+		if (food.surplus > 0) bits.push(food.surplus + " surplus");
+		if (food.deficit > 0) bits.push(food.deficit + " short");
+		ui.chromeFoodProd.parentElement.title = bits.join(" · ");
 	}
-	Space4x.setText(ui.chromeFoodProd, food);
-	Space4x.setText(ui.chromeFoodNeed, pops);
 	const hulls = Space4x.empireFreighterUse(state, player.id);
 	Space4x.setText(ui.chromeFreighters, hulls.owned);
 	Space4x.setText(ui.chromeFreightersUsed, hulls.busy);
+	if (ui.chromeFreighters && ui.chromeFreighters.parentElement) {
+		ui.chromeFreighters.parentElement.title =
+			hulls.busy + " in use (" + hulls.transit + " hauling, " + hulls.food + " food) · " +
+			hulls.idle + " idle · " + hulls.owned + " total";
+	}
 	let researchText = "Research —";
 	if (player.research.currentProjectId) {
 		const tech = Space4x.techById(state, player.research.currentProjectId);
@@ -271,8 +376,8 @@ Space4x.syncChrome = function (ui, state) {
 	Space4x.setText(ui.chromeResearch, researchText);
 	Space4x.setText(ui.chromeTodoCount, state.todos.length);
 	Space4x.setText(ui.btnAutoPlay, state.ui.autoPlaying ? "Pause" : "Auto Play");
-	ui.btnEndTurn.disabled = !!state.winnerEmpireId || Space4x.blockingTodos(state);
-	ui.btnAutoPlay.disabled = !!state.winnerEmpireId || Space4x.blockingTodos(state);
+	ui.btnEndTurn.disabled = !!state.winnerEmpireId || Space4x.blockingTodos(state) || state.turnHold === "afterSpace";
+	ui.btnAutoPlay.disabled = !!state.winnerEmpireId || Space4x.blockingTodos(state) || state.turnHold === "afterSpace";
 };
 
 Space4x.syncPanels = function (ui, state) {
@@ -314,7 +419,12 @@ Space4x.syncStage = function (ui, state) {
 	ui.stageEmpire.hidden = stage !== "empire";
 	if (ui.stageSpies) ui.stageSpies.hidden = stage !== "spies";
 	if (ui.stageDiplomacy) ui.stageDiplomacy.hidden = stage !== "diplomacy";
+	if (ui.stageCombat) ui.stageCombat.hidden = stage !== "combat";
+	if (ui.stageRevolt) ui.stageRevolt.hidden = stage !== "revolt";
+	if (ui.stageSpaceCombat) ui.stageSpaceCombat.hidden = stage !== "spaceCombat";
+	if (ui.stageDesign) ui.stageDesign.hidden = stage !== "design";
 	if (ui.stageReport) ui.stageReport.hidden = stage !== "report";
+	if (ui.stageEmpireReport) ui.stageEmpireReport.hidden = stage !== "empireReport";
 };
 
 Space4x.syncSystem = function (ui, state, cmds) {
@@ -324,6 +434,11 @@ Space4x.syncSystem = function (ui, state, cmds) {
 	if (!star && !picked.length) {
 		Space4x.setText(ui.systemName, "No system selected");
 		Space4x.setText(ui.systemPos, "");
+		if (ui.systemCombatLine) {
+			ui.systemCombatLine.hidden = true;
+			Space4x.setText(ui.systemCombatLine, "");
+		}
+		if (ui.btnEngageSpace) ui.btnEngageSpace.hidden = true;
 		Space4x.syncKeyedList(ui.systemBodies, [], function () { return ""; }, function () { return document.createElement("li"); }, function () {});
 		Space4x.syncFleetList(ui.systemFleets, [], state, cmds);
 		Space4x.setText(ui.systemSelected, "No ship selected.");
@@ -339,14 +454,51 @@ Space4x.syncSystem = function (ui, state, cmds) {
 	if (star) {
 		Space4x.setText(ui.systemName, star.name);
 		Space4x.setText(ui.systemPos, "(" + star.x + ", " + star.y + ")");
+		if (ui.systemRename) {
+			const canRename = player && Space4x.starCanRename(state, player.id, star.id);
+			ui.systemRename.hidden = !canRename;
+			if (canRename && ui.systemRenameInput && document.activeElement !== ui.systemRenameInput) {
+				ui.systemRenameInput.value = star.name;
+			}
+		}
 	} else {
 		Space4x.setText(ui.systemName, "In flight");
 		Space4x.setText(ui.systemPos, "");
+		if (ui.systemRename) ui.systemRename.hidden = true;
 	}
-	const explored = !star ? true : (player ? Space4x.starIsExplored(state, player.id, star.id) : true);
+	const explored = !star ? true : (Space4x.isObserver(state) ? true : (player ? Space4x.starIsExplored(state, player.id, star.id) : true));
 	if (ui.systemSurvey) {
 		ui.systemSurvey.hidden = explored;
 		Space4x.setText(ui.systemSurvey, explored ? "" : "Unexplored. Send a ship here to survey the planets.");
+	}
+	if (star && player && ui.systemCombatLine) {
+		const sit = Space4x.spaceCombatSituation(state, star.id, player.id);
+		const inv = Space4x.invasionSituation(state, star.id, player.id);
+		const lines = [];
+		if (sit.text) lines.push(sit.text);
+		if (inv.text) lines.push(inv.text);
+		const show = lines.length > 0;
+		ui.systemCombatLine.hidden = !show;
+		Space4x.setText(ui.systemCombatLine, lines.join(" "));
+		if (ui.btnEngageSpace) {
+			if (sit.hasOpenBattle) {
+				ui.btnEngageSpace.hidden = false;
+				ui.btnEngageSpace.textContent = "Open battle";
+				ui.btnEngageSpace.disabled = false;
+			} else if (sit.canEngage) {
+				ui.btnEngageSpace.hidden = false;
+				ui.btnEngageSpace.textContent = "Send to Space";
+				ui.btnEngageSpace.disabled = false;
+			} else {
+				ui.btnEngageSpace.hidden = true;
+			}
+		}
+	} else {
+		if (ui.systemCombatLine) {
+			ui.systemCombatLine.hidden = true;
+			Space4x.setText(ui.systemCombatLine, "");
+		}
+		if (ui.btnEngageSpace) ui.btnEngageSpace.hidden = true;
 	}
 	const founderShips = player && star && explored ? Space4x.foundingShipsAtStar(state, player.id, star.id) : [];
 	const bodies = star && explored ? star.bodies : [];
@@ -360,17 +512,30 @@ Space4x.syncSystem = function (ui, state, cmds) {
 			canvas.className = "system-planet";
 			const text = document.createElement("span");
 			text.className = "system-body-text";
+			const actions = document.createElement("div");
+			actions.className = "system-body-actions";
 			const open = document.createElement("button");
 			open.type = "button";
 			open.textContent = "Open";
 			open.className = "btn-open";
+			const invade = document.createElement("button");
+			invade.type = "button";
+			invade.textContent = "Invade";
+			invade.className = "btn-invade";
+			const unload = document.createElement("button");
+			unload.type = "button";
+			unload.textContent = "Unload";
+			unload.className = "btn-unload";
 			const found = document.createElement("button");
 			found.type = "button";
 			found.textContent = "Found";
 			found.className = "btn-found";
 			li.appendChild(canvas);
 			li.appendChild(text);
-			li.appendChild(open);
+			actions.appendChild(open);
+			actions.appendChild(unload);
+			actions.appendChild(invade);
+			li.appendChild(actions);
 			li.appendChild(found);
 			function goSettle() {
 				const home = Space4x.settlementOnBody(state, li.getAttribute("data-id"));
@@ -379,6 +544,12 @@ Space4x.syncSystem = function (ui, state, cmds) {
 			canvas.addEventListener("click", goSettle);
 			text.addEventListener("click", goSettle);
 			open.addEventListener("click", goSettle);
+			invade.addEventListener("click", function () {
+				cmds.invadeSettlement(li.getAttribute("data-id"));
+			});
+			unload.addEventListener("click", function () {
+				cmds.unloadTroops(li.getAttribute("data-id"));
+			});
 			found.addEventListener("click", function () {
 				const here = Space4x.starById(state, state.ui.selectedStarId);
 				const emp = Space4x.playerEmpire(state);
@@ -392,14 +563,21 @@ Space4x.syncSystem = function (ui, state, cmds) {
 		},
 		function (row, body) {
 			const canvas = row.querySelector("canvas");
-			Space4x.drawPlanet(canvas, body);
 			const home = Space4x.settlementOnBody(state, body.id);
+			Space4x.drawPlanet(canvas, body);
+			Space4x.stylePlanetBox(canvas, home ? Space4x.empireColor(state, home.empireId) : null);
 			let extra = "";
 			if (home) {
-				extra = " — " + home.name + " · " + home.pops.length + " " + Space4x.peopleWord(home.pops.length);
+				extra = " — " + Space4x.settlementLabel(state, home) + " · " + home.pops.length + " " + Space4x.peopleWord(home.pops.length);
 			}
-			row.querySelector("span").textContent = body.name + extra + "\n" + Space4x.bodyCaption(body, state);
+			row.querySelector("span").textContent = Space4x.bodyLabel(state, body) + extra + "\n" + Space4x.bodyCaption(body, state);
 			row.querySelector(".btn-open").hidden = !home;
+			const canUnload = !!(player && home && home.empireId === player.id &&
+				Space4x.canUnloadTroopsAtSettlement(state, player.id, home));
+			row.querySelector(".btn-unload").hidden = !canUnload;
+			const canInvade = !!(player && home && home.empireId !== player.id &&
+				Space4x.canInvadeSettlement(state, player.id, home));
+			row.querySelector(".btn-invade").hidden = !canInvade;
 			const legal = star ? Space4x.emptyLegalBodies(state, star, player && player.id) : [];
 			let can = false;
 			for (let i = 0; i < legal.length; i++) if (legal[i].id === body.id) can = true;
@@ -420,7 +598,7 @@ Space4x.syncSystem = function (ui, state, cmds) {
 	const unit = Space4x.unitById(state, state.ui.selectedUnitId);
 	let inspectOnly = picked.length > 0;
 	for (let i = 0; i < picked.length; i++) {
-		if (Space4x.shipCanTakeOrders(state, picked[i])) inspectOnly = false;
+		if (Space4x.playerCanOrderUnit(state, picked[i])) inspectOnly = false;
 	}
 	const inspectNote = inspectOnly ? " Cannot be given orders." : "";
 	if (selectedIds.length > 1) {
@@ -433,14 +611,15 @@ Space4x.syncSystem = function (ui, state, cmds) {
 	} else if (!unit) {
 		Space4x.setText(ui.systemSelected, "No ship selected. Click a fleet on the map or in this list.");
 	} else {
-		const emp = Space4x.empireById(state, unit.empireId);
-		Space4x.setText(ui.systemSelected, "Selected: " + (emp ? emp.name + " " : "") + Space4x.unitLabel(state, unit) + " — " + Space4x.unitPlaceLabel(state, unit) + inspectNote);
+		const place = Space4x.unitPlaceLabel(state, unit);
+		Space4x.setText(ui.systemSelected, "Selected: " + Space4x.unitLabel(state, unit) +
+			(place ? " — " + place : "") + inspectNote);
 	}
 	if (ui.btnDoneShipSelect) ui.btnDoneShipSelect.hidden = !unit && !selectedIds.length;
 	let cancelable = 0;
 	for (let i = 0; i < selectedIds.length; i++) {
 		const u = Space4x.unitById(state, selectedIds[i]);
-		if (u && u.targetStarId && Space4x.shipCanTakeOrders(state, u)) cancelable += 1;
+		if (u && u.targetStarId && Space4x.playerCanOrderUnit(state, u)) cancelable += 1;
 	}
 	if (ui.btnCancelShipOrder) {
 		ui.btnCancelShipOrder.hidden = cancelable === 0;
@@ -449,13 +628,211 @@ Space4x.syncSystem = function (ui, state, cmds) {
 	}
 };
 
+Space4x.makeColonyFlagIcon = function (color) {
+	return Space4x.makeTintedBadgeIcon("assets/ships/colony.svg", color, 22, 22, "fleet-flag-icon");
+};
+
+Space4x.makeScoutBadgeIcon = function (color) {
+	return Space4x.makeTintedBadgeIcon("assets/ships/scout.svg", color, 22, 22, "fleet-scout-icon");
+};
+
+Space4x.makeTintedBadgeIcon = function (path, color, w, h, className) {
+	const canvas = document.createElement("canvas");
+	canvas.className = className || "fleet-badge-art";
+	canvas.width = w || 22;
+	canvas.height = h || 22;
+	canvas.setAttribute("aria-hidden", "true");
+	const tint = color || Space4x.OBSERVER_SHIP_COLOR;
+	const ctx = canvas.getContext("2d");
+	Space4x.ensureShipArt(path, tint);
+	// Cancel ship heading offset so upright badges don't render upside-down.
+	const upright = -(Space4x.SHIP_ART_HEADING_OFFSET || 0);
+	if (!Space4x.drawTintedShipArt(ctx, path, tint, canvas.width / 2, canvas.height / 2,
+		canvas.width * 0.92, canvas.height * 0.92, upright, 1)) {
+		ctx.fillStyle = tint;
+		ctx.beginPath();
+		ctx.arc(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.28, 0, Math.PI * 2);
+		ctx.fill();
+	}
+	return canvas;
+};
+
+Space4x.makeEmpireCultureBadge = function (state, empireId) {
+	const wrap = document.createElement("span");
+	wrap.className = "empire-culture-badge";
+	const emp = Space4x.empireById(state, empireId);
+	const color = Space4x.empireColor(state, empireId) || "#9aa7c2";
+	wrap.style.boxShadow = "0 0 0 2px " + color;
+	wrap.title = emp ? emp.name : "";
+	const img = document.createElement("img");
+	img.alt = "";
+	img.className = "empire-culture-badge-art";
+	if (emp) Space4x.setCultureImg(img, state, emp.cultureId);
+	wrap.appendChild(img);
+	return wrap;
+};
+
+Space4x.makeTintedShipArtIcon = function (state, unit) {
+	const canvas = document.createElement("canvas");
+	canvas.className = "fleet-ship-art";
+	canvas.width = 28;
+	canvas.height = 18;
+	canvas.setAttribute("aria-hidden", "true");
+	const empire = Space4x.empireById(state, unit.empireId);
+	const color = Space4x.empireColor(state, unit.empireId) || Space4x.OBSERVER_SHIP_COLOR;
+	const design = empire && unit.designId
+		? Space4x.designById(empire, unit.defId, unit.designId)
+		: null;
+	const path = Space4x.designShipArtPath(state, unit.defId, design) ||
+		Space4x.hullShipArtPath(state, unit.defId);
+	if (!path) return canvas;
+	Space4x.ensureShipArtLayer(path, color);
+	Space4x.drawTintedShipArt(canvas.getContext("2d"), path, color,
+		canvas.width / 2, canvas.height / 2, canvas.width, canvas.height, 0, 1);
+	return canvas;
+};
+
+Space4x.fleetUnitActivityRank = function (state, unit) {
+	if (!unit) return 99;
+	if (unit.location && unit.location.kind === "space") return 0;
+	if (unit.targetStarId) return 1;
+	const reserved = Space4x.pendingInvasionFleets(state);
+	if (reserved[unit.id]) return 2;
+	if (unit.location && unit.location.kind === "orbit") return 3;
+	if (unit.location && unit.location.kind === "settlement") return 4;
+	return 5;
+};
+
+Space4x.fleetUnitTypeRank = function (state, unit) {
+	if (!unit) return 99;
+	if (Space4x.isCombatHull(state, unit)) {
+		if (unit.defId === "battleship") return 0;
+		if (unit.defId === "cruiser") return 1;
+		return 2;
+	}
+	if (Space4x.unitCanFound(state, unit)) return 3;
+	if (Space4x.isScout(state, unit)) return 4;
+	if (Space4x.isTroopHauler(state, unit)) return 5;
+	if (Space4x.isPopHauler(state, unit)) return 6;
+	return 7;
+};
+
+Space4x.fleetUnitEmpireRank = function (state, unit) {
+	if (!unit) return 99;
+	const player = Space4x.playerEmpire(state);
+	if (player && unit.empireId === player.id) return 0;
+	const emp = Space4x.empireById(state, unit.empireId);
+	if (!emp) return 98;
+	const idx = state.empires.indexOf(emp);
+	return idx >= 0 ? idx + 1 : 50;
+};
+
+Space4x.sortFleetUnits = function (state, units) {
+	const list = (units || []).slice();
+	list.sort(function (a, b) {
+		const ea = Space4x.fleetUnitEmpireRank(state, a);
+		const eb = Space4x.fleetUnitEmpireRank(state, b);
+		if (ea !== eb) return ea - eb;
+		const aa = Space4x.fleetUnitActivityRank(state, a);
+		const ab = Space4x.fleetUnitActivityRank(state, b);
+		if (aa !== ab) return aa - ab;
+		const ta = Space4x.fleetUnitTypeRank(state, a);
+		const tb = Space4x.fleetUnitTypeRank(state, b);
+		if (ta !== tb) return ta - tb;
+		const la = Space4x.unitLabel(state, a);
+		const lb = Space4x.unitLabel(state, b);
+		if (la < lb) return -1;
+		if (la > lb) return 1;
+		return String(a.id).localeCompare(String(b.id));
+	});
+	return list;
+};
+
+Space4x.makeFleetUnitIcon = function (state, unit) {
+	const wrap = document.createElement("span");
+	wrap.className = "fleet-unit-icons";
+	if (!unit) return wrap;
+	const color = Space4x.empireColor(state, unit.empireId) || Space4x.OBSERVER_SHIP_COLOR;
+	if (Space4x.isTroopHauler(state, unit)) {
+		const cargo = unit.cargoTroops || [];
+		if (cargo.length) {
+			const seen = {};
+			let shown = 0;
+			for (let i = 0; i < cargo.length && shown < 3; i++) {
+				const t = cargo[i];
+				const key = Space4x.troopStackId(t.defId, t.culture);
+				if (seen[key]) continue;
+				seen[key] = true;
+				const badge = Space4x.makeTroopBadgeRow(state, {
+					defId: t.defId,
+					culture: t.culture,
+					iconsOnly: true,
+					extraClass: "fleet-troop-badge"
+				});
+				wrap.appendChild(badge);
+				shown += 1;
+			}
+		} else {
+			wrap.appendChild(Space4x.makeTroopGlyph(state, "infantry"));
+		}
+		return wrap;
+	}
+	if (Space4x.isPopHauler(state, unit)) {
+		const cargo = unit.cargoPops || [];
+		const seen = {};
+		let shown = 0;
+		for (let i = 0; i < cargo.length && shown < 3; i++) {
+			const culture = cargo[i].culture;
+			if (!culture || seen[culture]) continue;
+			seen[culture] = true;
+			const img = document.createElement("img");
+			img.className = "fleet-pop-art";
+			img.alt = "";
+			Space4x.setCultureImg(img, state, culture);
+			wrap.appendChild(img);
+			shown += 1;
+		}
+		if (!shown) {
+			const empty = document.createElement("span");
+			empty.className = "fleet-empty-mark";
+			empty.textContent = "◇";
+			empty.style.color = color;
+			wrap.appendChild(empty);
+		}
+		return wrap;
+	}
+	if (Space4x.unitCanFound(state, unit)) {
+		wrap.appendChild(Space4x.makeColonyFlagIcon(color));
+		return wrap;
+	}
+	if (Space4x.isScout(state, unit)) {
+		wrap.appendChild(Space4x.makeScoutBadgeIcon(color));
+		return wrap;
+	}
+	if (Space4x.isCombatHull(state, unit)) {
+		wrap.appendChild(Space4x.makeTintedShipArtIcon(state, unit));
+		return wrap;
+	}
+	return wrap;
+};
+
 Space4x.syncFleetList = function (root, units, state, cmds) {
-	Space4x.syncKeyedList(root, units, function (u) { return u.id; },
+	const ordered = Space4x.sortFleetUnits(state, units);
+	Space4x.syncKeyedList(root, ordered, function (u) { return u.id; },
 		function () {
 			const li = document.createElement("li");
 			li.className = "fleet-row";
 			const btn = document.createElement("button");
 			btn.type = "button";
+			const icons = document.createElement("span");
+			icons.className = "fleet-unit-icons-slot";
+			const owner = document.createElement("span");
+			owner.className = "fleet-unit-owner";
+			const label = document.createElement("span");
+			label.className = "fleet-unit-label";
+			btn.appendChild(icons);
+			btn.appendChild(owner);
+			btn.appendChild(label);
 			li.appendChild(btn);
 			btn.addEventListener("click", function () {
 				cmds.selectUnit(li.getAttribute("data-id"));
@@ -463,8 +840,16 @@ Space4x.syncFleetList = function (root, units, state, cmds) {
 			return li;
 		},
 		function (row, unit) {
-			const emp = Space4x.empireById(state, unit.empireId);
-			row.querySelector("button").textContent = (emp ? emp.name + " · " : "") + Space4x.unitLabel(state, unit) + " — " + Space4x.unitPlaceLabel(state, unit);
+			const slot = row.querySelector(".fleet-unit-icons-slot");
+			while (slot.firstChild) slot.removeChild(slot.firstChild);
+			slot.appendChild(Space4x.makeFleetUnitIcon(state, unit));
+			const owner = row.querySelector(".fleet-unit-owner");
+			while (owner.firstChild) owner.removeChild(owner.firstChild);
+			owner.appendChild(Space4x.makeEmpireCultureBadge(state, unit.empireId));
+			const place = Space4x.unitPlaceLabel(state, unit);
+			row.querySelector(".fleet-unit-label").textContent =
+				Space4x.unitLabel(state, unit) + (place ? " — " + place : "");
+			row.title = Space4x.isTroopHauler(state, unit) ? Space4x.unitLabel(state, unit) : "";
 			row.classList.toggle("is-selected", Space4x.unitIsSelected(state, unit.id));
 		}
 	);
@@ -500,8 +885,7 @@ Space4x.syncSettleInspect = function (ui, state, st, mine) {
 			if (st.buildQueue[i].id === inspect.queueId) item = st.buildQueue[i];
 		}
 		if (item) {
-			const def = Space4x.settingOf(state).builds[item.defId];
-			const cost = Space4x.buildCost(state, st, def);
+			const cost = Space4x.queueItemCost(state, st, item);
 			meta += " · queued " + (item.progress || 0) + "/" + cost;
 			const etas = Space4x.queueBuildEtas(state, st);
 			for (let i = 0; i < st.buildQueue.length; i++) {
@@ -528,8 +912,13 @@ Space4x.syncSettleInspect = function (ui, state, st, mine) {
 	);
 	if (ui.btnSettleInspectQueue) {
 		ui.btnSettleInspectQueue.hidden = false;
-		ui.btnSettleInspectQueue.disabled = !mine || !info.canQueue;
-		Space4x.setText(ui.btnSettleInspectQueue, info.canQueue ? "Add to queue" : "Cannot queue");
+		if (info.openRefit) {
+			ui.btnSettleInspectQueue.disabled = !mine;
+			Space4x.setText(ui.btnSettleInspectQueue, "Open retrofit");
+		} else {
+			ui.btnSettleInspectQueue.disabled = !mine || !info.canQueue;
+			Space4x.setText(ui.btnSettleInspectQueue, info.canQueue ? "Add to queue" : "Cannot queue");
+		}
 	}
 };
 
@@ -554,7 +943,10 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 		if (ui.settleStructuresEmpty) ui.settleStructuresEmpty.hidden = true;
 		if (ui.settleStructures) Space4x.syncKeyedList(ui.settleStructures, [], function () { return ""; }, function () { return document.createElement("li"); }, function () {});
 		Space4x.syncGarrison(ui, state, cmds, null, false);
-		if (ui.settlePlanet) Space4x.drawPlanet(ui.settlePlanet, null);
+		if (ui.settlePlanet) {
+			Space4x.drawPlanet(ui.settlePlanet, null);
+			Space4x.stylePlanetBox(ui.settlePlanet, null);
+		}
 		Space4x.syncJobBoard(ui, state, cmds);
 		Space4x.syncSettleInspect(ui, state, null, false);
 		if (ui.settleBuildStubLine) {
@@ -568,11 +960,18 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 	}
 	const body = Space4x.bodyById(state, st.location.bodyId);
 	const empire = Space4x.empireById(state, st.empireId);
-	Space4x.setText(ui.settleName, st.name);
+	Space4x.setText(ui.settleName, Space4x.settlementLabel(state, st));
 	const cultureLabel = Space4x.settlementCultureLabel(state, st);
-	let meta = body ? body.name + " · " + Space4x.bodyCaption(body, state) : "";
+	let meta = body ? Space4x.bodyLabel(state, body) + " · " + Space4x.bodyCaption(body, state) : "";
 	if (cultureLabel) meta += (meta ? " · " : "") + cultureLabel;
 	if (empire) meta += (meta ? " — " : "") + empire.name;
+	const colorMoney = Space4x.settlementColorMoney(state, st);
+	const colorResearch = Space4x.settlementColorResearch(state, st);
+	if (colorMoney) meta += (meta ? " · " : "") + "+" + Space4x.fmtMoney(colorMoney) + " from rare mine";
+	if (colorResearch) meta += (meta ? " · " : "") + "+" + colorResearch + " research from ruins";
+	else if (body && Space4x.bodyHasColor(body, "ruins")) {
+		meta += (meta ? " · " : "") + "ruins (+1 research per scientist)";
+	}
 	Space4x.setText(ui.settleMeta, meta);
 	if (ui.settleCulture) {
 		const cid = Space4x.majorityCulture(state, st);
@@ -580,11 +979,12 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 		ui.settleCulture.title = cultureLabel;
 	}
 	Space4x.drawPlanet(ui.settlePlanet, body);
+	Space4x.stylePlanetBox(ui.settlePlanet, empire ? Space4x.empireColor(state, empire.id) : null, 4);
 	Space4x.setText(ui.settleIndustry, st.industryPool);
 	Space4x.setText(ui.settlePopLine, st.pops.length + " " + Space4x.peopleWord(st.pops.length));
 	const outlook = Space4x.settlementPopOutlook(state, st);
-	Space4x.setText(ui.settleGrowth, Space4x.popOutlookText(outlook));
-	if (ui.settleGrowth) ui.settleGrowth.title = Space4x.popOutlookTip(outlook);
+	Space4x.setText(ui.settleGrowth, Space4x.popOutlookText(outlook, state));
+	if (ui.settleGrowth) ui.settleGrowth.title = Space4x.popOutlookTip(outlook, state);
 	if (ui.settleLoyalty) {
 		const hasLoyalty = !!Space4x.loyaltyRules(state);
 		ui.settleLoyalty.hidden = !hasLoyalty;
@@ -598,7 +998,7 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 	}
 	const playerNow = Space4x.playerEmpire(state);
 	const mine = playerNow && st.empireId === playerNow.id;
-	if (ui.buildMeta) Space4x.setText(ui.buildMeta, st.name);
+	if (ui.buildMeta) Space4x.setText(ui.buildMeta, Space4x.settlementLabel(state, st));
 	if (ui.btnSettleOpenBuild) ui.btnSettleOpenBuild.disabled = false;
 	if (ui.btnSettleGetSettlers) ui.btnSettleGetSettlers.hidden = !mine;
 	if (ui.settleBuildStubLine) {
@@ -670,8 +1070,8 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 		function (row, item) {
 			const def = Space4x.settingOf(state).builds[item.defId];
 			row.setAttribute("data-def", item.defId);
-			row.querySelector(".q-name").textContent = def ? def.name : item.defId;
-			row.querySelector(".q-prog").textContent = (item.progress || 0) + "/" + Space4x.buildCost(state, st, def);
+			row.querySelector(".q-name").textContent = Space4x.queueItemLabel(state, item);
+			row.querySelector(".q-prog").textContent = (item.progress || 0) + "/" + Space4x.queueItemCost(state, st, item);
 			let idx = 0;
 			for (let i = 0; i < st.buildQueue.length; i++) {
 				if (st.buildQueue[i].id === item.id) idx = i;
@@ -691,18 +1091,38 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 		}
 	);
 	}
+	const front = st.buildQueue[0];
+	const rushQuote = front && mine ? Space4x.rushBuildQuote(state, st, front) : null;
+	if (ui.btnRushBuild) {
+		const showRush = !!(mine && front && rushQuote && !rushQuote.blocked && rushQuote.remain > 0);
+		ui.btnRushBuild.hidden = !showRush;
+		if (showRush) {
+			ui.btnRushBuild.textContent = "Rush for " + Space4x.fmtMoney(rushQuote.cost);
+			ui.btnRushBuild.disabled = (empire.stockpiles.money || 0) < rushQuote.cost;
+			ui.btnRushBuild.title = rushQuote.multiplier + "× remaining industry (" + rushQuote.remain + " left)";
+		}
+	}
+	if (ui.rushBuildHint) {
+		const showHint = !!(mine && front && rushQuote && !rushQuote.blocked && rushQuote.remain > 0);
+		ui.rushBuildHint.hidden = !showHint;
+		if (showHint) {
+			const pct = Math.round((rushQuote.pct || 0) * 100);
+			Space4x.setText(ui.rushBuildHint, "Pays to finish the current project now. Industry workers still work this turn (" + pct + "% done).");
+		}
+	}
 	const builds = Space4x.settingOf(state).builds;
 	const byKind = {};
 	const ids = Object.keys(builds);
 	for (let i = 0; i < ids.length; i++) {
 		const def = builds[ids[i]];
+		if (def.npc) continue;
 		if (def.requireTech && !Space4x.empireHasTech(empire, def.requireTech)) continue;
 		if (def.kind === "structure" && Space4x.countStructure(st, def.id) > 0 && !Space4x.canQueueBuild(state, st, def.id)) continue;
 		if (!byKind[def.kind]) byKind[def.kind] = [];
 		byKind[def.kind].push(def);
 	}
-	const kindOrder = ["structure", "spy", "unit", "abstract", "troop"];
-	const kindLabel = { structure: "Structures", spy: "Spies", unit: "Ships", abstract: "Empire", troop: "Ground" };
+	const kindOrder = ["structure", "spy", "unit", "refit", "stub", "abstract", "troop"];
+	const kindLabel = { structure: "Structures", spy: "Spies", unit: "Ships", refit: "Yard", stub: "Later", abstract: "Empire", troop: "Ground" };
 	const catalog = [];
 	for (let k = 0; k < kindOrder.length; k++) {
 		const group = byKind[kindOrder[k]];
@@ -736,7 +1156,7 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 			}
 			const def = item.def;
 			const btn = row.querySelector("button");
-			let label = def.name + " (" + Space4x.buildCost(state, st, def) + ")";
+			let label = def.kind === "refit" ? def.name : (def.name + " (" + Space4x.buildCost(state, st, def) + ")");
 			if (def.requireStructure && !Space4x.countStructure(st, def.requireStructure)) {
 				label += " · needs " + Space4x.structureName(state, def.requireStructure);
 			}
@@ -748,7 +1168,7 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 		}
 	);
 	Space4x.syncSettleInspect(ui, state, st, mine);
-	const docked = Space4x.unitsDockedAt(state, st.id);
+	const docked = playerNow ? Space4x.fleetsAtSettlement(state, st.id, playerNow.id) : Space4x.unitsDockedAt(state, st.id);
 	ui.settleFleetsEmpty.hidden = docked.length > 0;
 	Space4x.syncFleetList(ui.settleFleets, docked, state, cmds);
 };
@@ -782,6 +1202,12 @@ Space4x.syncUiFromState = function (app) {
 		Space4x.syncEmpireStage(ui, state, app.cmds);
 		Space4x.syncSpyStage(ui, state, app.cmds);
 		Space4x.syncDiplomacyStage(ui, state, app.cmds);
+		if (Space4x.syncEmpireReportStage) Space4x.syncEmpireReportStage(ui, state);
+		Space4x.syncCombatPanel(ui, state, app.cmds);
+		Space4x.syncCombatStage(ui, state, app.cmds);
+		Space4x.syncRevoltStage(ui, state, app.cmds);
+		Space4x.syncSpaceCombatStage(ui, state, app.cmds);
+		Space4x.syncDesignStage(ui, state, app.cmds);
 		Space4x.syncReport(ui, state);
 		Space4x.syncReportStage(ui, state);
 		if (!ui.canvas.hidden) Space4x.drawMap(ui, state);

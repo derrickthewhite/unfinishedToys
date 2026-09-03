@@ -121,6 +121,16 @@ Space4x.applyCultureYield = function (state, settlement, pop, out) {
 	let moneyMult = 1;
 	Space4x.eachCultureEffect(state, pop.culture, function (c, fx) {
 		if (fx.type === "moneyMult") moneyMult *= fx.mult || 1;
+		if (fx.type === "moneyPerPop") out.money += fx.n || 0;
+		if (fx.type === "agriBonusLowWorlds") {
+			if (!Space4x.cultureMatchesJob(fx, pop.job)) return;
+			const potential = body ? Space4x.agriPotential(state, body) : 99;
+			const max = fx.maxPotential != null ? fx.maxPotential : 3;
+			if (potential < max && (pop.job === "agriculture" || pop.job === "greenhouse")) {
+				out.food += fx.n || 0;
+			}
+			return;
+		}
 		if (fx.type !== "jobYield" || !Space4x.cultureMatchesJob(fx, pop.job)) return;
 		if (!Space4x.cultureMatchesBiome(fx, body)) return;
 		const product = spec && spec.product ? spec.product : null;
@@ -155,7 +165,7 @@ Space4x.settlementGrowRate = function (state, settlement, empire) {
 Space4x.cultureTroopTsPct = function (state, cultureId) {
 	let pct = 0;
 	Space4x.eachCultureEffect(state, cultureId, function (c, fx) {
-		if (fx.type === "troopTsPct") pct += fx.pct || 0;
+		if (fx.type === "troopTsPct" || fx.type === "troopArmorPct") pct += fx.pct || 0;
 	});
 	return pct;
 };
@@ -168,6 +178,128 @@ Space4x.cultureJobBonus = function (state, cultureId, job, body) {
 		n += fx.n || 0;
 	});
 	return n;
+};
+
+Space4x.cultureStarvationMult = function (state, cultureId) {
+	let mult = 1;
+	Space4x.eachCultureEffect(state, cultureId, function (c, fx) {
+		if (fx.type === "starvationMult") mult *= fx.mult != null ? fx.mult : 1;
+	});
+	return mult;
+};
+
+Space4x.popStarveRate = function (state, pop) {
+	const base = Space4x.settingOf(state).starvationRatePercent || 0;
+	if (!pop || !pop.culture) return base;
+	return base * Space4x.cultureStarvationMult(state, pop.culture);
+};
+
+Space4x.settlementStarveRate = function (state, settlement) {
+	const pops = settlement && settlement.pops ? settlement.pops : [];
+	if (!pops.length) return Space4x.settingOf(state).starvationRatePercent || 0;
+	let total = 0;
+	for (let i = 0; i < pops.length; i++) total += Space4x.popStarveRate(state, pops[i]);
+	return total / pops.length;
+};
+
+Space4x.categoryById = function (state, categoryId) {
+	const cats = Space4x.settingOf(state).categories || [];
+	for (let i = 0; i < cats.length; i++) if (cats[i].id === categoryId) return cats[i];
+	return null;
+};
+
+Space4x.techHasTag = function (state, tech, tag) {
+	if (!tech || !tag) return false;
+	if (tech.tags) {
+		for (let i = 0; i < tech.tags.length; i++) if (tech.tags[i] === tag) return true;
+	}
+	const cat = Space4x.categoryById(state, tech.categoryId);
+	if (cat && cat.tags) {
+		for (let i = 0; i < cat.tags.length; i++) if (cat.tags[i] === tag) return true;
+	}
+	if (tag === "ship" && Space4x.isShipTechCategory(state, tech.categoryId)) return true;
+	return false;
+};
+
+Space4x.techTags = function (state, tech) {
+	const out = [];
+	const seen = {};
+	function add(tag) {
+		if (!tag || seen[tag]) return;
+		seen[tag] = true;
+		out.push(tag);
+	}
+	if (tech && tech.tags) {
+		for (let i = 0; i < tech.tags.length; i++) add(tech.tags[i]);
+	}
+	const cat = tech ? Space4x.categoryById(state, tech.categoryId) : null;
+	if (cat && cat.tags) {
+		for (let i = 0; i < cat.tags.length; i++) add(cat.tags[i]);
+	}
+	if (tech && Space4x.isShipTechCategory(state, tech.categoryId)) add("ship");
+	return out;
+};
+
+Space4x.isShipTechCategory = function (state, categoryId) {
+	const cat = Space4x.categoryById(state, categoryId);
+	if (cat && cat.tags) {
+		for (let i = 0; i < cat.tags.length; i++) if (cat.tags[i] === "ship") return true;
+	}
+	const cats = Space4x.settingOf(state).shipTechCategories;
+	if (!cats || !cats.length) return false;
+	return cats.indexOf(categoryId) !== -1;
+};
+
+Space4x.cultureResearchPerTaggedTech = function (state, cultureId, tag) {
+	let n = 0;
+	Space4x.eachCultureEffect(state, cultureId, function (c, fx) {
+		if (fx.type === "researchPerTaggedTech" && (fx.tag || "ship") === tag) n += fx.n || 0;
+		if (fx.type === "researchPerShipTech" && tag === "ship") n += fx.n || 0;
+	});
+	return n;
+};
+
+Space4x.cultureResearchPerShipTech = function (state, cultureId) {
+	return Space4x.cultureResearchPerTaggedTech(state, cultureId, "ship");
+};
+
+Space4x.empireTaggedTechResearchBonus = function (state, empire, tag) {
+	if (!empire || !empire.research || !empire.research.currentProjectId) return 0;
+	const tech = Space4x.techById(state, empire.research.currentProjectId);
+	if (!tech || !Space4x.techHasTag(state, tech, tag)) return 0;
+	return Space4x.cultureResearchPerTaggedTech(state, empire.cultureId, tag);
+};
+
+Space4x.empireShipTechResearchBonus = function (state, empire) {
+	return Space4x.empireTaggedTechResearchBonus(state, empire, "ship");
+};
+
+Space4x.researchIncomePreview = function (state, empire) {
+	const lines = [];
+	let scientists = 0;
+	let ruins = 0;
+	if (!empire) return { scientists: 0, ruins: 0, shipTech: 0, treaties: 0, total: 0, lines: lines };
+	const homes = Space4x.settlementsOf(state, empire.id);
+	for (let i = 0; i < homes.length; i++) {
+		scientists += Space4x.produceSettlement(state, homes[i], empire).research;
+		const r = Space4x.settlementColorResearch(state, homes[i]);
+		if (r) {
+			ruins += r;
+			lines.push(homes[i].name + " ruins +" + r);
+		}
+	}
+	const shipTech = Space4x.empireShipTechResearchBonus(state, empire);
+	if (shipTech) lines.push("Species ship-tech bonus +" + shipTech);
+	const sci = Space4x.researchTreatyPreview(state, empire);
+	for (let i = 0; i < sci.lines.length; i++) lines.push(sci.lines[i]);
+	return {
+		scientists: scientists,
+		ruins: ruins,
+		shipTech: shipTech,
+		treaties: sci.total,
+		total: scientists + ruins + shipTech + sci.total,
+		lines: lines
+	};
 };
 
 Space4x.majorityCulture = function (state, settlement) {
@@ -221,8 +353,37 @@ Space4x.nextUnusedCultureId = function (state, gen) {
 	return Space4x.defaultCultureId(state);
 };
 
-Space4x.cultureSummary = function (c) {
-	return c && c.summary ? c.summary : "No special bonus yet.";
+Space4x.cultureBonusLines = function (state, c) {
+	const lines = [];
+	if (!c || !c.effects) return lines;
+	for (let i = 0; i < c.effects.length; i++) {
+		const text = Space4x.describeEffect(state, c.effects[i]);
+		if (text) lines.push(text);
+	}
+	return lines;
+};
+
+Space4x.cultureSummary = function (state, c) {
+	const lines = Space4x.cultureBonusLines(state, c);
+	if (lines.length) return lines.join("; ");
+	if (c && c.summary) return c.summary;
+	return "No special bonus yet.";
+};
+
+Space4x.cultureLoyaltyDelta = function (state, cultureId) {
+	let n = 0;
+	Space4x.eachCultureEffect(state, cultureId, function (c, fx) {
+		if (fx.type === "loyalty") n += fx.n || 0;
+	});
+	return n;
+};
+
+Space4x.cultureNegotiationPct = function (state, cultureId) {
+	let pct = 0;
+	Space4x.eachCultureEffect(state, cultureId, function (c, fx) {
+		if (fx.type === "negotiation") pct += fx.pct || 0;
+	});
+	return pct;
 };
 
 Space4x.cultureBlurb = function (state, cultureId) {
@@ -231,18 +392,20 @@ Space4x.cultureBlurb = function (state, cultureId) {
 			id: Space4x.RANDOM_CULTURE,
 			name: "Random",
 			art: false,
-			text: "A species is chosen when the game starts. Already-picked species are skipped when possible."
+			blurb: "A species is chosen when the game starts. Already-picked species are skipped when possible.",
+			bonuses: []
 		};
 	}
 	const c = Space4x.cultureById(state, cultureId);
 	if (!c) {
-		return { id: cultureId, name: "Species", art: false, text: "" };
+		return { id: cultureId, name: "Species", art: false, blurb: "", bonuses: [] };
 	}
 	return {
 		id: c.id,
 		name: c.name,
 		art: true,
-		text: Space4x.cultureSummary(c)
+		blurb: c.blurb || "",
+		bonuses: Space4x.cultureBonusLines(state, c)
 	};
 };
 

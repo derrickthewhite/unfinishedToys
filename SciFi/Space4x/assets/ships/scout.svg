@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+	<!-- Radar dish + ping arcs (magenta for empire tint) -->
+	<path fill="#ff00ff" d="M12 19.5a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8z"/>
+	<path fill="none" stroke="#ff00ff" stroke-width="1.8" stroke-linecap="round"
+		d="M12 17.2 V12.2"/>
+	<path fill="#ff00ff" d="M8.2 12.4c0-2.1 1.7-3.8 3.8-3.8s3.8 1.7 3.8 3.8H14.2a2.2 2.2 0 0 0-4.4 0z"/>
+	<path fill="none" stroke="#ff00ff" stroke-width="1.6" stroke-linecap="round" opacity="0.85"
+		d="M6.2 11.2a5.8 5.8 0 0 1 11.6 0"/>
+	<path fill="none" stroke="#ff00ff" stroke-width="1.5" stroke-linecap="round" opacity="0.55"
+		d="M4.2 10.4a7.8 7.8 0 0 1 15.6 0"/>
+	<path fill="none" stroke="#ff00ff" stroke-width="1.4" stroke-linecap="round" opacity="0.35"
+		d="M2.6 9.6a9.4 9.4 0 0 1 18.8 0"/>
+</svg>

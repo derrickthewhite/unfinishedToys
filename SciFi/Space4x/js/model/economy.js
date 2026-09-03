@@ -56,6 +56,7 @@ Space4x.jobYield = function (state, settlement, pop, empire) {
 	Space4x.applyCultureYield(state, settlement, pop, out);
 	if (out.food < 0) out.food = 0;
 	if (out.industry < 0) out.industry = 0;
+	if (out.research < 0) out.research = 0;
 	return out;
 };
 
@@ -65,7 +66,8 @@ Space4x.produceSettlement = function (state, settlement, empire) {
 	let research = 0;
 	let money = 0;
 	for (let i = 0; i < settlement.pops.length; i++) {
-		const y = Space4x.jobYield(state, settlement, settlement.pops[i], empire);
+		const pop = settlement.pops[i];
+		const y = Space4x.jobYield(state, settlement, pop, empire);
 		food += y.food;
 		industry += y.industry;
 		research += y.research;
@@ -75,6 +77,15 @@ Space4x.produceSettlement = function (state, settlement, empire) {
 	food += cover.food || 0;
 	industry += cover.industry || 0;
 	research += cover.research || 0;
+	if (Space4x.settlementUnderpoliced(state, settlement)) {
+		const rules = Space4x.loyaltyRules(state);
+		const cut = rules && rules.policeProductionPenalty != null ? rules.policeProductionPenalty : 0.1;
+		const mult = Math.max(0, 1 - cut);
+		food = Math.floor(food * mult);
+		industry = Math.floor(industry * mult);
+		research = Math.floor(research * mult);
+		money = Space4x.moneyRound(money * mult);
+	}
 	return { food: food, industry: industry, research: research, money: money };
 };
 
@@ -269,6 +280,24 @@ Space4x.phaseProduction = function (state) {
 		empire._producedMoney += y.money;
 		empire._pendingResearch += y.research;
 		empire._producedResearch += y.research;
+		const colorMoney = Space4x.settlementColorMoney(state, st);
+		if (colorMoney) {
+			empire.stockpiles.money += colorMoney;
+			empire._producedMoney += colorMoney;
+		}
+		const colorResearch = Space4x.settlementColorResearch(state, st);
+		if (colorResearch) {
+			empire._pendingResearch += colorResearch;
+			empire._producedResearch += colorResearch;
+		}
+	}
+	for (let i = 0; i < state.empires.length; i++) {
+		const empire = state.empires[i];
+		const shipTechBonus = Space4x.empireShipTechResearchBonus(state, empire);
+		if (shipTechBonus) {
+			empire._pendingResearch += shipTechBonus;
+			empire._producedResearch += shipTechBonus;
+		}
 	}
 };
 
@@ -283,6 +312,8 @@ Space4x.structureUpkeep = function (state, settlement) {
 	for (let i = 0; i < settlement.structures.length; i++) {
 		n += Space4x.defUpkeep(state, settlement.structures[i].defId);
 	}
+	const body = Space4x.bodyById(state, settlement.location.bodyId);
+	if (body && body.biome === "toxic") n *= 1.5;
 	return n;
 };
 
@@ -386,15 +417,17 @@ Space4x.assignNewPop = function (state, settlement, pop) {
 	const empire = Space4x.empireById(state, settlement.empireId);
 	const set = Space4x.settingOf(state);
 	const y = Space4x.produceSettlement(state, settlement, empire);
-	const needFood = y.food < settlement.pops.length * set.foodPerPop;
-	if (needFood && Space4x.countJob(settlement, "agriculture") < Space4x.jobCap(state, settlement, "agriculture")) {
+	const foodNeed = settlement.pops.length * (set.foodPerPop || 1);
+	const needMoreFood = y.food < foodNeed;
+	if (needMoreFood && Space4x.countJob(settlement, "agriculture") < Space4x.jobCap(state, settlement, "agriculture")) {
 		pop.job = "agriculture";
 		return;
 	}
-	if (needFood && Space4x.countJob(settlement, "greenhouse") < Space4x.jobCap(state, settlement, "greenhouse")) {
+	if (needMoreFood && Space4x.countJob(settlement, "greenhouse") < Space4x.jobCap(state, settlement, "greenhouse")) {
 		pop.job = "greenhouse";
 		return;
 	}
+	const carefulFood = empire && empire.isPlayer;
 	const order = set.jobOrder || Object.keys(set.jobs);
 	const options = [];
 	for (let i = 0; i < order.length; i++) {
@@ -404,6 +437,8 @@ Space4x.assignNewPop = function (state, settlement, pop) {
 	let bestV = -1;
 	for (let i = 0; i < options.length; i++) {
 		const job = options[i];
+		if (job === "research" && !Space4x.popCanResearch(pop)) continue;
+		if (carefulFood && !needMoreFood && (job === "agriculture" || job === "greenhouse")) continue;
 		const cap = Space4x.jobCap(state, settlement, job);
 		if (Space4x.countJob(settlement, job) >= cap) continue;
 		pop.job = job;
@@ -424,9 +459,12 @@ Space4x.setPopJob = function (state, settlement, popId, job) {
 		if (settlement.pops[i].id === popId) pop = settlement.pops[i];
 	}
 	if (!pop) return false;
+	if (job === "research" && !Space4x.popCanResearch(pop)) return false;
 	if (pop.job === job) return true;
 	const cap = Space4x.jobCap(state, settlement, job);
-	if (job !== "idle" && cap !== Infinity && Space4x.countJob(settlement, job) >= cap) return false;
+	const filling = job !== "idle" && cap !== Infinity &&
+		Space4x.countJob(settlement, job) >= cap;
+	if (filling) return false;
 	pop.job = job;
 	return true;
 };
@@ -478,6 +516,9 @@ Space4x.seedHomeJobs = function (state, settlement) {
 	for (; i < farmers; i++) pops[i].job = "agriculture";
 	for (let n = 0; n < industry && i < pops.length; n++, i++) pops[i].job = "industry";
 	for (let n = 0; n < research && i < pops.length; n++, i++) pops[i].job = "research";
+	for (let p = 0; p < pops.length; p++) {
+		if (pops[p].job === "research" && !Space4x.popCanResearch(pops[p])) pops[p].job = "industry";
+	}
 };
 
 Space4x.enforceJobCaps = function (state, settlement) {
@@ -491,6 +532,13 @@ Space4x.enforceJobCaps = function (state, settlement) {
 		while (Space4x.countJob(settlement, job) > cap) {
 			for (let i = settlement.pops.length - 1; i >= 0; i--) {
 				if (settlement.pops[i].job === job) {
+					if (job === "agriculture") {
+						const ghCap = Space4x.jobCap(state, settlement, "greenhouse");
+						if (ghCap !== Infinity && Space4x.countJob(settlement, "greenhouse") < ghCap) {
+							settlement.pops[i].job = "greenhouse";
+							break;
+						}
+					}
 					settlement.pops[i].job = "idle";
 					break;
 				}

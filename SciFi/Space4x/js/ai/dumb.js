@@ -7,8 +7,7 @@ Space4x.nearestEmptyStar = function (state, empireId, fromStar) {
 		const st = state.galaxy.stars[i];
 		const bodies = Space4x.emptyLegalBodies(state, st, empireId);
 		if (!bodies.length) continue;
-		if (Space4x.starHasEmpireSettlement(state, st.id, empireId)) continue;
-		if (!Space4x.inRangeOfEmpire(state, empireId, st.x, st.y)) continue;
+		if (!Space4x.inRangeOfEmpireAtCell(state, empireId, st.x, st.y)) continue;
 		const d = Space4x.dist(fromStar.x, fromStar.y, st.x, st.y);
 		if (d < bestD) {
 			bestD = d;
@@ -186,21 +185,33 @@ Space4x.aiReachScore = function (state, tech) {
 	return 12 - (soonest - tech.tier);
 };
 
-Space4x.aiPickReachTech = function (state, empire) {
+Space4x.aiAvailableTechPool = function (state, empire) {
+	const pool = [];
 	const cats = Space4x.settingOf(state).categories;
-	let best = null;
-	let bestScore = 0;
 	for (let c = 0; c < cats.length; c++) {
 		const opts = Space4x.availableTechs(state, empire, cats[c].id);
-		for (let i = 0; i < opts.length; i++) {
-			const score = Space4x.aiReachScore(state, opts[i]);
-			if (score > bestScore) {
-				bestScore = score;
-				best = opts[i];
-			}
-		}
+		for (let i = 0; i < opts.length; i++) pool.push(opts[i]);
 	}
-	return best;
+	return pool;
+};
+
+Space4x.aiPickRandomTech = function (state, empire, pool) {
+	const list = pool || Space4x.aiAvailableTechPool(state, empire);
+	if (!list.length) return null;
+	return list[Space4x.rngInt(state, list.length)];
+};
+
+Space4x.aiPickRandomReachTech = function (state, empire) {
+	const opts = Space4x.aiAvailableTechPool(state, empire);
+	const pool = [];
+	for (let i = 0; i < opts.length; i++) {
+		if (Space4x.aiReachScore(state, opts[i]) > 0) pool.push(opts[i]);
+	}
+	return Space4x.aiPickRandomTech(state, empire, pool);
+};
+
+Space4x.aiPickReachTech = function (state, empire) {
+	return Space4x.aiPickRandomReachTech(state, empire);
 };
 
 Space4x.aiPickResearch = function (state, empire, stuck) {
@@ -234,12 +245,7 @@ Space4x.aiPickResearch = function (state, empire, stuck) {
 			if (opts[o].id === prefer[p]) return opts[o];
 		}
 	}
-	const cats = Space4x.settingOf(state).categories;
-	for (let i = 0; i < cats.length; i++) {
-		const tech = Space4x.availableTech(state, empire, cats[i].id);
-		if (tech) return tech;
-	}
-	return null;
+	return Space4x.aiPickRandomTech(state, empire);
 };
 
 Space4x.dumbChoose = function (state, empireId) {
@@ -247,6 +253,10 @@ Space4x.dumbChoose = function (state, empireId) {
 	Space4x.dumbDiplomacy(state, empire);
 	Space4x.autoAssignJobs(state, empireId);
 	Space4x.ensureAiResearch(state, empireId);
+	Space4x.ensureEmpireDesigns(state, empire);
+	Space4x.autoUpdateDesign(state, empire, "cruiser");
+	Space4x.autoUpdateDesign(state, empire, "battleship");
+	Space4x.autoUpdateDesign(state, empire, "defenseStation");
 	const canColonize = Space4x.aiHasColonizeTarget(state, empire);
 	const pick = Space4x.aiPickResearch(state, empire, !canColonize);
 	if (pick) Space4x.setResearchProject(state, empireId, pick.id);
@@ -270,15 +280,37 @@ Space4x.dumbChoose = function (state, empireId) {
 		}
 		if (canColonize && Space4x.canQueueBuild(state, st, "colonyShip")) {
 			Space4x.queueBuild(state, st.id, "colonyShip");
+			continue;
+		}
+		if (Space4x.countStructure(st, "spaceDock") && Space4x.canQueueBuild(state, st, "defenseStation") &&
+			Space4x.combatShipsAtStar(state, empireId, st.location.starId).filter(function (u) {
+				return Space4x.isStationHull(state, u);
+			}).length < 1 && Space4x.rngInt(state, 100) < 35) {
+			Space4x.queueBuild(state, st.id, "defenseStation");
+			continue;
+		}
+		if (Space4x.countStructure(st, "spaceDock") && Space4x.canQueueBuild(state, st, "cruiser")) {
+			Space4x.queueBuild(state, st.id, "cruiser");
+			continue;
+		}
+		if (Space4x.aiAtWar(state, empire) && Space4x.canQueueBuild(state, st, "infantry")) {
+			const troops = (st.troops || []).length;
+			if (troops < Math.max(4, Math.floor(st.pops.length / 2))) {
+				Space4x.queueBuild(state, st.id, "infantry");
+			}
 		}
 	}
 	Space4x.aiSendSettlers(state, empireId);
+	Space4x.aiMoveCombatFleets(state, empireId);
+	Space4x.aiMoveTroopFleets(state, empireId);
+	Space4x.aiOrderInvasions(state, empireId);
 	for (let u = 0; u < state.units.length; u++) {
 		const unit = state.units[u];
 		if (unit.empireId !== empireId || !Space4x.unitCanFound(state, unit)) continue;
 		if (unit.targetStarId) continue;
+		const pos = Space4x.unitRangePos(unit);
 		const here = Space4x.starAt(state, unit.location.x, unit.location.y) ||
-			Space4x.nearestFriendlyStar(state, empireId, unit.location.x, unit.location.y);
+			Space4x.nearestFriendlyStar(state, empireId, pos.x, pos.y);
 		if (!here) continue;
 		const local = Space4x.emptyLegalBodies(state, here, empireId);
 		if (local.length) {
@@ -288,6 +320,178 @@ Space4x.dumbChoose = function (state, empireId) {
 		const dest = Space4x.nearestEmptyStar(state, empireId, here);
 		if (dest && dest.id !== here.id && Space4x.canLeaveSystem(state, empire, here.id, dest.id)) {
 			unit.targetStarId = dest.id;
+			if (unit.location.kind === "settlement") {
+				unit.location.kind = "orbit";
+				unit.location.settlementId = null;
+			}
 		}
+	}
+};
+
+Space4x.aiAtWar = function (state, empire) {
+	if (!empire) return false;
+	for (let i = 0; i < state.empires.length; i++) {
+		if (state.empires[i].id === empire.id) continue;
+		if (Space4x.atWar(empire, state.empires[i].id)) return true;
+	}
+	return false;
+};
+
+Space4x.aiWarTargets = function (state, empire) {
+	const out = [];
+	if (!empire) return out;
+	for (let i = 0; i < state.empires.length; i++) {
+		const them = state.empires[i];
+		if (them.id === empire.id) continue;
+		if (!Space4x.atWar(empire, them.id)) continue;
+		out.push(them);
+	}
+	return out;
+};
+
+Space4x.aiEnemyStars = function (state, empire) {
+	const wars = Space4x.aiWarTargets(state, empire);
+	const out = [];
+	const seen = {};
+	for (let w = 0; w < wars.length; w++) {
+		const homes = Space4x.settlementsOf(state, wars[w].id);
+		for (let i = 0; i < homes.length; i++) {
+			const starId = homes[i].location.starId;
+			if (seen[starId]) continue;
+			seen[starId] = true;
+			const star = Space4x.starById(state, starId);
+			if (star) out.push({ star: star, empire: wars[w], settlement: homes[i] });
+		}
+	}
+	return out;
+};
+
+Space4x.aiLocalCombatLoad = function (state, empireId, starId) {
+	const ships = Space4x.combatShipsAtStar(state, empireId, starId);
+	let n = 0;
+	for (let i = 0; i < ships.length; i++) n += Space4x.unitFleetLoad(state, ships[i]);
+	return n;
+};
+
+Space4x.aiPickCombatDestination = function (state, empire, fromStar) {
+	const targets = Space4x.aiEnemyStars(state, empire);
+	if (!targets.length || !fromStar) return null;
+	let best = null;
+	let bestScore = -Infinity;
+	for (let i = 0; i < targets.length; i++) {
+		const t = targets[i];
+		if (!Space4x.inRangeOfEmpireAtCell(state, empire.id, t.star.x, t.star.y)) continue;
+		if (!Space4x.canLeaveSystem(state, empire, fromStar.id, t.star.id)) continue;
+		const theirs = Space4x.aiLocalCombatLoad(state, t.empire.id, t.star.id);
+		const mineThere = Space4x.aiLocalCombatLoad(state, empire.id, t.star.id);
+		const dist = Space4x.dist(fromStar.x, fromStar.y, t.star.x, t.star.y);
+		const threat = Space4x.threatAssessment(state, empire, t.empire);
+		let score = 40 - theirs + mineThere * 0.5 - dist * 2;
+		if (threat.ratio >= 1) score += 20;
+		if (t.star.id === fromStar.id) score -= 5;
+		if (score > bestScore) {
+			bestScore = score;
+			best = t.star;
+		}
+	}
+	return best;
+};
+
+Space4x.aiMoveCombatFleets = function (state, empireId) {
+	const empire = Space4x.empireById(state, empireId);
+	if (!empire || !Space4x.aiAtWar(state, empire)) return;
+	for (let i = 0; i < state.units.length; i++) {
+		const unit = state.units[i];
+		if (unit.empireId !== empireId) continue;
+		if (!Space4x.isCombatHull(state, unit)) continue;
+		if (Space4x.isStationHull(state, unit)) continue;
+		if (!Space4x.shipCanTakeOrders(state, unit)) continue;
+		if (unit.targetStarId) continue;
+		const hereId = Space4x.unitStarId(state, unit);
+		const here = hereId ? Space4x.starById(state, hereId) : null;
+		if (!here) continue;
+		const localEnemy = Space4x.enemyCombatShipsAtStar(state, empireId, here.id);
+		if (localEnemy.length) continue;
+		const dest = Space4x.aiPickCombatDestination(state, empire, here);
+		if (!dest || dest.id === here.id) continue;
+		Space4x.setShipTarget(state, unit.id, dest.id);
+	}
+};
+
+Space4x.aiSpareInvasionTroops = function (state, settlement) {
+	if (!settlement || !settlement.troops) return [];
+	const keep = Math.max(1, Math.floor(settlement.pops.length / 5));
+	const defensive = [];
+	const offensive = [];
+	for (let i = 0; i < settlement.troops.length; i++) {
+		const t = settlement.troops[i];
+		if (t.defId === "police" || t.defId === "militia") defensive.push(t.id);
+		else offensive.push(t.id);
+	}
+	const spareDef = defensive.length > keep ? defensive.slice(keep) : [];
+	return offensive.concat(spareDef);
+};
+
+Space4x.aiMoveTroopFleets = function (state, empireId) {
+	const empire = Space4x.empireById(state, empireId);
+	if (!empire || !Space4x.aiAtWar(state, empire)) return;
+	const homes = Space4x.settlementsOf(state, empireId);
+	for (let i = 0; i < homes.length; i++) {
+		const st = homes[i];
+		const spareIds = Space4x.aiSpareInvasionTroops(state, st);
+		if (spareIds.length < 2) continue;
+		if ((empire.transport.freighters || 0) < 2) break;
+		Space4x.queueTroopFleetByIds(state, st.id, spareIds.slice(0, Math.min(8, spareIds.length)));
+	}
+	const reserved = Space4x.pendingInvasionFleets(state, empireId);
+	const targets = Space4x.aiEnemyStars(state, empire);
+	for (let i = 0; i < state.units.length; i++) {
+		const unit = state.units[i];
+		if (unit.empireId !== empireId || !unit.fleetMode) continue;
+		if (reserved[unit.id]) continue;
+		if (!(unit.cargoTroops || []).length) continue;
+		if (unit.targetStarId) continue;
+		const hereId = Space4x.unitStarId(state, unit);
+		const here = hereId ? Space4x.starById(state, hereId) : null;
+		if (!here) continue;
+		let best = null;
+		let bestD = Infinity;
+		for (let t = 0; t < targets.length; t++) {
+			const star = targets[t].star;
+			if (!Space4x.canLeaveSystem(state, empire, here.id, star.id)) continue;
+			if (!Space4x.inRangeOfEmpireAtCell(state, empireId, star.x, star.y)) continue;
+			const enemyShips = Space4x.enemyCombatShipsAtStar(state, empireId, star.id).length;
+			const d = Space4x.dist(here.x, here.y, star.x, star.y) + enemyShips * 8;
+			if (d < bestD) {
+				bestD = d;
+				best = star;
+			}
+		}
+		if (best && best.id !== here.id) Space4x.setShipTarget(state, unit.id, best.id);
+	}
+};
+
+Space4x.aiOrderInvasions = function (state, empireId) {
+	const empire = Space4x.empireById(state, empireId);
+	if (!empire || !Space4x.aiAtWar(state, empire)) return;
+	const cfg = Space4x.aiCfg(state);
+	const need = cfg.invadeStrengthRatio != null ? cfg.invadeStrengthRatio : 1.1;
+	const targets = Space4x.aiEnemyStars(state, empire);
+	for (let i = 0; i < targets.length; i++) {
+		const st = targets[i].settlement;
+		const them = targets[i].empire;
+		if (Space4x.hasPendingInvasion(state, st.id)) continue;
+		const threat = Space4x.threatAssessment(state, empire, them);
+		if (threat.ratio < need) continue;
+		if (Space4x.enemyCombatShipsAtStar(state, empireId, st.location.starId).length) continue;
+		const fleets = Space4x.invasionFleetsForSettlement(state, empireId, st);
+		if (!fleets.length) continue;
+		const atkTs = Space4x.troopListTs(state, empire, fleets.reduce(function (all, u) {
+			return all.concat(u.cargoTroops || []);
+		}, []));
+		const defTs = Space4x.troopListTs(state, them, st.troops || []);
+		if (atkTs < defTs * 0.9) continue;
+		const ids = fleets.map(function (u) { return u.id; });
+		Space4x.queueInvasion(state, ids, st.id);
 	}
 };

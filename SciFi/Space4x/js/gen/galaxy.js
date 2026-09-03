@@ -47,7 +47,7 @@ Space4x.rollBody = function (state, set, index) {
 	const roll = set.bodyKinds[Space4x.rngInt(state, set.bodyKinds.length)];
 	const body = {
 		id: Space4x.nextId(state, "b"),
-		name: "Body " + (index + 1),
+		name: Space4x.toRoman(index + 1),
 		kind: "rocky",
 		size: null,
 		biome: null,
@@ -55,27 +55,25 @@ Space4x.rollBody = function (state, set, index) {
 	};
 	if (roll === "gasGiant") {
 		body.kind = "gasGiant";
-		body.name = "Gas giant";
 		body.settlePrerequisite = "gasGiantTech";
 		return body;
 	}
 	if (roll === "asteroidBelt") {
 		body.kind = "asteroidBelt";
-		body.name = "Asteroid belt";
 		body.richness = Space4x.rollRichness(state, set.asteroidRichness || set.richness);
 		body.settlePrerequisite = "wp2ag";
+		Space4x.rollPlanetColors(state, body);
 		return body;
 	}
 	body.size = roll;
 	if (roll === "tiny") {
 		body.biome = "barren";
 		body.richness = Space4x.rollRichness(state, set.richness);
-		body.name = "Tiny barren";
 		return body;
 	}
 	body.biome = set.biomes[Space4x.rngInt(state, set.biomes.length)];
 	body.richness = Space4x.rollRichness(state, set.richness);
-	body.name = Space4x.titleCase(body.size) + " " + Space4x.titleCase(body.biome);
+	Space4x.rollPlanetColors(state, body);
 	return body;
 };
 
@@ -108,7 +106,7 @@ Space4x.ensureMediumGarden = function (state, star) {
 	}
 	const body = {
 		id: Space4x.nextId(state, "b"),
-		name: "Medium Garden",
+		name: Space4x.toRoman(star.bodies.length + 1),
 		kind: "rocky",
 		size: "medium",
 		biome: "garden",

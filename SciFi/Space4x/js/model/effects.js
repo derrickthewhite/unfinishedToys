@@ -229,11 +229,41 @@ Space4x.describeEffect = function (state, fx) {
 	if (fx.type === "range") return "+" + n + " ship range from friendly colonies";
 	if (fx.type === "commsRange") return "+" + n + " contact range beyond ship range";
 	if (fx.type === "industryPerPop") return "+" + n + " industry per industry worker";
-	if (fx.type === "researchPerPop") return "+" + n + " research per scientist";
+	if (fx.type === "researchPerPop") return (n > 0 ? "+" : "") + n + " research per scientist.";
 	if (fx.type === "foodPerFarmer") return "+" + n + " food per farmer";
 	if (fx.type === "growthRatePercent") return "+" + n + "% population growth";
-	if (fx.type === "loyalty") return "+" + n + " population loyalty";
-	if (fx.type === "spySkill") return "+" + n + " spy skill";
+	if (fx.type === "growthBase") {
+		const def = state ? (Space4x.settingOf(state).growthRatePercent || 5) : 5;
+		return "Fed pops grow at " + (fx.n || 0) + "% instead of " + def + "%.";
+	}
+	if (fx.type === "moneyMult") return "Working pops earn " + (fx.mult || 1) + "× money.";
+	if (fx.type === "moneyPerPop") return "+" + (fx.n || 0) + " money per working pop.";
+	if (fx.type === "starvationMult") {
+		const mult = fx.mult != null ? fx.mult : 1;
+		if (mult === 0.5) return "Starve at half the normal rate.";
+		return "Starvation rate ×" + mult + ".";
+	}
+	if (fx.type === "researchPerShipTech" || fx.type === "researchPerTaggedTech") {
+		const tag = fx.tag || "ship";
+		const label = tag === "ship" ? "ship" : tag === "groundCombat" ? "ground-combat" : tag;
+		return "+" + (fx.n || 0) + " research while researching " + label + " tech.";
+	}
+	if (fx.type === "firstBuildDiscount") return "First structure on each world costs less (coming soon).";
+	if (fx.type === "squidlingBonus") return "Deep-ocean farming and espionage bonuses (coming soon).";
+	if (fx.type === "troopTsPct") return (fx.pct > 0 ? "+" : "") + (fx.pct || 0) + "% troop strength.";
+	if (fx.type === "negotiation") {
+		const pct = fx.pct || 0;
+		if (pct > 0) return "+" + pct + "% attitude gains from others; −" + pct + "% attitude losses.";
+		if (pct < 0) return "−" + (-pct) + "% attitude gains from others; +" + (-pct) + "% attitude losses.";
+		return "";
+	}
+	if (fx.type === "spySkill") return (n > 0 ? "+" : "") + n + " spy skill";
+	if (fx.type === "agriBonusLowWorlds") {
+		const max = fx.maxPotential != null ? fx.maxPotential : 3;
+		return "+" + (fx.n || 0) + " food per farmer on worlds with fewer than " + max + " agriculture slots.";
+	}
+	if (fx.type === "shipBonus") return "Ship bonuses (coming soon).";
+	if (fx.type === "loyalty") return (n > 0 ? "+" : "") + n + " population loyalty";
 	if (fx.type === "militiaAsPolice") {
 		const who = fx.defId ? Space4x.structureName(state, fx.defId) : "some troops";
 		return who + " count as police for settlement loyalty.";
@@ -243,10 +273,19 @@ Space4x.describeEffect = function (state, fx) {
 		const sign = (fx.n || 0) > 0 ? "+" : "";
 		return sign + (fx.n || 0) + " " + who + " loyalty";
 	}
-	if (fx.type === "weapon") return "+" + n + " weapons (combat not in this slice)";
-	if (fx.type === "shield") return "+" + n + " shields (combat not in this slice)";
-	if (fx.type === "armor") return "+" + n + " armor (combat not in this slice)";
-	if (fx.type === "shipSize") return "+" + n + " ship size (not used yet)";
+	if (fx.type === "weapon") return "+" + n + " beam quality (legacy)";
+	if (fx.type === "shield") return "+" + n + " shield HP per facing";
+	if (fx.type === "armor") return "+" + n + " armor quality steps";
+	if (fx.type === "structure") return "+" + n + " structure quality steps";
+	if (fx.type === "fighterDamage") return "+" + n + " fighter weapon damage";
+	if (fx.type === "fighterRange") return "+" + n + " fighter weapon range";
+	if (fx.type === "fighterStructure") return "+" + n + " fighter structure";
+	if (fx.type === "shipSize") return "Hull quality N+" + n + " (scales existing warships for now)";
+	if (fx.type === "combatSpeed") return "+" + n + " combat speed";
+	if (fx.type === "unlockLoad") {
+		const item = state ? Space4x.spaceLoadItem(state, fx.id) : null;
+		return "Unlocks " + (item ? item.name : fx.id) + " for ship designs.";
+	}
 	if (fx.type === "unlockBuild") {
 		let name = fx.id || "a building";
 		if (state && fx.id) {
@@ -287,9 +326,14 @@ Space4x.describeEffect = function (state, fx) {
 		return sign + n + " " + cap + " slot" + (Math.abs(n) === 1 ? "" : "s");
 	}
 	if (fx.type === "jobYield") {
-		const spec = Space4x.settingOf(state).jobs[fx.job];
+		const jobs = fx.jobs && fx.jobs.length ? fx.jobs : (fx.job ? [fx.job] : []);
+		const labels = [];
+		for (let j = 0; j < jobs.length; j++) labels.push(Space4x.jobLabel(state, jobs[j]));
+		const spec = jobs.length ? Space4x.settingOf(state).jobs[jobs[0]] : null;
 		const product = spec && spec.product ? spec.product : "output";
-		let text = "+" + n + " " + product + " per " + Space4x.jobLabel(state, fx.job) + " worker here";
+		const worker = labels.length === 1 ? labels[0] + " worker" : labels.join(" or ") + " worker";
+		let text = (n > 0 ? "+" : "") + n + " " + product + " per " + worker;
+		if (fx.biomes && fx.biomes.length) text += " on " + fx.biomes.join(", ");
 		if (fx.richness && fx.richness.length) {
 			text += " (" + Space4x.richnessNames(state, fx.richness).join(" or ") + ")";
 		}

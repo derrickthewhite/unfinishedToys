@@ -1,9 +1,11 @@
 var Space4x = Space4x || {};
 
 Space4x.ADDITIVE_TECH = {
-	speed: true, range: true, commsRange: true, shipSize: true,
+	speed: true, range: true, commsRange: true, shipSize: true, combatSpeed: true,
 	industryPerPop: true, researchPerPop: true, foodPerFarmer: true,
-	growthRatePercent: true, weapon: true, shield: true, armor: true, loyalty: true, spySkill: true
+	growthRatePercent: true, weapon: true, shield: true, armor: true, structure: true,
+	fighterDamage: true, fighterRange: true, fighterStructure: true,
+	loyalty: true, spySkill: true
 };
 
 Space4x.applyTechEffects = function (empire, tech) {

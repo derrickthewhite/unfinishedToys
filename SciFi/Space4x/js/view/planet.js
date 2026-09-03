@@ -69,6 +69,12 @@ Space4x.drawPlanet = function (canvas, body) {
 	ctx.fill();
 };
 
+Space4x.stylePlanetBox = function (el, color, width) {
+	if (!el) return;
+	if (color) el.style.border = (width || 3) + "px solid " + color;
+	else el.style.border = "";
+};
+
 Space4x.bodyCaption = function (body, state) {
 	if (!body) return "";
 	if (body.kind === "gasGiant") return "Gas giant";
@@ -78,6 +84,8 @@ Space4x.bodyCaption = function (body, state) {
 			const rich = Space4x.richnessOf(state, body);
 			if (rich && rich.name) cap += " · " + rich.name;
 		}
+		const colors = Space4x.bodyColorLabels(state, body);
+		if (colors.length) cap += " · " + colors.join(", ");
 		return cap;
 	}
 	const size = body.size ? Space4x.titleCase(body.size) : "Rocky";
@@ -86,6 +94,8 @@ Space4x.bodyCaption = function (body, state) {
 	if (state) {
 		const rich = Space4x.richnessOf(state, body);
 		if (rich && rich.name) cap += " · " + rich.name;
+		const colors = Space4x.bodyColorLabels(state, body);
+		if (colors.length) cap += " · " + colors.join(", ");
 	}
 	return cap;
 };

@@ -52,10 +52,16 @@ Space4x.empireScore = function (state, empire) {
 
 Space4x.recordScoreSnapshot = function (state) {
 	if (!state.scoreHistory) state.scoreHistory = [];
+	if (!state.scoreEmpireMeta) state.scoreEmpireMeta = {};
 	const scores = {};
 	for (let i = 0; i < state.empires.length; i++) {
 		const empire = state.empires[i];
 		scores[empire.id] = Space4x.empireScore(state, empire);
+		state.scoreEmpireMeta[empire.id] = {
+			name: empire.name,
+			colorId: empire.colorId,
+			isPlayer: !!empire.isPlayer
+		};
 	}
 	const last = state.scoreHistory[state.scoreHistory.length - 1];
 	if (last && last.turn === state.turn) last.scores = scores;
