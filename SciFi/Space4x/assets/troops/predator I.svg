@@ -3,17 +3,17 @@
    viewBox="0 0 16 16"
    aria-hidden="true"
    version="1.1"
-   id="svg1"
-   sodipodi:docname="mechs.svg"
+   id="svg3"
+   sodipodi:docname="predator - Copy (3).svg"
    inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
   <defs
-     id="defs1" />
+     id="defs3" />
   <sodipodi:namedview
-     id="namedview1"
+     id="namedview3"
      pagecolor="#ffffff"
      bordercolor="#000000"
      borderopacity="0.25"
@@ -22,17 +22,17 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      showgrid="true"
-     inkscape:zoom="51.574601"
-     inkscape:cx="7.8333132"
-     inkscape:cy="10.189124"
-     inkscape:window-width="2560"
-     inkscape:window-height="1369"
-     inkscape:window-x="-8"
-     inkscape:window-y="-8"
-     inkscape:window-maximized="1"
-     inkscape:current-layer="svg1">
+     inkscape:zoom="18.234375"
+     inkscape:cx="6.5261354"
+     inkscape:cy="4.5518423"
+     inkscape:window-width="1278"
+     inkscape:window-height="664"
+     inkscape:window-x="-7"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg3">
     <inkscape:grid
-       id="grid1"
+       id="grid3"
        units="px"
        originx="0"
        originy="0"
@@ -46,14 +46,12 @@
        enabled="true"
        visible="true" />
   </sodipodi:namedview>
-  <path
-     fill="#7a8a9a"
-     d="M 8,4.4299914 13.4,4.4 v 7.2 l -5.4,3 -5.4,-3 V 4.4 Z"
-     id="path1"
-     sodipodi:nodetypes="ccccccc" />
-  <path
-     style="fill:#7a8a9a;fill-opacity:1;stroke-linecap:round"
-     d="m 6,4 h 4 V 1 H 6 Z"
-     id="path2"
-     sodipodi:nodetypes="ccccc" />
+  <g
+     id="g9"
+     transform="matrix(0.73684208,0,0,0.73684208,-0.43877683,14.163081)">
+    <path
+       id="path8"
+       style="fill:#c45c2a;fill-opacity:1;stroke:none;stroke-linecap:round"
+       d="m 10.809769,-13.364182 c -3.4310672,0.07455 -9.0000004,5.0000003 -9.0000004,5.0000003 0,0 5.5689332,4.92545 9.0000004,5 3.7259,0.08096 10,-5 10,-5 0,0 -6.2741,-5.0809603 -10,-5.0000003 z m 0,1 2,4.0000003 -2,4 -2.0000004,-4 z" />
+  </g>
 </svg>

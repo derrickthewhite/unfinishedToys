@@ -4,7 +4,7 @@
    aria-hidden="true"
    version="1.1"
    id="svg1"
-   sodipodi:docname="mechs.svg"
+   sodipodi:docname="Warrior.svg"
    inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -23,8 +23,8 @@
      inkscape:deskcolor="#d1d1d1"
      showgrid="true"
      inkscape:zoom="51.574601"
-     inkscape:cx="7.8333132"
-     inkscape:cy="10.189124"
+     inkscape:cx="8.4343842"
+     inkscape:cy="6.2142992"
      inkscape:window-width="2560"
      inkscape:window-height="1369"
      inkscape:window-x="-8"
@@ -47,13 +47,13 @@
        visible="true" />
   </sodipodi:namedview>
   <path
-     fill="#7a8a9a"
-     d="M 8,4.4299914 13.4,4.4 v 7.2 l -5.4,3 -5.4,-3 V 4.4 Z"
+     style="fill:#c45c2a;stroke-linecap:round"
+     d="M 11.613147,12.567449 6.9744126,6.0496165 9.576571,4.1976633 8.8387582,3.4953621 8.2589164,2.680633 5.8147291,4.4201583 4.6550455,2.7907 3.8403164,3.3705418 5,5 0.81628733,4.295338 c 0,0 0.70772167,2.7190202 1.50463797,3.8387582 0.7969163,1.119738 3.1340962,2.6790748 3.1340962,2.6790748 l 0.704662,-4.1837127 4.6387345,6.5178327 z"
      id="path1"
-     sodipodi:nodetypes="ccccccc" />
+     sodipodi:nodetypes="ccccccccccscccc" />
   <path
-     style="fill:#7a8a9a;fill-opacity:1;stroke-linecap:round"
-     d="m 6,4 h 4 V 1 H 6 Z"
+     style="fill:#c45c2a;stroke-linecap:round"
+     d="M 7.413539,11.043675 13.971,4.8792844 c 0,0 0.02812,1.6440465 -0.41936,2.4738968 C 12.432944,9.4278077 8.0984712,11.772281 8.0984712,11.772281 L 8.7834034,12.500888 8.0547967,13.18582 7.3698644,12.457213 5.9126509,13.827078 5.2277186,13.098471 6.6849322,11.728607 6,11 6.7286067,10.315068 Z"
      id="path2"
-     sodipodi:nodetypes="ccccc" />
+     sodipodi:nodetypes="ccscccccccccc" />
 </svg>
