@@ -153,10 +153,22 @@ Space4x.buildSiteOk = function (state, settlement, def) {
 	return true;
 };
 
+Space4x.defTechUnlocked = function (empire, def) {
+	if (!def) return false;
+	if (def.requireTechAny && def.requireTechAny.length) {
+		for (let i = 0; i < def.requireTechAny.length; i++) {
+			if (Space4x.empireHasTech(empire, def.requireTechAny[i])) return true;
+		}
+		return false;
+	}
+	if (!def.requireTech) return true;
+	return Space4x.empireHasTech(empire, def.requireTech);
+};
+
 Space4x.canFinishBuild = function (state, settlement, def, extra) {
 	if (!def || !settlement) return false;
 	const empire = Space4x.empireById(state, settlement.empireId);
-	if (def.requireTech && !Space4x.empireHasTech(empire, def.requireTech)) return false;
+	if (!Space4x.defTechUnlocked(empire, def)) return false;
 	if (def.requireStructure && Space4x.buildCountWithExtra(settlement, def.requireStructure, extra) <= 0) return false;
 	if (def.kind === "refit") return true;
 	if (!Space4x.buildSiteOk(state, settlement, def)) return false;
@@ -168,7 +180,7 @@ Space4x.canFinishBuild = function (state, settlement, def, extra) {
 Space4x.queueBlockReason = function (state, settlement, def, extra) {
 	if (!def) return "Unknown project";
 	const empire = Space4x.empireById(state, settlement.empireId);
-	if (def.requireTech && !Space4x.empireHasTech(empire, def.requireTech)) {
+	if (!Space4x.defTechUnlocked(empire, def)) {
 		return "Needs the required technology";
 	}
 	if (def.requireStructure && Space4x.buildCountWithExtra(settlement, def.requireStructure, extra) <= 0) {
@@ -213,7 +225,7 @@ Space4x.canQueueBuild = function (state, settlement, defId) {
 	if (def.npc) return false;
 	if (def.stub || def.kind === "stub" || def.kind === "refit") return false;
 	const empire = Space4x.empireById(state, settlement.empireId);
-	if (def.requireTech && !Space4x.empireHasTech(empire, def.requireTech)) return false;
+	if (!Space4x.defTechUnlocked(empire, def)) return false;
 	if (!Space4x.buildSiteOk(state, settlement, def)) return false;
 	const cap = Space4x.buildCap(state, settlement, def);
 	if (cap === Infinity) return true;

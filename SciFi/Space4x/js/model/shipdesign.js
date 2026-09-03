@@ -343,6 +343,8 @@ Space4x.autoDesignLoad = function (state, empire, hullDefId) {
 	for (let s = 0; s < shields.length; s++) {
 		if (addGroup(shields[s], 1)) break;
 	}
+	addGroup("radioScanner", 1);
+	addGroup("smartArmor", 1);
 	if (hullDefId === "battleship" || hullDefId === "defenseStation") {
 		const fighters = ["assaultBay", "strikeBay", "interceptorBay", "fighterBay"];
 		for (let f = 0; f < fighters.length; f++) {

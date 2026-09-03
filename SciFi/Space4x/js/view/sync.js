@@ -1116,7 +1116,7 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 	for (let i = 0; i < ids.length; i++) {
 		const def = builds[ids[i]];
 		if (def.npc) continue;
-		if (def.requireTech && !Space4x.empireHasTech(empire, def.requireTech)) continue;
+		if (!Space4x.defTechUnlocked(empire, def)) continue;
 		if (def.kind === "structure" && Space4x.countStructure(st, def.id) > 0 && !Space4x.canQueueBuild(state, st, def.id)) continue;
 		if (!byKind[def.kind]) byKind[def.kind] = [];
 		byKind[def.kind].push(def);
