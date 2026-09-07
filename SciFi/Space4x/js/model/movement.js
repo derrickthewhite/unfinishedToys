@@ -7,6 +7,7 @@ Space4x.enterOrbit = function (unit, star) {
 	unit.location.y = star.y;
 	unit.location.settlementId = null;
 	unit.targetStarId = null;
+	unit.walkingHome = false;
 };
 
 Space4x.stepToward = function (state, unit, tx, ty, speed, requireRange) {
@@ -50,6 +51,17 @@ Space4x.canReachThisTurn = function (state, unit, tx, ty, speed, requireRange) {
 	return true;
 };
 
+Space4x.walkUnitHome = function (state, unit, home, speed) {
+	if (!home) return;
+	unit.walkingHome = true;
+	const already = unit.location.kind === "orbit" && unit.location.starId === home.id;
+	if (Space4x.canReachThisTurn(state, unit, home.x, home.y, speed, false)) {
+		Space4x.arriveAtStar(state, unit, home, already);
+	} else {
+		Space4x.stepToward(state, unit, home.x, home.y, speed, false);
+	}
+};
+
 Space4x.phaseMovement = function (state) {
 	for (let i = 0; i < state.units.length; i++) state.units[i].arrivedThisTurn = false;
 	const ids = [];
@@ -68,30 +80,42 @@ Space4x.phaseMovement = function (state) {
 		const home = Space4x.nearestFriendlyStar(state, unit.empireId, pos.x, pos.y);
 		if (!home) continue;
 		const inRange = Space4x.inRangeOfEmpire(state, unit.empireId, pos.x, pos.y);
-		if (!inRange) {
-			unit.walkingHome = true;
-			const already = unit.location.kind === "orbit" && unit.location.starId === home.id;
-			if (Space4x.canReachThisTurn(state, unit, home.x, home.y, stats.speed, false)) {
-				Space4x.arriveAtStar(state, unit, home, already);
-			} else {
-				Space4x.stepToward(state, unit, home.x, home.y, stats.speed, false);
-			}
+		const dest = unit.targetStarId ? Space4x.starById(state, unit.targetStarId) : null;
+		const webJump = Space4x.isSpindelHauler(state, unit) || Space4x.isSpindelColony(state, unit);
+		const destInRange = dest && (webJump || Space4x.inRangeOfEmpireAtCell(state, unit.empireId, dest.x, dest.y));
+		if (!inRange || (unit.location.kind === "space" && !destInRange)) {
+			Space4x.walkUnitHome(state, unit, home, stats.speed);
 			continue;
 		}
 		unit.walkingHome = false;
-		if (!unit.targetStarId) continue;
-		if (unit.location.kind === "orbit" && unit.location.starId === unit.targetStarId) {
-			Space4x.arriveAtStar(state, unit, Space4x.starById(state, unit.targetStarId), true);
+		if (!dest) continue;
+		if (!destInRange) {
+			unit.targetStarId = null;
 			continue;
 		}
-		const dest = Space4x.starById(state, unit.targetStarId);
-		if (!dest) continue;
-		if (!Space4x.canLeaveSystem(state, empire, Space4x.unitStarId(state, unit), dest.id)) {
+		if (unit.location.kind === "orbit" && unit.location.starId === dest.id) {
+			Space4x.arriveAtStar(state, unit, dest, true);
+			continue;
+		}
+		if (Space4x.isSpindelColony(state, unit)) {
+			const fromStarId = Space4x.unitStarId(state, unit);
+			if (fromStarId && !Space4x.starHasSpindel(state, fromStarId)) {
+				unit.targetStarId = null;
+				continue;
+			}
+			if (!Space4x.starHasSpindel(state, dest.id)) {
+				unit.targetStarId = null;
+				continue;
+			}
+		}
+		if (!Space4x.canLeaveSystem(state, empire, Space4x.unitStarId(state, unit), dest.id, {
+			spindelWeb: webJump
+		})) {
 			unit.targetStarId = null;
 			continue;
 		}
 		const already = unit.location.kind === "orbit" && unit.location.starId === dest.id;
-		if (Space4x.canReachThisTurn(state, unit, dest.x, dest.y, stats.speed, true)) {
+		if (webJump || Space4x.canReachThisTurn(state, unit, dest.x, dest.y, stats.speed, true)) {
 			Space4x.arriveAtStar(state, unit, dest, already);
 		} else {
 			Space4x.stepToward(state, unit, dest.x, dest.y, stats.speed, true);
@@ -108,7 +132,8 @@ Space4x.phaseMovement = function (state) {
 		if (unit.location.kind !== "orbit") continue;
 		const star = Space4x.starById(state, unit.location.starId);
 		if (!star) continue;
-		const bodies = Space4x.emptyLegalBodies(state, star, unit.empireId);
+		const settleOpts = Space4x.unitFoundRequiresSpindel(state, unit) ? { spindelOnly: true } : {};
+		const bodies = Space4x.emptyLegalBodies(state, star, unit.empireId, settleOpts);
 		if (bodies.length) Space4x.foundSettlement(state, unit.id, bodies[0].id);
 	}
 };
@@ -141,8 +166,17 @@ Space4x.setShipTarget = function (state, unitId, starId) {
 	if (!dest) return false;
 	if (Space4x.unitStarId(state, unit) === dest.id) return false;
 	const empire = Space4x.empireById(state, unit.empireId);
-	if (!Space4x.canLeaveSystem(state, empire, Space4x.unitStarId(state, unit), dest.id)) return false;
-	if (!Space4x.inRangeOfEmpireAtCell(state, unit.empireId, dest.x, dest.y)) return false;
+	const webShip = Space4x.isSpindelColony(state, unit);
+	if (!Space4x.canLeaveSystem(state, empire, Space4x.unitStarId(state, unit), dest.id, {
+		spindelWeb: webShip
+	})) return false;
+	if (webShip) {
+		const fromStarId = Space4x.unitStarId(state, unit);
+		if (fromStarId && !Space4x.starHasSpindel(state, fromStarId)) return false;
+		if (!Space4x.starHasSpindel(state, dest.id)) return false;
+	} else if (!Space4x.inRangeOfEmpireAtCell(state, unit.empireId, dest.x, dest.y)) {
+		return false;
+	}
 	unit.targetStarId = starId;
 	if (unit.location.kind === "settlement") {
 		unit.location.kind = "orbit";

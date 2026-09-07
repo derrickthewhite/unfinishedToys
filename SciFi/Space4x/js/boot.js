@@ -88,6 +88,18 @@ Space4x.bindUi = function (app) {
 	if (ui.btnSpaceOk) ui.btnSpaceOk.addEventListener("click", cmds.dismissSpaceCombat);
 	if (ui.btnBackGalaxyDesign) ui.btnBackGalaxyDesign.addEventListener("click", cmds.showGalaxy);
 	if (ui.btnBackGalaxyReport) ui.btnBackGalaxyReport.addEventListener("click", cmds.showGalaxy);
+	if (ui.btnBackGalaxyGuide) ui.btnBackGalaxyGuide.addEventListener("click", cmds.showGalaxy);
+	if (ui.guideToc) {
+		ui.guideToc.addEventListener("click", function (ev) {
+			const a = ev.target.closest("a[href^='#']");
+			if (!a || !ui.stageGuide) return;
+			const id = a.getAttribute("href").slice(1);
+			const target = document.getElementById(id);
+			if (!target || !ui.stageGuide.contains(target)) return;
+			ev.preventDefault();
+			target.scrollIntoView({ behavior: "smooth", block: "start" });
+		});
+	}
 	if (ui.btnSpaceEndShip) ui.btnSpaceEndShip.addEventListener("click", cmds.endSpaceShip);
 	if (ui.btnSpaceEndSide) ui.btnSpaceEndSide.addEventListener("click", cmds.endSpaceSide);
 	if (ui.btnSpaceAutocombat) ui.btnSpaceAutocombat.addEventListener("click", cmds.toggleSpaceCombatAuto);
@@ -189,8 +201,17 @@ Space4x.bindUi = function (app) {
 			});
 		}
 	}
+	if (ui.diploDuration) ui.diploDuration.addEventListener("change", function () { cmds.diploSetDuration(this.value); });
 	if (ui.btnDiploGiveMoney) ui.btnDiploGiveMoney.addEventListener("click", function () { cmds.diploAddMoney("give"); });
 	if (ui.btnDiploWantMoney) ui.btnDiploWantMoney.addEventListener("click", function () { cmds.diploAddMoney("want"); });
+	if (ui.btnDiploGiveTribute) ui.btnDiploGiveTribute.addEventListener("click", function () { cmds.diploAddTribute("give"); });
+	if (ui.btnDiploWantTribute) ui.btnDiploWantTribute.addEventListener("click", function () { cmds.diploAddTribute("want"); });
+	if (ui.btnDiploGiveResearch) ui.btnDiploGiveResearch.addEventListener("click", function () { cmds.diploAddResearchPoints("give"); });
+	if (ui.btnDiploWantResearch) ui.btnDiploWantResearch.addEventListener("click", function () { cmds.diploAddResearchPoints("want"); });
+	if (ui.btnDiploGiveTech) ui.btnDiploGiveTech.addEventListener("click", function () { cmds.diploAddTech("give"); });
+	if (ui.btnDiploWantTech) ui.btnDiploWantTech.addEventListener("click", function () { cmds.diploAddTech("want"); });
+	if (ui.btnDiploGiveLend) ui.btnDiploGiveLend.addEventListener("click", function () { cmds.diploAddLend("give"); });
+	if (ui.btnDiploWantLend) ui.btnDiploWantLend.addEventListener("click", function () { cmds.diploAddLend("want"); });
 	if (ui.btnDiploGiveWorld) ui.btnDiploGiveWorld.addEventListener("click", function () { cmds.diploAddWorld("give"); });
 	if (ui.btnDiploWantWorld) ui.btnDiploWantWorld.addEventListener("click", function () { cmds.diploAddWorld("want"); });
 	if (ui.btnDiploGiveShip) ui.btnDiploGiveShip.addEventListener("click", function () { cmds.diploAddShip("give"); });
@@ -219,6 +240,10 @@ Space4x.bindUi = function (app) {
 		}
 		if (stage === "report") {
 			cmds.showReport();
+			return;
+		}
+		if (stage === "guide") {
+			cmds.showGuide();
 			return;
 		}
 		if (stage === "spies") {

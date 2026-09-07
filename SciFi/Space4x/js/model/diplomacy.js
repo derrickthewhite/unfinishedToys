@@ -20,40 +20,88 @@ Space4x.pactProposalLabel = function (id) {
 	return "Propose " + Space4x.pactLabel(id);
 };
 
-Space4x.activeTreatyLabels = function (a, b) {
+Space4x.diplomacyCfg = function (state) {
+	const set = Space4x.settingOf(state);
+	return (set && set.diplomacy) || {};
+};
+
+Space4x.defaultTreatyTurns = function (state) {
+	const n = Space4x.diplomacyCfg(state).defaultTreatyTurns;
+	return n != null ? n : 20;
+};
+
+Space4x.interestPerEightTurns = function (state) {
+	const n = Space4x.diplomacyCfg(state).interestPerEightTurns;
+	return n != null ? n : 0.2;
+};
+
+Space4x.treatyTurnsLeft = function (state, a, b, id) {
+	if (!state || !Space4x.hasTreaty(a, b, id)) return 0;
+	const rel = Space4x.relationOf(a, typeof b === "string" ? b : b.id);
+	if (!rel) return 0;
+	const until = id === "trade" ? rel.tradeUntil : (id === "research" ? rel.researchUntil : null);
+	if (until == null) return 0;
+	return Math.max(0, until - state.turn);
+};
+
+Space4x.activeTreatyLabels = function (a, b, state) {
 	const out = [];
 	if (Space4x.atWar(a, b)) out.push("At war");
 	else {
 		for (let i = 0; i < Space4x.PACTS.length; i++) {
 			const id = Space4x.PACTS[i];
 			if (id === "peace") continue;
-			if (Space4x.hasTreaty(a, b, id)) out.push(Space4x.pactLabel(id));
+			if (!Space4x.hasTreaty(a, b, id)) continue;
+			let label = Space4x.pactLabel(id);
+			if (state && (id === "trade" || id === "research")) {
+				const left = Space4x.treatyTurnsLeft(state, a, b, id);
+				if (left > 0) label += " (" + left + " turn" + (left === 1 ? "" : "s") + " left)";
+			}
+			out.push(label);
 		}
+		const extras = Space4x.activeDiplomacyStreamLabels(a, b, state);
+		for (let i = 0; i < extras.length; i++) out.push(extras[i]);
 		if (!out.length) out.push("No treaties");
 	}
 	return out;
 };
 
-Space4x.empireForeignRelations = function (state, empire) {
+Space4x.empireForeignRelations = function (state, empire, opts) {
+	opts = opts || {};
+	const all = !!opts.all;
 	const out = [];
 	if (!empire || !state) return out;
 	for (let i = 0; i < state.empires.length; i++) {
 		const other = state.empires[i];
-		if (other.id === empire.id) continue;
+		if (other.id === empire.id || other.dormant) continue;
 		const rel = Space4x.relationOf(empire, other.id);
-		if (!rel || !rel.contacted) continue;
-		const bits = Space4x.activeTreatyLabels(empire, other);
+		const contacted = !!(rel && rel.contacted);
+		if (!all && !contacted) continue;
+		const bits = contacted ? Space4x.activeTreatyLabels(empire, other, state) : [];
 		out.push({
 			id: other.id,
 			name: other.name,
 			war: Space4x.atWar(empire, other),
-			text: bits.join(", ")
+			contacted: contacted,
+			text: contacted ? bits.join(", ") : "No contact"
 		});
 	}
 	out.sort(function (a, b) {
 		if (a.war !== b.war) return a.war ? -1 : 1;
+		if (a.contacted !== b.contacted) return a.contacted ? -1 : 1;
 		return (a.name || "").localeCompare(b.name || "");
 	});
+	return out;
+};
+
+Space4x.observableEmpires = function (state) {
+	const out = [];
+	const list = state && state.empires ? state.empires : [];
+	for (let i = 0; i < list.length; i++) {
+		if (list[i].dormant) continue;
+		out.push(list[i]);
+	}
+	out.sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); });
 	return out;
 };
 
@@ -61,6 +109,7 @@ Space4x.canProposePact = function (state, a, b, id) {
 	if (!a || !b || a.id === b.id) return false;
 	if (id === "peace") return Space4x.atWar(a, b);
 	if (Space4x.atWar(a, b)) return false;
+	if (id === "trade" || id === "research") return true;
 	return !Space4x.hasTreaty(a, b, id);
 };
 
@@ -74,7 +123,13 @@ Space4x.filterProposedPacts = function (state, from, to, pacts) {
 };
 
 Space4x.emptyDraft = function () {
-	return { give: [], want: [], pacts: [] };
+	return { give: [], want: [], pacts: [], duration: 20 };
+};
+
+Space4x.draftDuration = function (state, draft) {
+	const n = draft && draft.duration != null ? parseInt(draft.duration, 10) : 0;
+	if (n === 8 || n === 20 || n === 40) return n;
+	return Space4x.defaultTreatyTurns(state);
 };
 
 Space4x.empireHasDiplomacy = function (state, empire) {
@@ -95,12 +150,19 @@ Space4x.ensureRelation = function (empire, otherId) {
 			research: false,
 			passage: false,
 			stopSpies: false,
+			tradeUntil: null,
+			researchUntil: null,
+			tributes: [],
+			structureLends: [],
 			attitude: 0,
 			contacted: false,
 			met: false
 		};
 	}
-	return empire.relations[otherId];
+	const rel = empire.relations[otherId];
+	if (rel.tributes == null) rel.tributes = [];
+	if (rel.structureLends == null) rel.structureLends = [];
+	return rel;
 };
 
 Space4x.relationOf = function (empire, otherId) {
@@ -124,9 +186,19 @@ Space4x.hasTreaty = function (a, b, id) {
 };
 
 Space4x.clampAttitude = function (n) {
-	if (n > 100) return 100;
-	if (n < -100) return -100;
-	return Math.round(n);
+	if (n > 100) n = 100;
+	if (n < -100) n = -100;
+	return Math.round(n * 100) / 100;
+};
+
+Space4x.formatAttitude = function (n) {
+	return String(Math.round(n || 0));
+};
+
+Space4x.addRawAttitude = function (empire, otherId, delta) {
+	const rel = Space4x.ensureRelation(empire, otherId);
+	if (!rel || !delta) return;
+	rel.attitude = Space4x.clampAttitude((rel.attitude || 0) + delta);
 };
 
 Space4x.addAttitude = function (state, empire, otherId, delta) {
@@ -134,16 +206,18 @@ Space4x.addAttitude = function (state, empire, otherId, delta) {
 	if (!rel || !delta) return;
 	const other = state ? Space4x.empireById(state, otherId) : null;
 	if (other && state) {
-		const pct = Space4x.cultureNegotiationPct(state, other.cultureId);
+		const pct = Space4x.empireNegotiationPct(state, other);
 		if (pct > 0) {
-			if (delta > 0) delta = Math.round(delta * (1 + pct / 100));
-			else if (delta < 0) delta = Math.round(delta * (1 - pct / 100));
+			if (delta > 0) delta = delta * (1 + pct / 100);
+			else if (delta < 0) delta = delta * (1 - pct / 100);
 		} else if (pct < 0) {
 			const abs = -pct;
-			if (delta > 0) delta = Math.round(delta * (1 - abs / 100));
-			else if (delta < 0) delta = Math.round(delta * (1 + abs / 100));
+			if (delta > 0) delta = delta * (1 - abs / 100);
+			else if (delta < 0) delta = delta * (1 + abs / 100);
 		}
 	}
+	delta = Space4x.clampAttitude(delta);
+	if (!delta) return;
 	rel.attitude = Space4x.clampAttitude((rel.attitude || 0) + delta);
 };
 
@@ -198,7 +272,7 @@ Space4x.contactedEmpires = function (state, viewer) {
 	if (!viewer) return out;
 	for (let i = 0; i < state.empires.length; i++) {
 		const e = state.empires[i];
-		if (e.id === viewer.id) continue;
+		if (e.id === viewer.id || e.dormant) continue;
 		if (!Space4x.inContactWithEmpire(state, viewer.id, e.id)) continue;
 		out.push(e);
 	}
@@ -212,6 +286,7 @@ Space4x.phaseFirstContact = function (state) {
 		for (let j = i + 1; j < state.empires.length; j++) {
 			const a = state.empires[i];
 			const b = state.empires[j];
+			if (a.dormant || b.dormant) continue;
 			const ra = Space4x.ensureRelation(a, b.id);
 			const rb = Space4x.ensureRelation(b, a.id);
 			const now = Space4x.inContactWithEmpire(state, a.id, b.id);
@@ -254,11 +329,22 @@ Space4x.setPairFlag = function (a, b, key, value) {
 	if (rb) rb[key] = !!value;
 };
 
+Space4x.setPairValue = function (a, b, key, value) {
+	const ra = Space4x.ensureRelation(a, b.id);
+	const rb = Space4x.ensureRelation(b, a.id);
+	if (ra) ra[key] = value;
+	if (rb) rb[key] = value;
+};
+
 Space4x.clearTreaties = function (a, b) {
 	Space4x.setPairFlag(a, b, "trade", false);
 	Space4x.setPairFlag(a, b, "research", false);
 	Space4x.setPairFlag(a, b, "passage", false);
 	Space4x.setPairFlag(a, b, "stopSpies", false);
+	Space4x.setPairValue(a, b, "tradeUntil", null);
+	Space4x.setPairValue(a, b, "researchUntil", null);
+	Space4x.setPairValue(a, b, "tributes", []);
+	Space4x.setPairValue(a, b, "structureLends", []);
 };
 
 Space4x.dropOffersBetween = function (state, aId, bId) {
@@ -336,8 +422,243 @@ Space4x.diploDraftProbe = function (state, player, them, draft) {
 		toId: them.id,
 		give: (draft && draft.give) ? draft.give.slice() : [],
 		want: (draft && draft.want) ? draft.want.slice() : [],
-		pacts: Space4x.filterProposedPacts(state, player, them, (draft && draft.pacts) ? draft.pacts.slice() : [])
+		pacts: Space4x.filterProposedPacts(state, player, them, (draft && draft.pacts) ? draft.pacts.slice() : []),
+		duration: Space4x.draftDuration(state, draft)
 	};
+};
+
+Space4x.activeDiplomacyStreamLabels = function (a, b, state) {
+	const out = [];
+	if (!a || !b) return out;
+	const rel = Space4x.relationOf(a, b.id);
+	if (!rel) return out;
+	const turn = state ? state.turn : 0;
+	const tributes = rel.tributes || [];
+	for (let i = 0; i < tributes.length; i++) {
+		const t = tributes[i];
+		const left = t.untilTurn != null ? Math.max(0, t.untilTurn - turn) : 0;
+		const who = t.fromId === a.id ? a.name + " pays" : b.name + " pays";
+		out.push(who + " " + (t.n || 0) + " " + (t.resource || "resource") + "/turn" +
+			(left ? " (" + left + " left)" : ""));
+	}
+	const lends = rel.structureLends || [];
+	for (let i = 0; i < lends.length; i++) {
+		const L = lends[i];
+		const def = state ? Space4x.settingOf(state).builds[L.defId] : null;
+		const name = def ? def.name : (L.defId || "structure");
+		const left = L.untilTurn != null ? Math.max(0, L.untilTurn - turn) : 0;
+		const who = L.fromId === a.id ? a.name + " lends" : b.name + " lends";
+		out.push(who + " " + name + (left ? " (" + left + " left)" : ""));
+	}
+	return out;
+};
+
+Space4x.pushPairStream = function (a, b, key, item) {
+	const ra = Space4x.ensureRelation(a, b.id);
+	const rb = Space4x.ensureRelation(b, a.id);
+	if (ra) {
+		if (!ra[key]) ra[key] = [];
+		ra[key].push(item);
+	}
+	if (rb) {
+		if (!rb[key]) rb[key] = [];
+		rb[key].push({
+			resource: item.resource,
+			n: item.n,
+			defId: item.defId,
+			untilTurn: item.untilTurn,
+			fromId: item.fromId
+		});
+	}
+};
+
+Space4x.grantResearchPoints = function (state, empire, n) {
+	const amt = Math.max(0, Math.round(n || 0));
+	if (!empire || !amt) return;
+	if (empire.research && empire.research.currentProjectId) {
+		empire.research.progress = (empire.research.progress || 0) + amt;
+		const tech = Space4x.techById(state, empire.research.currentProjectId);
+		if (tech && empire.research.progress >= tech.cost) {
+			Space4x.completeTech(state, empire, tech);
+		}
+	} else {
+		if (!empire.research) empire.research = {};
+		empire.research.giftPoints = (empire.research.giftPoints || 0) + amt;
+	}
+};
+
+Space4x.grantCompletedTech = function (state, empire, tech) {
+	if (!empire || !tech || Space4x.empireHasTech(empire, tech.id)) return;
+	const keep = empire.research ? {
+		id: empire.research.currentProjectId,
+		progress: empire.research.progress,
+		cost: empire.research.cost
+	} : null;
+	Space4x.completeTech(state, empire, tech);
+	if (keep && keep.id && keep.id !== tech.id) {
+		empire.research.currentProjectId = keep.id;
+		empire.research.progress = keep.progress;
+		empire.research.cost = keep.cost;
+	}
+};
+
+Space4x.lendableBuildDefs = function (state) {
+	const builds = Space4x.settingOf(state).builds || {};
+	const ids = Object.keys(builds);
+	const out = [];
+	for (let i = 0; i < ids.length; i++) {
+		if (builds[ids[i]].lendable) out.push(builds[ids[i]]);
+	}
+	out.sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); });
+	return out;
+};
+
+Space4x.empireOwnsLendable = function (state, empire, defId) {
+	if (!empire || !defId) return false;
+	const def = Space4x.settingOf(state).builds[defId];
+	if (!def || !def.lendable) return false;
+	return Space4x.countEmpireStructure(state, empire.id, defId) > 0;
+};
+
+Space4x.ownedLendables = function (state, empire) {
+	const defs = Space4x.lendableBuildDefs(state);
+	const out = [];
+	for (let i = 0; i < defs.length; i++) {
+		if (Space4x.empireOwnsLendable(state, empire, defs[i].id)) out.push(defs[i]);
+	}
+	return out;
+};
+
+Space4x.giftableTechs = function (state, giver, receiver) {
+	const ids = (giver && giver.research && giver.research.completedTechIds) || [];
+	const out = [];
+	for (let i = 0; i < ids.length; i++) {
+		if (Space4x.empireHasTech(receiver, ids[i])) continue;
+		const tech = Space4x.techById(state, ids[i]);
+		if (tech) out.push(tech);
+	}
+	out.sort(function (a, b) { return (a.name || "").localeCompare(b.name || ""); });
+	return out;
+};
+
+Space4x.empireScientistCount = function (state, empire) {
+	if (!empire) return 0;
+	let n = 0;
+	const homes = Space4x.settlementsOf(state, empire.id);
+	for (let i = 0; i < homes.length; i++) n += Space4x.countJob(homes[i], "research");
+	return n;
+};
+
+Space4x.eachActiveLendTo = function (state, empireId, fn) {
+	const empire = Space4x.empireById(state, empireId);
+	if (!empire || !empire.relations) return;
+	const ids = Object.keys(empire.relations);
+	for (let i = 0; i < ids.length; i++) {
+		const rel = empire.relations[ids[i]];
+		const lends = rel && rel.structureLends ? rel.structureLends : [];
+		for (let L = 0; L < lends.length; L++) {
+			if (lends[L].fromId === empireId) continue;
+			if (lends[L].untilTurn != null && lends[L].untilTurn <= state.turn) continue;
+			const def = Space4x.settingOf(state).builds[lends[L].defId];
+			if (def) fn(def, lends[L]);
+		}
+	}
+};
+
+Space4x.takeEmpireFoodSurplus = function (state, empire, amount) {
+	let left = Math.max(0, amount || 0);
+	if (!empire || !left) return 0;
+	const set = Space4x.settingOf(state);
+	const per = set.foodPerPop || 1;
+	const homes = Space4x.settlementsOf(state, empire.id).slice();
+	homes.sort(function (a, b) {
+		const sa = Math.max(0, (a.foodPresent || 0) - a.pops.length * per);
+		const sb = Math.max(0, (b.foodPresent || 0) - b.pops.length * per);
+		return sb - sa;
+	});
+	let taken = 0;
+	for (let i = 0; i < homes.length && left > 0; i++) {
+		const need = homes[i].pops.length * per;
+		const surplus = Math.max(0, (homes[i].foodPresent || 0) - need);
+		const n = Math.min(surplus, left);
+		if (n <= 0) continue;
+		homes[i].foodPresent = (homes[i].foodPresent || 0) - n;
+		left -= n;
+		taken += n;
+	}
+	return taken;
+};
+
+Space4x.giveEmpireFood = function (state, empire, amount) {
+	const n = Math.max(0, amount || 0);
+	if (!empire || !n) return;
+	const homes = Space4x.settlementsOf(state, empire.id);
+	if (!homes.length) return;
+	let dest = homes[0];
+	for (let i = 1; i < homes.length; i++) {
+		if (homes[i].pops.length > dest.pops.length) dest = homes[i];
+	}
+	dest.foodPresent = (dest.foodPresent || 0) + n;
+};
+
+Space4x.payMoneyTribute = function (state, payer, payee, n) {
+	const want = Space4x.moneyRound(n);
+	if (!payer || !payee || !(want > 0)) return 0;
+	const have = Space4x.moneyRound(payer.stockpiles.money || 0);
+	const sent = Space4x.moneyRound(Math.min(have, want));
+	if (!(sent > 0)) {
+		state.turnLog.push(payer.name + " could not pay a money tribute to " + payee.name + ".");
+		return 0;
+	}
+	payer.stockpiles.money = Space4x.moneyRound(have - sent);
+	payee.stockpiles.money = Space4x.moneyRound((payee.stockpiles.money || 0) + sent);
+	if (sent < want) {
+		state.turnLog.push(payer.name + " paid " + Space4x.fmtMoney(sent) + " of " +
+			Space4x.fmtMoney(want) + " tribute to " + payee.name + ".");
+	}
+	return sent;
+};
+
+Space4x.payPairTributes = function (state, resource) {
+	const seen = {};
+	for (let i = 0; i < state.empires.length; i++) {
+		const a = state.empires[i];
+		if (!a.relations) continue;
+		const ids = Object.keys(a.relations);
+		for (let r = 0; r < ids.length; r++) {
+			const b = Space4x.empireById(state, ids[r]);
+			if (!b) continue;
+			const rel = a.relations[ids[r]];
+			const list = rel.tributes || [];
+			for (let t = 0; t < list.length; t++) {
+				const item = list[t];
+				if (item.resource !== resource) continue;
+				if (item.fromId !== a.id) continue;
+				if (item.untilTurn != null && item.untilTurn <= state.turn) continue;
+				const key = a.id + ">" + b.id + ">" + resource + ">" + item.n + ">" + item.untilTurn;
+				if (seen[key]) continue;
+				seen[key] = true;
+				if (resource === "money") Space4x.payMoneyTribute(state, a, b, item.n);
+				else if (resource === "research") {
+					b._pendingResearch = (b._pendingResearch || 0) + (item.n || 0);
+					state.turnLog.push(b.name + " received " + item.n + " research tribute from " + a.name + ".");
+				} else if (resource === "food") {
+					const got = Space4x.takeEmpireFoodSurplus(state, a, item.n);
+					if (got) {
+						Space4x.giveEmpireFood(state, b, got);
+						state.turnLog.push(a.name + " sent " + got + " food tribute to " + b.name +
+							(got < item.n ? " (short of " + item.n + ")" : "") + ".");
+					} else {
+						state.turnLog.push(a.name + " had no surplus food for a tribute to " + b.name + ".");
+					}
+				}
+			}
+		}
+	}
+};
+
+Space4x.phaseDiplomacyFoodTributes = function (state) {
+	Space4x.payPairTributes(state, "food");
 };
 
 Space4x.spiesOnEmpire = function (state, attacker, victimId) {
@@ -391,15 +712,98 @@ Space4x.makePeace = function (state, a, b) {
 	state.turnLog.push(a.name + " and " + b.name + " made peace.");
 };
 
-Space4x.signTreaty = function (state, a, b, id) {
+Space4x.signTreaty = function (state, a, b, id, duration) {
 	if (id === "peace" || id === "war") return;
 	if (Space4x.atWar(a, b)) return;
+	const turns = duration != null ? duration : Space4x.defaultTreatyTurns(state);
+	const until = state.turn + turns;
+	const already = Space4x.hasTreaty(a, b, id);
 	Space4x.setPairFlag(a, b, id, true);
+	if (id === "trade" || id === "research") {
+		const key = id === "trade" ? "tradeUntil" : "researchUntil";
+		const ra = Space4x.ensureRelation(a, b.id);
+		const rb = Space4x.ensureRelation(b, a.id);
+		const next = Math.max(ra && ra[key] != null ? ra[key] : 0, until);
+		if (ra) ra[key] = next;
+		if (rb) rb[key] = next;
+	}
 	if (id === "stopSpies") {
 		Space4x.idleSpiesOnEmpire(state, a, b.id);
 		Space4x.idleSpiesOnEmpire(state, b, a.id);
 	}
-	state.turnLog.push(a.name + " and " + b.name + " signed a " + Space4x.pactLabel(id).toLowerCase() + ".");
+	if (id === "trade" || id === "research") {
+		const warmth = Space4x.diplomacyCfg(state).treatyWarmth;
+		const n = warmth != null ? warmth : 1;
+		Space4x.addAttitude(state, a, b.id, n);
+		Space4x.addAttitude(state, b, a.id, n);
+	}
+	const verb = already && (id === "trade" || id === "research") ? "renewed" : "signed";
+	state.turnLog.push(a.name + " and " + b.name + " " + verb + " a " + Space4x.pactLabel(id).toLowerCase() + ".");
+};
+
+Space4x.expireTimedDiplomacy = function (state) {
+	if (!state || !state.empires) return;
+	for (let i = 0; i < state.empires.length; i++) {
+		const a = state.empires[i];
+		for (let j = i + 1; j < state.empires.length; j++) {
+			const b = state.empires[j];
+			if (!a.relations && !b.relations) continue;
+			const ra = Space4x.ensureRelation(a, b.id);
+			const rb = Space4x.ensureRelation(b, a.id);
+			if (ra.trade && ra.tradeUntil != null && ra.tradeUntil <= state.turn) {
+				Space4x.setPairFlag(a, b, "trade", false);
+				Space4x.setPairValue(a, b, "tradeUntil", null);
+				state.turnLog.push("The trade treaty between " + a.name + " and " + b.name + " expired.");
+			}
+			if (ra.research && ra.researchUntil != null && ra.researchUntil <= state.turn) {
+				Space4x.setPairFlag(a, b, "research", false);
+				Space4x.setPairValue(a, b, "researchUntil", null);
+				state.turnLog.push("The research treaty between " + a.name + " and " + b.name + " expired.");
+			}
+			function pruneList(list, kind, log) {
+				const keep = [];
+				for (let k = 0; k < (list || []).length; k++) {
+					const item = list[k];
+					if (item.untilTurn != null && item.untilTurn <= state.turn) {
+						if (log) {
+							const who = item.fromId === a.id ? a.name : b.name;
+							const them = item.fromId === a.id ? b.name : a.name;
+							if (kind === "tribute") {
+								state.turnLog.push(who + "'s " + (item.resource || "resource") + " tribute to " + them + " ended.");
+							} else {
+								const def = Space4x.settingOf(state).builds[item.defId];
+								state.turnLog.push("The lend of " + (def ? def.name : item.defId) + " from " + who + " to " + them + " ended.");
+							}
+						}
+						continue;
+					}
+					keep.push(item);
+				}
+				return keep;
+			}
+			ra.tributes = pruneList(ra.tributes, "tribute", true);
+			rb.tributes = pruneList(rb.tributes, "tribute", false);
+			ra.structureLends = pruneList(ra.structureLends, "lend", true);
+			rb.structureLends = pruneList(rb.structureLends, "lend", false);
+		}
+	}
+};
+
+Space4x.migrateDiplomacyRelations = function (state) {
+	if (!state || !state.empires) return;
+	const until = state.turn + Space4x.defaultTreatyTurns(state);
+	for (let i = 0; i < state.empires.length; i++) {
+		const empire = state.empires[i];
+		if (!empire.relations) continue;
+		const ids = Object.keys(empire.relations);
+		for (let r = 0; r < ids.length; r++) {
+			const rel = Space4x.ensureRelation(empire, ids[r]);
+			if (rel.trade && rel.tradeUntil == null) rel.tradeUntil = until;
+			if (rel.research && rel.researchUntil == null) rel.researchUntil = until;
+			if (!rel.tributes) rel.tributes = [];
+			if (!rel.structureLends) rel.structureLends = [];
+		}
+	}
 };
 
 Space4x.producedResearch = function (state, empire) {
@@ -466,7 +870,60 @@ Space4x.tradeTreatyPreview = function (state, empire) {
 	return { total: total, lines: lines };
 };
 
+Space4x.phaseAttitudeDrift = function (state) {
+	if (!state || !state.empires) return;
+	const cfg = Space4x.diplomacyCfg(state);
+	const chance = cfg.attitudeDriftChance != null ? cfg.attitudeDriftChance : 0.25;
+	const min = cfg.attitudeDriftMin != null ? cfg.attitudeDriftMin : -6;
+	const max = cfg.attitudeDriftMax != null ? cfg.attitudeDriftMax : 4;
+	for (let i = 0; i < state.empires.length; i++) {
+		const a = state.empires[i];
+		if (a.dormant) continue;
+		for (let j = i + 1; j < state.empires.length; j++) {
+			const b = state.empires[j];
+			if (b.dormant) continue;
+			const ra = Space4x.ensureRelation(a, b.id);
+			const rb = Space4x.ensureRelation(b, a.id);
+			if (!ra.contacted && !rb.contacted) continue;
+			if (Space4x.atWar(a, b)) continue;
+			if (Space4x.rngNext(state) >= chance) continue;
+			const delta = min + Space4x.rngInt(state, max - min + 1);
+			if (!delta) continue;
+			const moodA = Space4x.attitudeMood(ra.attitude);
+			const moodB = Space4x.attitudeMood(rb.attitude);
+			Space4x.addRawAttitude(a, b.id, delta);
+			Space4x.addRawAttitude(b, a.id, delta);
+			if (Space4x.attitudeMood(ra.attitude) !== moodA || Space4x.attitudeMood(rb.attitude) !== moodB) {
+				state.turnLog.push("Relations between " + a.name + " and " + b.name + " shifted.");
+			}
+		}
+	}
+};
+
+Space4x.phaseTreatyWarmth = function (state) {
+	if (!state || !state.empires) return;
+	const cfg = Space4x.diplomacyCfg(state);
+	const every = cfg.treatyWarmthEvery != null ? cfg.treatyWarmthEvery : 4;
+	const n = cfg.treatyWarmth != null ? cfg.treatyWarmth : 1;
+	if (!every || !n || state.turn % every !== 0) return;
+	for (let i = 0; i < state.empires.length; i++) {
+		const a = state.empires[i];
+		if (a.dormant) continue;
+		for (let j = i + 1; j < state.empires.length; j++) {
+			const b = state.empires[j];
+			if (b.dormant) continue;
+			if (!Space4x.hasTreaty(a, b, "trade") && !Space4x.hasTreaty(a, b, "research")) continue;
+			Space4x.addAttitude(state, a, b.id, n);
+			Space4x.addAttitude(state, b, a.id, n);
+		}
+	}
+};
+
 Space4x.phaseDiplomacyYields = function (state) {
+	Space4x.expireTimedDiplomacy(state);
+	Space4x.phaseTreatyWarmth(state);
+	Space4x.payPairTributes(state, "money");
+	Space4x.payPairTributes(state, "research");
 	for (let i = 0; i < state.empires.length; i++) {
 		const empire = state.empires[i];
 		const trade = Space4x.tradeTreatyPreview(state, empire);
@@ -528,6 +985,20 @@ Space4x.largestSettlement = function (state, empireId) {
 Space4x.clauseLabel = function (state, clause) {
 	if (!clause) return "";
 	if (clause.type === "money") return Space4x.fmtMoney(clause.n) + " money";
+	if (clause.type === "researchPoints") return (clause.n || 0) + " research points";
+	if (clause.type === "tech") {
+		const tech = Space4x.techById(state, clause.techId);
+		return (tech ? tech.name : clause.techId) + " (tech)";
+	}
+	if (clause.type === "tribute") {
+		const turns = clause.turns || Space4x.defaultTreatyTurns(state);
+		return (clause.n || 0) + " " + (clause.resource || "resource") + "/turn for " + turns + " turns";
+	}
+	if (clause.type === "structureLend") {
+		const def = Space4x.settingOf(state).builds[clause.defId];
+		const turns = clause.turns || Space4x.defaultTreatyTurns(state);
+		return "Lend " + (def ? def.name : clause.defId) + " for " + turns + " turns";
+	}
 	if (clause.type === "settlement") {
 		const st = Space4x.settlementById(state, clause.settlementId);
 		return st ? Space4x.settlementLabel(state, st) : "a world";
@@ -592,6 +1063,22 @@ Space4x.clauseValid = function (state, giver, receiver, clause) {
 		if (!Space4x.largestSettlement(state, receiver.id)) return false;
 		return Space4x.countTroops(st, clause.defId, clause.culture) >= (clause.n || 0) && (clause.n || 0) > 0;
 	}
+	if (clause.type === "researchPoints") return (clause.n || 0) > 0;
+	if (clause.type === "tech") {
+		const tech = Space4x.techById(state, clause.techId);
+		if (!tech) return false;
+		if (!Space4x.empireHasTech(giver, tech.id)) return false;
+		if (Space4x.empireHasTech(receiver, tech.id)) return false;
+		const cost = Space4x.moneyRound(tech.cost || 0);
+		return Space4x.moneyRound(giver.stockpiles.money || 0) >= cost;
+	}
+	if (clause.type === "tribute") {
+		if (["money", "food", "research"].indexOf(clause.resource) < 0) return false;
+		return (clause.n || 0) > 0 && (clause.turns || 0) > 0;
+	}
+	if (clause.type === "structureLend") {
+		return (clause.turns || 0) > 0 && Space4x.empireOwnsLendable(state, giver, clause.defId);
+	}
 	return false;
 };
 
@@ -625,7 +1112,22 @@ Space4x.packageValid = function (state, from, to, offer) {
 	for (let i = 0; i < want.length; i++) {
 		if (!Space4x.clauseValid(state, to, from, want[i])) return false;
 	}
+	if (Space4x.clausesMoneyNeed(state, give) > Space4x.moneyRound(from.stockpiles.money || 0)) return false;
+	if (Space4x.clausesMoneyNeed(state, want) > Space4x.moneyRound(to.stockpiles.money || 0)) return false;
 	return true;
+};
+
+Space4x.clausesMoneyNeed = function (state, clauses) {
+	let n = 0;
+	for (let i = 0; i < (clauses || []).length; i++) {
+		const c = clauses[i];
+		if (c.type === "money") n += Space4x.moneyRound(c.n || 0);
+		if (c.type === "tech") {
+			const tech = Space4x.techById(state, c.techId);
+			n += Space4x.moneyRound(tech && tech.cost != null ? tech.cost : 0);
+		}
+	}
+	return Space4x.moneyRound(n);
 };
 
 Space4x.transferSettlement = function (state, settlement, toEmpire) {
@@ -679,31 +1181,298 @@ Space4x.applyClause = function (state, giver, receiver, clause) {
 	if (clause.type === "troops") {
 		Space4x.transferTroops(state, clause, receiver);
 		state.turnLog.push(giver.name + " transferred " + Space4x.clauseLabel(state, clause) + " to " + receiver.name + ".");
+		return;
+	}
+	if (clause.type === "researchPoints") {
+		Space4x.grantResearchPoints(state, receiver, clause.n);
+		state.turnLog.push(giver.name + " transferred " + (clause.n || 0) + " research points to " + receiver.name + ".");
+		return;
+	}
+	if (clause.type === "tech") {
+		const tech = Space4x.techById(state, clause.techId);
+		if (!tech) return;
+		const cost = Space4x.moneyRound(tech.cost || 0);
+		giver.stockpiles.money = Space4x.moneyRound((giver.stockpiles.money || 0) - cost);
+		Space4x.grantCompletedTech(state, receiver, tech);
+		state.turnLog.push(giver.name + " taught " + tech.name + " to " + receiver.name +
+			" for " + Space4x.fmtMoney(cost) + ".");
+		return;
+	}
+	if (clause.type === "tribute") {
+		const turns = clause.turns || Space4x.defaultTreatyTurns(state);
+		Space4x.pushPairStream(giver, receiver, "tributes", {
+			resource: clause.resource,
+			n: clause.n,
+			untilTurn: state.turn + turns,
+			fromId: giver.id
+		});
+		state.turnLog.push(giver.name + " will pay " + clause.n + " " + clause.resource +
+			"/turn to " + receiver.name + " for " + turns + " turns.");
+		return;
+	}
+	if (clause.type === "structureLend") {
+		const turns = clause.turns || Space4x.defaultTreatyTurns(state);
+		Space4x.pushPairStream(giver, receiver, "structureLends", {
+			defId: clause.defId,
+			untilTurn: state.turn + turns,
+			fromId: giver.id
+		});
+		state.turnLog.push(giver.name + " lent " + Space4x.structureName(state, clause.defId) +
+			" to " + receiver.name + " for " + turns + " turns.");
 	}
 };
 
-Space4x.clauseValue = function (state, clause) {
-	if (!clause) return 0;
-	if (clause.type === "money") return clause.n || 0;
-	if (clause.type === "settlement") {
-		const st = Space4x.settlementById(state, clause.settlementId);
-		return st ? 50 + st.pops.length * 8 : 40;
+Space4x.npvStream = function (state, rateCredits, turns) {
+	const T = Math.max(0, Math.round(turns || 0));
+	const interest = Space4x.interestPerEightTurns(state);
+	const decay = 1 - interest;
+	let n = 0;
+	for (let t = 0; t < T; t++) n += rateCredits * Math.pow(decay, t / 8);
+	return n;
+};
+
+Space4x.creditRate = function (kind, n) {
+	const amt = n || 0;
+	if (kind === "food") return amt * 3;
+	if (kind === "money") return amt * 0.5;
+	if (kind === "research") return amt * 1;
+	return 0;
+};
+
+Space4x.isUtilityHull = function (state, unit) {
+	if (!unit) return false;
+	if (Space4x.isScout(state, unit)) return true;
+	return unit.defId === "colonyShip" || unit.defId === "spindelColony";
+};
+
+Space4x.empireCanUseColonyAt = function (state, empire, starId) {
+	const star = Space4x.starById(state, starId);
+	if (!star || !empire) return false;
+	return Space4x.emptyLegalBodies(state, star, empire.id).length > 0;
+};
+
+Space4x.empireCanBuildTroopDef = function (state, empire, def) {
+	if (!def || def.kind !== "troop" || !empire) return false;
+	if (!Space4x.defTechUnlocked(empire, def)) return false;
+	return Space4x.defCultureUnlocked(state, empire, def);
+};
+
+Space4x.receiverBestSameTagTs = function (state, receiver, def) {
+	if (!def) return 0;
+	const builds = Space4x.settingOf(state).builds || {};
+	const ids = Object.keys(builds);
+	let best = 0;
+	for (let i = 0; i < ids.length; i++) {
+		const other = builds[ids[i]];
+		if (other.kind !== "troop") continue;
+		if (!Space4x.empireCanBuildTroopDef(state, receiver, other)) continue;
+		if (def.tags && def.tags.length && !Space4x.defMatchesTags(other, def.tags)) continue;
+		const ts = Space4x.troopTs(state, receiver, other, receiver.cultureId);
+		if (ts > best) best = ts;
 	}
-	if (clause.type === "ship") {
-		const u = Space4x.unitById(state, clause.unitId);
-		const def = u ? Space4x.settingOf(state).builds[u.defId] : null;
-		return def && def.cost && def.cost.industry ? def.cost.industry * 0.4 : 20;
+	return best;
+};
+
+Space4x.settlementFoodPotential = function (state, settlement) {
+	if (!settlement) return 0;
+	const empire = Space4x.empireById(state, settlement.empireId);
+	const body = Space4x.bodyById(state, settlement.location.bodyId);
+	const agri = Space4x.jobCap(state, settlement, "agriculture");
+	const gh = Space4x.jobCap(state, settlement, "greenhouse");
+	const agriN = agri === Infinity ? 0 : agri;
+	const ghN = gh === Infinity ? 0 : gh;
+	const farmer = Space4x.foodPerFarmer(state, body, empire, settlement);
+	const spec = Space4x.settingOf(state).jobs.greenhouse;
+	const ghEach = spec && spec.base != null ? spec.base : 3;
+	return agriN * farmer + ghN * ghEach;
+};
+
+Space4x.settlementStructureIndustry = function (state, settlement) {
+	if (!settlement) return 0;
+	const builds = Space4x.settingOf(state).builds;
+	let n = 0;
+	const list = settlement.structures || [];
+	for (let i = 0; i < list.length; i++) {
+		n += Space4x.baseDefCost(builds[list[i].defId]);
 	}
-	if (clause.type === "troops") {
-		const def = Space4x.settingOf(state).builds[clause.defId];
-		const each = def && def.cost && def.cost.industry ? def.cost.industry : 10;
-		return (clause.n || 0) * each * 0.5;
+	return n;
+};
+
+Space4x.lendRateCredits = function (state, def, borrower) {
+	if (!def || !def.effects) return 20;
+	let n = 0;
+	for (let i = 0; i < def.effects.length; i++) {
+		const fx = def.effects[i];
+		if (fx.type === "galaxyScan") n += 20;
+		if (fx.type === "empireResearchPerPop") n += (fx.n || 0) * Space4x.empireScientistCount(state, borrower);
+		if (fx.type === "empireSpySkill") n += (fx.n || 0) * 0.5;
+	}
+	return n || 20;
+};
+
+Space4x.pactNetCredits = function (state, viewer, other, pact, duration) {
+	if (pact === "trade") {
+		const netMoney = 0.2 * (Space4x.producedMoney(state, other) - Space4x.producedMoney(state, viewer));
+		return Space4x.npvStream(state, netMoney * 0.5, duration);
+	}
+	if (pact === "research") {
+		const netSci = 0.2 * (Space4x.producedResearch(state, other) - Space4x.producedResearch(state, viewer));
+		return Space4x.npvStream(state, netSci, duration);
 	}
 	return 0;
 };
 
+Space4x.dealValue = function (state, viewer, other, clause, incoming) {
+	if (!clause) return 0;
+	const receiver = incoming ? viewer : other;
+	const giver = incoming ? other : viewer;
+	const turns = clause.turns || Space4x.defaultTreatyTurns(state);
+	if (clause.type === "money") return (clause.n || 0) * 0.5;
+	if (clause.type === "researchPoints") return clause.n || 0;
+	if (clause.type === "tech") {
+		const tech = Space4x.techById(state, clause.techId);
+		const cost = tech && tech.cost != null ? tech.cost : 0;
+		if (incoming) return cost;
+		return cost * 0.5;
+	}
+	if (clause.type === "tribute") {
+		return Space4x.npvStream(state, Space4x.creditRate(clause.resource, clause.n), turns);
+	}
+	if (clause.type === "structureLend") {
+		const def = Space4x.settingOf(state).builds[clause.defId];
+		const rate = Space4x.lendRateCredits(state, def, incoming ? viewer : other);
+		return incoming ? Space4x.npvStream(state, rate, turns) : 0;
+	}
+	if (clause.type === "settlement") {
+		const st = Space4x.settlementById(state, clause.settlementId);
+		if (!st) return 40;
+		const excess = Math.max(0, Space4x.settlementFoodPotential(state, st) - st.pops.length);
+		return 3 * excess * 8 + 0.5 * Space4x.settlementStructureIndustry(state, st) + st.pops.length * 2;
+	}
+	if (clause.type === "ship") {
+		const u = Space4x.unitById(state, clause.unitId);
+		if (!u) return 20;
+		const industry = Space4x.baseDefCost(Space4x.settingOf(state).builds[u.defId]);
+		if (Space4x.isUtilityHull(state, u) && !u.targetStarId) {
+			return Space4x.shipScrapValue(state, u) * 0.5;
+		}
+		if ((u.defId === "colonyShip" || u.defId === "spindelColony") && receiver) {
+			const starId = u.targetStarId || (u.location && u.location.starId);
+			if (starId && !Space4x.empireCanUseColonyAt(state, receiver, starId)) {
+				return industry * 0.75;
+			}
+		}
+		return industry;
+	}
+	if (clause.type === "troops") {
+		const def = Space4x.settingOf(state).builds[clause.defId];
+		const each = Space4x.baseDefCost(def) || 10;
+		let v = (clause.n || 0) * each;
+		if (receiver && !Space4x.empireCanBuildTroopDef(state, receiver, def)) v *= 2;
+		if (receiver && def) {
+			const unitTs = Space4x.troopTs(state, giver || receiver, def, clause.culture || (giver && giver.cultureId));
+			const best = Space4x.receiverBestSameTagTs(state, receiver, def);
+			const denom = Math.max(unitTs, best, 1);
+			v *= unitTs / denom;
+		}
+		return v;
+	}
+	return 0;
+};
+
+Space4x.clauseValue = function (state, clause) {
+	return Space4x.dealValue(state, null, null, clause, true);
+};
+
+Space4x.clausePrefKey = function (clause) {
+	if (!clause) return "";
+	if (clause.type === "money" || (clause.type === "tribute" && clause.resource === "money")) return "money";
+	if (clause.type === "researchPoints" || clause.type === "tech" ||
+		(clause.type === "tribute" && clause.resource === "research")) return "research";
+	if (clause.type === "tribute" && clause.resource === "food") return "food";
+	if (clause.type === "ship") return "ships";
+	if (clause.type === "troops") return "troops";
+	if (clause.type === "settlement") return "worlds";
+	return clause.type;
+};
+
+Space4x.empireTradePrefs = function (state, empire) {
+	const out = { covet: [], discount: [] };
+	if (!empire || !state) return out;
+	const peers = [];
+	for (let i = 0; i < state.empires.length; i++) {
+		const e = state.empires[i];
+		if (e.id === empire.id || e.dormant) continue;
+		peers.push(e);
+	}
+	if (!peers.length) return out;
+	function avg(fn) {
+		let n = 0;
+		for (let i = 0; i < peers.length; i++) n += fn(peers[i]);
+		return n / peers.length;
+	}
+	const myTech = ((empire.research && empire.research.completedTechIds) || []).length;
+	const myMoney = empire.stockpiles.money || 0;
+	const myIndustry = Space4x.empireIndustryOutput(state, empire);
+	const food = Space4x.empireFoodSummary(state, empire.id);
+	const myShips = Space4x.giftableShips(state, empire.id).length;
+	let myTs = 0;
+	const homes = Space4x.settlementsOf(state, empire.id);
+	for (let i = 0; i < homes.length; i++) {
+		const troops = homes[i].troops || [];
+		for (let t = 0; t < troops.length; t++) {
+			const def = Space4x.settingOf(state).builds[troops[t].defId];
+			myTs += Space4x.troopTs(state, empire, def, troops[t].culture);
+		}
+	}
+	const peerTech = avg(function (e) { return ((e.research && e.research.completedTechIds) || []).length; });
+	const peerMoney = avg(function (e) { return e.stockpiles.money || 0; });
+	const peerIndustry = avg(function (e) { return Space4x.empireIndustryOutput(state, e); });
+	const peerPop = avg(function (e) { return Space4x.settlementsOf(state, e.id).reduce(function (n, st) { return n + st.pops.length; }, 0); });
+	const peerShips = avg(function (e) { return Space4x.giftableShips(state, e.id).length; });
+	const peerTs = avg(function (e) {
+		let n = 0;
+		const hs = Space4x.settlementsOf(state, e.id);
+		for (let i = 0; i < hs.length; i++) {
+			const troops = hs[i].troops || [];
+			for (let t = 0; t < troops.length; t++) {
+				const def = Space4x.settingOf(state).builds[troops[t].defId];
+				n += Space4x.troopTs(state, e, def, troops[t].culture);
+			}
+		}
+		return n;
+	});
+	if (myTech < peerTech || Space4x.producedResearch(state, empire) < avg(function (e) { return Space4x.producedResearch(state, e); })) {
+		out.covet.push("research");
+	}
+	if (myMoney < peerMoney * 0.7 || myIndustry < peerIndustry * 0.7) out.covet.push("money");
+	if (food.deficit > 0 || food.pops < peerPop * 0.7) out.covet.push("food");
+	if (myShips < peerShips) out.covet.push("ships");
+	if (myTs < peerTs) out.covet.push("troops");
+	if (myShips < peerShips && myTs < peerTs) out.discount.push("worlds");
+	return out;
+};
+
+Space4x.formatTradePrefs = function (prefs) {
+	if (!prefs) return "";
+	const want = (prefs.covet || []).join(", ");
+	const skip = (prefs.discount || []).join(", ");
+	if (!want && !skip) return "No strong trade leanings.";
+	let text = "";
+	if (want) text += "They want: " + want;
+	if (skip) text += (text ? " · " : "") + "They discount: " + skip;
+	return text + ".";
+};
+
+Space4x.prefMultiplier = function (prefs, key, incoming) {
+	if (!prefs || !key) return 1;
+	if (incoming && prefs.covet && prefs.covet.indexOf(key) >= 0) return 1.25;
+	if (key === "worlds" && prefs.discount && prefs.discount.indexOf("worlds") >= 0) return 0.75;
+	return 1;
+};
+
 Space4x.sortClauses = function (list) {
-	const order = { money: 0, troops: 1, ship: 2, settlement: 3 };
+	const order = { money: 0, researchPoints: 1, tech: 2, tribute: 3, structureLend: 4, troops: 5, ship: 6, settlement: 7 };
 	return (list || []).slice().sort(function (a, b) {
 		return (order[a.type] != null ? order[a.type] : 9) - (order[b.type] != null ? order[b.type] : 9);
 	});
@@ -717,19 +1486,20 @@ Space4x.applyOffer = function (state, offer) {
 		return Space4x.absorbRevoltPolity(state, from, to);
 	}
 	const pacts = offer.pacts || [];
+	const duration = offer.duration != null ? offer.duration : Space4x.defaultTreatyTurns(state);
 	for (let i = 0; i < pacts.length; i++) {
 		if (pacts[i] === "peace") Space4x.makePeace(state, from, to);
 	}
 	for (let i = 0; i < pacts.length; i++) {
-		if (pacts[i] !== "peace") Space4x.signTreaty(state, from, to, pacts[i]);
+		if (pacts[i] !== "peace") Space4x.signTreaty(state, from, to, pacts[i], duration);
 	}
 	const give = Space4x.sortClauses(offer.give);
 	for (let i = 0; i < give.length; i++) Space4x.applyClause(state, from, to, give[i]);
 	const want = Space4x.sortClauses(offer.want);
 	for (let i = 0; i < want.length; i++) Space4x.applyClause(state, to, from, want[i]);
 	let netTo = 0;
-	for (let i = 0; i < give.length; i++) netTo += Space4x.clauseValue(state, give[i]);
-	for (let i = 0; i < want.length; i++) netTo -= Space4x.clauseValue(state, want[i]);
+	for (let i = 0; i < give.length; i++) netTo += Space4x.dealValue(state, to, from, give[i], true);
+	for (let i = 0; i < want.length; i++) netTo -= Space4x.dealValue(state, to, from, want[i], false);
 	const bump = Math.max(-20, Math.min(25, Math.round(netTo / 20)));
 	if (bump) {
 		Space4x.addAttitude(state, to, from.id, bump);
@@ -753,6 +1523,7 @@ Space4x.submitOffer = function (state, fromId, toId, draft) {
 		give: (draft && draft.give) ? draft.give.slice() : [],
 		want: (draft && draft.want) ? draft.want.slice() : [],
 		pacts: Space4x.filterProposedPacts(state, from, to, (draft && draft.pacts) ? draft.pacts.slice() : []),
+		duration: Space4x.draftDuration(state, draft),
 		turn: state.turn
 	};
 	if (!Space4x.packageValid(state, from, to, offer)) return { ok: false, offer: offer };
@@ -852,7 +1623,7 @@ Space4x.unitFleetLoad = function (state, unit) {
 	Space4x.ensureEmpireDesigns(state, empire);
 	const design = Space4x.activeDesign(empire, unit.defId);
 	if (design) return Space4x.designLoadUsed(state, design);
-	return Space4x.hullLoadCap(state, unit.defId) * 0.5;
+	return Space4x.hullLoadCap(state, unit.defId, Space4x.empireById(state, unit.empireId)) * 0.5;
 };
 
 Space4x.empireFleetLoad = function (state, empire) {
@@ -953,29 +1724,20 @@ Space4x.formatThreatNumber = function (n) {
 	return String(v);
 };
 
-Space4x.aiPactScore = function (state, me, them, pact) {
+Space4x.formatThreatPercent = function (ratio) {
+	return Math.round((ratio || 0) * 100) + "%";
+};
+
+Space4x.aiPactScore = function (state, me, them, pact, duration) {
+	const turns = duration != null ? duration : Space4x.defaultTreatyTurns(state);
 	if (pact === "peace") {
 		const threat = Space4x.threatAssessment(state, me, them);
 		if (threat.ratio < 0.7) return 22;
 		if (threat.ratio > 1.15) return -18;
 		return 2;
 	}
-	if (pact === "trade") {
-		const mine = Space4x.producedMoney(state, me);
-		const theirs = Space4x.producedMoney(state, them);
-		let score = 12 + (theirs - mine) * 0.2 * 6;
-		if (mine > theirs * 1.3) score -= 22;
-		return score;
-	}
-	if (pact === "research") {
-		const mine = Space4x.producedResearch(state, me);
-		const theirs = Space4x.producedResearch(state, them);
-		let score = 12 + (theirs - mine) * 0.2 * 4;
-		if (mine > theirs * 1.4) score -= 25;
-		const myTechs = ((me.research && me.research.completedTechIds) || []).length;
-		const theirTechs = ((them.research && them.research.completedTechIds) || []).length;
-		if (myTechs > theirTechs + 1) score -= 10;
-		return score;
+	if (pact === "trade" || pact === "research") {
+		return Space4x.pactNetCredits(state, me, them, pact, turns) * 0.35 + 2;
 	}
 	if (pact === "passage") return 4;
 	if (pact === "stopSpies") {
@@ -991,13 +1753,21 @@ Space4x.aiScoreOffer = function (state, me, offer) {
 	if (!them) return -999;
 	const rel = Space4x.relationOf(me, them.id);
 	const attitude = rel ? rel.attitude || 0 : 0;
+	const prefs = Space4x.empireTradePrefs(state, me);
+	const duration = offer.duration != null ? offer.duration : Space4x.defaultTreatyTurns(state);
 	let score = attitude * 0.4;
 	const incoming = offer.fromId === them.id ? (offer.give || []) : (offer.want || []);
 	const outgoing = offer.fromId === them.id ? (offer.want || []) : (offer.give || []);
-	for (let i = 0; i < incoming.length; i++) score += Space4x.clauseValue(state, incoming[i]) * 0.35;
-	for (let i = 0; i < outgoing.length; i++) score -= Space4x.clauseValue(state, outgoing[i]) * 0.45;
+	for (let i = 0; i < incoming.length; i++) {
+		const key = Space4x.clausePrefKey(incoming[i]);
+		score += Space4x.dealValue(state, me, them, incoming[i], true) * 0.35 * Space4x.prefMultiplier(prefs, key, true);
+	}
+	for (let i = 0; i < outgoing.length; i++) {
+		const key = Space4x.clausePrefKey(outgoing[i]);
+		score -= Space4x.dealValue(state, me, them, outgoing[i], false) * 0.45 * Space4x.prefMultiplier(prefs, key, false);
+	}
 	const pacts = offer.pacts || [];
-	for (let i = 0; i < pacts.length; i++) score += Space4x.aiPactScore(state, me, them, pacts[i]);
+	for (let i = 0; i < pacts.length; i++) score += Space4x.aiPactScore(state, me, them, pacts[i], duration);
 	return score;
 };
 
@@ -1011,6 +1781,18 @@ Space4x.aiOfferThreshold = function (state, me, them) {
 	const rel = Space4x.relationOf(me, them.id);
 	const attitude = rel ? rel.attitude || 0 : 0;
 	return 10 - attitude * 0.25;
+};
+
+Space4x.mergeGiveClause = function (draft, clause) {
+	if (!draft.give) draft.give = [];
+	if (clause.type === "money") {
+		for (let i = 0; i < draft.give.length; i++) {
+			if (draft.give[i].type !== "money") continue;
+			draft.give[i].n = Space4x.moneyRound((draft.give[i].n || 0) + clause.n);
+			return;
+		}
+	}
+	draft.give.push(clause);
 };
 
 Space4x.balanceDiploDraft = function (state, player, them, draft) {
@@ -1029,29 +1811,52 @@ Space4x.balanceDiploDraft = function (state, player, them, draft) {
 			need: need
 		};
 	}
-	const deficit = need - score;
-	const bump = Math.max(1, Math.ceil(deficit / 0.35));
-	const committed = Space4x.moneyInClauses(draft.give);
-	const wallet = Space4x.moneyRound((player.stockpiles.money || 0) - committed);
-	if (bump <= wallet) {
-		if (!draft.give) draft.give = [];
-		let merged = false;
-		for (let i = 0; i < draft.give.length; i++) {
-			if (draft.give[i].type !== "money") continue;
-			draft.give[i].n = Space4x.moneyRound((draft.give[i].n || 0) + bump);
-			merged = true;
-			break;
+	const duration = Space4x.draftDuration(state, draft);
+	const snapshot = JSON.parse(JSON.stringify(draft.give || []));
+	const bits = [];
+	function remainingGap() {
+		return need - Space4x.aiScoreOffer(state, them, Space4x.diploDraftProbe(state, player, them, draft));
+	}
+	let gap = remainingGap();
+	const committed = Space4x.clausesMoneyNeed(state, draft.give);
+	let wallet = Space4x.moneyRound((player.stockpiles.money || 0) - committed);
+	if (gap > 0 && wallet > 0) {
+		const credits = gap / 0.35;
+		const lump = Space4x.moneyRound(Math.max(1, Math.ceil(credits / 0.5)));
+		const add = Math.min(lump, wallet);
+		if (add > 0) {
+			Space4x.mergeGiveClause(draft, { type: "money", n: add });
+			bits.push("Added " + Space4x.fmtMoney(add) + " money");
+			wallet = Space4x.moneyRound(wallet - add);
 		}
-		if (!merged) draft.give.push({ type: "money", n: bump });
+	}
+	gap = remainingGap();
+	if (gap > 0) {
+		const credits = gap / 0.35;
+		const perTurnCredits = Space4x.npvStream(state, 0.5, duration);
+		if (perTurnCredits > 0) {
+			const rate = Math.max(1, Math.ceil(credits / perTurnCredits));
+			Space4x.mergeGiveClause(draft, { type: "tribute", resource: "money", n: rate, turns: duration });
+			bits.push("Added " + rate + " money/turn for " + duration + " turns");
+		}
+	}
+	gap = remainingGap();
+	if (gap > 0) {
+		const pts = Math.max(1, Math.ceil(gap / 0.35));
+		Space4x.mergeGiveClause(draft, { type: "researchPoints", n: pts });
+		bits.push("Added " + pts + " research points");
+	}
+	score = Space4x.aiScoreOffer(state, them, Space4x.diploDraftProbe(state, player, them, draft));
+	if (score >= need) {
 		return {
 			ok: true,
 			balanced: true,
-			message: "Added " + Space4x.fmtMoney(bump) + " to sweeten the deal.",
-			addedMoney: bump,
+			message: bits.length ? bits.join(". ") + "." : "They would likely accept this as written.",
 			score: score,
 			need: need
 		};
 	}
+	draft.give = snapshot;
 	return {
 		ok: false,
 		message: "Nothing will make this work — they want far more than you can afford to offer.",
@@ -1102,17 +1907,85 @@ Space4x.phaseResolvePendingOffers = function (state) {
 	state.offers = keep;
 };
 
+Space4x.aiStanceLabel = function (stance) {
+	if (stance === "conquer") return "on a war footing";
+	if (stance === "survive") return "seeking terms";
+	return "expanding";
+};
+
+Space4x.aiCultureWarlike = function (state, empire) {
+	if (!empire) return false;
+	if (Space4x.empireHasCultureEffect && Space4x.empireHasCultureEffect(state, empire, "warriors")) return true;
+	return Space4x.cultureTroopTsPct(state, empire.cultureId) >= 20;
+};
+
+Space4x.aiOpportunityRatio = function (state, empire) {
+	const cfg = Space4x.aiCfg(state);
+	let n = cfg.opportunityRatio != null ? cfg.opportunityRatio : 1.2;
+	if (Space4x.aiCultureWarlike(state, empire)) n = Math.min(n, 1.1);
+	const neg = Space4x.empireNegotiationPct(state, empire);
+	if (neg > 0) n += 0.1;
+	if (neg < 0) n -= 0.1;
+	return n;
+};
+
+Space4x.aiBoxedIn = function (state, empire) {
+	if (!empire || !Space4x.aiHasColonizeTarget) return false;
+	return !Space4x.aiHasColonizeTarget(state, empire);
+};
+
+Space4x.aiRivalInRange = function (state, me, them) {
+	const homes = Space4x.settlementsOf(state, them.id);
+	for (let i = 0; i < homes.length; i++) {
+		const star = Space4x.starById(state, homes[i].location.starId);
+		if (star && Space4x.inRangeOfEmpireAtCell(state, me.id, star.x, star.y)) return true;
+	}
+	return false;
+};
+
+Space4x.aiStance = function (state, empire) {
+	if (!empire) return "expand";
+	const wars = Space4x.aiWarTargets ? Space4x.aiWarTargets(state, empire) : [];
+	const homes = Space4x.settlementsOf(state, empire.id);
+	if (wars.length) {
+		let losing = false;
+		for (let i = 0; i < wars.length; i++) {
+			if (Space4x.threatAssessment(state, empire, wars[i]).ratio < 0.7) losing = true;
+		}
+		const foodGap = Space4x.empireFoodGap ? Space4x.empireFoodGap(state, empire.id) : 0;
+		if (losing || foodGap > 0 || homes.length <= 2) return "survive";
+		return "conquer";
+	}
+	if (Space4x.aiBoxedIn(state, empire)) return "conquer";
+	const need = Space4x.aiOpportunityRatio(state, empire);
+	const rivals = Space4x.contactedEmpires(state, empire);
+	for (let i = 0; i < rivals.length; i++) {
+		const them = rivals[i];
+		const rel = Space4x.relationOf(empire, them.id);
+		const att = rel ? rel.attitude || 0 : 0;
+		if (att >= 40) continue;
+		if (Space4x.threatAssessment(state, empire, them).ratio >= need) return "conquer";
+	}
+	return "expand";
+};
+
 Space4x.aiWantsWar = function (state, me, them) {
 	if (Space4x.atWar(me, them)) return false;
 	if (!Space4x.inContactWithEmpire(state, me.id, them.id)) return false;
 	const cfg = Space4x.aiCfg(state);
 	const rel = Space4x.relationOf(me, them.id);
 	const attitude = rel ? rel.attitude || 0 : 0;
-	const warAtt = cfg.warAttitude != null ? cfg.warAttitude : -25;
-	if (attitude > warAtt) return false;
+	if (attitude >= 40) return false;
 	const threat = Space4x.threatAssessment(state, me, them);
-	const need = cfg.warStrengthRatio != null ? cfg.warStrengthRatio : 1.05;
-	return threat.ratio >= need;
+	const warAtt = cfg.warAttitude != null ? cfg.warAttitude : -25;
+	const grudgeNeed = cfg.warStrengthRatio != null ? cfg.warStrengthRatio : 1.0;
+	if (attitude <= warAtt && threat.ratio >= grudgeNeed) return true;
+	const boxed = Space4x.aiBoxedIn(state, me);
+	if ((boxed || threat.ratio >= Space4x.aiOpportunityRatio(state, me)) &&
+		Space4x.aiRivalInRange(state, me, them)) {
+		return true;
+	}
+	return false;
 };
 
 Space4x.aiWantsPeace = function (state, me, them) {
@@ -1127,9 +2000,57 @@ Space4x.aiWantsPeace = function (state, me, them) {
 	return threat.ratio < weak;
 };
 
+Space4x.aiWantsPassage = function (state, me, them) {
+	if (!me || !them || Space4x.hasTreaty(me, them, "passage") || Space4x.atWar(me, them)) return false;
+	const theirHomes = Space4x.settlementsOf(state, them.id);
+	if (!theirHomes.length) return false;
+	const stats = Space4x.shipStats(state, me);
+	function inRangeFrom(stars, gx, gy) {
+		const w = Space4x.cellWorldPos(gx, gy);
+		for (let i = 0; i < stars.length; i++) {
+			const s = Space4x.cellWorldPos(stars[i].x, stars[i].y);
+			if (Space4x.dist(w.x, w.y, s.x, s.y) <= stats.range + 1e-9) return true;
+		}
+		return false;
+	}
+	const mine = Space4x.friendlyStars(state, me.id);
+	const extra = mine.slice();
+	for (let i = 0; i < theirHomes.length; i++) {
+		const star = Space4x.starById(state, theirHomes[i].location.starId);
+		if (star) extra.push(star);
+	}
+	const stars = state.galaxy && state.galaxy.stars ? state.galaxy.stars : [];
+	for (let i = 0; i < stars.length; i++) {
+		const st = stars[i];
+		if (!Space4x.emptyLegalBodies(state, st, me.id).length) continue;
+		if (inRangeFrom(mine, st.x, st.y)) continue;
+		if (inRangeFrom(extra, st.x, st.y)) return true;
+	}
+	const wars = Space4x.aiEnemyStars ? Space4x.aiEnemyStars(state, me) : [];
+	for (let i = 0; i < wars.length; i++) {
+		const st = wars[i].star;
+		if (inRangeFrom(mine, st.x, st.y)) continue;
+		if (inRangeFrom(extra, st.x, st.y)) return true;
+	}
+	return false;
+};
+
+Space4x.aiFillSurviveSweetener = function (state, empire, them, draft) {
+	const duration = Space4x.draftDuration(state, draft);
+	const money = Space4x.moneyRound(empire.stockpiles.money || 0);
+	if (money >= 5) {
+		const rate = Math.max(1, Math.min(8, Math.round(money * 0.05) || 2));
+		draft.give.push({ type: "tribute", resource: "money", n: rate, turns: duration });
+	} else {
+		draft.give.push({ type: "researchPoints", n: 20 });
+	}
+};
+
 Space4x.dumbDiplomacy = function (state, empire) {
 	if (!empire || empire.isPlayer) return;
+	const stance = Space4x.aiStance(state, empire);
 	const rivals = Space4x.contactedEmpires(state, empire);
+	const duration = Space4x.defaultTreatyTurns(state);
 	for (let i = 0; i < rivals.length; i++) {
 		const them = rivals[i];
 		if (Space4x.aiWantsWar(state, empire, them)) {
@@ -1140,24 +2061,50 @@ Space4x.dumbDiplomacy = function (state, empire) {
 		if (!Space4x.empireHasDiplomacy(state, them)) continue;
 		if (Space4x.offerBetween(state, empire.id, them.id) || Space4x.offerBetween(state, them.id, empire.id)) continue;
 		const draft = Space4x.emptyDraft();
-		if (Space4x.aiWantsPeace(state, empire, them)) draft.pacts.push("peace");
-		if (!Space4x.atWar(empire, them) || draft.pacts.indexOf("peace") >= 0) {
-			if (Space4x.canProposePact(state, empire, them, "trade") && Space4x.aiPactScore(state, empire, them, "trade") >= 4) {
-				draft.pacts.push("trade");
+		draft.duration = duration;
+		const atWar = Space4x.atWar(empire, them);
+		const vsStance = atWar && Space4x.threatAssessment(state, empire, them).ratio < 0.7 ? "survive" : stance;
+		if (atWar && (vsStance === "survive" || Space4x.aiWantsPeace(state, empire, them))) {
+			draft.pacts.push("peace");
+			Space4x.aiFillSurviveSweetener(state, empire, them, draft);
+		}
+		if (!atWar || draft.pacts.indexOf("peace") >= 0) {
+			const timed = ["trade", "research"];
+			for (let p = 0; p < timed.length; p++) {
+				const id = timed[p];
+				if (!Space4x.canProposePact(state, empire, them, id)) continue;
+				if (Space4x.hasTreaty(empire, them, id)) {
+					if (Space4x.treatyTurnsLeft(state, empire, them, id) <= 4 &&
+						Space4x.aiPactScore(state, empire, them, id, duration) >= 0) {
+						draft.pacts.push(id);
+					}
+					continue;
+				}
+				if (Space4x.aiPactScore(state, empire, them, id, duration) >= 4) draft.pacts.push(id);
 			}
-			if (Space4x.canProposePact(state, empire, them, "research") && Space4x.aiPactScore(state, empire, them, "research") >= 4) {
-				draft.pacts.push("research");
+			if (Space4x.canProposePact(state, empire, them, "passage") &&
+				Space4x.aiWantsPassage(state, empire, them)) {
+				draft.pacts.push("passage");
+			}
+			if (Space4x.canProposePact(state, empire, them, "stopSpies") &&
+				Space4x.spiesOnEmpire(state, them, empire.id) > 0) {
+				draft.pacts.push("stopSpies");
+			}
+		}
+		if (stance === "conquer" && !atWar) {
+			const threat = Space4x.threatAssessment(state, empire, them);
+			const rel = Space4x.relationOf(empire, them.id);
+			const att = rel ? rel.attitude || 0 : 0;
+			if (threat.ratio >= 1.15 && att < 40) {
+				const income = Space4x.producedMoney(state, them);
+				const rate = Math.max(2, Math.round((income || 4) * 0.2) || 2);
+				draft.want.push({ type: "tribute", resource: "money", n: rate, turns: duration });
 			}
 		}
 		draft.pacts = Space4x.filterProposedPacts(state, empire, them, draft.pacts);
-		if (!draft.pacts.length) continue;
-		const probe = {
-			fromId: empire.id,
-			toId: them.id,
-			give: [],
-			want: [],
-			pacts: draft.pacts.slice()
-		};
+		if (!draft.pacts.length && !draft.give.length && !draft.want.length) continue;
+		const probe = Space4x.diploDraftProbe(state, empire, them, draft);
+		if (!Space4x.packageValid(state, empire, them, probe)) continue;
 		if (!them.isPlayer && !Space4x.aiAcceptsOffer(state, them, probe) && draft.pacts.indexOf("peace") < 0) continue;
 		Space4x.submitOffer(state, empire.id, them.id, draft);
 	}

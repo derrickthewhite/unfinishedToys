@@ -72,6 +72,7 @@ Space4x.inTransitFreighterHulls = function (state, empireId) {
 	for (let i = 0; i < state.units.length; i++) {
 		const u = state.units[i];
 		if (empireId && u.empireId !== empireId) continue;
+		if (Space4x.isSpindelHauler(state, u)) continue;
 		n += Space4x.unitFreighterHulls(state, u);
 	}
 	return n;
@@ -252,6 +253,15 @@ Space4x.applyStarName = function (state, starId, newName) {
 	return true;
 };
 
+Space4x.applyEmpireName = function (state, empireId, newName) {
+	newName = (newName || "").trim();
+	if (!newName) return false;
+	const empire = Space4x.empireById(state, empireId);
+	if (!empire) return false;
+	empire.name = newName;
+	return true;
+};
+
 Space4x.settlementById = function (state, id) {
 	for (let i = 0; i < state.settlements.length; i++) {
 		if (state.settlements[i].id === id) return state.settlements[i];
@@ -276,7 +286,11 @@ Space4x.destroySettlement = function (state, settlementId, reason) {
 		if (Space4x.isPopHauler(state, unit) || Space4x.isTroopHauler(state, unit)) {
 			if (unit.destSettlementId === settlementId || unit.originSettlementId === settlementId) {
 				const empire = Space4x.empireById(state, unit.empireId);
-				if (empire) empire.transport.freighters += unit.hulls || 0;
+				if (empire) {
+					Space4x.ensureTransportPools(empire);
+					if (Space4x.isSpindelHauler(state, unit)) empire.transport.spindelNavigators += unit.hulls || 0;
+					else empire.transport.freighters += unit.hulls || 0;
+				}
 				state.units.splice(i, 1);
 			}
 			continue;
@@ -443,8 +457,10 @@ Space4x.empireHasWarp = function (state, empire) {
 	return Space4x.empireHasTech(empire, id);
 };
 
-Space4x.canLeaveSystem = function (state, empire, fromStarId, toStarId) {
+Space4x.canLeaveSystem = function (state, empire, fromStarId, toStarId, opts) {
+	opts = opts || {};
 	if (!toStarId || fromStarId === toStarId) return true;
+	if (opts.spindelWeb) return true;
 	return Space4x.empireHasWarp(state, empire);
 };
 
@@ -473,11 +489,14 @@ Space4x.canSettleBody = function (state, empire, body) {
 };
 
 Space4x.unitLabel = function (state, unit) {
-	if (Space4x.isPopHauler(state, unit)) return "Freighter";
+	if (Space4x.isPopHauler(state, unit)) {
+		return Space4x.isSpindelHauler(state, unit) ? "Spindel Navigator" : "Freighter";
+	}
 	if (Space4x.isTroopHauler(state, unit)) {
 		const cargo = unit.cargoTroops || [];
-		if (cargo.length) return Space4x.troopCargoLabel(state, cargo);
-		return "Troop transport";
+		const prefix = Space4x.isSpindelHauler(state, unit) ? "Spindel · " : "";
+		if (cargo.length) return prefix + Space4x.troopCargoLabel(state, cargo);
+		return prefix + "Troop transport";
 	}
 	const def = Space4x.settingOf(state).builds[unit.defId];
 	return def ? def.name : unit.defId;
@@ -668,7 +687,7 @@ Space4x.richnessOf = function (state, body) {
 };
 
 Space4x.shipHasLeft = function (unit) {
-	return !!(unit && unit.location && unit.location.kind === "space");
+	return !!(unit && unit.location && unit.location.kind === "space" && unit.targetStarId);
 };
 
 Space4x.shipCanTakeOrders = function (state, unit) {
@@ -750,12 +769,14 @@ Space4x.invasionFleetsForSettlement = function (state, empireId, settlement) {
 	if (!attacker || settlement.empireId === empireId) return [];
 	if (!Space4x.atWar(attacker, settlement.empireId)) return [];
 	const starId = settlement.location.starId;
-	if (Space4x.enemyCombatShipsAtStar(state, empireId, starId).length) return [];
+	const blocked = Space4x.enemyCombatShipsAtStar(state, empireId, starId).length > 0;
 	const reserved = Space4x.pendingInvasionFleets(state, empireId);
 	const selected = Space4x.selectedTroopFleetsAtStar(state, empireId, starId);
 	let fleets = selected.length ? selected : Space4x.troopFleetsAtStar(state, empireId, starId);
 	fleets = fleets.filter(function (u) {
-		return !reserved[u.id] && Space4x.fleetHasInvadingTroops(state, u);
+		if (reserved[u.id] || !Space4x.fleetHasInvadingTroops(state, u)) return false;
+		if (blocked && !Space4x.fleetCanInvadePastShips(state, u)) return false;
+		return true;
 	});
 	return fleets;
 };
@@ -826,8 +847,6 @@ Space4x.invasionSituation = function (state, starId, empireId) {
 	}
 	if (pending && !any) {
 		out.text = "Invasion ordered here (resolves end of turn).";
-	} else if (blockedByShips && fleets.length) {
-		out.text = "Enemy combat ships in system block invasion.";
 	} else if (any) {
 		if (selected.length) {
 			out.text = selected.length + " troop transport" + (selected.length === 1 ? "" : "s") +
@@ -836,6 +855,9 @@ Space4x.invasionSituation = function (state, starId, empireId) {
 			out.text = fleets.length + " troop transport" + (fleets.length === 1 ? "" : "s") +
 				" in orbit. Click Invade on an enemy world.";
 		}
+		if (blockedByShips) out.text += " High Orbit Troopers ignore enemy ships.";
+	} else if (blockedByShips && fleets.length) {
+		out.text = "Enemy combat ships in system block invasion.";
 	} else if (onlyDefensive) {
 		out.text = "Militia and other defensive troops cannot invade.";
 	} else if (needSelect) {
@@ -957,12 +979,14 @@ Space4x.selectedUnits = function (state) {
 	return out;
 };
 
-Space4x.emptyLegalBodies = function (state, star, empireId) {
+Space4x.emptyLegalBodies = function (state, star, empireId, opts) {
+	opts = opts || {};
 	const empire = empireId ? Space4x.empireById(state, empireId) : null;
 	const out = [];
 	for (let i = 0; i < star.bodies.length; i++) {
 		const body = star.bodies[i];
 		if (!Space4x.canSettleBody(state, empire, body)) continue;
+		if (opts.spindelOnly && !Space4x.bodyHasSpindel(body)) continue;
 		let taken = false;
 		for (let j = 0; j < state.settlements.length; j++) {
 			if (state.settlements[j].location.bodyId === body.id) taken = true;
@@ -984,6 +1008,14 @@ Space4x.empireHasGalaxyScan = function (state, empireId) {
 	Space4x.eachEmpireStructureEffect(state, empireId, function (def, fx) {
 		if (fx.type === "galaxyScan") found = true;
 	});
+	if (!found && Space4x.eachActiveLendTo) {
+		Space4x.eachActiveLendTo(state, empireId, function (def) {
+			const fx = def.effects || [];
+			for (let i = 0; i < fx.length; i++) {
+				if (fx[i].type === "galaxyScan") found = true;
+			}
+		});
+	}
 	return found;
 };
 

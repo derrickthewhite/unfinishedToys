@@ -64,7 +64,8 @@ Space4x.settlementHungry = function (state, settlement) {
 		const sit = Space4x.foodSituation(state, settlement);
 		present = sit.present;
 	}
-	return present < pops;
+	const support = Space4x.settlementFoodSupport(state, settlement, present);
+	return support.foodShort;
 };
 
 Space4x.settlementStarveMemory = function (settlement) {
@@ -185,11 +186,41 @@ Space4x.applyOccupationChange = function (state, settlement, newOwner, previousO
 	Space4x.applyConquestLoyaltyPenalty(state, settlement, fromId, amount);
 };
 
+Space4x.empireJobLoyalty = function (state, empire, job) {
+	let n = 0;
+	Space4x.eachEmpireTechEffect(state, empire, function (tech, fx) {
+		if (fx.type !== "jobLoyalty") return;
+		if (fx.job && fx.job !== job) return;
+		if (fx.jobs && fx.jobs.length) {
+			let hit = false;
+			for (let i = 0; i < fx.jobs.length; i++) {
+				if (fx.jobs[i] === job) hit = true;
+			}
+			if (!hit) return;
+		}
+		n += fx.n || 0;
+	});
+	return n;
+};
+
+Space4x.empireConquestHealStep = function (state, empire) {
+	let step = 1;
+	Space4x.eachEmpireTechEffect(state, empire, function (tech, fx) {
+		if (fx.type === "conquestHealMult") {
+			const n = Math.round(fx.mult || 1);
+			if (n > step) step = n;
+		}
+	});
+	return step;
+};
+
 Space4x.healLoyaltyMods = function (state) {
 	const list = state.settlements || [];
 	for (let s = 0; s < list.length; s++) {
 		const mods = list[s].loyaltyMods;
 		if (!mods) continue;
+		const empire = Space4x.empireById(state, list[s].empireId);
+		const conquestStep = Space4x.empireConquestHealStep(state, empire);
 		const keys = Object.keys(mods);
 		for (let i = 0; i < keys.length; i++) {
 			const row = mods[keys[i]];
@@ -201,15 +232,18 @@ Space4x.healLoyaltyMods = function (state) {
 			row.heal = (row.heal || 0) + 1;
 			if (row.heal < every) continue;
 			row.heal = 0;
-			if (row.delta > 0) row.delta -= 1;
-			else if (row.delta < 0) row.delta += 1;
+			const step = row.source === "conquest" ? conquestStep : 1;
+			if (row.delta > 0) row.delta -= Math.min(row.delta, step);
+			else if (row.delta < 0) row.delta += Math.min(-row.delta, step);
 			if (!row.delta) delete mods[keys[i]];
 		}
 	}
 };
 
 Space4x.groupLoyalty = function (state, settlement, job, cultureId) {
+	const empire = settlement ? Space4x.empireById(state, settlement.empireId) : null;
 	let n = Space4x.cultureLoyalty(state, settlement, cultureId) + Space4x.groupSpyDelta(settlement, job, cultureId);
+	n += Space4x.empireJobLoyalty(state, empire, job);
 	if (n < 0) n = 0;
 	if (n > 100) n = 100;
 	return n;
@@ -234,6 +268,12 @@ Space4x.loyaltyExplain = function (state, settlement, cultureId, job) {
 	}
 	const civic = empire && empire.modifiers ? empire.modifiers.loyalty : 0;
 	if (civic) lines.push((civic > 0 ? "+" : "") + civic + " tech");
+	if (job) {
+		const jobLoy = Space4x.empireJobLoyalty(state, empire, job);
+		if (jobLoy) {
+			lines.push((jobLoy > 0 ? "+" : "") + jobLoy + " " + Space4x.jobLabel(state, job) + " tech");
+		}
+	}
 	Space4x.eachStructureEffect(state, settlement, function (def, fx) {
 		if (fx.type !== "settlementLoyalty" || !fx.n) return;
 		lines.push((fx.n > 0 ? "+" : "") + fx.n + " " + def.name);
@@ -464,28 +504,216 @@ Space4x.majorityCultureOfPops = function (state, pops, fallback) {
 	return tied[0];
 };
 
-Space4x.revoltEmpireName = function (state, settlement) {
-	const base = settlement.name + " revolt";
-	function taken(name) {
-		for (let i = 0; i < state.empires.length; i++) {
-			if (state.empires[i].name === name) return true;
-		}
-		return false;
+Space4x.empireNameTaken = function (state, name) {
+	const list = state.empires || [];
+	for (let i = 0; i < list.length; i++) {
+		if (list[i].name === name) return true;
 	}
-	if (!taken(base)) return base;
+	return false;
+};
+
+Space4x.isDormantEmpire = function (empire) {
+	return !!(empire && empire.dormant);
+};
+
+Space4x.isActiveEmpire = function (empire) {
+	return !!(empire && !empire.dormant);
+};
+
+Space4x.revoltNameSuffixes = function (state) {
+	const rules = Space4x.revoltRules(state);
+	const list = rules && rules.nameSuffixes;
+	if (list && list.length) return list.slice();
+	return [
+		"Rebellion", "Movement", "Revolt", "Independence", "Militia",
+		"New Way", "Grand Path", "Association", "Resistance", "$newParent"
+	];
+};
+
+Space4x.buildRevoltEmpireName = function (state, cultureId, parent, suffix) {
+	const species = Space4x.cultureName(state, cultureId) || "Rebel";
+	if (suffix === "$newParent") {
+		const parentName = parent && parent.name ? parent.name : "Empire";
+		return "New " + parentName;
+	}
+	return species + " " + suffix;
+};
+
+Space4x.revoltEmpireName = function (state, settlement, cultureId, parent) {
+	const suffixes = Space4x.revoltNameSuffixes(state);
+	for (let i = 0; i < suffixes.length; i++) {
+		const name = Space4x.buildRevoltEmpireName(state, cultureId, parent, suffixes[i]);
+		if (!Space4x.empireNameTaken(state, name)) return name;
+	}
+	const species = Space4x.cultureName(state, cultureId) || "Rebel";
+	const base = species + " Rebellion";
+	if (!Space4x.empireNameTaken(state, base)) return base;
 	let n = 2;
-	while (taken(base + " " + n)) n += 1;
+	while (Space4x.empireNameTaken(state, base + " " + n)) n += 1;
 	return base + " " + n;
 };
 
+Space4x.findDormantRevoltEmpire = function (state, cultureId) {
+	const list = state.empires || [];
+	for (let i = 0; i < list.length; i++) {
+		const e = list[i];
+		if (!e.dormant || !e.isRevoltPolity) continue;
+		if (cultureId && e.cultureId !== cultureId) continue;
+		return e;
+	}
+	return null;
+};
+
+// Same-species revolts share one polity. Only mint another when revolting
+// against an already-active revolt of that species (rebellion-from-rebellion).
+Space4x.findReusableRevoltEmpire = function (state, cultureId, parent) {
+	const parentId = parent && parent.id;
+	const list = state.empires || [];
+	for (let i = 0; i < list.length; i++) {
+		const e = list[i];
+		if (e.dormant || !e.isRevoltPolity) continue;
+		if (cultureId && e.cultureId !== cultureId) continue;
+		if (e.id === parentId) continue;
+		return e;
+	}
+	return Space4x.findDormantRevoltEmpire(state, cultureId);
+};
+
+Space4x.mergeScoreHistoryEmpire = function (state, fromId, intoId) {
+	if (!fromId || !intoId || fromId === intoId) return;
+	const history = state.scoreHistory || [];
+	for (let t = 0; t < history.length; t++) {
+		const scores = history[t].scores;
+		if (!scores || !scores[fromId]) continue;
+		const src = scores[fromId];
+		const dst = scores[intoId] || (scores[intoId] = {});
+		const keys = Object.keys(src);
+		for (let k = 0; k < keys.length; k++) {
+			const key = keys[k];
+			dst[key] = (dst[key] || 0) + (src[key] || 0);
+		}
+		delete scores[fromId];
+	}
+	if (state.scoreEmpireMeta) delete state.scoreEmpireMeta[fromId];
+};
+
+Space4x.mergeRevoltPolityInto = function (state, from, into) {
+	if (!from || !into || from.id === into.id) return;
+	const homes = Space4x.settlementsOf(state, from.id).slice();
+	for (let i = 0; i < homes.length; i++) {
+		Space4x.transferSettlement(state, homes[i], into);
+	}
+	const ships = [];
+	for (let i = 0; i < (state.units || []).length; i++) {
+		if (state.units[i].empireId === from.id) ships.push(state.units[i]);
+	}
+	for (let i = 0; i < ships.length; i++) {
+		if (Space4x.transferShip) Space4x.transferShip(state, ships[i], into);
+		else ships[i].empireId = into.id;
+	}
+	const money = Space4x.moneyRound((from.stockpiles && from.stockpiles.money) || 0);
+	if (money) {
+		from.stockpiles.money = 0;
+		into.stockpiles = into.stockpiles || { money: 0 };
+		into.stockpiles.money = Space4x.moneyRound((into.stockpiles.money || 0) + money);
+	}
+	Space4x.mergeScoreHistoryEmpire(state, from.id, into.id);
+	if (Space4x.forgetEmpireDiplomacy) Space4x.forgetEmpireDiplomacy(state, from.id);
+	state.empires = state.empires.filter(function (e) { return e.id !== from.id; });
+};
+
+Space4x.consolidateRevoltPolities = function (state) {
+	if (!state || !state.empires) return;
+	const byCulture = {};
+	for (let i = 0; i < state.empires.length; i++) {
+		const e = state.empires[i];
+		if (!e.isRevoltPolity) continue;
+		const key = e.cultureId || e.id;
+		if (!byCulture[key]) byCulture[key] = [];
+		byCulture[key].push(e);
+	}
+	const cultures = Object.keys(byCulture);
+	for (let c = 0; c < cultures.length; c++) {
+		const list = byCulture[cultures[c]];
+		if (list.length < 2) continue;
+		list.sort(function (a, b) {
+			if (!!a.dormant !== !!b.dormant) return a.dormant ? 1 : -1;
+			return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+		});
+		const keeper = list[0];
+		let oldest = list[0];
+		for (let i = 1; i < list.length; i++) {
+			if (String(list[i].id).localeCompare(String(oldest.id), undefined, { numeric: true }) < 0) {
+				oldest = list[i];
+			}
+		}
+		if (oldest && oldest.name) keeper.name = oldest.name;
+		for (let i = 1; i < list.length; i++) {
+			Space4x.mergeRevoltPolityInto(state, list[i], keeper);
+		}
+	}
+};
+
+Space4x.mothballRevoltEmpire = function (state, empire) {
+	if (!empire || empire.isPlayer) return false;
+	empire.dormant = true;
+	empire.isRevoltPolity = true;
+	empire.revoltJoinOffered = false;
+	empire.revoltJoinDueTurn = null;
+	empire.spies = [];
+	empire.stockpiles = { money: 0 };
+	empire.transport = { freighters: 0, spindelNavigators: 0 };
+	empire.relations = {};
+	empire.knackFirstStructure = {};
+	if (Space4x.forgetEmpireDiplomacy) Space4x.forgetEmpireDiplomacy(state, empire.id);
+	return true;
+};
+
+Space4x.reviveRevoltEmpire = function (state, rebel, parent, settlement) {
+	if (!rebel || !parent || !settlement) return null;
+	rebel.dormant = false;
+	rebel.isRevoltPolity = true;
+	rebel.revoltFromEmpireId = parent.id;
+	rebel.revoltJoinDueTurn = null;
+	rebel.revoltJoinOffered = false;
+	rebel.isPlayer = false;
+	rebel.aiId = "dumb";
+	rebel.spies = [];
+	rebel.stockpiles = { money: 0 };
+	rebel.transport = { freighters: 0, spindelNavigators: 0 };
+	rebel.relations = {};
+	rebel.knackFirstStructure = {};
+	Space4x.copyEmpireResearch(state, parent, rebel);
+	rebel.exploredStarIds = (parent.exploredStarIds || []).slice();
+	Space4x.markStarExplored(state, rebel.id, settlement.location.starId);
+	return rebel;
+};
+
+Space4x.attachToRevoltEmpire = function (state, rebel, parent, settlement) {
+	if (!rebel || !parent || !settlement) return null;
+	if (rebel.dormant) return Space4x.reviveRevoltEmpire(state, rebel, parent, settlement);
+	rebel.isRevoltPolity = true;
+	rebel.revoltFromEmpireId = parent.id;
+	Space4x.markStarExplored(state, rebel.id, settlement.location.starId);
+	return rebel;
+};
+
 Space4x.createRevoltEmpire = function (state, parent, settlement, cultureId) {
+	const cid = cultureId || (parent && parent.cultureId);
+	const existing = Space4x.findReusableRevoltEmpire(state, cid, parent);
+	if (existing) {
+		Space4x.attachToRevoltEmpire(state, existing, parent, settlement);
+		return existing;
+	}
 	const rebel = Space4x.createEmpire(state, {
 		id: Space4x.nextId(state, "e"),
-		name: Space4x.revoltEmpireName(state, settlement),
+		name: Space4x.revoltEmpireName(state, settlement, cid, parent),
 		isPlayer: false,
 		aiId: "dumb",
-		cultureId: cultureId || parent.cultureId
+		cultureId: cid
 	});
+	rebel.isRevoltPolity = true;
+	rebel.revoltFromEmpireId = parent ? parent.id : null;
 	Space4x.copyEmpireResearch(state, parent, rebel);
 	rebel.exploredStarIds = (parent.exploredStarIds || []).slice();
 	Space4x.markStarExplored(state, rebel.id, settlement.location.starId);
@@ -499,6 +727,10 @@ Space4x.removeEmpireIfEmpty = function (state, empireId) {
 	if (Space4x.settlementsOf(state, empireId).length) return;
 	for (let i = 0; i < state.units.length; i++) {
 		if (state.units[i].empireId === empireId) return;
+	}
+	if (empire.isRevoltPolity || empire.dormant) {
+		Space4x.mothballRevoltEmpire(state, empire);
+		return;
 	}
 	state.empires = state.empires.filter(function (e) { return e.id !== empireId; });
 	if (Space4x.forgetEmpireDiplomacy) Space4x.forgetEmpireDiplomacy(state, empireId);
@@ -517,7 +749,7 @@ Space4x.empirePopCount = function (state, empireId) {
 };
 
 Space4x.endRevoltIfNoPopulace = function (state, empire) {
-	if (!empire || !empire.isRevoltPolity || empire.isPlayer) return false;
+	if (!empire || !empire.isRevoltPolity || empire.isPlayer || empire.dormant) return false;
 	if (Space4x.empirePopCount(state, empire.id) > 0) return false;
 	const name = empire.name;
 	const homes = Space4x.settlementsOf(state, empire.id).slice();
@@ -532,9 +764,7 @@ Space4x.endRevoltIfNoPopulace = function (state, empire) {
 		}
 	}
 	state.units = (state.units || []).filter(function (u) { return u.empireId !== empire.id; });
-	empire.isRevoltPolity = false;
-	state.empires = state.empires.filter(function (e) { return e.id !== empire.id; });
-	if (Space4x.forgetEmpireDiplomacy) Space4x.forgetEmpireDiplomacy(state, empire.id);
+	Space4x.mothballRevoltEmpire(state, empire);
 	state.turnLog.push(name + " ends — no populace remains" +
 		(parent ? "; worlds revert to " + parent.name : "") + ".");
 	return true;
@@ -559,7 +789,7 @@ Space4x.revoltPolities = function (state) {
 	const out = [];
 	const list = state.empires || [];
 	for (let i = 0; i < list.length; i++) {
-		if (list[i].isRevoltPolity) out.push(list[i]);
+		if (list[i].isRevoltPolity && !list[i].dormant) out.push(list[i]);
 	}
 	return out;
 };
@@ -578,7 +808,7 @@ Space4x.strongestEmpire = function (state, empires) {
 };
 
 Space4x.findRevoltJoinTarget = function (state, rebel) {
-	if (!rebel || !rebel.isRevoltPolity) return null;
+	if (!rebel || !rebel.isRevoltPolity || rebel.dormant) return null;
 	const parentId = rebel.revoltFromEmpireId;
 	const cultureId = rebel.cultureId;
 	if (!cultureId) return null;
@@ -606,6 +836,8 @@ Space4x.findRevoltJoinTarget = function (state, rebel) {
 
 Space4x.setRevoltWar = function (state, rebel, parent) {
 	if (!rebel || !parent || rebel.id === parent.id) return;
+	rebel.isRevoltPolity = true;
+	rebel.revoltFromEmpireId = parent.id;
 	if (Space4x.atWar(rebel, parent)) return;
 	Space4x.setPairFlag(rebel, parent, "war", true);
 	if (Space4x.clearTreaties) Space4x.clearTreaties(rebel, parent);
@@ -702,7 +934,7 @@ Space4x.revoltJoinOfferClauses = function (state, rebel) {
 };
 
 Space4x.absorbRevoltPolity = function (state, rebel, target) {
-	if (!rebel || !target || rebel.id === target.id) return false;
+	if (!rebel || !target || rebel.id === target.id || rebel.dormant) return false;
 	const rebelName = rebel.name;
 	const targetName = target.name;
 	const settlements = Space4x.settlementsOf(state, rebel.id).slice();
@@ -719,9 +951,7 @@ Space4x.absorbRevoltPolity = function (state, rebel, target) {
 		rebel.stockpiles.money = 0;
 		target.stockpiles.money = Space4x.moneyRound((target.stockpiles.money || 0) + money);
 	}
-	rebel.isRevoltPolity = false;
-	state.empires = state.empires.filter(function (e) { return e.id !== rebel.id; });
-	if (Space4x.forgetEmpireDiplomacy) Space4x.forgetEmpireDiplomacy(state, rebel.id);
+	Space4x.mothballRevoltEmpire(state, rebel);
 	const summary = rebelName + " joins " + targetName + ".";
 	state.turnLog.push(summary);
 	if (!target.isPlayer) {

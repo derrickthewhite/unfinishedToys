@@ -29,6 +29,24 @@ Space4x.euclid = function (ax, ay, bx, by) {
 	return Math.sqrt(dx * dx + dy * dy);
 };
 
+Space4x.empireShipAttackBonus = function (state, empire) {
+	let n = empire && empire.modifiers ? (empire.modifiers.shipAttack || 0) : 0;
+	if (!empire) return n;
+	Space4x.eachCultureEffect(state, empire.cultureId, function (c, fx) {
+		if (fx.type === "shipAttack") n += fx.n || 0;
+	});
+	return n;
+};
+
+Space4x.empireShipDefenseBonus = function (state, empire) {
+	let n = empire && empire.modifiers ? (empire.modifiers.shipDefense || 0) : 0;
+	if (!empire) return n;
+	Space4x.eachCultureEffect(state, empire.cultureId, function (c, fx) {
+		if (fx.type === "shipDefense") n += fx.n || 0;
+	});
+	return n;
+};
+
 Space4x.stepCost = function (dx, dy) {
 	if (!dx && !dy) return 0;
 	if (dx && dy) return Math.sqrt(2);
@@ -723,14 +741,15 @@ Space4x.beamHitChance = function (state, battle, shooter, target, item) {
 	const cfg = Space4x.spaceCombatCfg(state);
 	const dist = Space4x.euclid(shooter.x, shooter.y, target.x, target.y);
 	const atkEmp = Space4x.empireById(state, shooter.empireId);
-	let attack = (cfg.attackSkill || 100);
+	const defEmp = target ? Space4x.empireById(state, target.empireId) : null;
+	let attack = (cfg.attackSkill || 100) + Space4x.empireShipAttackBonus(state, atkEmp);
 	if (shooter.load) {
 		for (let i = 0; i < shooter.load.length; i++) {
 			const loadItem = Space4x.spaceLoadItem(state, shooter.load[i].itemId);
 			if (loadItem && loadItem.attackSkill) attack += loadItem.attackSkill;
 		}
 	}
-	const dodge = cfg.dodgeSkill || 50;
+	let dodge = (cfg.dodgeSkill || 50) + Space4x.empireShipDefenseBonus(state, defEmp);
 	if (item && item.attackSkill) attack += item.attackSkill;
 	const penMult = item && item.rangePenaltyMult != null ? item.rangePenaltyMult : 1;
 	const pen = (cfg.rangePenaltyPerSquare || 1) * dist * penMult;
@@ -998,6 +1017,14 @@ Space4x.resetRoundEnergy = function (battle) {
 	}
 };
 
+Space4x.empireMissileHitPct = function (state, empire) {
+	let best = 0;
+	Space4x.eachEmpireTechEffect(state, empire, function (tech, fx) {
+		if (fx.type === "missileHitPct" && (fx.pct || 0) > best) best = fx.pct || 0;
+	});
+	return best;
+};
+
 Space4x.regenShields = function (state, battle) {
 	const pct = (Space4x.spaceCombatCfg(state).shieldRegenPct || 25) / 100;
 	const list = battle.tokens || [];
@@ -1026,7 +1053,10 @@ Space4x.advanceMissiles = function (state, battle) {
 		Space4x.moveTokenToward(state, battle, m, target.x, target.y, 40);
 		if (Space4x.euclid(m.x, m.y, target.x, target.y) <= 1.01) {
 			const cfg = Space4x.spaceCombatCfg(state);
-			const chance = Math.max(0, (cfg.missileSkill || 70) - (cfg.missileEvasion || 0));
+			const empire = Space4x.empireById(state, m.empireId);
+			const pct = Space4x.empireMissileHitPct(state, empire);
+			const base = cfg.missileSkill || 70;
+			const chance = Math.max(0, Math.round(base * (1 + pct / 100)) - (cfg.missileEvasion || 0));
 			if (Space4x.rngInt(state, 100) < chance) {
 				const result = Space4x.applyDamage(state, battle, target, m.x, m.y, m.damage);
 				battle.log.push("Missile hits " + (target.name || "target") + " for " + m.damage + ".");
@@ -1060,7 +1090,11 @@ Space4x.fireFighterShot = function (state, battle, shooter, target, opts) {
 	opts = opts || {};
 	const cfg = Space4x.spaceCombatCfg(state);
 	const dist = Space4x.euclid(shooter.x, shooter.y, target.x, target.y);
-	const chance = Math.max(0, Math.min(100, (cfg.attackSkill || 100) - (cfg.dodgeSkill || 50) - (cfg.rangePenaltyPerSquare || 1) * dist));
+	const atkEmp = Space4x.empireById(state, shooter.empireId);
+	const defEmp = target ? Space4x.empireById(state, target.empireId) : null;
+	const attack = (cfg.attackSkill || 100) + Space4x.empireShipAttackBonus(state, atkEmp);
+	const dodge = (cfg.dodgeSkill || 50) + Space4x.empireShipDefenseBonus(state, defEmp);
+	const chance = Math.max(0, Math.min(100, attack - dodge - (cfg.rangePenaltyPerSquare || 1) * dist));
 	if (Space4x.rngInt(state, 100) >= chance) {
 		battle.log.push("Fighter misses " + (target.name || "target") + ".");
 		if (!opts.noFx) Space4x.queueSpaceCombatHitFx(battle, shooter, target, null, { miss: true });

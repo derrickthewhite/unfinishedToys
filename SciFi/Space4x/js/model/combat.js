@@ -28,9 +28,13 @@ Space4x.troopListTagTs = function (state, empire, troops, tag) {
 
 Space4x.quickCombatDamage = function (state, atkEmpire, atkTroops, defEmpire, defTroops) {
 	const total = Space4x.troopListTs(state, atkEmpire, atkTroops);
-	if (!(total > 0)) return { damage: 0, d20: 0, extras: [] };
+	if (!(total > 0)) {
+		return { damage: 0, d20: 0, general: 0, categories: [], extras: [] };
+	}
 	const d20 = 1 + Space4x.rngInt(state, 20);
-	let damage = Math.ceil(total * d20 / 100);
+	const general = Math.ceil(total * d20 / 100);
+	let damage = general;
+	const categories = [{ tag: "General", damage: general }];
 	const extras = [];
 	const tags = ["Air", "Armor", "Infantry"];
 	for (let i = 0; i < tags.length; i++) {
@@ -39,10 +43,13 @@ Space4x.quickCombatDamage = function (state, atkEmpire, atkTroops, defEmpire, de
 		if (!(atkT > 0)) continue;
 		if (defT > 0 && atkT < defT * 1.5) continue;
 		const d10 = 1 + Space4x.rngInt(state, 10);
-		damage += Math.ceil(total * d10 / 100);
-		extras.push({ tag: tags[i], d10: d10 });
+		const extra = Math.ceil(total * d10 / 100);
+		damage += extra;
+		const row = { tag: tags[i], d10: d10, damage: extra };
+		extras.push(row);
+		categories.push({ tag: tags[i], damage: extra, d10: d10 });
 	}
-	return { damage: damage, d20: d20, extras: extras };
+	return { damage: damage, d20: d20, general: general, categories: categories, extras: extras };
 };
 
 Space4x.pruneTroopsByLoss = function (state, empire, troops, remain) {
@@ -85,10 +92,14 @@ Space4x.quickCombat = function (state, atk, def) {
 		defPool = Math.max(0, defPool - hitDef.damage);
 		rounds.push({
 			n: n,
+			atkTs: atkPool,
+			defTs: defPool,
 			atkDealt: hitDef.damage,
 			defDealt: hitAtk.damage,
 			atkPool: atkPool,
-			defPool: defPool
+			defPool: defPool,
+			atkCategories: hitDef.categories,
+			defCategories: hitAtk.categories
 		});
 	}
 	let winner = "defender";

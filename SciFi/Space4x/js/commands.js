@@ -71,17 +71,36 @@ Space4x.createCommands = function (app) {
 		after();
 		const player = Space4x.playerEmpire(app.state);
 		const homes = player ? Space4x.settlementsOf(app.state, player.id) : [];
-		if (homes.length) {
-			const starId = homes[0].location.starId;
-			const star = Space4x.starById(app.state, starId);
+		const starId = homes.length ? homes[0].location.starId : null;
+		const star = starId ? Space4x.starById(app.state, starId) : null;
+
+		function askStarName() {
+			if (!starId || !star) return;
 			Space4x.showPromptModal(app.ui, {
 				message: "Name your home star system.",
-				value: star ? star.name : "",
+				label: "Star system",
+				value: star.name || "",
 				onOk: function (name) {
 					Space4x.applyStarName(app.state, starId, name);
 					app.sync();
 				}
 			});
+		}
+
+		if (player) {
+			Space4x.showPromptModal(app.ui, {
+				message: "Name your empire.",
+				label: "Empire",
+				value: player.name || "",
+				onOk: function (name) {
+					Space4x.applyEmpireName(app.state, player.id, name);
+					app.sync();
+					askStarName();
+				},
+				onCancel: askStarName
+			});
+		} else {
+			askStarName();
 		}
 	};
 
@@ -106,6 +125,10 @@ Space4x.createCommands = function (app) {
 	cmds.setGalaxyPreset = function (id) {
 		if (id === "custom") return;
 		Space4x.applyGalaxyPreset(app.state.gen, id);
+		const gen = app.state.gen;
+		if (app.ui.genWidth) app.ui.genWidth.value = String(gen.width);
+		if (app.ui.genHeight) app.ui.genHeight.value = String(gen.height);
+		if (app.ui.genStars) app.ui.genStars.value = String(gen.starCount);
 		after();
 	};
 
@@ -261,6 +284,7 @@ Space4x.createCommands = function (app) {
 	};
 
 	cmds.diploDeclareWar = function () {
+		if (Space4x.isObserver(app.state)) return;
 		const player = Space4x.playerEmpire(app.state);
 		if (!player || !app.state.ui.diploRivalId) return;
 		Space4x.declareWar(app.state, player.id, app.state.ui.diploRivalId);
@@ -269,6 +293,7 @@ Space4x.createCommands = function (app) {
 	};
 
 	cmds.diploSetPact = function (id, on) {
+		if (Space4x.isObserver(app.state)) return;
 		const draft = Space4x.diploDraftOf(app.state);
 		const idx = draft.pacts.indexOf(id);
 		if (on) {
@@ -280,6 +305,7 @@ Space4x.createCommands = function (app) {
 	};
 
 	cmds.diploAddClause = function (side, clause) {
+		if (Space4x.isObserver(app.state)) return;
 		const draft = Space4x.diploDraftOf(app.state);
 		if (side !== "give" && side !== "want") return;
 		draft[side].push(clause);
@@ -287,6 +313,7 @@ Space4x.createCommands = function (app) {
 	};
 
 	cmds.diploRemoveClause = function (side, index) {
+		if (Space4x.isObserver(app.state)) return;
 		const draft = Space4x.diploDraftOf(app.state);
 		if (side !== "give" && side !== "want") return;
 		if (index < 0 || index >= draft[side].length) return;
@@ -294,10 +321,57 @@ Space4x.createCommands = function (app) {
 		after();
 	};
 
+	cmds.diploSetDuration = function (value) {
+		if (Space4x.isObserver(app.state)) return;
+		const draft = Space4x.diploDraftOf(app.state);
+		const n = parseInt(value, 10);
+		draft.duration = (n === 8 || n === 20 || n === 40) ? n : 20;
+		after();
+	};
+
 	cmds.diploAddMoney = function (side) {
+		if (Space4x.isObserver(app.state)) return;
 		const n = Space4x.moneyRound(parseFloat(app.ui.diploMoneyN && app.ui.diploMoneyN.value) || 0);
 		if (!(n > 0)) return;
 		cmds.diploAddClause(side, { type: "money", n: n });
+	};
+
+	cmds.diploAddTribute = function (side) {
+		if (Space4x.isObserver(app.state)) return;
+		const resource = app.ui.diploTributeResource && app.ui.diploTributeResource.value;
+		const n = parseInt(app.ui.diploTributeN && app.ui.diploTributeN.value, 10) || 0;
+		if (["money", "food", "research"].indexOf(resource) < 0 || !(n > 0)) return;
+		const draft = Space4x.diploDraftOf(app.state);
+		cmds.diploAddClause(side, {
+			type: "tribute",
+			resource: resource,
+			n: n,
+			turns: Space4x.draftDuration(app.state, draft)
+		});
+	};
+
+	cmds.diploAddResearchPoints = function (side) {
+		if (Space4x.isObserver(app.state)) return;
+		const n = parseInt(app.ui.diploResearchN && app.ui.diploResearchN.value, 10) || 0;
+		if (!(n > 0)) return;
+		cmds.diploAddClause(side, { type: "researchPoints", n: n });
+	};
+
+	cmds.diploAddTech = function (side) {
+		const sel = side === "give" ? app.ui.diploGiveTech : app.ui.diploWantTech;
+		if (!sel || !sel.value) return;
+		cmds.diploAddClause(side, { type: "tech", techId: sel.value });
+	};
+
+	cmds.diploAddLend = function (side) {
+		const sel = side === "give" ? app.ui.diploGiveLend : app.ui.diploWantLend;
+		if (!sel || !sel.value) return;
+		const draft = Space4x.diploDraftOf(app.state);
+		cmds.diploAddClause(side, {
+			type: "structureLend",
+			defId: sel.value,
+			turns: Space4x.draftDuration(app.state, draft)
+		});
 	};
 
 	cmds.diploAddWorld = function (side) {
@@ -336,6 +410,7 @@ Space4x.createCommands = function (app) {
 	};
 
 	cmds.diploSend = function () {
+		if (Space4x.isObserver(app.state)) return;
 		const player = Space4x.playerEmpire(app.state);
 		const toId = app.state.ui.diploRivalId;
 		if (!player || !toId) return;
@@ -353,6 +428,7 @@ Space4x.createCommands = function (app) {
 	};
 
 	cmds.diploBalance = function () {
+		if (Space4x.isObserver(app.state)) return;
 		const player = Space4x.playerEmpire(app.state);
 		const toId = app.state.ui.diploRivalId;
 		if (!player || !toId) return;
@@ -364,6 +440,7 @@ Space4x.createCommands = function (app) {
 	};
 
 	cmds.diploAccept = function () {
+		if (Space4x.isObserver(app.state)) return;
 		const player = Space4x.playerEmpire(app.state);
 		if (!player) return;
 		const offer = Space4x.offerTo(app.state, player.id, app.state.ui.diploRivalId);
@@ -373,6 +450,7 @@ Space4x.createCommands = function (app) {
 	};
 
 	cmds.diploRefuse = function () {
+		if (Space4x.isObserver(app.state)) return;
 		const player = Space4x.playerEmpire(app.state);
 		if (!player) return;
 		const offer = Space4x.offerTo(app.state, player.id, app.state.ui.diploRivalId);
@@ -423,6 +501,11 @@ Space4x.createCommands = function (app) {
 
 	cmds.showReport = function () {
 		app.state.ui.stage = "report";
+		after();
+	};
+
+	cmds.showGuide = function () {
+		app.state.ui.stage = "guide";
 		after();
 	};
 
@@ -1057,16 +1140,21 @@ Space4x.createCommands = function (app) {
 			after();
 			return;
 		}
+		let skipRange = true;
 		for (let i = 0; i < ids.length; i++) {
 			const unit = Space4x.unitById(app.state, ids[i]);
 			const fromStar = unit ? Space4x.unitStarId(app.state, unit) : null;
-			if (Space4x.wouldLeaveSystemWithoutWarp(app.state, player, fromStar, starId)) {
+			const webShip = !!(unit && Space4x.isSpindelColony(app.state, unit) &&
+				fromStar && Space4x.starHasSpindel(app.state, fromStar) &&
+				Space4x.starHasSpindel(app.state, starId));
+			if (!webShip) skipRange = false;
+			if (!webShip && Space4x.wouldLeaveSystemWithoutWarp(app.state, player, fromStar, starId)) {
 				Space4x.showModal(app.ui, Space4x.settingMessage(app.state, "noWarpDrive"));
 				after();
 				return;
 			}
 		}
-		if (!Space4x.inRangeOfEmpireAtCell(app.state, player.id, dest.x, dest.y)) {
+		if (!skipRange && !Space4x.inRangeOfEmpireAtCell(app.state, player.id, dest.x, dest.y)) {
 			after();
 			return;
 		}

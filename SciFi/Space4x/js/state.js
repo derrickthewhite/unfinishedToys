@@ -48,8 +48,11 @@ Space4x.emptyModifiers = function () {
 		fighterDamage: 0,
 		fighterRange: 0,
 		fighterStructure: 0,
+		shipAttack: 0,
+		shipDefense: 0,
 		loyalty: 0,
-		spySkill: 0
+		spySkill: 0,
+		loadPct: 0
 	};
 };
 
@@ -67,12 +70,13 @@ Space4x.createEmpire = function (state, opts) {
 		cultureId: opts.cultureId || Space4x.defaultCultureId(state),
 		colorId: opts.colorId != null ? opts.colorId : null,
 		stockpiles: { money: 0 },
-		transport: { freighters: 0 },
+		transport: { freighters: 0, spindelNavigators: 0 },
 		modifiers: Space4x.emptyModifiers(),
 		exploredStarIds: [],
 		spies: [],
 		relations: {},
 		shipDesigns: {},
+		knackFirstStructure: {},
 		research: {
 			model: "category",
 			currentProjectId: null,

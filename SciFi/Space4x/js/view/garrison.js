@@ -54,6 +54,14 @@ Space4x.makeTroopBadgeRow = function (state, opts) {
 	const glyph = Space4x.makeTroopGlyph(state, defId);
 	glyph.setAttribute("data-def", defId || "");
 	row.appendChild(glyph);
+	const def = defId && Space4x.settingOf(state).builds[defId];
+	if (def && def.level) {
+		const lvl = document.createElement("span");
+		lvl.className = "troop-badge-level";
+		lvl.textContent = def.level;
+		lvl.title = "Level " + def.level;
+		row.appendChild(lvl);
+	}
 	if (opts.culture) {
 		const art = document.createElement("img");
 		art.className = "troop-badge-art";
@@ -64,7 +72,6 @@ Space4x.makeTroopBadgeRow = function (state, opts) {
 		row.appendChild(Space4x.makeWildlifeMark());
 	}
 	if (!opts.iconsOnly) {
-		const def = defId && Space4x.settingOf(state).builds[defId];
 		const species = opts.culture ? Space4x.cultureName(state, opts.culture) : "";
 		const name = document.createElement("span");
 		name.className = "troop-badge-name";
@@ -139,7 +146,7 @@ Space4x.syncTroopLaneBoard = function (container, state, st, opts) {
 			}
 			const species = stack.culture ? Space4x.cultureName(state, stack.culture) : "";
 			const ts = Space4x.troopTs(state, empire, stack.def, stack.culture);
-			const unitName = stack.def ? stack.def.name : stack.defId;
+			const unitName = stack.def ? Space4x.troopDisplayName(stack.def) : stack.defId;
 			const laneTitle = unitName + (species ? " · " + species : "") + " · TS " + ts;
 			lane.title = laneTitle;
 			if (opts.inline) {
@@ -183,6 +190,13 @@ Space4x.syncTroopLaneBoard = function (container, state, st, opts) {
 			} else if (Space4x.troopIsWildlife(state, stack.defId)) {
 				head.appendChild(Space4x.makeWildlifeMark());
 			}
+			if (stack.def && stack.def.level) {
+				const lvl = document.createElement("span");
+				lvl.className = "troop-badge-level";
+				lvl.textContent = stack.def.level;
+				lvl.title = "Level " + stack.def.level;
+				head.appendChild(lvl);
+			}
 			const label = document.createElement("span");
 			label.className = "troop-lane-name";
 			label.textContent = stack.def ? stack.def.name : stack.defId;
@@ -216,12 +230,18 @@ Space4x.syncTroopMoveCost = function (ui, state, st) {
 	const parsed = ui.settleTroopDef ? Space4x.parseTroopStackId(ui.settleTroopDef.value) : { defId: "", culture: null };
 	const have = st ? Space4x.countTroops(st, parsed.defId, parsed.culture || undefined) : 0;
 	const player = st ? Space4x.empireById(state, st.empireId) : null;
-	const use = player ? Space4x.empireFreighterUse(state, player.id) : { idle: 0, transit: 0, owned: 0 };
+	const dest = ui.settleTroopTo ? Space4x.settlementById(state, ui.settleTroopTo.value) : null;
+	const useSpindel = !!(player && st && dest && Space4x.canUseSpindelNavigators(state, player, st, dest));
+	const use = player
+		? (useSpindel ? Space4x.empireSpindelNavigatorUse(state, player.id) : Space4x.empireFreighterUse(state, player.id))
+		: { idle: 0, transit: 0, owned: 0 };
+	const craft = useSpindel ? "Spindel Navigator" : "freighter";
+	const need = n * factor;
 	let text = "";
-	if (n > 0) text = n * factor + " freighter" + (n * factor === 1 ? "" : "s");
+	if (n > 0) text = need + " " + craft + (need === 1 ? "" : "s");
 	if (have && n > have) text += " · only " + have + " here";
 	if (use.transit > 0) text += (text ? " · " : "") + use.transit + " in use";
-	if (n > 0 && n * factor > use.idle) {
+	if (n > 0 && need > use.idle) {
 		text += (text ? " · " : "") + use.idle + " idle of " + use.owned;
 	}
 	Space4x.setText(ui.settleTroopCost, text);
@@ -298,7 +318,7 @@ Space4x.syncGarrison = function (ui, state, cmds, st, mine) {
 			function (opt, item) {
 				opt.value = item.id;
 				const species = item.culture ? " " + Space4x.cultureName(state, item.culture) : "";
-				opt.textContent = item.def.name + species + " (" + item.n + ")";
+				opt.textContent = Space4x.troopDisplayName(item.def) + species + " (" + item.n + ")";
 			}
 		);
 	}
@@ -340,14 +360,20 @@ Space4x.syncGarrison = function (ui, state, cmds, st, mine) {
 	Space4x.syncTroopMoveCost(ui, state, st);
 	if (ui.btnSettleTroopMove) {
 		const dest = ui.settleTroopTo ? Space4x.settlementById(state, ui.settleTroopTo.value) : null;
-		const warpOk = !st || !dest || Space4x.canLeaveSystem(state, player, st.location.starId, dest.location.starId);
+		const useSpindel = !!(player && st && dest && Space4x.canUseSpindelNavigators(state, player, st, dest));
+		const warpOk = !st || !dest ||
+			Space4x.canLeaveSystem(state, player, st.location.starId, dest.location.starId, { spindelWeb: useSpindel });
 		const selN = selectedIds.length;
 		if (!warpOk) {
 			ui.btnSettleTroopMove.disabled = true;
 			if (ui.settleTroopCost) Space4x.setText(ui.settleTroopCost, "Needs Warp Drive to move between stars");
 		} else if (selN > 0) {
 			const factor = Space4x.settingOf(state).troopMoveFreighterFactor || 1;
-			const idle = player ? Space4x.empireFreighterUse(state, player.id).idle : 0;
+			const idle = player
+				? (useSpindel
+					? Space4x.empireSpindelNavigatorUse(state, player.id).idle
+					: Space4x.empireFreighterUse(state, player.id).idle)
+				: 0;
 			ui.btnSettleTroopMove.disabled = !mine || dests.length < 1 || Math.floor(idle / factor) < selN;
 		}
 	}

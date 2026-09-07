@@ -23,7 +23,7 @@
      inkscape:deskcolor="#d1d1d1"
      showgrid="true"
      inkscape:zoom="36.46875"
-     inkscape:cx="9.5698372"
+     inkscape:cx="9.5972579"
      inkscape:cy="6.7866324"
      inkscape:window-width="2560"
      inkscape:window-height="1369"
@@ -46,70 +46,9 @@
        enabled="true"
        visible="true" />
   </sodipodi:namedview>
-  <rect
-     style="fill:#a0652a;fill-opacity:1;stroke:none;stroke-linecap:round"
-     id="rect2"
-     width="7"
-     height="2"
-     x="4.774632"
-     y="6.2098889" />
-  <circle
-     style="fill:#a0652a;fill-opacity:1;stroke:none;stroke-linecap:round"
+  <path
      id="path4"
-     cx="2.6782033"
-     cy="-10.459293"
-     r="4.5"
-     transform="rotate(120)" />
-  <circle
-     style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-linecap:round"
-     id="path5"
-     cx="7.774632"
-     cy="7.7098889"
-     r="2.5" />
-  <rect
-     style="fill:#a0652a;fill-opacity:1;stroke:none;stroke-linecap:round"
-     id="rect5"
-     width="3"
-     height="2"
-     x="6.274632"
-     y="2.2098887" />
-  <rect
-     style="fill:#a0652a;fill-opacity:1;stroke:none;stroke-linecap:round"
-     id="rect6"
-     width="3"
-     height="2"
-     x="6.274632"
-     y="10.952528" />
-  <rect
-     style="fill:#a0652a;fill-opacity:1;stroke:none;stroke-linecap:round"
-     id="rect7"
-     width="3"
-     height="2"
-     x="8.9528351"
-     y="-8.3137436"
-     transform="rotate(60)" />
-  <rect
-     style="fill:#a0652a;fill-opacity:1;stroke:none;stroke-linecap:round"
-     id="rect8"
-     width="3"
-     height="2"
-     x="8.9528351"
-     y="0.42889526"
-     transform="rotate(60)" />
-  <rect
-     style="fill:#a0652a;fill-opacity:1;stroke:none;stroke-linecap:round"
-     id="rect10"
-     width="3"
-     height="2"
-     x="1.1782032"
-     y="-15.959292"
-     transform="rotate(120)" />
-  <rect
-     style="fill:#a0652a;fill-opacity:1;stroke:none;stroke-linecap:round"
-     id="rect11"
-     width="3"
-     height="2"
-     x="1.1782032"
-     y="-7.2166529"
+     style="fill:#a0652a;stroke-linecap:round"
+     d="M -1.2246587 -6.5391399 L -0.29097509 -7.0782024 A 4.5 4.5 31.717474 0 0 1.1782768 -6.2169773 L 1.1788578 -5.2159709 L 4.1784941 -5.2157609 L 4.1779131 -6.2167673 A 4.5 4.5 31.717474 0 0 5.6470032 -7.0784785 L 6.5806419 -6.5394939 L 8.0802782 -9.1373601 L 7.1131234 -9.6953339 A 4.5 4.5 31.717474 0 0 7.1775564 -10.458733 A 4.5 4.5 31.717474 0 0 7.0905383 -11.339921 L 8.08004 -11.91121 L 6.58004 -14.509286 L 5.5550177 -13.91749 A 4.5 4.5 31.717474 0 0 4.1779271 -14.701118 L 4.177654 -15.959404 L 1.1780177 -15.959613 L 1.1782908 -14.701328 A 4.5 4.5 31.717474 0 0 -0.20005419 -13.916817 L -1.2225926 -14.508218 L -2.7239204 -11.909375 L -1.7348981 -11.336963 A 4.5 4.5 31.717474 0 0 -1.8213525 -10.459363 A 4.5 4.5 31.717474 0 0 -1.757146 -9.6958098 L -2.7246587 -9.1372161 L -1.2246587 -6.5391399 z M 0.62341748 -9.338178 A 2.5 2.5 0 0 1 1.538481 -12.753242 A 2.5 2.5 0 0 1 4.9535445 -11.838178 A 2.5 2.5 0 0 1 4.038481 -8.4231145 A 2.5 2.5 0 0 1 0.62341748 -9.338178 z "
      transform="rotate(120)" />
 </svg>

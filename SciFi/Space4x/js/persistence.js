@@ -79,6 +79,7 @@ Space4x.applySave = function (live, envelope) {
 
 Space4x.migrateState = function (state) {
 	if (!state) return;
+	if (Space4x.consolidateRevoltPolities) Space4x.consolidateRevoltPolities(state);
 	if (state.galaxy && Space4x.ensureGalaxyBgSeed) Space4x.ensureGalaxyBgSeed(state);
 	if (state.turnEvents && state.turnEvents.spaceBattles && Space4x.ensureAllCombatBgSeeds) {
 		Space4x.ensureAllCombatBgSeeds(state);
@@ -88,8 +89,12 @@ Space4x.migrateState = function (state) {
 		}
 	}
 	if (state.empires) {
+		if (Space4x.migrateDiplomacyRelations) Space4x.migrateDiplomacyRelations(state);
 		Space4x.ensureEmpireColors(state);
 		for (let e = 0; e < state.empires.length; e++) {
+			Space4x.ensureTransportPools(state.empires[e]);
+			Space4x.ensureKnackState(state.empires[e]);
+			Space4x.backfillKnackFirstStructures(state, state.empires[e]);
 			Space4x.ensureEmpireDesigns(state, state.empires[e]);
 			if (state.empires[e].modifiers && state.empires[e].modifiers.combatSpeed == null) {
 				state.empires[e].modifiers.combatSpeed = 0;
@@ -100,9 +105,20 @@ Space4x.migrateState = function (state) {
 				if (m.fighterDamage == null) m.fighterDamage = 0;
 				if (m.fighterRange == null) m.fighterRange = 0;
 				if (m.fighterStructure == null) m.fighterStructure = 0;
+				if (m.shipAttack == null) m.shipAttack = 0;
+				if (m.shipDefense == null) m.shipDefense = 0;
 			}
 			if (Space4x.ensureEmpireDesigns) Space4x.ensureEmpireDesigns(state, state.empires[e]);
 		}
+	}
+	if (state.galaxy && state.galaxy.stars && Space4x.ensureBodyColorDetails) {
+		for (let s = 0; s < state.galaxy.stars.length; s++) {
+			const bodies = state.galaxy.stars[s].bodies || [];
+			for (let b = 0; b < bodies.length; b++) {
+				Space4x.ensureBodyColorDetails(state, bodies[b]);
+			}
+		}
+		if (Space4x.ensureSpindelVision) Space4x.ensureSpindelVision(state);
 	}
 	if (!state.settlements) return;
 	if (state.turnHold == null) state.turnHold = null;

@@ -114,7 +114,7 @@ Space4x.cultureMatchesBiome = function (fx, body) {
 	return false;
 };
 
-Space4x.applyCultureYield = function (state, settlement, pop, out) {
+Space4x.applyCultureYield = function (state, settlement, pop, out, opts) {
 	if (!pop || !pop.culture) return;
 	const body = settlement ? Space4x.bodyById(state, settlement.location.bodyId) : null;
 	const spec = Space4x.settingOf(state).jobs[pop.job];
@@ -137,6 +137,7 @@ Space4x.applyCultureYield = function (state, settlement, pop, out) {
 		if (product && out[product] != null) out[product] += fx.n || 0;
 	});
 	if (moneyMult !== 1) out.money = Space4x.moneyRound(out.money * moneyMult);
+	if (Space4x.applyKnackYield) Space4x.applyKnackYield(state, settlement, pop, out, opts || {});
 };
 
 Space4x.cultureGrowthBase = function (state, pop) {
@@ -290,6 +291,14 @@ Space4x.researchIncomePreview = function (state, empire) {
 	}
 	const shipTech = Space4x.empireShipTechResearchBonus(state, empire);
 	if (shipTech) lines.push("Species ship-tech bonus +" + shipTech);
+	const knackBits = [];
+	for (let i = 0; i < homes.length; i++) {
+		const bits = Space4x.researchKnackExplainBits(state, homes[i]);
+		for (let b = 0; b < bits.length; b++) {
+			if (knackBits.indexOf(bits[b]) < 0) knackBits.push(bits[b]);
+		}
+	}
+	for (let i = 0; i < knackBits.length; i++) lines.push(knackBits[i] + " (in scientist output)");
 	const sci = Space4x.researchTreatyPreview(state, empire);
 	for (let i = 0; i < sci.lines.length; i++) lines.push(sci.lines[i]);
 	return {
@@ -381,6 +390,15 @@ Space4x.cultureLoyaltyDelta = function (state, cultureId) {
 Space4x.cultureNegotiationPct = function (state, cultureId) {
 	let pct = 0;
 	Space4x.eachCultureEffect(state, cultureId, function (c, fx) {
+		if (fx.type === "negotiation") pct += fx.pct || 0;
+	});
+	return pct;
+};
+
+Space4x.empireNegotiationPct = function (state, empire) {
+	if (!empire) return 0;
+	let pct = Space4x.cultureNegotiationPct(state, empire.cultureId);
+	Space4x.eachEmpireTechEffect(state, empire, function (tech, fx) {
 		if (fx.type === "negotiation") pct += fx.pct || 0;
 	});
 	return pct;

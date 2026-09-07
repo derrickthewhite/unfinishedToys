@@ -5,7 +5,8 @@ Space4x.ADDITIVE_TECH = {
 	industryPerPop: true, researchPerPop: true, foodPerFarmer: true,
 	growthRatePercent: true, weapon: true, shield: true, armor: true, structure: true,
 	fighterDamage: true, fighterRange: true, fighterStructure: true,
-	loyalty: true, spySkill: true
+	shipAttack: true, shipDefense: true,
+	loyalty: true, spySkill: true, loadPct: true
 };
 
 Space4x.applyTechEffects = function (empire, tech) {
@@ -80,7 +81,8 @@ Space4x.copyEmpireResearch = function (state, from, to) {
 Space4x.phaseResearch = function (state) {
 	for (let i = 0; i < state.empires.length; i++) {
 		const empire = state.empires[i];
-		const add = empire._pendingResearch || 0;
+		const add = (empire._pendingResearch || 0) + ((empire.research && empire.research.giftPoints) || 0);
+		if (empire.research) empire.research.giftPoints = 0;
 		if (!empire.research.currentProjectId) continue;
 		const tech = Space4x.techById(state, empire.research.currentProjectId);
 		if (!tech) continue;

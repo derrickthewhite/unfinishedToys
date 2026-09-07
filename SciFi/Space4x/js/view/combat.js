@@ -176,7 +176,7 @@ Space4x.makeCombatUnitRow = function (state, stack, lost) {
 	}
 	const line = document.createElement("div");
 	line.className = "garrison-btn combat-troop-line";
-	const title = (stack.name || stack.defId || "Unit") +
+	const title = (stack.level ? stack.name + " " + stack.level : (stack.name || stack.defId || "Unit")) +
 		(stack.culture ? " · " + (Space4x.cultureName(state, stack.culture) || stack.culture) : "") +
 		" · " + stack.tsEach + " TS each · " + stack.ts + " total";
 	line.appendChild(Space4x.makeTroopBadgeRow(state, {
@@ -300,7 +300,7 @@ Space4x.syncCombatStage = function (ui, state, cmds) {
 		Space4x.syncCombatUnitList(ui.combatDefenderForces, state, [], "None");
 		Space4x.syncCombatUnitList(ui.combatAttackerLost, state, [], "None", true);
 		Space4x.syncCombatUnitList(ui.combatDefenderLost, state, [], "None", true);
-		Space4x.syncCombatLines(ui.combatRounds, []);
+		Space4x.syncCombatRoundsTable(ui, state, []);
 		Space4x.syncCombatLines(ui.combatEffects, []);
 		return;
 	}
@@ -352,8 +352,152 @@ Space4x.syncCombatStage = function (ui, state, cmds) {
 	Space4x.syncCombatUnitList(ui.combatDefenderForces, state, defStacks, defEmpty);
 	Space4x.syncCombatUnitList(ui.combatAttackerLost, state, Space4x.combatStacksFromReport(combat, "attacker", "lost"), "None", true);
 	Space4x.syncCombatUnitList(ui.combatDefenderLost, state, Space4x.combatStacksFromReport(combat, "defender", "lost"), "None", true);
-	Space4x.syncCombatLines(ui.combatRounds, combat.rounds || []);
+	Space4x.syncCombatRoundsTable(ui, state, combat.rounds || []);
 	Space4x.syncCombatLines(ui.combatEffects, combat.effects || [], "No other effects.");
+};
+
+Space4x.combatDamageIconDefId = function (tag) {
+	if (tag === "General" || tag === "Infantry") return "infantry";
+	if (tag === "Air") return "air";
+	if (tag === "Armor") return "armor";
+	return null;
+};
+
+Space4x.normalizeCombatRound = function (round, index) {
+	if (round == null) return { id: "note-" + index, note: "" };
+	if (typeof round === "string") return { id: "note-" + index, note: round };
+	if (round.note) return { id: "note-" + index, note: round.note };
+	const n = round.n != null ? round.n : index + 1;
+	return {
+		id: "r-" + n,
+		n: n,
+		atkTs: round.atkTs != null ? round.atkTs : round.atkPool,
+		defTs: round.defTs != null ? round.defTs : round.defPool,
+		atkDealt: round.atkDealt || 0,
+		defDealt: round.defDealt || 0,
+		atkCategories: round.atkCategories || [],
+		defCategories: round.defCategories || []
+	};
+};
+
+Space4x.makeCombatDamageCats = function (state, categories) {
+	const wrap = document.createElement("div");
+	wrap.className = "combat-dmg-cats";
+	const list = categories || [];
+	let shown = 0;
+	for (let i = 0; i < list.length; i++) {
+		const cat = list[i];
+		if (!cat || !(cat.damage > 0)) continue;
+		shown += 1;
+		const chip = document.createElement("span");
+		const tag = cat.tag || "General";
+		chip.className = "combat-dmg-cat is-" + String(tag).toLowerCase();
+		chip.title = tag + " damage";
+		const iconId = Space4x.combatDamageIconDefId(tag);
+		if (iconId && state) {
+			const icon = Space4x.makeTroopGlyph(state, iconId);
+			icon.classList.add("combat-dmg-cat-icon");
+			icon.width = 16;
+			icon.height = 16;
+			chip.appendChild(icon);
+		}
+		const label = document.createElement("span");
+		label.className = "combat-dmg-cat-label";
+		label.textContent = tag;
+		chip.appendChild(label);
+		const value = document.createElement("span");
+		value.className = "combat-dmg-cat-value";
+		value.textContent = String(cat.damage);
+		chip.appendChild(value);
+		wrap.appendChild(chip);
+	}
+	if (!shown) {
+		const empty = document.createElement("span");
+		empty.className = "muted";
+		empty.textContent = "—";
+		wrap.appendChild(empty);
+	}
+	return wrap;
+};
+
+Space4x.syncCombatRoundsTable = function (ui, state, rounds) {
+	const tbody = ui.combatRounds;
+	if (!tbody) return;
+	const items = (rounds || []).map(function (round, i) {
+		return Space4x.normalizeCombatRound(round, i);
+	});
+	if (ui.combatRoundsEmpty) ui.combatRoundsEmpty.hidden = items.length > 0;
+	const tableWrap = tbody.closest ? tbody.closest(".combat-rounds-table-wrap") : null;
+	if (tableWrap) tableWrap.hidden = items.length === 0;
+	Space4x.syncKeyedList(tbody, items, function (r) { return r.id; },
+		function (item) {
+			const tr = document.createElement("tr");
+			if (item.note) {
+				const td = document.createElement("td");
+				td.colSpan = 7;
+				td.className = "combat-round-note";
+				tr.appendChild(td);
+				return tr;
+			}
+			const cells = [
+				"num", "atk-ts", "atk-cats", "atk-total", "def-total", "def-cats", "def-ts"
+			];
+			for (let i = 0; i < cells.length; i++) {
+				const td = document.createElement("td");
+				td.className = "combat-cell-" + cells[i];
+				tr.appendChild(td);
+			}
+			return tr;
+		},
+		function (row, item) {
+			if (item.note) {
+				const td = row.querySelector("td");
+				if (td) td.textContent = item.note;
+				return;
+			}
+			row.querySelector(".combat-cell-num").textContent = "";
+			const num = document.createElement("span");
+			num.className = "combat-round-num";
+			num.textContent = String(item.n);
+			row.querySelector(".combat-cell-num").appendChild(num);
+
+			const atkTs = row.querySelector(".combat-cell-atk-ts");
+			atkTs.textContent = "";
+			const atkTsSpan = document.createElement("span");
+			atkTsSpan.className = "combat-round-ts";
+			atkTsSpan.textContent = item.atkTs != null ? String(item.atkTs) : "—";
+			atkTs.appendChild(atkTsSpan);
+
+			const atkCats = row.querySelector(".combat-cell-atk-cats");
+			atkCats.textContent = "";
+			atkCats.appendChild(Space4x.makeCombatDamageCats(state, item.atkCategories));
+
+			const atkTotal = row.querySelector(".combat-cell-atk-total");
+			atkTotal.textContent = "";
+			const atkTot = document.createElement("span");
+			atkTot.className = "combat-round-total is-atk";
+			atkTot.textContent = String(item.atkDealt || 0);
+			atkTotal.appendChild(atkTot);
+
+			const defTotal = row.querySelector(".combat-cell-def-total");
+			defTotal.textContent = "";
+			const defTot = document.createElement("span");
+			defTot.className = "combat-round-total is-def";
+			defTot.textContent = String(item.defDealt || 0);
+			defTotal.appendChild(defTot);
+
+			const defCats = row.querySelector(".combat-cell-def-cats");
+			defCats.textContent = "";
+			defCats.appendChild(Space4x.makeCombatDamageCats(state, item.defCategories));
+
+			const defTs = row.querySelector(".combat-cell-def-ts");
+			defTs.textContent = "";
+			const defTsSpan = document.createElement("span");
+			defTsSpan.className = "combat-round-ts";
+			defTsSpan.textContent = item.defTs != null ? String(item.defTs) : "—";
+			defTs.appendChild(defTsSpan);
+		}
+	);
 };
 
 Space4x.syncCombatLines = function (listEl, lines, emptyText) {

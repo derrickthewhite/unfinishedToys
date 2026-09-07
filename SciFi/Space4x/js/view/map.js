@@ -445,7 +445,8 @@ Space4x.drawMap = function (ui, state) {
 			ctx.arc(p.x, p.y, Math.max(5, cell * 0.35), 0, Math.PI * 2);
 			ctx.stroke();
 		}
-		Space4x.drawStarLabel(ctx, p.x, p.y, r, star.name, cell);
+		const label = Space4x.starDisplayName(state, player && player.id, star);
+		Space4x.drawStarLabel(ctx, p.x, p.y, r, label, cell);
 	}
 
 	const fleets = Space4x.fleetMarkers(state, layout);

@@ -9,6 +9,31 @@ Space4x.foodPerFarmer = function (state, body, empire, settlement) {
 	return n < 0 ? 0 : n;
 };
 
+Space4x.empireStructureBonus = function (state, empireId, type) {
+	let n = 0;
+	Space4x.eachEmpireStructureEffect(state, empireId, function (def, fx) {
+		if (fx.type === type) n += fx.n || 0;
+	});
+	if (Space4x.eachActiveLendTo) {
+		Space4x.eachActiveLendTo(state, empireId, function (def) {
+			const fx = def.effects || [];
+			for (let i = 0; i < fx.length; i++) {
+				if (fx[i].type === type) n += fx[i].n || 0;
+			}
+		});
+	}
+	return n;
+};
+
+Space4x.empireToxicUpkeepExempt = function (state, empireId) {
+	const empire = Space4x.empireById(state, empireId);
+	let ok = false;
+	Space4x.eachEmpireTechEffect(state, empire, function (tech, fx) {
+		if (fx.type === "toxicUpkeepExempt") ok = true;
+	});
+	return ok;
+};
+
 Space4x.YIELD_READERS = {
 	farmerBiome: function (state, settlement, pop, empire) {
 		const body = Space4x.bodyById(state, settlement.location.bodyId);
@@ -34,11 +59,14 @@ Space4x.YIELD_READERS = {
 		const out = { food: 0, industry: 0, research: 0 };
 		out[product] = spec.base + (empire.modifiers[modKey] || 0) +
 			Space4x.structureJobYield(state, settlement, pop.job);
+		if (product === "research" && empire) {
+			out.research += Space4x.empireStructureBonus(state, empire.id, "empireResearchPerPop");
+		}
 		return out;
 	}
 };
 
-Space4x.jobYield = function (state, settlement, pop, empire) {
+Space4x.jobYield = function (state, settlement, pop, empire, opts) {
 	const set = Space4x.settingOf(state);
 	const job = pop.job;
 	const out = { food: 0, industry: 0, research: 0, money: 0 };
@@ -53,7 +81,7 @@ Space4x.jobYield = function (state, settlement, pop, empire) {
 		out.industry += y.industry || 0;
 		out.research += y.research || 0;
 	}
-	Space4x.applyCultureYield(state, settlement, pop, out);
+	Space4x.applyCultureYield(state, settlement, pop, out, opts);
 	if (out.food < 0) out.food = 0;
 	if (out.industry < 0) out.industry = 0;
 	if (out.research < 0) out.research = 0;
@@ -193,13 +221,15 @@ Space4x.outputExplain = function (state, settlement, job) {
 	if (job === "industry") {
 		const body = Space4x.bodyById(state, settlement.location.bodyId);
 		const rich = Space4x.richnessOf(state, body);
+		const previewDef = Space4x.settlementPreviewBuildDef(state, settlement);
+		const yieldOpts = { buildDef: previewDef };
 		let workerOut = 0;
 		const cultures = {};
 		for (let i = 0; i < settlement.pops.length; i++) {
 			const pop = settlement.pops[i];
 			if (pop.job !== job) continue;
 			if (pop.culture) cultures[pop.culture] = true;
-			workerOut += Space4x.jobYield(state, settlement, pop, empire).industry;
+			workerOut += Space4x.jobYield(state, settlement, pop, empire, yieldOpts).industry;
 		}
 		const cultureIds = Object.keys(cultures);
 		amount = workerOut;
@@ -213,6 +243,8 @@ Space4x.outputExplain = function (state, settlement, job) {
 			const bonus = Space4x.cultureJobBonus(state, cultureIds[0], job, body);
 			if (bonus) why += " +" + bonus + " " + Space4x.cultureName(state, cultureIds[0]);
 		} else if (cultureIds.length > 1) why += " mixed species";
+		const knackBits = Space4x.industryKnackExplainBits(state, settlement, previewDef);
+		for (let k = 0; k < knackBits.length; k++) why += " · " + knackBits[k];
 		lines.push(n + " worker" + (n === 1 ? "" : "s") + " × " + perSafe + " (" + why + ") = " + amount);
 		const cover = Space4x.structureCoverByJob(state, settlement)[job];
 		if (cover && cover.n) {
@@ -247,6 +279,8 @@ Space4x.outputExplain = function (state, settlement, job) {
 			const bonus = Space4x.cultureJobBonus(state, cultureIds[0], job, body);
 			if (bonus) why += " +" + bonus + " " + Space4x.cultureName(state, cultureIds[0]);
 		} else if (cultureIds.length > 1) why += " mixed species";
+		const knackBits = Space4x.researchKnackExplainBits(state, settlement);
+		for (let k = 0; k < knackBits.length; k++) why += " · " + knackBits[k];
 		lines.push(n + " scientist" + (n === 1 ? "" : "s") + " × " + per + " (" + why + ") = " + amount);
 		const cover = Space4x.structureCoverByJob(state, settlement)[job];
 		if (cover && cover.n) {
@@ -313,7 +347,7 @@ Space4x.structureUpkeep = function (state, settlement) {
 		n += Space4x.defUpkeep(state, settlement.structures[i].defId);
 	}
 	const body = Space4x.bodyById(state, settlement.location.bodyId);
-	if (body && body.biome === "toxic") n *= 1.5;
+	if (body && body.biome === "toxic" && !Space4x.empireToxicUpkeepExempt(state, settlement.empireId)) n *= 1.5;
 	return n;
 };
 
@@ -327,8 +361,22 @@ Space4x.shipUpkeep = function (state, unit) {
 
 Space4x.freighterUpkeep = function (state, empireId, foodHullsUsed) {
 	if ((foodHullsUsed || 0) > 0) return 1;
-	if (Space4x.popHaulers(state, empireId).length) return 1;
-	if (Space4x.troopHaulers(state, empireId).length) return 1;
+	for (let i = 0; i < state.units.length; i++) {
+		const u = state.units[i];
+		if (u.empireId !== empireId) continue;
+		if (!Space4x.isHauler(state, u)) continue;
+		if (Space4x.isSpindelHauler(state, u)) continue;
+		return 1;
+	}
+	return 0;
+};
+
+Space4x.spindelNavigatorUpkeep = function (state, empireId) {
+	for (let i = 0; i < state.units.length; i++) {
+		const u = state.units[i];
+		if (u.empireId !== empireId) continue;
+		if (Space4x.isSpindelHauler(state, u)) return 1;
+	}
 	return 0;
 };
 
@@ -363,13 +411,16 @@ Space4x.empireUpkeep = function (state, empireId, foodHullsUsed) {
 	}
 	const freighters = Space4x.freighterUpkeep(state, empireId, foodHullsUsed || 0);
 	if (freighters) lines.push("Freighters −" + Space4x.fmtMoney(freighters) + " (in use)");
+	const navigators = Space4x.spindelNavigatorUpkeep(state, empireId);
+	if (navigators) lines.push("Spindel Navigators −" + Space4x.fmtMoney(navigators) + " (in use)");
 	return {
 		buildings: buildings,
 		troops: troops,
 		spies: spies,
 		ships: ships,
 		freighters: freighters,
-		upkeep: Space4x.moneyRound(buildings + troops + spies + ships + freighters),
+		navigators: navigators,
+		upkeep: Space4x.moneyRound(buildings + troops + spies + ships + freighters + navigators),
 		lines: lines
 	};
 };

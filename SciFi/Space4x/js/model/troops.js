@@ -29,6 +29,21 @@ Space4x.troopCanInvade = function (state, troop) {
 	return true;
 };
 
+Space4x.troopCanInvadePastShips = function (state, troop) {
+	if (!troop || !Space4x.troopCanInvade(state, troop)) return false;
+	const def = Space4x.settingOf(state).builds[troop.defId];
+	return !!(def && (def.invadePastShips || Space4x.defMatchesTags(def, ["OrbitalInsert"])));
+};
+
+Space4x.fleetCanInvadePastShips = function (state, unit) {
+	const invading = Space4x.invadingTroopsFromCargo(state, unit && unit.cargoTroops);
+	if (!invading.length) return false;
+	for (let i = 0; i < invading.length; i++) {
+		if (!Space4x.troopCanInvadePastShips(state, invading[i])) return false;
+	}
+	return true;
+};
+
 Space4x.invadingTroopsFromCargo = function (state, cargo) {
 	const out = [];
 	const list = cargo || [];
@@ -75,6 +90,42 @@ Space4x.troopTs = function (state, empire, def, cultureId) {
 	if (!empire) return base;
 	const pct = Space4x.troopArmorPct(state, empire, def) + Space4x.cultureTroopTsPct(state, cultureId);
 	return Math.round((base + Space4x.troopWeaponBonus(state, empire, def)) * (1 + pct / 100));
+};
+
+Space4x.troopDisplayName = function (def) {
+	if (!def) return "Unit";
+	if (def.level) return def.name + " " + def.level;
+	return def.name || def.id || "Unit";
+};
+
+Space4x.PREDATOR_LEVEL_IDS = ["predatorI", "predatorII", "predatorIII", "predatorIV"];
+
+Space4x.wildlifePredatorDefIds = function (state) {
+	const rules = Space4x.planetColorRules(state).wildlife || {};
+	if (rules.predatorLevels && rules.predatorLevels.length) {
+		const out = [];
+		for (let i = 0; i < rules.predatorLevels.length; i++) {
+			if (rules.predatorLevels[i].predatorDefId) out.push(rules.predatorLevels[i].predatorDefId);
+		}
+		if (out.length) return out;
+	}
+	if (rules.predatorDefIds && rules.predatorDefIds.length) return rules.predatorDefIds.slice();
+	if (rules.predatorDefId) return [rules.predatorDefId];
+	return Space4x.PREDATOR_LEVEL_IDS.slice();
+};
+
+Space4x.bodyPredatorDefId = function (state, body) {
+	const detail = Space4x.bodyColorDetail(body, "wildlife");
+	if (detail && detail.predatorDefId && Space4x.settingOf(state).builds[detail.predatorDefId]) {
+		return detail.predatorDefId;
+	}
+	if (body && body.predatorDefId && Space4x.settingOf(state).builds[body.predatorDefId]) {
+		return body.predatorDefId;
+	}
+	const level = Space4x.bodyWildlifeLevel(body);
+	if (level) return Space4x.predatorDefIdForLevel(level);
+	const ids = Space4x.wildlifePredatorDefIds(state);
+	return ids[0] || "predatorI";
 };
 
 Space4x.spawnTroop = function (state, settlement, defId, silent) {
@@ -215,10 +266,13 @@ Space4x.launchTroopHauler = function (state, from, to, taken, opts) {
 	if (!from || !taken || !taken.length) return false;
 	const empire = Space4x.empireById(state, from.empireId);
 	if (!empire) return false;
+	Space4x.ensureTransportPools(empire);
 	const factor = Space4x.settingOf(state).troopMoveFreighterFactor || 1;
 	const hulls = taken.length * factor;
-	if (hulls > empire.transport.freighters) return false;
-	empire.transport.freighters -= hulls;
+	const useSpindel = !!(to && Space4x.canUseSpindelNavigators(state, empire, from, to));
+	const poolKey = useSpindel ? "spindelNavigators" : "freighters";
+	if (hulls > (empire.transport[poolKey] || 0)) return false;
+	empire.transport[poolKey] -= hulls;
 	const star = Space4x.starById(state, from.location.starId);
 	const unit = {
 		id: Space4x.nextId(state, "u"),
@@ -234,7 +288,8 @@ Space4x.launchTroopHauler = function (state, from, to, taken, opts) {
 		},
 		cargoTroops: taken,
 		originSettlementId: from.id,
-		hulls: hulls
+		hulls: hulls,
+		spindelTransport: useSpindel
 	};
 	if (opts.fleetMode) {
 		unit.fleetMode = true;
@@ -245,12 +300,14 @@ Space4x.launchTroopHauler = function (state, from, to, taken, opts) {
 		return true;
 	}
 	if (!to || from.id === to.id || from.empireId !== to.empireId) return false;
-	if (!Space4x.canLeaveSystem(state, empire, from.location.starId, to.location.starId)) return false;
+	if (!Space4x.canLeaveSystem(state, empire, from.location.starId, to.location.starId, { spindelWeb: useSpindel })) return false;
 	const destStar = Space4x.starById(state, to.location.starId);
 	unit.targetStarId = destStar.id;
 	unit.destSettlementId = to.id;
 	state.units.push(unit);
-	state.turnLog.push(Space4x.troopCargoLabel(state, taken) + " boarded freighters at " + from.name + " bound for " + to.name + ".");
+	const craft = useSpindel ? "Spindel Navigators" : "freighters";
+	state.turnLog.push(Space4x.troopCargoLabel(state, taken) + " boarded " + craft +
+		" at " + from.name + " bound for " + to.name + ".");
 	return true;
 };
 
@@ -281,7 +338,7 @@ Space4x.troopCargoLabel = function (state, troops) {
 	for (let i = 0; i < order.length; i++) {
 		const row = counts[order[i]];
 		const def = builds[row.defId];
-		let name = def ? def.name : row.defId;
+		let name = def ? Space4x.troopDisplayName(def) : row.defId;
 		if (row.culture) name += " " + Space4x.cultureName(state, row.culture);
 		bits.push(row.n + " " + name);
 	}
@@ -299,9 +356,12 @@ Space4x.queueTroopMove = function (state, fromId, toId, defId, count, culture) {
 	n = Math.min(n, Space4x.countTroops(from, defId, culture || undefined));
 	if (n <= 0) return false;
 	const empire = Space4x.empireById(state, from.empireId);
-	if (!Space4x.canLeaveSystem(state, empire, from.location.starId, to.location.starId)) return false;
+	const useSpindel = Space4x.canUseSpindelNavigators(state, empire, from, to);
+	if (!Space4x.canLeaveSystem(state, empire, from.location.starId, to.location.starId, { spindelWeb: useSpindel })) return false;
 	const factor = Space4x.settingOf(state).troopMoveFreighterFactor || 1;
-	n = Math.min(n, Math.floor(empire.transport.freighters / factor));
+	Space4x.ensureTransportPools(empire);
+	const poolKey = useSpindel ? "spindelNavigators" : "freighters";
+	n = Math.min(n, Math.floor((empire.transport[poolKey] || 0) / factor));
 	if (n <= 0) return false;
 	const taken = Space4x.takeTroopsForMove(from, defId, n, culture);
 	if (!taken.length) return false;
@@ -314,7 +374,8 @@ Space4x.queueTroopMoveByIds = function (state, fromId, toId, troopIds) {
 	if (!from || !to || from.id === to.id || from.empireId !== to.empireId) return false;
 	if (!troopIds || !troopIds.length) return false;
 	const empire = Space4x.empireById(state, from.empireId);
-	if (!Space4x.canLeaveSystem(state, empire, from.location.starId, to.location.starId)) return false;
+	const useSpindel = Space4x.canUseSpindelNavigators(state, empire, from, to);
+	if (!Space4x.canLeaveSystem(state, empire, from.location.starId, to.location.starId, { spindelWeb: useSpindel })) return false;
 	const taken = Space4x.takeTroopsByIds(from, troopIds);
 	if (!taken.length) return false;
 	return Space4x.launchTroopHauler(state, from, to, taken, {});
@@ -323,7 +384,11 @@ Space4x.queueTroopMoveByIds = function (state, fromId, toId, troopIds) {
 Space4x.finishTroopFleet = function (state, unit) {
 	if (!unit) return;
 	const empire = Space4x.empireById(state, unit.empireId);
-	if (empire) empire.transport.freighters += unit.hulls || 0;
+	if (empire) {
+		Space4x.ensureTransportPools(empire);
+		if (Space4x.isSpindelHauler(state, unit)) empire.transport.spindelNavigators += unit.hulls || 0;
+		else empire.transport.freighters += unit.hulls || 0;
+	}
 	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
 };
 
@@ -625,7 +690,9 @@ Space4x.unloadTroopHauler = function (state, unit) {
 	const cargo = unit.cargoTroops || [];
 	for (let i = 0; i < cargo.length; i++) dest.troops.push(cargo[i]);
 	const empire = Space4x.empireById(state, unit.empireId);
-	empire.transport.freighters += unit.hulls || 0;
+	Space4x.ensureTransportPools(empire);
+	if (Space4x.isSpindelHauler(state, unit)) empire.transport.spindelNavigators += unit.hulls || 0;
+	else empire.transport.freighters += unit.hulls || 0;
 	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
 	if (cargo.length) {
 		state.turnLog.push(Space4x.troopCargoLabel(state, cargo) + " arrived at " + dest.name + ".");

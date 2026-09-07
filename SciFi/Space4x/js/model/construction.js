@@ -46,6 +46,7 @@ Space4x.completeBuild = function (state, settlement, defId, queueItem) {
 		Space4x.spawnTroop(state, settlement, defId);
 	} else if (def && def.kind === "structure") {
 		settlement.structures.push({ defId: defId });
+		Space4x.markKnackFirstStructure(empire, defId);
 		Space4x.enforceJobCaps(state, settlement);
 		state.turnLog.push(settlement.name + " built a " + def.name + ".");
 	} else if (def && def.kind === "spy") {
@@ -60,8 +61,14 @@ Space4x.runCompleteEffects = function (state, settlement, def) {
 	for (let i = 0; i < def.effects.length; i++) {
 		const fx = def.effects[i];
 		if (fx.type === "grantFreighters") {
+			Space4x.ensureTransportPools(empire);
 			empire.transport.freighters += fx.n || 0;
 			state.turnLog.push(settlement.name + " launched " + (fx.n || 0) + " freighters.");
+		}
+		if (fx.type === "grantSpindelNavigators") {
+			Space4x.ensureTransportPools(empire);
+			empire.transport.spindelNavigators += fx.n || 0;
+			state.turnLog.push(settlement.name + " launched " + (fx.n || 0) + " Spindel Navigators.");
 		}
 	}
 };
@@ -107,9 +114,23 @@ Space4x.phaseConstruction = function (state) {
 	}
 };
 
+Space4x.countEmpireStructure = function (state, empireId, defId) {
+	let n = 0;
+	const homes = Space4x.settlementsOf(state, empireId);
+	for (let i = 0; i < homes.length; i++) n += Space4x.countStructure(homes[i], defId);
+	return n;
+};
+
+Space4x.countEmpireQueuedBuild = function (state, empireId, defId) {
+	let n = 0;
+	const homes = Space4x.settlementsOf(state, empireId);
+	for (let i = 0; i < homes.length; i++) n += Space4x.countQueuedBuild(homes[i], defId);
+	return n;
+};
+
 Space4x.buildCap = function (state, settlement, def) {
 	if (!def) return 0;
-	if (def.unique) return 1;
+	if (def.unique || def.uniqueEmpire) return 1;
 	if (def.maxFrom === "agriPotential") {
 		const body = Space4x.bodyById(state, settlement.location.bodyId);
 		return Space4x.agriPotential(state, body);
@@ -165,15 +186,22 @@ Space4x.defTechUnlocked = function (empire, def) {
 	return Space4x.empireHasTech(empire, def.requireTech);
 };
 
+Space4x.defCultureUnlocked = function (state, empire, def) {
+	if (!def || !def.requireCultureEffect) return true;
+	return Space4x.empireHasCultureEffect(state, empire, def.requireCultureEffect);
+};
+
 Space4x.canFinishBuild = function (state, settlement, def, extra) {
 	if (!def || !settlement) return false;
 	const empire = Space4x.empireById(state, settlement.empireId);
 	if (!Space4x.defTechUnlocked(empire, def)) return false;
+	if (!Space4x.defCultureUnlocked(state, empire, def)) return false;
 	if (def.requireStructure && Space4x.buildCountWithExtra(settlement, def.requireStructure, extra) <= 0) return false;
 	if (def.kind === "refit") return true;
 	if (!Space4x.buildSiteOk(state, settlement, def)) return false;
 	const cap = Space4x.buildCap(state, settlement, def);
 	if (cap !== Infinity && Space4x.buildCountWithExtra(settlement, def.id, extra) >= cap) return false;
+	if (def.uniqueEmpire && Space4x.countEmpireStructure(state, empire.id, def.id) >= 1) return false;
 	return true;
 };
 
@@ -183,12 +211,23 @@ Space4x.queueBlockReason = function (state, settlement, def, extra) {
 	if (!Space4x.defTechUnlocked(empire, def)) {
 		return "Needs the required technology";
 	}
+	if (!Space4x.defCultureUnlocked(state, empire, def)) {
+		if (def.requireCultureEffect === "spindelWeb") return "Needs Spindel Web (Nehudi)";
+		if (def.requireCultureEffect === "warriors") return "Needs Warriors trait (Gaunt, Nehudi, or Loroko)";
+		return "Needs the required culture trait";
+	}
 	if (def.requireStructure && Space4x.buildCountWithExtra(settlement, def.requireStructure, extra) <= 0) {
 		return "Needs " + Space4x.structureName(state, def.requireStructure) + " on this world";
 	}
 	if (!Space4x.buildSiteOk(state, settlement, def)) return "This world cannot build that";
 	const cap = Space4x.buildCap(state, settlement, def);
 	if (cap !== Infinity && Space4x.buildCountWithExtra(settlement, def.id, extra) >= cap) return "Limit reached here";
+	if (def.uniqueEmpire) {
+		if (Space4x.countEmpireStructure(state, empire.id, def.id) >= 1) return "Already built in this empire";
+		const queued = Space4x.countEmpireQueuedBuild(state, empire.id, def.id);
+		const here = Space4x.countQueuedBuild(settlement, def.id);
+		if (queued > here) return "Already queued elsewhere in this empire";
+	}
 	return "";
 };
 
@@ -226,14 +265,19 @@ Space4x.canQueueBuild = function (state, settlement, defId) {
 	if (def.stub || def.kind === "stub" || def.kind === "refit") return false;
 	const empire = Space4x.empireById(state, settlement.empireId);
 	if (!Space4x.defTechUnlocked(empire, def)) return false;
+	if (!Space4x.defCultureUnlocked(state, empire, def)) return false;
 	if (!Space4x.buildSiteOk(state, settlement, def)) return false;
 	const cap = Space4x.buildCap(state, settlement, def);
-	if (cap === Infinity) return true;
+	if (cap === Infinity && !def.uniqueEmpire) return true;
 	let n = Space4x.countStructure(settlement, defId);
 	for (let i = 0; i < settlement.buildQueue.length; i++) {
 		if (settlement.buildQueue[i].defId === defId) n += 1;
 	}
-	return n < cap;
+	if (def.uniqueEmpire) {
+		n = Space4x.countEmpireStructure(state, empire.id, defId) +
+			Space4x.countEmpireQueuedBuild(state, empire.id, defId);
+	}
+	return n < (cap === Infinity ? 1 : cap);
 };
 
 Space4x.queueItemCost = function (state, settlement, item) {
@@ -550,13 +594,17 @@ Space4x.foundSettlement = function (state, unitId, bodyId) {
 	if (!unit || !Space4x.unitCanFound(state, unit)) return false;
 	const star = Space4x.starById(state, unit.location.starId) || Space4x.starAt(state, unit.location.x, unit.location.y);
 	if (!star || unit.location.kind === "space") return false;
-	const bodies = Space4x.emptyLegalBodies(state, star, unit.empireId);
+	const settleOpts = Space4x.unitFoundRequiresSpindel(state, unit) ? { spindelOnly: true } : {};
+	const bodies = Space4x.emptyLegalBodies(state, star, unit.empireId, settleOpts);
 	let body = null;
 	for (let i = 0; i < bodies.length; i++) {
 		if (bodies[i].id === bodyId) body = bodies[i];
 	}
 	if (!body) return false;
-	if (!Space4x.inRangeOfEmpireAtCell(state, unit.empireId, star.x, star.y)) return false;
+	if (!Space4x.isSpindelColony(state, unit) &&
+		!Space4x.inRangeOfEmpireAtCell(state, unit.empireId, star.x, star.y)) {
+		return false;
+	}
 	const name = star.name + " " + Space4x.bodyLabel(state, body);
 	const home = Space4x.createSettlement(state, unit.empireId, star.id, body.id, name, 1);
 	Space4x.absorbBodyNatives(state, home, body);
@@ -648,6 +696,7 @@ Space4x.buildInspectInfo = function (state, settlement, defId) {
 	}
 	if (def.kind === "abstract") stats.push("Added to the empire pool");
 	if (def.unique) stats.push("One per settlement");
+	if (def.uniqueEmpire) stats.push("One per empire");
 	Space4x.pushStructureInspectStats(state, settlement, def, stats);
 	if (def.maxFrom === "agriPotential") stats.push("Capped by this world's agriculture potential");
 	if (def.requireAgri) stats.push("Needs a world with agriculture slots");
@@ -659,6 +708,8 @@ Space4x.buildInspectInfo = function (state, settlement, defId) {
 	if (def.forbidKinds && def.forbidKinds.length) stats.push("Not on " + def.forbidKinds.map(Space4x.titleCase).join(", "));
 	if (def.forbidBiomes && def.forbidBiomes.length) stats.push("Not on " + def.forbidBiomes.map(Space4x.titleCase).join(", "));
 	if (def.onlyKinds && def.onlyKinds.length) stats.push("Only on " + def.onlyKinds.map(Space4x.titleCase).join(", "));
+	const knackNotes = Space4x.settlementKnackFootnotes(state, settlement, def);
+	for (let k = 0; k < knackNotes.length; k++) stats.push(knackNotes[k].text);
 	const built = settlement ? Space4x.countStructure(settlement, defId) : 0;
 	if (built && def.kind === "structure") stats.push("Standing here: " + built);
 	if (def.kind === "troop" && settlement) {

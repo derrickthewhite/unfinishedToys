@@ -6,6 +6,7 @@ Space4x.spySkill = function (state, empire) {
 	Space4x.eachCultureEffect(state, empire.cultureId, function (c, fx) {
 		if (fx.type === "spySkill") n += fx.n || 0;
 	});
+	if (Space4x.empireStructureBonus) n += Space4x.empireStructureBonus(state, empire.id, "empireSpySkill");
 	return n;
 };
 

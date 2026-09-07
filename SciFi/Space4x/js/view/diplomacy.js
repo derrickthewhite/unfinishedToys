@@ -5,6 +5,7 @@ Space4x.diploDraftOf = function (state) {
 	if (!state.ui.diploDraft.give) state.ui.diploDraft.give = [];
 	if (!state.ui.diploDraft.want) state.ui.diploDraft.want = [];
 	if (!state.ui.diploDraft.pacts) state.ui.diploDraft.pacts = [];
+	if (state.ui.diploDraft.duration == null) state.ui.diploDraft.duration = 20;
 	return state.ui.diploDraft;
 };
 
@@ -46,12 +47,18 @@ Space4x.fillOptionList = function (sel, items, valueFn, labelFn, selected) {
 
 Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 	if (!ui.stageDiplomacy) return;
+	const observing = Space4x.isObserver(state);
 	const player = Space4x.playerEmpire(state);
-	if (!player) return;
-	const canTalk = Space4x.empireHasDiplomacy(state, player);
-	const rivals = Space4x.contactedEmpires(state, player);
+	if (!observing && !player) return;
+
+	const canTalk = observing ? true : Space4x.empireHasDiplomacy(state, player);
+	const rivals = observing
+		? Space4x.observableEmpires(state)
+		: Space4x.contactedEmpires(state, player);
 	if (ui.diploGate) {
-		if (!canTalk) {
+		if (observing) {
+			Space4x.setText(ui.diploGate, "Observer: browse empires and open reports. Offers and war are disabled.");
+		} else if (!canTalk) {
 			Space4x.setText(ui.diploGate, "Research Exotranslation to talk. You can still declare war on empires in range.");
 		} else if (!rivals.length) {
 			Space4x.setText(ui.diploGate, "No empires in ship range yet.");
@@ -67,7 +74,7 @@ Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 	if (!selected && rivals[0]) {
 		selected = rivals[0];
 		state.ui.diploRivalId = selected.id;
-		Space4x.resetDiploDraft(state);
+		if (!observing) Space4x.resetDiploDraft(state);
 	}
 	if (!rivals.length) {
 		state.ui.diploRivalId = null;
@@ -98,30 +105,80 @@ Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 		function (row, e) {
 			Space4x.setCultureImg(row.querySelector("img"), state, e.cultureId);
 			row.querySelector(".diplo-rival-name").textContent = e.name;
-			const war = Space4x.atWar(player, e);
-			const rel = Space4x.relationOf(player, e.id);
-			const offer = Space4x.offerTo(state, player.id, e.id);
-			const attitude = rel ? (rel.attitude || 0) : 0;
-			let relText = war ? "War" : "Peace";
-			relText += " · " + attitude;
-			if (rel && rel.welcomePending) relText = "New · " + attitude;
-			else if (offer && !offer.attentionSeen) relText = "Offer · " + attitude;
+			let relText = "";
+			if (observing) {
+				const worlds = Space4x.settlementsOf(state, e.id).length;
+				relText = (e.isRevoltPolity ? "Revolt" : "Empire") + " · " + worlds + " world" + (worlds === 1 ? "" : "s");
+			} else {
+				const war = Space4x.atWar(player, e);
+				const rel = Space4x.relationOf(player, e.id);
+				const offer = Space4x.offerTo(state, player.id, e.id);
+				const attitude = rel ? (rel.attitude || 0) : 0;
+				const attLabel = Space4x.formatAttitude(attitude);
+				relText = war ? "War" : "Peace";
+				relText += " · " + attLabel;
+				if (rel && rel.welcomePending) relText = "New · " + attLabel;
+				else if (offer && !offer.attentionSeen) relText = "Offer · " + attLabel;
+				row.classList.toggle("is-war", war);
+				row.classList.toggle("is-attention", !!(rel && rel.welcomePending) || !!(offer && !offer.attentionSeen));
+			}
 			row.querySelector(".diplo-rival-rel").textContent = relText;
-			row.classList.toggle("is-war", war);
 			row.classList.toggle("is-selected", selected && selected.id === e.id);
-			row.classList.toggle("is-attention", !!(rel && rel.welcomePending) || !!(offer && !offer.attentionSeen));
+			if (observing) {
+				row.classList.toggle("is-war", false);
+				row.classList.toggle("is-attention", false);
+			}
 		}
 	);
 
 	if (ui.diploDetail) ui.diploDetail.hidden = !selected;
-	if (!selected) return;
+	if (!selected) {
+		if (ui.diploDeal) ui.diploDeal.hidden = true;
+		if (ui.diploStance) ui.diploStance.hidden = true;
+		if (ui.btnDiploReport) {
+			ui.btnDiploReport.hidden = true;
+			ui.btnDiploReport.disabled = true;
+		}
+		if (ui.btnDiploWar) {
+			ui.btnDiploWar.hidden = true;
+			ui.btnDiploWar.disabled = true;
+		}
+		return;
+	}
 
 	Space4x.setCultureImg(ui.diploRivalArt, state, selected.cultureId);
 	Space4x.setText(ui.diploRivalName, selected.name);
 	const who = Space4x.cultureName(state, selected.cultureId);
+	const homes = Space4x.settlementsOf(state, selected.id);
+	if (observing) {
+		let meta = (who ? who + " · " : "") + homes.length + " world" + (homes.length === 1 ? "" : "s");
+		if (selected.isRevoltPolity) meta += " · Revolt";
+		Space4x.setText(ui.diploRivalMeta, meta);
+		if (ui.diploAttitude) ui.diploAttitude.hidden = true;
+		if (ui.diploWelcome) ui.diploWelcome.hidden = true;
+		if (ui.diploThreat) ui.diploThreat.hidden = true;
+		if (ui.diploPrefs) ui.diploPrefs.hidden = true;
+		if (ui.diploStance) {
+			ui.diploStance.hidden = false;
+			Space4x.setText(ui.diploStance, "Stance: " + Space4x.aiStanceLabel(Space4x.aiStance(state, selected)));
+		}
+		if (ui.diploInbox) ui.diploInbox.hidden = true;
+		if (ui.diploOutbox) ui.diploOutbox.hidden = true;
+		if (ui.diploPendingNote) ui.diploPendingNote.hidden = true;
+		if (ui.diploDeal) ui.diploDeal.hidden = true;
+		if (ui.btnDiploWar) {
+			ui.btnDiploWar.hidden = true;
+			ui.btnDiploWar.disabled = true;
+		}
+		if (ui.btnDiploReport) {
+			ui.btnDiploReport.hidden = false;
+			ui.btnDiploReport.disabled = false;
+		}
+		return;
+	}
+
 	const war = Space4x.atWar(player, selected);
 	let meta = (who ? who + " · " : "") + (war ? "At war" : "At peace");
-	const homes = Space4x.settlementsOf(state, selected.id);
 	let known = 0;
 	for (let i = 0; i < homes.length; i++) {
 		if (Space4x.settlementDiscoveredBy(state, player.id, homes[i])) known += 1;
@@ -134,7 +191,7 @@ Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 	const mood = Space4x.attitudeMood(attitude);
 	if (ui.diploAttitude) {
 		ui.diploAttitude.hidden = false;
-		Space4x.setText(ui.diploAttitudeNum, String(attitude));
+		Space4x.setText(ui.diploAttitudeNum, Space4x.formatAttitude(attitude));
 		Space4x.setText(ui.diploAttitudeMood, mood);
 		if (ui.diploAttitudeFill) {
 			const pct = Math.max(0, Math.min(100, (attitude + 100) / 2));
@@ -143,7 +200,22 @@ Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 			ui.diploAttitudeFill.classList.toggle("is-friendly", attitude > 15);
 		}
 	}
-	if (ui.diploThreat) ui.diploThreat.hidden = true;
+	if (ui.diploThreat) {
+		const threat = Space4x.threatAssessment(state, player, selected);
+		ui.diploThreat.hidden = false;
+		Space4x.setText(ui.diploThreat, "Threat " + Space4x.formatThreatPercent(threat.ratio) +
+			" · you " + Space4x.formatThreatNumber(threat.viewerEffective) +
+			" vs them " + Space4x.formatThreatNumber(threat.targetEffective));
+	}
+	if (ui.diploPrefs) {
+		const prefs = Space4x.empireTradePrefs(state, selected);
+		ui.diploPrefs.hidden = false;
+		Space4x.setText(ui.diploPrefs, Space4x.formatTradePrefs(prefs));
+	}
+	if (ui.diploStance) {
+		ui.diploStance.hidden = false;
+		Space4x.setText(ui.diploStance, "Stance: " + Space4x.aiStanceLabel(Space4x.aiStance(state, selected)));
+	}
 
 	if (ui.diploWelcome) {
 		const welcome = playerRel && playerRel.welcomeMessage;
@@ -151,7 +223,7 @@ Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 		Space4x.setText(ui.diploWelcome, welcome || "");
 	}
 
-	const bits = Space4x.activeTreatyLabels(player, selected);
+	const bits = Space4x.activeTreatyLabels(player, selected, state);
 	if (Space4x.hasTreaty(player, selected, "research")) {
 		const tech = selected.research && selected.research.currentProjectId ?
 			Space4x.techById(state, selected.research.currentProjectId) : null;
@@ -204,6 +276,9 @@ Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 
 	const draft = Space4x.diploDraftOf(state);
 	draft.pacts = Space4x.filterProposedPacts(state, player, selected, draft.pacts);
+	if (ui.diploDuration && document.activeElement !== ui.diploDuration) {
+		ui.diploDuration.value = String(Space4x.draftDuration(state, draft));
+	}
 	const pactRows = [
 		{ id: "peace", input: ui.diploPactPeace, wrap: ui.diploPactPeaceWrap },
 		{ id: "trade", input: ui.diploPactTrade, wrap: ui.diploPactTradeWrap },
@@ -220,6 +295,14 @@ Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 		if (can) canProposeAny = true;
 		if (document.activeElement !== row.input) {
 			row.input.checked = draft.pacts.indexOf(row.id) >= 0;
+		}
+		const span = row.wrap.querySelector("span");
+		if (span && (row.id === "trade" || row.id === "research") && Space4x.hasTreaty(player, selected, row.id)) {
+			const left = Space4x.treatyTurnsLeft(state, player, selected, row.id);
+			span.textContent = "Renew " + Space4x.pactLabel(row.id).toLowerCase() +
+				(left ? " (" + left + " turns left)" : "");
+		} else if (span) {
+			span.textContent = Space4x.pactProposalLabel(row.id);
 		}
 	}
 	if (ui.diploPactNone) ui.diploPactNone.hidden = canProposeAny;
@@ -305,13 +388,28 @@ Space4x.syncDiplomacyStage = function (ui, state, cmds) {
 	Space4x.fillOptionList(ui.diploGiveTroop, myTroops, function (t) { return t.id; }, function (t) { return t.label; });
 	Space4x.fillOptionList(ui.diploWantTroop, theirTroops, function (t) { return t.id; }, function (t) { return t.label; });
 
+	const myTechs = Space4x.giftableTechs(state, player, selected);
+	const theirTechs = Space4x.giftableTechs(state, selected, player);
+	Space4x.fillOptionList(ui.diploGiveTech, myTechs, function (t) { return t.id; }, function (t) {
+		return t.name + " (" + t.cost + ")";
+	});
+	Space4x.fillOptionList(ui.diploWantTech, theirTechs, function (t) { return t.id; }, function (t) {
+		return t.name + " (" + t.cost + ")";
+	});
+
+	const myLends = Space4x.ownedLendables(state, player);
+	const theirLends = Space4x.ownedLendables(state, selected);
+	Space4x.fillOptionList(ui.diploGiveLend, myLends, function (d) { return d.id; }, function (d) { return d.name; });
+	Space4x.fillOptionList(ui.diploWantLend, theirLends, function (d) { return d.id; }, function (d) { return d.name; });
+
 	const themTalk = Space4x.empireHasDiplomacy(state, selected);
 	const probe = {
 		fromId: player.id,
 		toId: selected.id,
 		give: draft.give || [],
 		want: draft.want || [],
-		pacts: Space4x.filterProposedPacts(state, player, selected, draft.pacts || [])
+		pacts: Space4x.filterProposedPacts(state, player, selected, draft.pacts || []),
+		duration: Space4x.draftDuration(state, draft)
 	};
 	const canSend = canTalk && themTalk && Space4x.packageValid(state, player, selected, probe);
 	if (ui.btnDiploSend) {

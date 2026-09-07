@@ -161,6 +161,36 @@ Space4x.previewEmpireFood = function (state, empireId) {
 	return { produced: produced, present: present, hullsUsed: startHulls - hulls.n };
 };
 
+Space4x.settlementVatCapacity = function (state, settlement) {
+	let n = 0;
+	Space4x.eachStructureEffect(state, settlement, function (def, fx) {
+		if (fx.type === "vatSupport") n += fx.n != null ? fx.n : 1;
+	});
+	return n;
+};
+
+Space4x.settlementFoodSupport = function (state, settlement, presentOverride) {
+	const pops = settlement && settlement.pops ? settlement.pops.length : 0;
+	const present = presentOverride != null
+		? presentOverride
+		: ((settlement && (settlement.foodPresent || settlement.lastFoodPresent)) || 0);
+	const fed = Math.min(present, pops);
+	const shortfall = Math.max(0, pops - fed);
+	const vatCap = Space4x.settlementVatCapacity(state, settlement);
+	const vatUsed = Math.min(shortfall, vatCap);
+	const starving = shortfall - vatUsed;
+	return {
+		pops: pops,
+		present: present,
+		fed: fed,
+		shortfall: shortfall,
+		vatCap: vatCap,
+		vatUsed: vatUsed,
+		starving: starving,
+		foodShort: starving > 0
+	};
+};
+
 Space4x.foodSituation = function (state, settlement) {
 	const set = Space4x.settingOf(state);
 	const need = settlement.pops.length * (set.foodPerPop || 1);
@@ -168,15 +198,19 @@ Space4x.foodSituation = function (state, settlement) {
 	const produced = preview.produced[settlement.id] || 0;
 	const present = preview.present[settlement.id] || 0;
 	const imported = Math.max(0, present - produced);
-	const fed = Math.min(present, need);
+	const support = Space4x.settlementFoodSupport(state, settlement, present);
 	return {
 		produced: produced,
 		present: present,
 		imported: imported,
 		need: need,
-		fed: fed,
+		fed: support.fed,
+		vatCap: support.vatCap,
+		vatUsed: support.vatUsed,
+		starving: support.starving,
 		deficit: Math.max(0, need - present),
-		surplus: Math.max(0, produced - need)
+		surplus: Math.max(0, produced - need),
+		foodShort: support.foodShort
 	};
 };
 

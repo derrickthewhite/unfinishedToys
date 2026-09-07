@@ -12,8 +12,14 @@ Space4x.reportEmpires = function (state) {
 	for (let i = 0; i < state.empires.length; i++) {
 		const e = state.empires[i];
 		byId[e.id] = true;
-		out.push(e);
 		state.scoreEmpireMeta[e.id] = { name: e.name, colorId: e.colorId, isPlayer: !!e.isPlayer };
+		out.push({
+			id: e.id,
+			name: e.name,
+			colorId: e.colorId,
+			isPlayer: !!e.isPlayer,
+			fallen: !!e.dormant
+		});
 	}
 	const history = state.scoreHistory || [];
 	for (let t = 0; t < history.length; t++) {
@@ -85,14 +91,9 @@ Space4x.drawScoreChart = function (canvas, history, empires, key, state) {
 			? Space4x.empireColor(state, empire.id)
 			: (Space4x.EMPIRE_COLORS[empire.colorId != null ? empire.colorId : idx] || "#fff");
 		const pts = [];
-		let stopped = false;
 		for (let t = 0; t < history.length; t++) {
 			const row = (history[t].scores || {})[empire.id];
-			if (!row) {
-				if (pts.length) stopped = true;
-				continue;
-			}
-			if (stopped) continue;
+			if (!row) continue;
 			const x = history.length === 1
 				? padX
 				: padX + t * innerW / (history.length - 1);

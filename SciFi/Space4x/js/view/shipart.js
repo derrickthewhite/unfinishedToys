@@ -32,6 +32,9 @@ Space4x.DEFAULT_SHIP_ART = {
 	],
 	colonyShip: [
 		"assets/ships/colony.svg"
+	],
+	spindelColony: [
+		"assets/ships/spindel-colony.svg"
 	]
 };
 
@@ -40,7 +43,8 @@ Space4x.HULL_SHIP_ART_FALLBACK = {
 	battleship: "assets/ships/battleship.svg",
 	missile: "assets/ships/missile.svg",
 	scout: "assets/ships/scout.svg",
-	colonyShip: "assets/ships/colony.svg"
+	colonyShip: "assets/ships/colony.svg",
+	spindelColony: "assets/ships/spindel-colony.svg"
 };
 
 Space4x.OBSERVER_SHIP_COLOR = "#e8eef8";

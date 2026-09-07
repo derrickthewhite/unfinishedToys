@@ -98,6 +98,7 @@
 				<span id="chrome-money-line">Money <span id="chrome-money">0</span></span>
 				<span>Food <span id="chrome-food-prod">0</span> / <span id="chrome-food-need">0</span></span>
 				<span title="Empire freighter pool. Hauls food (1 each), population (5 each), and ground units (1 each). In-transit hulls count as used, not gone. Not map warships.">Freighters <span id="chrome-freighters-used">0</span> / <span id="chrome-freighters">0</span></span>
+				<span id="chrome-spindel-wrap" hidden title="Spindel Navigators. Same cargo rules as freighters, but only Spindel world to Spindel world, any distance in one turn.">Navigators <span id="chrome-spindel-used">0</span> / <span id="chrome-spindel">0</span></span>
 				<span id="chrome-research" class="chrome-link">Research —</span>
 			</div>
 		</header>
@@ -296,6 +297,9 @@
 										</div>
 									</div>
 									<p id="diplo-welcome" class="diplo-welcome" hidden></p>
+									<p id="diplo-threat" class="muted" hidden></p>
+									<p id="diplo-prefs" class="muted" hidden></p>
+									<p id="diplo-stance" class="muted" hidden></p>
 								</div>
 							</div>
 							<div id="diplo-inbox" hidden>
@@ -322,6 +326,13 @@
 									</div>
 									<div id="diplo-pact-proposals">
 										<h4>Treaties to request</h4>
+										<label class="diplo-duration-label">Duration
+											<select id="diplo-duration">
+												<option value="8">8 turns</option>
+												<option value="20" selected>20 turns</option>
+												<option value="40">40 turns</option>
+											</select>
+										</label>
 										<label class="diplo-pact-opt" id="diplo-pact-peace-wrap" hidden>
 											<input type="checkbox" id="diplo-pact-peace" data-pact="peace">
 											<span>Propose peace (end the war)</span>
@@ -365,6 +376,75 @@
 											<div class="diplo-add-actions">
 												<button type="button" id="btn-diplo-give-money">Offer</button>
 												<button type="button" id="btn-diplo-want-money">Demand</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Tribute
+													<select id="diplo-tribute-resource">
+														<option value="money">Money / turn</option>
+														<option value="food">Food / turn</option>
+														<option value="research">Research / turn</option>
+													</select>
+												</label>
+												<label>Amount
+													<input id="diplo-tribute-n" type="number" min="1" value="5">
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-give-tribute">Offer</button>
+												<button type="button" id="btn-diplo-want-tribute">Demand</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Research points
+													<input id="diplo-research-n" type="number" min="1" value="20">
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-give-research">Offer</button>
+												<button type="button" id="btn-diplo-want-research">Demand</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Your tech
+													<select id="diplo-give-tech"></select>
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-give-tech-btn">Offer</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Their tech
+													<select id="diplo-want-tech"></select>
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-want-tech-btn">Demand</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Your structure
+													<select id="diplo-give-lend"></select>
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-give-lend-btn">Lend</button>
+											</div>
+										</div>
+										<div class="diplo-add-group">
+											<div class="diplo-add-fields">
+												<label>Their structure
+													<select id="diplo-want-lend"></select>
+												</label>
+											</div>
+											<div class="diplo-add-actions">
+												<button type="button" id="btn-diplo-want-lend-btn">Demand lend</button>
 											</div>
 										</div>
 										<div class="diplo-add-group">
@@ -492,8 +572,24 @@
 						</div>
 					</div>
 					<section class="combat-rounds-wrap">
-						<h3>Combat rounds <span class="combat-debug-note muted">(temporary debug view)</span></h3>
-						<ul id="combat-rounds" class="combat-rounds"></ul>
+						<h3>Combat rounds</h3>
+						<div class="combat-rounds-table-wrap">
+							<table class="combat-rounds-table">
+								<thead>
+									<tr>
+										<th>Round</th>
+										<th>Attacker TS</th>
+										<th>Attacker damage by category</th>
+										<th>Attacker total damage</th>
+										<th>Defender total damage</th>
+										<th>Defender damage by category</th>
+										<th>Defender TS</th>
+									</tr>
+								</thead>
+								<tbody id="combat-rounds"></tbody>
+							</table>
+						</div>
+						<p id="combat-rounds-empty" class="muted combat-rounds-empty" hidden>No rounds fought.</p>
 					</section>
 					<section class="combat-effects-wrap">
 						<h3>Other effects</h3>
@@ -643,6 +739,7 @@
 										</div>
 									</div>
 									<div id="empire-report-threat" class="diplo-threat muted"></div>
+									<p id="empire-report-stance" class="muted"></p>
 								</div>
 							</div>
 						</section>
@@ -699,6 +796,81 @@
 						<ul id="report-list"></ul>
 					</div>
 				</div>
+				<div id="stage-guide" hidden>
+					<div id="guide-head">
+						<button type="button" id="btn-back-galaxy-guide">Galaxy</button>
+						<div>
+							<h2>Guide Book</h2>
+							<p class="muted">Reference for species, ground units, ships, and ship loadouts.</p>
+						</div>
+					</div>
+					<nav id="guide-toc" class="guide-toc" aria-label="Guide sections">
+						<a href="#guide-species">Species</a>
+						<a href="#guide-units">Units</a>
+						<a href="#guide-ships">Ships</a>
+						<a href="#guide-upgrades">Ship upgrades</a>
+					</nav>
+					<section id="guide-species" class="guide-section">
+						<h3>Species</h3>
+						<div class="guide-table-wrap">
+							<table class="guide-table">
+								<thead>
+									<tr>
+										<th>Art</th>
+										<th>Name</th>
+										<th>Bonuses</th>
+										<th>Blurb</th>
+									</tr>
+								</thead>
+								<tbody id="guide-species-body"></tbody>
+							</table>
+						</div>
+					</section>
+					<section id="guide-units" class="guide-section">
+						<h3>Units</h3>
+						<div class="guide-table-wrap">
+							<table class="guide-table">
+								<thead>
+									<tr>
+										<th>Badge</th>
+										<th>Name</th>
+										<th>Tags</th>
+										<th>TS</th>
+										<th>Cost</th>
+										<th>Upkeep</th>
+										<th>Tech</th>
+										<th>Notes</th>
+									</tr>
+								</thead>
+								<tbody id="guide-units-body"></tbody>
+							</table>
+						</div>
+					</section>
+					<section id="guide-ships" class="guide-section">
+						<h3>Ships</h3>
+						<div class="guide-table-wrap">
+							<table class="guide-table">
+								<thead>
+									<tr>
+										<th>Icon</th>
+										<th>Name</th>
+										<th>Cost</th>
+										<th>Upkeep</th>
+										<th>Load</th>
+										<th>Tech</th>
+										<th>Summary</th>
+									</tr>
+								</thead>
+								<tbody id="guide-ships-body"></tbody>
+							</table>
+						</div>
+					</section>
+					<section id="guide-upgrades" class="guide-section">
+						<h3>Ship upgrades</h3>
+						<p class="muted">Outfit combat hulls on the Designs screen. Load size is per unit unless noted.</p>
+						<div id="guide-upgrade-tables"></div>
+					</section>
+				</div>
 			</div>
 			<aside id="side">
 				<nav id="side-nav">
@@ -712,6 +884,7 @@
 					<button type="button" data-stage="empire">Settlements</button>
 					<button type="button" data-stage="design">Designs</button>
 					<button type="button" data-stage="report">Report</button>
+					<button type="button" data-stage="guide">Guide Book</button>
 					<button type="button" data-panel="menu">Menu</button>
 				</nav>
 
@@ -824,7 +997,9 @@
 	<script src="js/query.js"></script>
 	<script src="js/model/effects.js"></script>
 	<script src="js/model/culture.js"></script>
+	<script src="js/model/knacks.js"></script>
 	<script src="js/model/planetcolor.js"></script>
+	<script src="js/model/spindel.js"></script>
 	<script src="js/state.js"></script>
 	<script src="js/persistence.js"></script>
 	<script src="js/gen/galaxy.js"></script>
@@ -869,6 +1044,7 @@
 	<script src="js/view/revolt.js"></script>
 	<script src="js/view/spacecombat.js"></script>
 	<script src="js/view/design.js"></script>
+	<script src="js/view/guide.js"></script>
 	<script src="js/view/sync.js"></script>
 	<script src="js/boot.js"></script>
 </body>

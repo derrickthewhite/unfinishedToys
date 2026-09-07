@@ -48,12 +48,22 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			facings: ["front", "right", "back", "left"],
 			nScalesExistingShips: true
 		},
+		diplomacy: {
+			defaultTreatyTurns: 20,
+			interestPerEightTurns: 0.2,
+			attitudeDriftChance: 0.25,
+			attitudeDriftMin: -6,
+			attitudeDriftMax: 4,
+			treatyWarmthEvery: 4,
+			treatyWarmth: 1
+		},
 		ai: {
 			threatHorizon: 5,
 			otherWarCommit: 0.4,
 			sharedWarCommit: 0.25,
 			warAttitude: -25,
-			warStrengthRatio: 1.05,
+			warStrengthRatio: 1.0,
+			opportunityRatio: 1.2,
 			peaceAttitude: 10,
 			peaceStrengthRatio: 0.7,
 			invadeStrengthRatio: 1.1
@@ -82,6 +92,9 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			],
 			colonyShip: [
 				"assets/ships/colony.svg"
+			],
+			spindelColony: [
+				"assets/ships/spindel-colony.svg"
 			],
 			battleship: [
 				"assets/ships/Battleship/Battleship-1.svg",
@@ -226,17 +239,39 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			interceptorBay: { id: "interceptorBay", name: "Interceptor bay", kind: "fighter", size: 16, fighterBeam: [1, 4], fighterRange: 14, fighterStructure: 16, fighterSpeedMult: 1.6, requireTech: "wp2fi", summary: "Fast escort fighters." },
 			strikeBay: { id: "strikeBay", name: "Strike bay", kind: "fighter", size: 20, fighterBeam: [2, 6], fighterRange: 16, fighterStructure: 22, requireTech: "wp4fi", summary: "Strike craft with harder guns." },
 			assaultBay: { id: "assaultBay", name: "Assault bay", kind: "fighter", size: 24, fighterBeam: [3, 8], fighterRange: 18, fighterStructure: 28, fighterSpeedMult: 1.4, requireTech: "wp6fi", summary: "Heavy assault fighters." },
-			autoRepair: { id: "autoRepair", name: "Auto repair", kind: "device", size: 8, stub: true, requireTech: "ro1ar" },
-			radioScanner: { id: "radioScanner", name: "Radio scanner", kind: "device", size: 5, attackSkill: 15, requireTech: "pp1", summary: "Targeting array. +15 to hit with beam weapons." },
-			autoTargeter: { id: "autoTargeter", name: "Auto targeter", kind: "device", size: 8, stub: true, requireTech: "ro2at", summary: "Stub beam-fire upgrade." },
-			exhaustSeeker: { id: "exhaustSeeker", name: "Exhaust seeker", kind: "device", size: 8, stub: true, requireTech: "ro2es", summary: "Stub missile-guidance upgrade." },
-			missileInterceptor: { id: "missileInterceptor", name: "Missile interceptors", kind: "missileLauncher", size: 8, range: 24, stub: true, requireTech: "ro3mi", summary: "Specialized anti-missile defense. Stub." },
-			grapplingSuits: { id: "grapplingSuits", name: "Grappling suits", kind: "device", size: 10, stub: true, requireTech: "ro3gs", summary: "Boarding gear. Stub." },
-			smartArmor: { id: "smartArmor", name: "Smart armor", kind: "device", size: 10, stub: true, requireTech: "ro5sa", summary: "Fit once. Intended +50% armor at load N×10. Stub." },
+			autoRepair: {
+				id: "autoRepair", name: "Auto repair", kind: "device", size: 8, stub: true, requireTech: "ro1ar",
+				summary: "Stub. Intended mid-combat or post-battle structure repair."
+			},
+			radioScanner: {
+				id: "radioScanner", name: "Radio scanner", kind: "device", sizePerN: 5, attackSkill: 15,
+				requireTech: "pp1", summary: "Targeting array. Load 5×N. +15 to hit with beam weapons."
+			},
+			autoTargeter: {
+				id: "autoTargeter", name: "Auto targeter", kind: "device", size: 8, stub: true, requireTech: "ro2at",
+				summary: "Stub. Intended beam fire-control upgrade (extra shots / better fire rate)."
+			},
+			exhaustSeeker: {
+				id: "exhaustSeeker", name: "Exhaust seeker", kind: "device", size: 8, stub: true, requireTech: "ro2es",
+				summary: "Stub. Intended missile guidance upgrade (better tracking after launch)."
+			},
+			missileInterceptor: {
+				id: "missileInterceptor", name: "Missile interceptors", kind: "missileLauncher", size: 8, range: 24,
+				stub: true, requireTech: "ro3mi",
+				summary: "Stub. Specialized anti-missile defense; combat rules not wired yet."
+			},
+			grapplingSuits: {
+				id: "grapplingSuits", name: "Grappling suits", kind: "device", size: 10, stub: true, requireTech: "ro3gs",
+				summary: "Stub. Boarding gear for capturing or raiding ships."
+			},
+			smartArmor: {
+				id: "smartArmor", name: "Smart armor", kind: "device", sizePerN: 10, armorPct: 50, uniqueLoad: true,
+				requireTech: "ro5sa", summary: "Fit once. Load 10×N. +50% armor."
+			},
 			ammoGremlin: {
 				id: "ammoGremlin", name: "Gremlin magazine", kind: "missileAmmo", size: 6, rounds: 2, damage: 24,
 				launcherId: "chemicalLauncher", stub: true, requireTech: "ro5gw",
-				summary: "Damage over 10 rounds; double expected warhead-tier total. Stub."
+				summary: "Stub. Damage over 10 rounds; about double expected warhead-tier total."
 			},
 		},
 		loyalty: {
@@ -254,12 +289,52 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 		revolt: {
 			rebelTroopDefId: "militia",
 			inciteCostPerPop: 5,
-			politicalUnrestChance: 100
+			politicalUnrestChance: 100,
+			nameSuffixes: [
+				"Rebellion",
+				"Movement",
+				"Revolt",
+				"Independence",
+				"Militia",
+				"New Way",
+				"Grand Path",
+				"Association",
+				"Resistance",
+				"Uprising",
+				"Insurgency",
+				"Liberation Front",
+				"Free State",
+				"Separatists",
+				"Underground",
+				"$newParent"
+			]
 		},
 		planetColors: {
 			natives: { label: "Natives", popCount: 3 },
-			rareMine: { label: "Rare resource mine", moneyPerTurn: 10 },
-			wildlife: { label: "Dangerous wildlife", attackChance: 0.1, predatorDefId: "predator" },
+			rareMine: {
+				label: "Rare resource mine",
+				moneyPerTurn: 10,
+				moneyTiers: [
+					{ moneyPerTurn: 10, weight: 4 },
+					{ moneyPerTurn: 20, weight: 3 },
+					{ moneyPerTurn: 30, weight: 2 },
+					{ moneyPerTurn: 50, weight: 1 }
+				]
+			},
+			wildlife: {
+				label: "Dangerous wildlife",
+				attackChance: 0.1,
+				predatorLevels: [
+					{ level: "I", predatorDefId: "predatorI", weight: 1 },
+					{ level: "II", predatorDefId: "predatorII", weight: 1 },
+					{ level: "III", predatorDefId: "predatorIII", weight: 1 },
+					{ level: "IV", predatorDefId: "predatorIV", weight: 1 }
+				]
+			},
+			spindel: {
+				label: "Spindel world",
+				wildlifeChance: 0.75
+			},
 			ruins: { label: "Ancient ruins", researchPerScientist: 1 },
 			spaceMonster: { label: "Space monster lair", placeholder: true }
 		},
@@ -364,17 +439,22 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				c("cat", "Cat", "Cat (Jaguar).svg", [
 					{ type: "loyalty", n: -10 },
 					{ type: "troopTsPct", pct: 20 },
-					{ type: "shipBonus", stub: true }
-				], "Proud felinoid clans who prize independence and keen senses. Territory and reputation matter more than grand alliances."),
+					{ type: "shipAttack", n: 20 },
+					{ type: "shipDefense", n: 20 },
+					{ type: "spySkill", n: 5 }
+				], "Proud felinoid clans who prize independence and keen senses. Their pilots and fighters strike and evade with predatory grace, and their spies are hard to shake."),
 				c("centurion", "Centurion", "Centurion.svg", [
 					{ type: "jobYield", job: "industry", n: 1 },
-					{ type: "troopTsPct", pct: 10 }
+					{ type: "troopTsPct", pct: 10 },
+					{ type: "knackResearch", n: 1, categories: ["reactors", "exoticMaterials"] }
 				], "Disciplined soldiers forged in long campaigns. They respect strength, order, and clear chains of command."),
 				c("crabbit", "Crabbit", "Crabbit.svg", [
 					wetFarm,
-					{ type: "troopTsPct", pct: 10 }
+					{ type: "troopTsPct", pct: 10 },
+					{ type: "knackResearch", n: 1, categories: ["robotics", "exoticMaterials"] }
 				], "Armored crab-folk who burrow into damp soils. Wet worlds feed their colonies unusually well."),
 				c("gaunt", "Gaunt", "Gaunt.svg", [
+					{ type: "warriors" },
 					{ type: "troopTsPct", pct: 30 },
 					{ type: "negotiation", pct: -10 },
 					{ type: "spySkill", n: -10 },
@@ -386,11 +466,15 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 					{ type: "loyalty", n: 10 },
 					{ type: "spySkill", n: -10 }
 				], "Hive-minded insects with fierce colony loyalty. Populations swell quickly when food is steady."),
-				c("human", "Human", "Human A27.svg", [{ type: "negotiation", pct: 25 }], "Adaptable diplomats who trade, talk, and compromise before they fight. Their envoys build goodwill that lasts."),
+				c("human", "Human", "Human A27.svg", [
+					{ type: "negotiation", pct: 25 },
+					{ type: "knackResearch", n: 1, categories: ["sociology"] }
+				], "Adaptable diplomats who trade, talk, and compromise before they fight. Their envoys build goodwill that lasts."),
 				c("hmmm", "Hmmm", "hmmm A.svg", [
 					{ type: "jobYield", job: "research", n: 1 },
 					{ type: "loyalty", n: 10 },
-					{ type: "spySkill", n: -10 }
+					{ type: "spySkill", n: -10 },
+					{ type: "knackBuild", pct: 20, when: "repeatStructureSettlement" }
 				], "Quiet thinkers who ask uncomfortable questions. Research comes naturally; their calm crews rarely cause trouble."),
 				c("karkadann", "Karkadann", "Karkadann D.svg", [
 					{ type: "jobYield", job: "industry", n: 2 },
@@ -405,19 +489,22 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				], "Amphibious negotiators at ease on wet worlds and at treaty tables alike. Natural pacifists with loyal communities and skilled envoys."),
 				c("krouta", "Krouta", "Krouta C.svg", [{ type: "troopTsPct", pct: 30 }], "Hyena clans with a martial culture. Peace is temporary; strength is remembered."),
 				c("loroko", "Loroko", "Loroko A.svg", [
+					{ type: "warriors" },
 					{ type: "troopTsPct", pct: 20 },
 					{ type: "troopArmorPct", pct: 15 },
 					{ type: "loyalty", n: 5 }
 				], "A deeply militarized people forged for campaigns. Pain barely slows them; discipline and force are their native language."),
 				c("mogwai", "Mogwai", "Mogwai B.svg", [
 					{ type: "jobYield", job: "research", n: 1 },
-					{ type: "firstBuildDiscount", stub: true }
+					{ type: "knackBuild", pct: 20, when: "firstStructureEmpire" }
 				], "Curious scholars with soft fur and sharp minds. Laboratories flourish wherever they settle."),
 				c("nehudi", "Nehudi", "Nehudi D.svg", [
+					{ type: "spindelWeb" },
+					{ type: "warriors" },
 					{ type: "troopTsPct", pct: 20 },
 					nehudiFarm,
 					{ type: "jobYield", job: "research", n: -1 }
-				], "Stoic desert dwellers at home with harsh nature. They coax extra harvests from arid, desert, and wetland soils, but their scientists lag behind."),
+				], "Stoic desert dwellers bound by the Spindel Web. Spindel Navigators and Spindel Colonies link Spindel worlds in one turn; they see every Spindel system. Harsh soils yield extra food, but their scientists lag."),
 				c("ranathim", "Ranathim", "Ranathim B.svg", [
 					{ type: "troopTsPct", pct: 20 },
 					{ type: "loyalty", n: -10 },
@@ -432,9 +519,9 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				], "Coiled and patient predators who watch more than they speak. They strike when the moment is right."),
 				c("squidling", "Squidling", "Squidling.svg", [
 					wetFarm,
-					{ type: "researchPerTaggedTech", tag: "ship", n: 1 },
-					{ type: "squidlingBonus", stub: true }
-				], "Aquatic cephalopods who farm the deeps. Ocean and swamp colonies are their breadbasket. +1 research while researching ship tech."),
+					{ type: "knackResearch", n: 1, categories: ["warpPhysics", "reactors"] },
+					{ type: "knackBuild", pct: 20, when: "ship" }
+				], "Aquatic cephalopods who farm the deeps. Ocean and swamp colonies are their breadbasket. They excel at Warp Physics, Reactors, and shipbuilding."),
 				c("temkor", "Temkor", "Temkor (Red).svg", [
 					wetFarm,
 					{ type: "loyalty", n: -10 },
@@ -444,7 +531,8 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				c("trader", "Trader", "Trader B.svg", [
 					{ type: "moneyMult", mult: 1.5 },
 					{ type: "spySkill", n: 5 },
-					{ type: "loyalty", n: 5 }
+					{ type: "loyalty", n: 5 },
+					{ type: "knackResearch", n: 1, categories: ["biology"] }
 				], "Merchants without a fixed homeworld tradition — profit is culture. Every working hand earns more coin.")
 			];
 		}()),
@@ -527,7 +615,7 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			},
 			surveyDish: {
 				id: "surveyDish", name: "Survey Dish", kind: "structure",
-				cost: { industry: 400 }, upkeep: 2, requireTech: "wp3sd", unique: true,
+				cost: { industry: 400 }, upkeep: 2, requireTech: "wp3sd", unique: true, lendable: true,
 				effects: [{ type: "galaxyScan" }],
 				summary: "Unique here. Reveals every planet and ship. Extra dishes on other worlds are backups."
 			},
@@ -578,8 +666,8 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			bioCycleVats: {
 				id: "bioCycleVats", name: "Bio-Cycle Vats", kind: "structure",
 				cost: { industry: 20 }, upkeep: 0.5, requireTech: "bi4cs",
-				effects: [],
-				summary: "Each vat is meant to stop negative growth for one pop. Not wired yet."
+				effects: [{ type: "vatSupport", n: 1 }],
+				summary: "Each vat can support one pop that would otherwise go hungry. Vat-supported pops neither grow nor starve. Used only when food runs short."
 			},
 			antiPestLab: {
 				id: "antiPestLab", name: "Anti-Pest Lab", kind: "structure",
@@ -590,8 +678,11 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			cropOptimizer: {
 				id: "cropOptimizer", name: "Crop Optimizer", kind: "structure",
 				cost: { industry: 200 }, upkeep: 1, requireTech: "bi6cp", unique: true,
-				effects: [{ type: "jobYield", job: "agriculture", n: 2 }, { type: "jobYield", job: "greenhouse", n: 2 }],
-				summary: "Unique. +2 food per agriculture and greenhouse worker. Garden-only agri filter not wired yet."
+				effects: [
+					{ type: "jobYield", job: "agriculture", n: 2, biomes: ["garden"] },
+					{ type: "jobYield", job: "greenhouse", n: 2 }
+				],
+				summary: "Unique. +2 food per garden-world farmer and per greenhouse worker."
 			},
 			bioSilicateMiners: {
 				id: "bioSilicateMiners", name: "Bio-silicate miners", kind: "structure",
@@ -613,9 +704,9 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			},
 			imperialSpySchool: {
 				id: "imperialSpySchool", name: "Imperial Spy School", kind: "structure",
-				cost: { industry: 300 }, upkeep: 3, requireTech: "so4is", unique: true,
-				effects: [],
-				summary: "Unique. Intended +15 spy skill empire-wide. Not wired yet."
+				cost: { industry: 300 }, upkeep: 3, requireTech: "so4is", uniqueEmpire: true, lendable: true,
+				effects: [{ type: "empireSpySkill", n: 15 }],
+				summary: "One per empire. +15 spy skill empire-wide."
 			},
 			utilityCoordinator: {
 				id: "utilityCoordinator", name: "Utility Coordinator", kind: "structure",
@@ -625,9 +716,27 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			},
 			grandCentralLibrary: {
 				id: "grandCentralLibrary", name: "Grand Central Library", kind: "structure",
-				cost: { industry: 1000 }, upkeep: 2, requireTech: "so6nk", unique: true,
-				effects: [],
-				summary: "Unique here (one-per-empire not wired). Intended +2 research on all scientists in the empire. Not wired yet."
+				cost: { industry: 1000 }, upkeep: 2, requireTech: "so6nk", uniqueEmpire: true, lendable: true,
+				effects: [{ type: "empireResearchPerPop", n: 2 }],
+				summary: "One per empire. +2 research per scientist empire-wide."
+			},
+			microscannerFactory: {
+				id: "microscannerFactory", name: "Microscanner Factory", kind: "structure",
+				cost: { industry: 400 }, upkeep: 4, requireTech: "ro4mf", uniqueEmpire: true, lendable: true,
+				effects: [{ type: "empireResearchPerPop", n: 1 }],
+				summary: "One per empire. +1 research per scientist empire-wide."
+			},
+			molecularPrinters: {
+				id: "molecularPrinters", name: "Molecular Printers", kind: "structure",
+				cost: { industry: 600 }, upkeep: 6, requireTech: "ro6mp", uniqueEmpire: true, lendable: true,
+				effects: [{ type: "empireResearchPerPop", n: 1 }],
+				summary: "One per empire. +1 research per scientist empire-wide."
+			},
+			quantumConstructors: {
+				id: "quantumConstructors", name: "Quantum Constructors", kind: "structure",
+				cost: { industry: 800 }, upkeep: 8, requireTech: "ro7qc", uniqueEmpire: true, lendable: true,
+				effects: [{ type: "empireResearchPerPop", n: 1 }],
+				summary: "One per empire. +1 research per scientist empire-wide."
 			},
 			globalOptimizer: {
 				id: "globalOptimizer", name: "Global Optimizer", kind: "structure",
@@ -665,21 +774,32 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			},
 			police: { id: "police", name: "Police", kind: "troop", cost: { industry: 10 }, upkeep: 1, ts: 15, tags: ["Infantry", "Police"], glyph: { asset: "assets/troops/police.svg" }, summary: "Local security for keeping the peace." },
 			militia: { id: "militia", name: "Militia", kind: "troop", cost: { industry: 10 }, upkeep: 0.2, ts: 20, tags: ["Infantry", "Defensive"], glyph: { asset: "assets/troops/militia.svg" }, summary: "Cheap garrison of part-time soldiers for defense only." },
-			predator: { id: "predator", name: "Predators", kind: "troop", npc: true, cost: { industry: 0 }, upkeep: 0, ts: 15, tags: ["Melee", "Wildlife"], glyph: { asset: "assets/troops/predator.svg" }, summary: "Dangerous wildlife. Not buildable." },
-			trainedPredator: { id: "trainedPredator", name: "Predators", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 15, tags: ["Melee"], requireTechAny: ["ro4pc", "bi4pb"], glyph: { asset: "assets/troops/predator.svg" }, summary: "Trained wildlife. Default troop strength 15; planet-wildlife scaling not wired yet." },
+			predator: { id: "predator", name: "Dangerous Predators", level: "I", kind: "troop", npc: true, cost: { industry: 0 }, upkeep: 0, ts: 15, tags: ["Melee", "Wildlife"], glyph: { asset: "assets/troops/predator I.svg" }, summary: "Legacy wildlife entry (level I). Not buildable." },
+			predatorI: { id: "predatorI", name: "Dangerous Predators", level: "I", kind: "troop", npc: true, cost: { industry: 0 }, upkeep: 0, ts: 15, tags: ["Melee", "Wildlife"], glyph: { asset: "assets/troops/predator I.svg" }, summary: "Dangerous wildlife, level I. Melee. Not buildable." },
+			predatorII: { id: "predatorII", name: "Dangerous Predators", level: "II", kind: "troop", npc: true, cost: { industry: 0 }, upkeep: 0, ts: 30, tags: ["Melee", "Wildlife"], glyph: { asset: "assets/troops/predator II.svg" }, summary: "Dangerous wildlife, level II. Melee. Not buildable." },
+			predatorIII: { id: "predatorIII", name: "Dangerous Predators", level: "III", kind: "troop", npc: true, cost: { industry: 0 }, upkeep: 0, ts: 45, tags: ["Melee", "Wildlife"], glyph: { asset: "assets/troops/predator III.svg" }, summary: "Dangerous wildlife, level III. Melee. Not buildable." },
+			predatorIV: { id: "predatorIV", name: "Dangerous Predators", level: "IV", kind: "troop", npc: true, cost: { industry: 0 }, upkeep: 0, ts: 60, tags: ["Melee", "Wildlife"], glyph: { asset: "assets/troops/predator IV.svg" }, summary: "Dangerous wildlife, level IV. Melee. Not buildable." },
+			trainedPredator: { id: "trainedPredator", name: "Trained Predators", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 15, tags: ["Melee"], requireTechAny: ["ro4pc", "bi4pb"], glyph: { asset: "assets/troops/predator.svg" }, summary: "Trained wildlife. Melee. Default troop strength 15." },
 			infantry: { id: "infantry", name: "Infantry", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 50, tags: ["Infantry"], glyph: { asset: "assets/troops/infantry.svg" }, summary: "Line infantry." },
+			warriors: { id: "warriors", name: "Warriors", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 50, tags: ["Melee"], requireCultureEffect: "warriors", glyph: { asset: "assets/troops/Warrior.svg" }, summary: "Racial melee fighters. Gaunt, Nehudi, and Loroko only." },
 			elites: { id: "elites", name: "Elites", kind: "troop", cost: { industry: 40 }, upkeep: 2, ts: 120, tags: ["Infantry", "Elite"], glyph: { asset: "assets/troops/elites.svg" }, summary: "Elite infantry resistant to loss and efficient to move around." },
 			armor: { id: "armor", name: "Armor", kind: "troop", cost: { industry: 20 }, upkeep: 1, ts: 50, tags: ["Armor"], glyph: { asset: "assets/troops/armor.svg" }, summary: "Ground armor." },
 			mechs: { id: "mechs", name: "Mechs", kind: "troop", cost: { industry: 40 }, upkeep: 2, ts: 120, tags: ["Armor"], requireTech: "rx2mh", glyph: { asset: "assets/troops/mechs.svg" }, summary: "Giant Walkers with Guns. Armor Unit." },
 			air: { id: "air", name: "Air", kind: "troop", cost: { industry: 100 }, upkeep: 4, ts: 100, tags: ["Air"], glyph: { asset: "assets/troops/air.svg" }, summary: "Air wing." },
 			battlesuit: { id: "battlesuit", name: "Battlesuit Warriors", kind: "troop", cost: { industry: 40 }, upkeep: 2, ts: 40, tags: ["Melee"], requireTech: "ex5bw", glyph: { asset: "assets/troops/elites.svg" }, summary: "Melee battlesuits." },
-			highOrbitTrooper: { id: "highOrbitTrooper", name: "High Orbit Troopers", kind: "troop", cost: { industry: 100 }, upkeep: 4, ts: 100, tags: ["Infantry"], requireTech: "ex5ho", glyph: { asset: "assets/troops/air.svg" }, summary: "Infantry. Attacking past enemy ships is not wired yet." },
+			highOrbitTrooper: { id: "highOrbitTrooper", name: "High Orbit Troopers", kind: "troop", cost: { industry: 100 }, upkeep: 4, ts: 100, tags: ["Infantry"], invadePastShips: true, requireTech: "ex5ho", glyph: { asset: "assets/troops/air.svg" }, summary: "Infantry. Can invade past enemy combat ships in orbit." },
 			warriorMonk: { id: "warriorMonk", name: "Warrior Monks", kind: "troop", cost: { industry: 80 }, upkeep: 2, ts: 60, tags: ["Melee"], requireTech: "so4wm", glyph: { asset: "assets/troops/infantry.svg" }, summary: "Melee monastic troops." },
 			spaceFreighter: {
 				id: "spaceFreighter", name: "Space freighters (×5)", kind: "abstract",
 				cost: { industry: 25 }, requireTech: "rx0ip",
 				effects: [{ type: "grantFreighters", n: 5 }],
 				summary: "Adds five hulls to the empire freighter pool. Each hull hauls 1 food. Five hulls move one person. One hull moves one ground unit. 1 money if any hulls haul food, people, or troops this turn."
+			},
+			spindelNavigators: {
+				id: "spindelNavigators", name: "Spindel Navigators (×5)", kind: "abstract",
+				cost: { industry: 50 }, upkeep: 1, requireCultureEffect: "spindelWeb",
+				effects: [{ type: "grantSpindelNavigators", n: 5 }],
+				summary: "Adds five Spindel Navigator hulls. Same cargo rules as freighters, but only between Spindel worlds, and any distance takes one turn. Nehudi Spindel Web only. 1 money if any navigators haul this turn."
 			},
 			scout: {
 				id: "scout", name: "Scout", kind: "unit",
@@ -691,6 +811,12 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				cost: { industry: 100 }, upkeep: 4, requireTech: "bi0ce", requireStructure: "spaceDock",
 				effects: [{ type: "foundSettlement" }],
 				summary: "Founds a new settlement on a legal empty world. Needs Contained Ecology, a Space Dock, and Warp Drive to leave this star. Unarmed."
+			},
+			spindelColony: {
+				id: "spindelColony", name: "Spindel Colony", kind: "unit",
+				cost: { industry: 100 }, upkeep: 1, requireCultureEffect: "spindelWeb",
+				effects: [{ type: "foundSettlement", spindelOnly: true }],
+				summary: "Nehudi Spindel Web colony hull. No Space Dock needed. Travels Spindel system to Spindel system in one turn (any distance) and founds only on Spindel planets."
 			},
 			cruiser: {
 				id: "cruiser", name: "Cruiser", kind: "unit",
@@ -821,33 +947,36 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			tech("so2pb", "Patriot Board", "sociology", 2, [{ type: "unlockBuild", id: "patriotBoard" }], "Unlocks Patriot Board: unique 100-industry building, upkeep 1. +10 settlement loyalty, −25 unit loyalty."),
 			tech("so2mp", "Military Privilege", "sociology", 2, [{ type: "unlockBuild", id: "grandBarracks" }], "Unlocks Grand Barracks: 100 industry, upkeep 2. −5 settlement loyalty. +50 unit loyalty for five garrison units; extra copies cover five more."),
 			tech("so2ap", "Armed Populace", "sociology", 2, [{ type: "militiaAsPolice", defId: "militia" }, { type: "unitLoyalty", defId: "militia", n: -10 }], "Militia count as police for settlement loyalty. Militia loyalty −10."),
-			tech("so2gt", "Applied Game Theory", "sociology", 2, [{ type: "stub", n: 1 }], "+10% positive attitude, −10% negative attitude. Needs the negotiation bonus to read empire techs."),
+			tech("so2gt", "Applied Game Theory", "sociology", 2, [{ type: "negotiation", pct: 10 }], "+10% attitude gains from others; −10% attitude losses."),
 			tech("so3dc", "Deep Cover", "sociology", 3, [{ type: "spySkill", n: 10 }], "+10 spy skill."),
-			tech("so3re", "Reeducation", "sociology", 3, [{ type: "stub", n: 1 }], "Intended to double conquest-loyalty recovery. Not wired yet."),
+			tech("so3re", "Reeducation", "sociology", 3, [{ type: "conquestHealMult", mult: 2 }], "Conquered pops recover loyalty twice as fast."),
 			tech("so3qc", "Quantum Codebreaking", "sociology", 3, [{ type: "stub", n: 1 }], "Intended +30 spy skill when stealing technology. Not wired yet."),
-			tech("so4is", "Imperial Spy School", "sociology", 4, [{ type: "unlockBuild", id: "imperialSpySchool" }], "Unlocks Imperial Spy School: unique 300-industry building, upkeep 3. Empire-wide spy bonus is not wired yet."),
+			tech("so4is", "Imperial Spy School", "sociology", 4, [{ type: "unlockBuild", id: "imperialSpySchool" }], "Unlocks Imperial Spy School: one per empire, 300 industry, upkeep 3. +15 spy skill empire-wide."),
 			tech("so4wm", "Warrior Monks", "sociology", 4, [{ type: "unlockBuild", id: "warriorMonk" }], "Unlocks Warrior Monks: 80 industry, troop strength 60, Melee."),
-			tech("so4rt", "Radical Thinking", "sociology", 4, [{ type: "researchPerPop", n: 2 }], "Scientists produce +2 research. Loyalty penalty on science pops is not wired yet."),
+			tech("so4rt", "Radical Thinking", "sociology", 4, [
+				{ type: "researchPerPop", n: 2 },
+				{ type: "jobLoyalty", job: "research", n: -20 }
+			], "Scientists produce +2 research. Research pops have −20 loyalty."),
 			tech("so5se", "The Scarcity Equation", "sociology", 5, [{ type: "unlockBuild", id: "utilityCoordinator" }], "Unlocks Utility Coordinator: unique 300-industry building, upkeep 3. Working pops on that world earn +1 money."),
 			tech("so5mw", "Memetic Warfare", "sociology", 5, [{ type: "spySkill", n: 10 }, { type: "loyalty", n: 5 }], "+10 spy skill. +5 population loyalty."),
-			tech("so6nk", "Networks of Knowledge", "sociology", 6, [{ type: "unlockBuild", id: "grandCentralLibrary" }], "Unlocks Grand Central Library: unique 1000-industry building, upkeep 2. Empire-wide scientist bonus is not wired yet."),
+			tech("so6nk", "Networks of Knowledge", "sociology", 6, [{ type: "unlockBuild", id: "grandCentralLibrary" }], "Unlocks Grand Central Library: one per empire, 1000 industry, upkeep 2. +2 research per scientist empire-wide."),
 			tech("so7sl", "Scientific Living", "sociology", 7, [{ type: "unlockBuild", id: "globalOptimizer" }], "Unlocks Global Optimizer: unique 300-industry building, upkeep 1. +1 output on working jobs on that world."),
 			tech("so8en", "Enlightenment", "sociology", 8, [{ type: "unlockBuild", id: "transcendenceMonastery" }], "Unlocks Transcendence Monastery: unique 10,000-industry building. Victory (and joke follow-ups) not wired yet."),
 			tech("bi0ce", "Contained Ecology", "biology", 0, [{ type: "unlockBuild", id: "colonyShip" }], "Sealed life support. Unlocks colony ships. A Space Dock is still required to build them."),
 			tech("bi1ct", "Crop Tweaking", "biology", 1, [{ type: "unlockBuild", id: "cropTweaks" }], "Unlocks Crop Tweaks: a one-time 100-industry building with no upkeep. Farmers on that world produce +1 food."),
 			tech("bi1", "Organ Cloning", "biology", 1, [{ type: "growthRatePercent", n: 2 }], "Fed population accumulates growth 2% faster."),
-			tech("bi2gh", "Exo-Greenhouses", "biology", 2, [{ type: "unlockBuild", id: "greenhouse" }], "Sealed farms. Unlocks Greenhouse: 3 food per worker, converts one agriculture slot. Works on barren worlds."),
+			tech("bi2gh", "Exo-Greenhouses", "biology", 2, [{ type: "unlockBuild", id: "greenhouse" }], "Sealed farms. Unlocks Greenhouse: 3 food per worker, converts one agriculture slot. Works on barren and toxic worlds."),
 			tech("bi2aq", "Aquaculture", "biology", 2, [{ type: "unlockBuild", id: "deepWaterFarm" }], "Unlocks Deep-Water Farming: unique 20-industry building, upkeep 1. Ocean worlds only. Farmers produce +3 food."),
 			tech("bi3cd", "Combat Drugs", "biology", 3, [{ type: "troopArmorPct", tags: ["Infantry"], pct: 10 }], "+10% troop strength for infantry. Instant; no building."),
+			tech("bi4cs", "Closed Systems", "biology", 3, [{ type: "unlockBuild", id: "bioCycleVats" }], "Unlocks Bio-Cycle Vats: 20 industry, upkeep 0.5. Each vat supports one unfed pop — no growth, no starvation — only when food is short."),
 			tech("bi4of", "Orbital Farming", "biology", 4, [{ type: "unlockBuild", id: "farmCylinder" }], "Unlocks Farm Cylinder: 250 industry, upkeep 1. Asteroid belts only. Adds one agriculture job slot."),
 			tech("bi4pb", "Predator Breeding", "biology", 4, [{ type: "unlockBuild", id: "trainedPredator" }], "Unlocks Predators: 20 industry, troop strength 15, Melee. Same unit as Predator Control Chips."),
-			tech("bi4cs", "Closed Systems", "biology", 4, [{ type: "unlockBuild", id: "bioCycleVats" }], "Unlocks Bio-Cycle Vats: 20 industry, upkeep 0.5. Stopping negative growth per vat is not wired yet."),
 			tech("bi4", "Pathogen", "biology", 4, [{ type: "weapon", n: 1 }], "Bio-weapons. Combat stub."),
 			tech("bi5mc", "Mass Cloning", "biology", 5, [{ type: "unlockBuild", id: "massCloning" }], "Unlocks Mass Cloning. Adding a new population is not wired yet."),
 			tech("bi5ss", "Super Soldiers", "biology", 5, [{ type: "troopArmorPct", tags: ["Elite", "Air", "Armor"], pct: 50 }], "+50% troop strength for elites, air, and armor."),
 			tech("bi5ap", "Anti-Pest Lab", "biology", 5, [{ type: "unlockBuild", id: "antiPestLab" }], "Unlocks Anti-Pest Lab: 200 industry, upkeep 1. +1 food per agriculture and greenhouse worker."),
 			tech("bi5", "Organ Cloning III", "biology", 5, [{ type: "growthRatePercent", n: 1 }], "Another +1% growth."),
-			tech("bi6cp", "Crop Perfection", "biology", 6, [{ type: "unlockBuild", id: "cropOptimizer" }], "Unlocks Crop Optimizer: unique 200-industry building, upkeep 1. +2 food per agriculture and greenhouse worker."),
+			tech("bi6cp", "Crop Perfection", "biology", 6, [{ type: "unlockBuild", id: "cropOptimizer" }], "Unlocks Crop Optimizer: unique 200-industry building, upkeep 1. +2 food per garden farmer and greenhouse worker."),
 			tech("bi6sc", "Species Creation", "biology", 6, [{ type: "stub", n: 1 }], "Stub. For custom races later."),
 			tech("bi6bm", "Bio-silicate miners", "biology", 6, [{ type: "unlockBuild", id: "bioSilicateMiners" }], "Unlocks Bio-silicate miners: unique 200-industry building, no upkeep. Agricultural slots produce +1 industry."),
 			tech("bi7", "Xeno-Adaptation", "biology", 7, [{ type: "stub", n: 1 }], "Placeholder tier-7 biology tech."),
@@ -862,12 +991,15 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			tech("ex3", "Armor Plate", "exoticMaterials", 3, [{ type: "armor", n: 1 }], "Ship armor +1 quality step (armor HP)."),
 			tech("ex3cs", "Mass Carbon Synthesis", "exoticMaterials", 3, [{ type: "unlockBuild", id: "carbonSynth" }], "Unlocks the Carbon synthesizer. Poor or very poor agri worlds: unique building, −1 agri slot, +1 industry per Industry worker."),
 			tech("ex3se", "Space Elevator", "exoticMaterials", 3, [{ type: "unlockBuild", id: "spaceElevator" }], "Unlocks the Space Elevator. Unique. Ships built on that world cost 25% less."),
-			tech("ex4sc", "Superconductors", "exoticMaterials", 4, [{ type: "range", n: 1 }], "Low-loss power. Ships operate 1 hex farther from friendly colonies. +20% ship load is not wired yet."),
+			tech("ex4sc", "Superconductors", "exoticMaterials", 4, [
+				{ type: "range", n: 1 },
+				{ type: "loadPct", n: 20 }
+			], "Ships operate 1 hex farther from friendly colonies. +20% ship load of base."),
 			tech("ex4gc", "Gauss Cannon", "exoticMaterials", 4, [{ type: "unlockLoad", id: "gaussCannon" }], "Unlocks the gauss cannon ship weapon."),
 			tech("ex4st", "Reinforced Keels", "exoticMaterials", 4, [{ type: "structure", n: 1 }], "Ship structure +1 quality step."),
-			tech("ex4rm", "Resistant Materials", "exoticMaterials", 4, [{ type: "stub", n: 1 }], "Intended to remove the toxic-world upkeep surcharge. Not wired yet."),
+			tech("ex4rm", "Resistant Materials", "exoticMaterials", 4, [{ type: "toxicUpkeepExempt" }], "No extra upkeep surcharge on toxic worlds."),
 			tech("ex5bw", "Battlesuit Warriors", "exoticMaterials", 5, [{ type: "unlockBuild", id: "battlesuit" }], "Unlocks Battlesuit Warriors: 40 industry, troop strength 40, Melee."),
-			tech("ex5ho", "High Orbit Troopers", "exoticMaterials", 5, [{ type: "unlockBuild", id: "highOrbitTrooper" }], "Unlocks High Orbit Troopers: 100 industry, troop strength 100, Infantry. Invading past enemy ships is not wired yet."),
+			tech("ex5ho", "High Orbit Troopers", "exoticMaterials", 5, [{ type: "unlockBuild", id: "highOrbitTrooper" }], "Unlocks High Orbit Troopers: 100 industry, troop strength 100, Infantry. Can invade past enemy combat ships."),
 			tech("ex5ap", "Composite Armor", "exoticMaterials", 5, [{ type: "armor", n: 1 }], "Ship armor +1 quality step."),
 			tech("ex6md", "Mantle Drill", "exoticMaterials", 6, [{ type: "unlockBuild", id: "mantleDrill" }], "Unlocks Mantle Drill: unique 400-industry building, upkeep 2. +2 industry to five Industry workers."),
 			tech("ex6st", "Monostructure", "exoticMaterials", 6, [{ type: "structure", n: 1 }], "Ship structure +1 quality step."),
@@ -878,25 +1010,25 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			tech("ro1ar", "Auto Repair", "robotics", 1, [{ type: "unlockLoad", id: "autoRepair" }], "Unlocks Auto Repair as a ship device. Effect still a stub."),
 			tech("ro1dr", "Drones", "robotics", 1, [{ type: "troopArmorPct", tags: ["Infantry", "Armor", "Air", "Police", "Defensive"], pct: 20 }], "+20% troop strength for non-melee units."),
 			tech("ro2ms", "Mass Surveillance", "robotics", 2, [{ type: "unlockBuild", id: "surveillanceCenter" }], "Unlocks Surveillance center: unique 100-industry building, upkeep 2. +20 settlement loyalty."),
-			tech("ro2at", "Auto Targeter", "robotics", 2, [{ type: "unlockLoad", id: "autoTargeter" }], "Stub upgrade to beams."),
-			tech("ro2lt", "Lidar Targeting", "robotics", 2, [{ type: "stub", n: 1 }], "Intended +30% missile hit chance past base. Not wired yet."),
-			tech("ro2es", "Exhaust Seeking", "robotics", 2, [{ type: "unlockLoad", id: "exhaustSeeker" }], "Stub upgrade to missiles."),
-			tech("ro3mi", "Missile Interceptors", "robotics", 3, [{ type: "unlockLoad", id: "missileInterceptor" }], "Unlocks a stub anti-missile weapon."),
+			tech("ro2at", "Auto Targeter", "robotics", 2, [{ type: "unlockLoad", id: "autoTargeter" }], "Unlocks Auto Targeter (beam fire-control stub)."),
+			tech("ro2lt", "Lidar Targeting", "robotics", 2, [{ type: "missileHitPct", pct: 30 }], "+30% missile hit chance of base. Best targeting tech wins."),
+			tech("ro2es", "Exhaust Seeking", "robotics", 2, [{ type: "unlockLoad", id: "exhaustSeeker" }], "Unlocks Exhaust Seeker (missile guidance stub)."),
+			tech("ro3mi", "Missile Interceptors", "robotics", 3, [{ type: "unlockLoad", id: "missileInterceptor" }], "Unlocks Missile Interceptors (anti-missile stub)."),
 			tech("ro3mf", "Micro-Farmers", "robotics", 3, [{ type: "unlockBuild", id: "microFarmers" }], "Unlocks Micro-Farmers: 50 industry, upkeep 1. +1 food to four agriculture or greenhouse slots."),
 			tech("ro3dm", "Domestic Minifabs", "robotics", 3, [{ type: "unlockBuild", id: "domesticMinifabs" }], "Unlocks Domestic Minifabs: 50 industry, upkeep 1. Non-industry workers produce +1 industry."),
 			tech("ro3vm", "Vacuum Miners", "robotics", 3, [{ type: "stub", n: 1 }], "+1 industry on barren worlds and asteroids. Needs biome/kind industry bonuses."),
-			tech("ro3mn", "Miniaturization", "robotics", 3, [{ type: "stub", n: 1 }], "Intended +20% ship load from base. Not wired yet."),
-			tech("ro3gs", "Grappling Suits", "robotics", 3, [{ type: "unlockLoad", id: "grapplingSuits" }], "Unlocks Grappling Suits as a boarding stub."),
-			tech("ro4st", "Synthetic Targeting", "robotics", 4, [{ type: "stub", n: 1 }], "Intended +70% missile hit chance past base. Not wired yet."),
+			tech("ro3mn", "Miniaturization", "robotics", 3, [{ type: "loadPct", n: 20 }], "+20% ship load of base."),
+			tech("ro3gs", "Grappling Suits", "robotics", 3, [{ type: "unlockLoad", id: "grapplingSuits" }], "Unlocks Grappling Suits (boarding stub)."),
+			tech("ro4st", "Synthetic Targeting", "robotics", 4, [{ type: "missileHitPct", pct: 70 }], "+70% missile hit chance of base. Best targeting tech wins."),
 			tech("ro4pc", "Predator Control Chips", "robotics", 4, [{ type: "unlockBuild", id: "trainedPredator" }], "Unlocks Predators: 20 industry, troop strength 15, Melee. Same unit as Predator Breeding."),
-			tech("ro4mf", "Microscanner Factory", "robotics", 4, [{ type: "stub", n: 1 }], "Intended unique 400-industry building, upkeep 4, +1 research to all scientists in the empire. Needs empire-wide building yields."),
+			tech("ro4mf", "Microscanner Factory", "robotics", 4, [{ type: "unlockBuild", id: "microscannerFactory" }], "Unlocks Microscanner Factory: one per empire, 400 industry, upkeep 4. +1 research per scientist empire-wide."),
 			tech("ro5gw", "Gremlin Warhead", "robotics", 5, [{ type: "unlockLoad", id: "ammoGremlin" }], "Unlocks Gremlin magazines. Damage-over-time is not wired yet."),
-			tech("ro5sa", "Smart Armor", "robotics", 5, [{ type: "unlockLoad", id: "smartArmor" }], "Unlocks Smart Armor as a ship device. +50% armor at load N×10 is not wired yet."),
-			tech("ro6qt", "Quantum Targeting", "robotics", 6, [{ type: "stub", n: 1 }], "Intended +100% missile hit chance past base. Not wired yet."),
-			tech("ro6mp", "Molecular Printers", "robotics", 6, [{ type: "stub", n: 1 }], "Science bonus from an empire-wide or settlement building. Numbers and wiring later."),
-			tech("ro7qc", "Quantum Constructors", "robotics", 7, [{ type: "stub", n: 1 }], "Science bonus from an empire-wide or settlement building. Numbers and wiring later."),
+			tech("ro5sa", "Smart Armor", "robotics", 5, [{ type: "unlockLoad", id: "smartArmor" }], "Unlocks Smart Armor: fit once, load 10×N, +50% armor."),
+			tech("ro6qt", "Quantum Targeting", "robotics", 6, [{ type: "missileHitPct", pct: 100 }], "+100% missile hit chance of base. Best targeting tech wins."),
+			tech("ro6mp", "Molecular Printers", "robotics", 6, [{ type: "unlockBuild", id: "molecularPrinters" }], "Unlocks Molecular Printers: one per empire, 600 industry, upkeep 6. +1 research per scientist empire-wide."),
+			tech("ro7qc", "Quantum Constructors", "robotics", 7, [{ type: "unlockBuild", id: "quantumConstructors" }], "Unlocks Quantum Constructors: one per empire, 800 industry, upkeep 8. +1 research per scientist empire-wide."),
 			tech("pp0", "Laser Optics", "particlePhysics", 0, [{ type: "unlockLoad", id: "lightCannon" }], "Unlocks the laser beam for ship designs."),
-			tech("pp1", "Radio Scanner", "particlePhysics", 1, [{ type: "unlockLoad", id: "radioScanner" }], "Unlocks Radio Scanner: load 5, +15 to hit with beam weapons. N×5 load scaling is not wired yet."),
+			tech("pp1", "Radio Scanner", "particlePhysics", 1, [{ type: "unlockLoad", id: "radioScanner" }], "Unlocks Radio Scanner: load 5×N, +15 to hit with beam weapons."),
 			tech("pp1ms", "Maser Beam", "particlePhysics", 1, [{ type: "unlockLoad", id: "maserBeam" }], "Unlocks the maser beam ship weapon."),
 			tech("pp1lr", "Laser Rifle", "particlePhysics", 1, [{ type: "troopWeapon", tags: ["Infantry"], n: 5 }, { type: "troopWeapon", tags: ["Air"], n: 20 }], "+5 troop strength for infantry, +20 for air. Weapons do not stack; use the best."),
 			tech("pp2pa", "Pulse Array", "particlePhysics", 2, [{ type: "unlockLoad", id: "pulseArray" }], "Unlocks the pulse array ship weapon."),

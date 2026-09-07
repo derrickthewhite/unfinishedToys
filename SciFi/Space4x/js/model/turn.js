@@ -103,7 +103,7 @@ Space4x.rebuildTodos = function (state) {
 	}
 	for (let i = 0; i < state.empires.length; i++) {
 		const them = state.empires[i];
-		if (them.id === player.id) continue;
+		if (them.id === player.id || them.dormant) continue;
 		const rel = Space4x.relationOf(player, them.id);
 		if (!rel || !rel.welcomePending) continue;
 		todos.push({
@@ -133,7 +133,8 @@ Space4x.rebuildTodos = function (state) {
 		if (!arrivedColonies || arrivedColonies.indexOf(unit.id) === -1) continue;
 		const star = Space4x.starById(state, unit.location.starId);
 		if (!star) continue;
-		const bodies = Space4x.emptyLegalBodies(state, star, player.id);
+		const settleOpts = Space4x.unitFoundRequiresSpindel(state, unit) ? { spindelOnly: true } : {};
+		const bodies = Space4x.emptyLegalBodies(state, star, player.id, settleOpts);
 		if (!bodies.length) continue;
 		todos.push({
 			id: "found-" + unit.id,
@@ -141,7 +142,7 @@ Space4x.rebuildTodos = function (state) {
 			unitId: unit.id,
 			starId: star.id,
 			blocking: false,
-			text: "Colony ship arrived at " + star.name
+			text: "Colony ship arrived at " + Space4x.starDisplayName(state, player.id, star)
 		});
 	}
 	const combats = Space4x.playerUnseenGroundCombats(state);
@@ -269,6 +270,7 @@ Space4x.checkVictory = function (state) {
 	const alive = [];
 	for (let i = 0; i < state.empires.length; i++) {
 		const e = state.empires[i];
+		if (e.dormant) continue;
 		const homes = Space4x.settlementsOf(state, e.id);
 		let ships = 0;
 		for (let u = 0; u < state.units.length; u++) {
@@ -288,11 +290,13 @@ Space4x.finishTurnAfterSpace = function (state) {
 	Space4x.phaseConstruction(state);
 	Space4x.phaseSpies(state);
 	Space4x.phaseTransport(state);
+	Space4x.phaseDiplomacyFoodTributes(state);
 	Space4x.phaseUpkeep(state);
 	Space4x.phasePopulation(state);
 	Space4x.phaseRebellion(state);
 	Space4x.phaseEndEmptyRevolts(state);
 	Space4x.phaseFirstContact(state);
+	Space4x.phaseAttitudeDrift(state);
 	state.turn += 1;
 	Space4x.phaseRevoltJoins(state);
 	Space4x.phaseResolvePendingOffers(state);
@@ -325,7 +329,8 @@ Space4x.runTurn = function (state) {
 	};
 	state.turnHold = null;
 	for (let i = 0; i < state.empires.length; i++) {
-		if (!state.empires[i].isPlayer) Space4x.dumbChoose(state, state.empires[i].id);
+		if (state.empires[i].isPlayer || state.empires[i].dormant) continue;
+		Space4x.dumbChoose(state, state.empires[i].id);
 	}
 	Space4x.phasePendingInvasions(state);
 	Space4x.phaseEndEmptyRevolts(state);

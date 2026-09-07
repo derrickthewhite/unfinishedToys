@@ -50,6 +50,7 @@ Space4x.placeEmpires = function (state) {
 		Space4x.seedHomeJobs(state, home);
 		Space4x.spawnTroop(state, home, "police", true);
 		Space4x.spawnTroop(state, home, "police", true);
+		Space4x.applyNehudiHomeSpindel(state, empire, body, home);
 		Space4x.markStarExplored(state, empire.id, star.id);
 		state.settlements.push(home);
 	}
@@ -95,12 +96,13 @@ Space4x.startNewGame = function (state) {
 	Space4x.ensureGenColors(gen);
 	const usedCultures = {};
 	const usedColors = {};
+	const playerCultureId = Space4x.resolveGenCultureId(state, gen.playerCultureId, usedCultures);
 	state.empires.push(Space4x.createEmpire(state, {
 		id: Space4x.nextId(state, "e"),
-		name: "Player",
+		name: Space4x.polityNameForCulture(state, playerCultureId),
 		isPlayer: true,
 		aiId: null,
-		cultureId: Space4x.resolveGenCultureId(state, gen.playerCultureId, usedCultures),
+		cultureId: playerCultureId,
 		colorId: Space4x.resolveGenColorId(state, gen.playerColorId, usedColors)
 	}));
 	for (let i = 0; i < gen.opponents.length; i++) {
@@ -121,6 +123,7 @@ Space4x.startNewGame = function (state) {
 	Space4x.ensureGalaxyBgSeed(state);
 	Space4x.resolvePlanetColors(state);
 	Space4x.placeEmpires(state);
+	Space4x.ensureSpindelVision(state);
 	Space4x.ensureEmpireColors(state);
 	for (let i = 0; i < state.empires.length; i++) Space4x.ensureEmpireDesigns(state, state.empires[i]);
 	if (state.autoAssignJobs) {

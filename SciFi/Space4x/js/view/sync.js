@@ -75,9 +75,14 @@ Space4x.syncCulturePicker = function (root, state, selectedId, onPick) {
 Space4x.pullGenerationForm = function (ui, gen, skipFocused) {
 	const focus = skipFocused ? document.activeElement : null;
 	if (!skipFocused || focus !== ui.genSeed) gen.seed = ui.genSeed.value;
-	if (!skipFocused || focus !== ui.genWidth) gen.width = parseInt(ui.genWidth.value, 10) || 30;
-	if (!skipFocused || focus !== ui.genHeight) gen.height = parseInt(ui.genHeight.value, 10) || 30;
-	if (!skipFocused || focus !== ui.genStars) gen.starCount = parseInt(ui.genStars.value, 10) || 25;
+	// While the size preset is focused (e.g. just changed), keep gen dimensions —
+	// otherwise stale width/height/stars inputs overwrite the preset.
+	const presetFocus = ui.genSizePreset && focus === ui.genSizePreset;
+	if (!presetFocus) {
+		if (!skipFocused || focus !== ui.genWidth) gen.width = parseInt(ui.genWidth.value, 10) || 30;
+		if (!skipFocused || focus !== ui.genHeight) gen.height = parseInt(ui.genHeight.value, 10) || 30;
+		if (!skipFocused || focus !== ui.genStars) gen.starCount = parseInt(ui.genStars.value, 10) || 25;
+	}
 	if (!skipFocused || focus !== ui.genSetting) gen.settingId = ui.genSetting.value;
 	if (!skipFocused || focus !== ui.genAutoJobs) gen.autoAssignJobs = ui.genAutoJobs.checked;
 	if (ui.genHideUnvisited && (!skipFocused || focus !== ui.genHideUnvisited)) {
@@ -309,11 +314,15 @@ Space4x.syncChrome = function (ui, state) {
 	Space4x.setText(ui.chromeTurn, state.turn);
 	if (ui.chromePlayAs) {
 		const ids = [];
-		for (let i = 0; i < state.empires.length; i++) ids.push(state.empires[i].id);
+		for (let i = 0; i < state.empires.length; i++) {
+			if (state.empires[i].dormant) continue;
+			ids.push(state.empires[i].id);
+		}
 		const key = ids.join(",") + ":obs";
 		if (ui.chromePlayAs.getAttribute("data-ids") !== key) {
 			while (ui.chromePlayAs.firstChild) ui.chromePlayAs.removeChild(ui.chromePlayAs.firstChild);
 			for (let i = 0; i < state.empires.length; i++) {
+				if (state.empires[i].dormant) continue;
 				const opt = document.createElement("option");
 				opt.value = state.empires[i].id;
 				opt.textContent = state.empires[i].name;
@@ -362,6 +371,17 @@ Space4x.syncChrome = function (ui, state) {
 		ui.chromeFreighters.parentElement.title =
 			hulls.busy + " in use (" + hulls.transit + " hauling, " + hulls.food + " food) · " +
 			hulls.idle + " idle · " + hulls.owned + " total";
+	}
+	if (ui.chromeSpindelWrap) {
+		const showSpindel = Space4x.empireHasSpindelWeb(state, player);
+		ui.chromeSpindelWrap.hidden = !showSpindel;
+		if (showSpindel) {
+			const nav = Space4x.empireSpindelNavigatorUse(state, player.id);
+			Space4x.setText(ui.chromeSpindel, nav.owned);
+			Space4x.setText(ui.chromeSpindelUsed, nav.busy);
+			ui.chromeSpindelWrap.title =
+				nav.busy + " in use · " + nav.idle + " idle · " + nav.owned + " total · Spindel↔Spindel only, 1 turn";
+		}
 	}
 	let researchText = "Research —";
 	if (player.research.currentProjectId) {
@@ -424,6 +444,7 @@ Space4x.syncStage = function (ui, state) {
 	if (ui.stageSpaceCombat) ui.stageSpaceCombat.hidden = stage !== "spaceCombat";
 	if (ui.stageDesign) ui.stageDesign.hidden = stage !== "design";
 	if (ui.stageReport) ui.stageReport.hidden = stage !== "report";
+	if (ui.stageGuide) ui.stageGuide.hidden = stage !== "guide";
 	if (ui.stageEmpireReport) ui.stageEmpireReport.hidden = stage !== "empireReport";
 };
 
@@ -452,7 +473,8 @@ Space4x.syncSystem = function (ui, state, cmds) {
 	}
 	const player = Space4x.playerEmpire(state);
 	if (star) {
-		Space4x.setText(ui.systemName, star.name);
+		const viewer = Space4x.playerEmpire(state);
+		Space4x.setText(ui.systemName, Space4x.starDisplayName(state, viewer && viewer.id, star));
 		Space4x.setText(ui.systemPos, "(" + star.x + ", " + star.y + ")");
 		if (ui.systemRename) {
 			const canRename = player && Space4x.starCanRename(state, player.id, star.id);
@@ -578,7 +600,12 @@ Space4x.syncSystem = function (ui, state, cmds) {
 			const canInvade = !!(player && home && home.empireId !== player.id &&
 				Space4x.canInvadeSettlement(state, player.id, home));
 			row.querySelector(".btn-invade").hidden = !canInvade;
-			const legal = star ? Space4x.emptyLegalBodies(state, star, player && player.id) : [];
+			const legalOpts = {};
+			let founder = founderShips[0];
+			const selUnit = Space4x.unitById(state, state.ui.selectedUnitId);
+			if (selUnit && founderShips.indexOf(selUnit) >= 0) founder = selUnit;
+			if (founder && Space4x.unitFoundRequiresSpindel(state, founder)) legalOpts.spindelOnly = true;
+			const legal = star ? Space4x.emptyLegalBodies(state, star, player && player.id, legalOpts) : [];
 			let can = false;
 			for (let i = 0; i < legal.length; i++) if (legal[i].id === body.id) can = true;
 			row.querySelector(".btn-found").hidden = !can || !founderShips.length;
@@ -630,6 +657,10 @@ Space4x.syncSystem = function (ui, state, cmds) {
 
 Space4x.makeColonyFlagIcon = function (color) {
 	return Space4x.makeTintedBadgeIcon("assets/ships/colony.svg", color, 22, 22, "fleet-flag-icon");
+};
+
+Space4x.makeSpindelColonyIcon = function (color) {
+	return Space4x.makeTintedBadgeIcon("assets/ships/spindel-colony.svg", color, 22, 22, "fleet-flag-icon");
 };
 
 Space4x.makeScoutBadgeIcon = function (color) {
@@ -802,7 +833,11 @@ Space4x.makeFleetUnitIcon = function (state, unit) {
 		return wrap;
 	}
 	if (Space4x.unitCanFound(state, unit)) {
-		wrap.appendChild(Space4x.makeColonyFlagIcon(color));
+		if (Space4x.isSpindelColony(state, unit)) {
+			wrap.appendChild(Space4x.makeSpindelColonyIcon(color));
+		} else {
+			wrap.appendChild(Space4x.makeColonyFlagIcon(color));
+		}
 		return wrap;
 	}
 	if (Space4x.isScout(state, unit)) {
@@ -1117,6 +1152,7 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 		const def = builds[ids[i]];
 		if (def.npc) continue;
 		if (!Space4x.defTechUnlocked(empire, def)) continue;
+		if (!Space4x.defCultureUnlocked(state, empire, def)) continue;
 		if (def.kind === "structure" && Space4x.countStructure(st, def.id) > 0 && !Space4x.canQueueBuild(state, st, def.id)) continue;
 		if (!byKind[def.kind]) byKind[def.kind] = [];
 		byKind[def.kind].push(def);
@@ -1157,13 +1193,15 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 			const def = item.def;
 			const btn = row.querySelector("button");
 			let label = def.kind === "refit" ? def.name : (def.name + " (" + Space4x.buildCost(state, st, def) + ")");
+			if (Space4x.catalogHasKnackMark(state, st, def)) label += "*";
 			if (def.requireStructure && !Space4x.countStructure(st, def.requireStructure)) {
 				label += " · needs " + Space4x.structureName(state, def.requireStructure);
 			}
 			const can = Space4x.canQueueBuild(state, st, def.id);
 			if (def.unique) label += can ? " · unique" : " · already here";
+			if (def.uniqueEmpire) label += can ? " · empire unique" : " · already in empire";
 			btn.textContent = label;
-			row.classList.toggle("is-capped", !!(def.unique && !can));
+			row.classList.toggle("is-capped", !!((def.unique || def.uniqueEmpire) && !can));
 			row.classList.toggle("is-inspect", !!(inspect && inspect.kind === "catalog" && inspect.defId === def.id));
 		}
 	);
@@ -1210,6 +1248,7 @@ Space4x.syncUiFromState = function (app) {
 		Space4x.syncDesignStage(ui, state, app.cmds);
 		Space4x.syncReport(ui, state);
 		Space4x.syncReportStage(ui, state);
+		if (Space4x.syncGuideStage) Space4x.syncGuideStage(ui, state);
 		if (!ui.canvas.hidden) Space4x.drawMap(ui, state);
 	}
 	if (state.winnerEmpireId) {

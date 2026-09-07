@@ -60,6 +60,7 @@ Space4x.summarizeTroopSide = function (state, empire, troops) {
 				defId: t.defId,
 				culture: t.culture || null,
 				name: name,
+				level: def && def.level ? def.level : null,
 				count: 0,
 				tsEach: each,
 				ts: 0
@@ -75,7 +76,8 @@ Space4x.summarizeTroopSide = function (state, empire, troops) {
 	for (let g = 0; g < stackOrder.length; g++) {
 		const row = groups[stackOrder[g]];
 		stacks.push(row);
-		lines.push(row.count + "× " + row.name + " (" + row.tsEach + " TS each, " + row.ts + " total)");
+		const label = row.level ? row.name + " " + row.level : row.name;
+		lines.push(row.count + "× " + label + " (" + row.tsEach + " TS each, " + row.ts + " total)");
 	}
 	return { ts: ts, stacks: stacks, lines: lines };
 };
@@ -130,12 +132,6 @@ Space4x.buildGroundCombatReport = function (state, opts) {
 	if (opts.popsLost) {
 		effects.push(opts.popsLost + " " + Space4x.peopleWord(opts.popsLost) + " lost.");
 	}
-	const roundLines = [];
-	for (let r = 0; r < fight.rounds.length; r++) {
-		const round = fight.rounds[r];
-		roundLines.push("Round " + round.n + ": attacker deals " + round.atkDealt + ", defender deals " + round.defDealt +
-			" → " + round.atkPool + " vs " + round.defPool + " TS remaining.");
-	}
 	const winnerLabel = fight.winner === "attacker" ? opts.attackerLabel : opts.defenderLabel;
 	return {
 		id: Space4x.nextId(state, "gc"),
@@ -163,7 +159,7 @@ Space4x.buildGroundCombatReport = function (state, opts) {
 		attackerEmpireId: opts.atk.empire ? opts.atk.empire.id : null,
 		defenderEmpireId: opts.def.empire ? opts.def.empire.id : null,
 		attackerDefId: opts.attackerDefId || null,
-		rounds: roundLines,
+		rounds: fight.rounds || [],
 		winner: fight.winner,
 		winnerLabel: winnerLabel,
 		popsLost: opts.popsLost || 0,
@@ -180,9 +176,6 @@ Space4x.phaseGroundCombat = function (state) {
 Space4x.phaseWildlifeCombat = function (state) {
 	const rules = Space4x.planetColorRules(state).wildlife || {};
 	const chance = rules.attackChance != null ? rules.attackChance : 0.1;
-	const defId = rules.predatorDefId || "predator";
-	const def = Space4x.settingOf(state).builds[defId];
-	if (!def) return;
 
 	for (let i = 0; i < state.settlements.length; i++) {
 		const st = state.settlements[i];
@@ -193,16 +186,26 @@ Space4x.phaseWildlifeCombat = function (state) {
 		const n = Space4x.unusedAgriSlots(state, st);
 		if (n <= 0) continue;
 
+		if (!Space4x.bodyWildlifeLevel(body)) Space4x.applyWildlifeColor(state, body);
+		const defId = Space4x.bodyPredatorDefId(state, body);
 		const predators = [];
 		for (let p = 0; p < n; p++) {
-			predators.push({ id: Space4x.nextId(state, "t"), defId: defId, culture: null });
+			predators.push({
+				id: Space4x.nextId(state, "t"),
+				defId: defId,
+				culture: null
+			});
 		}
 		const loyalBefore = st.troops ? st.troops.slice() : [];
-		const predatorName = def ? def.name : "Predators";
+		const level = Space4x.bodyWildlifeLevel(body);
+		const predatorName = level ? ("Dangerous Predators " + level) : "Dangerous Predators";
+		const leadDefId = defId;
 		const label = Space4x.settlementLabel(state, st);
 		const empire = Space4x.empireById(state, st.empireId);
 		const defLabel = empire ? (empire.name + " garrison") : "Garrison";
-		state.turnLog.push(predatorName + " attack " + label + " (" + n + " " + Space4x.unitsWord(n) + ").");
+		const atkPreview = Space4x.summarizeTroopSide(state, null, predators);
+		state.turnLog.push(predatorName + " attack " + label + " (" + n + " " + Space4x.unitsWord(n) +
+			", " + atkPreview.ts + " TS).");
 
 		let popsLost = 0;
 		const effects = [];
@@ -243,8 +246,8 @@ Space4x.phaseWildlifeCombat = function (state) {
 				defenderCultureId: empire ? empire.cultureId : null,
 				attackerEmpireId: null,
 				defenderEmpireId: empire ? empire.id : null,
-				attackerDefId: defId,
-				rounds: ["No garrison — predators overrun the colony."],
+				attackerDefId: leadDefId,
+				rounds: [{ note: "No garrison — predators overrun the colony." }],
 				winner: "attacker",
 				winnerLabel: predatorName,
 				popsLost: popsLost,
@@ -286,8 +289,8 @@ Space4x.phaseWildlifeCombat = function (state) {
 				defenderCultureId: empire ? empire.cultureId : null,
 				attackerEmpireId: null,
 				defenderEmpireId: empire ? empire.id : null,
-				attackerDefId: defId,
-				rounds: [pending],
+				attackerDefId: leadDefId,
+				rounds: [{ note: pending }],
 				winner: "defender",
 				winnerLabel: defLabel,
 				popsLost: 0,
@@ -315,7 +318,7 @@ Space4x.phaseWildlifeCombat = function (state) {
 			empireId: st.empireId,
 			attackerLabel: predatorName,
 			defenderLabel: defLabel,
-			attackerDefId: defId,
+			attackerDefId: leadDefId,
 			atk: { empire: null, troops: predators },
 			def: { empire: empire, troops: loyalBefore },
 			atkTroopsBefore: predators,

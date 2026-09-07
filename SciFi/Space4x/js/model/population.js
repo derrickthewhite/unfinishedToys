@@ -86,10 +86,11 @@ Space4x.phasePopulation = function (state) {
 			continue;
 		}
 		const present = st.foodPresent || 0;
-		const fed = Math.min(present, pops);
-		const unfed = Math.max(0, pops - present);
-		if (unfed > 0) st.foodShort = true;
-		let fedLeft = fed;
+		const support = Space4x.settlementFoodSupport(state, st, present);
+		const foodShort = support.foodShort;
+		if (foodShort) st.foodShort = true;
+		let fedLeft = support.fed;
+		let vatLeft = support.vatUsed;
 		const acc = st.growthAccByCulture;
 		let births = 0;
 		let deaths = 0;
@@ -102,14 +103,18 @@ Space4x.phasePopulation = function (state) {
 			const starve = Space4x.popStarveRate(state, pop);
 			let net = 0;
 			if (fedLeft > 0) {
-				net = grow;
+				// No growth while anyone on the world is truly starving.
+				net = foodShort ? 0 : grow;
 				fedLeft -= 1;
+			} else if (vatLeft > 0) {
+				net = 0;
+				vatLeft -= 1;
 			} else {
 				net = -starve;
 			}
 			acc[cid] = (acc[cid] || 0) + net;
 		}
-		if (fed === 0) {
+		if (support.fed === 0 && support.vatUsed === 0) {
 			const ids = Object.keys(acc);
 			for (let c = 0; c < ids.length; c++) {
 				if (acc[ids[c]] > 0) acc[ids[c]] = 0;
@@ -120,7 +125,7 @@ Space4x.phasePopulation = function (state) {
 			const cid = cultureIds[c];
 			let cultureBirths = 0;
 			let cultureDeaths = 0;
-			while (acc[cid] >= 100) {
+			while (!foodShort && acc[cid] >= 100) {
 				cultureBirths += 1;
 				acc[cid] -= 100;
 			}
@@ -188,10 +193,11 @@ Space4x.turnsUntilPopChange = function (acc, netPer) {
 	return null;
 };
 
-Space4x.culturePopOutlook = function (state, st, empire, cultureId, fedLeftRef) {
+Space4x.culturePopOutlook = function (state, st, empire, cultureId, fedLeftRef, vatLeftRef, foodShort) {
 	const pops = st.pops || [];
 	let count = 0;
 	let fed = 0;
+	let onVats = 0;
 	let unfed = 0;
 	let growSum = 0;
 	let starveSum = 0;
@@ -206,26 +212,31 @@ Space4x.culturePopOutlook = function (state, st, empire, cultureId, fedLeftRef) 
 		if (fedLeftRef.left > 0) {
 			fed += 1;
 			fedLeftRef.left -= 1;
+		} else if (vatLeftRef && vatLeftRef.left > 0) {
+			onVats += 1;
+			vatLeftRef.left -= 1;
 		} else {
 			unfed += 1;
 		}
 	}
 	const growRate = count ? growSum / count : 0;
 	const starveRate = count ? starveSum / count : 0;
-	const fedContrib = fed * growRate;
+	const fedContrib = foodShort ? 0 : fed * growRate;
 	const unfedContrib = unfed * starveRate;
 	const netPer = fedContrib - unfedContrib;
 	Space4x.ensureGrowthAccByCulture(state, st, empire);
 	const acc = (st.growthAccByCulture && st.growthAccByCulture[cultureId]) || 0;
 	const combinedRate = count ? netPer / count : 0;
 	let changeThisTurn = 0;
-	if (netPer > 0) changeThisTurn = Math.floor((acc + netPer) / 100);
+	if (!foodShort && netPer > 0) changeThisTurn = Math.floor((acc + netPer) / 100);
 	else if (netPer < 0) changeThisTurn = Math.min(count, Math.floor(-(acc + netPer) / 100));
 	return {
 		cultureId: cultureId,
 		pops: count,
 		fed: fed,
+		onVats: onVats,
 		unfed: unfed,
+		foodShort: !!foodShort,
 		growRate: growRate,
 		starveRate: starveRate,
 		fedContrib: fedContrib,
@@ -233,7 +244,7 @@ Space4x.culturePopOutlook = function (state, st, empire, cultureId, fedLeftRef) 
 		netPer: netPer,
 		combinedRate: combinedRate,
 		acc: acc,
-		changeTurns: Space4x.turnsUntilPopChange(acc, netPer),
+		changeTurns: foodShort && netPer >= 0 ? null : Space4x.turnsUntilPopChange(acc, netPer),
 		changeThisTurn: changeThisTurn
 	};
 };
@@ -242,9 +253,10 @@ Space4x.settlementPopOutlook = function (state, st) {
 	const empire = Space4x.empireById(state, st.empireId);
 	const pops = st.pops.length;
 	const sit = Space4x.foodSituation(state, st);
-	const present = sit.present;
-	const fed = sit.fed;
-	const fedLeftRef = { left: fed };
+	const support = Space4x.settlementFoodSupport(state, st, sit.present);
+	const foodShort = support.foodShort;
+	const fedLeftRef = { left: support.fed };
+	const vatLeftRef = { left: support.vatUsed };
 	const cultures = {};
 	for (let i = 0; i < (st.pops || []).length; i++) {
 		const cid = Space4x.popCultureId(st.pops[i], empire) || Space4x.defaultCultureId(state);
@@ -253,7 +265,7 @@ Space4x.settlementPopOutlook = function (state, st) {
 	const cultureIds = Object.keys(cultures);
 	const rows = [];
 	for (let i = 0; i < cultureIds.length; i++) {
-		rows.push(Space4x.culturePopOutlook(state, st, empire, cultureIds[i], fedLeftRef));
+		rows.push(Space4x.culturePopOutlook(state, st, empire, cultureIds[i], fedLeftRef, vatLeftRef, foodShort));
 	}
 	rows.sort(function (a, b) { return b.pops - a.pops; });
 	let netPer = 0;
@@ -264,12 +276,15 @@ Space4x.settlementPopOutlook = function (state, st) {
 	}
 	const combinedRate = pops ? netPer / pops : 0;
 	let changeThisTurn = 0;
-	if (netPer > 0) changeThisTurn = Math.floor((acc + netPer) / 100);
+	if (!foodShort && netPer > 0) changeThisTurn = Math.floor((acc + netPer) / 100);
 	else if (netPer < 0) changeThisTurn = Math.min(pops, Math.floor(-(acc + netPer) / 100));
 	return {
 		pops: pops,
-		fed: fed,
-		unfed: Math.max(0, pops - present),
+		fed: support.fed,
+		onVats: support.vatUsed,
+		vatCap: support.vatCap,
+		unfed: support.starving,
+		foodShort: foodShort,
 		produced: sit.produced,
 		need: sit.need,
 		imported: sit.imported,
@@ -280,7 +295,7 @@ Space4x.settlementPopOutlook = function (state, st) {
 		unfedContrib: rows.reduce(function (n, r) { return n + r.unfedContrib; }, 0),
 		netPer: netPer,
 		combinedRate: combinedRate,
-		changeTurns: Space4x.turnsUntilPopChange(acc, netPer),
+		changeTurns: foodShort && netPer >= 0 ? null : Space4x.turnsUntilPopChange(acc, netPer),
 		changeThisTurn: changeThisTurn,
 		cultures: rows
 	};
@@ -290,6 +305,8 @@ Space4x.popOutlookFoodLine = function (o) {
 	if (!o || !o.pops) return "";
 	let line = "Food " + o.produced + "/" + o.need + " produced";
 	line += " · " + o.fed + "/" + o.pops + " fed";
+	if (o.onVats > 0) line += " · " + o.onVats + " on Bio-Cycle Vats";
+	if (o.unfed > 0) line += " · " + o.unfed + " starving";
 	if (o.imported > 0) line += " · " + o.imported + " imported";
 	if (o.surplus > 0) line += " · " + o.surplus + " surplus";
 	return line;
@@ -298,6 +315,9 @@ Space4x.popOutlookFoodLine = function (o) {
 Space4x.popOutlookText = function (o, state) {
 	if (!o || o.pops === 0) return "No population.";
 	const foodLine = Space4x.popOutlookFoodLine(o);
+	if (o.foodShort && o.netPer >= 0) {
+		return "Growth paused (hungry) · " + foodLine;
+	}
 	if (o.cultures && o.cultures.length > 1) {
 		const parts = [];
 		for (let i = 0; i < o.cultures.length; i++) {
@@ -330,20 +350,28 @@ Space4x.popOutlookText = function (o, state) {
 Space4x.popOutlookTip = function (o, state) {
 	if (!o || o.pops === 0) return "";
 	const lines = [Space4x.popOutlookFoodLine(o)];
+	if (o.foodShort) {
+		lines.push("Growth pauses while anyone is starving. Vat-supported pops neither grow nor starve.");
+	} else if (o.onVats > 0) {
+		lines.push("Bio-Cycle Vats cover shortfall only. Vat-supported pops neither grow nor starve.");
+	}
 	if (o.cultures && o.cultures.length > 1) {
 		for (let i = 0; i < o.cultures.length; i++) {
 			const row = o.cultures[i];
 			if (!row.pops) continue;
 			const name = Space4x.cultureName(state, row.cultureId) || row.cultureId;
 			let bit = name + ": " + row.fed + " fed +" + Space4x.fmtPercent(row.fedContrib) + "%";
+			if (row.onVats) bit += ", " + row.onVats + " on vats";
 			if (row.unfed) bit += ", " + row.unfed + " short −" + Space4x.fmtPercent(row.unfedContrib) + "%";
 			lines.push(bit);
 		}
 		return lines.join("\n");
 	}
-	if (o.fed > 0 && o.unfed > 0) {
-		lines.push(o.fed + " fed +" + Space4x.fmtPercent(o.fedContrib) +
-			"% · " + o.unfed + " short −" + Space4x.fmtPercent(o.unfedContrib) + "%");
+	if (o.fed > 0 && (o.unfed > 0 || o.onVats > 0)) {
+		let mix = o.fed + " fed +" + Space4x.fmtPercent(o.fedContrib) + "%";
+		if (o.onVats) mix += " · " + o.onVats + " on vats";
+		if (o.unfed) mix += " · " + o.unfed + " short −" + Space4x.fmtPercent(o.unfedContrib) + "%";
+		lines.push(mix);
 	}
 	return lines.join("\n");
 };
@@ -406,15 +434,18 @@ Space4x.queuePopMove = function (state, fromId, toId, count) {
 	n = Math.min(n, from.pops.length);
 	if (n <= 0) return false;
 	const empire = Space4x.empireById(state, from.empireId);
-	if (!Space4x.canLeaveSystem(state, empire, from.location.starId, to.location.starId)) return false;
+	Space4x.ensureTransportPools(empire);
+	const useSpindel = Space4x.canUseSpindelNavigators(state, empire, from, to);
+	if (!Space4x.canLeaveSystem(state, empire, from.location.starId, to.location.starId, { spindelWeb: useSpindel })) return false;
 	const factor = Space4x.settingOf(state).popMoveFreighterFactor || 5;
-	n = Math.min(n, Math.floor(empire.transport.freighters / factor));
+	const poolKey = useSpindel ? "spindelNavigators" : "freighters";
+	n = Math.min(n, Math.floor((empire.transport[poolKey] || 0) / factor));
 	if (n <= 0) return false;
 	const hulls = n * factor;
 	const taken = Space4x.takePopsForMove(from, n);
 	if (!taken.length) return false;
 	for (let t = 0; t < taken.length; t++) taken[t].job = "idle";
-	empire.transport.freighters -= hulls;
+	empire.transport[poolKey] -= hulls;
 	const star = Space4x.starById(state, from.location.starId);
 	const destStar = Space4x.starById(state, to.location.starId);
 	state.units.push({
@@ -433,9 +464,12 @@ Space4x.queuePopMove = function (state, fromId, toId, count) {
 		cargoPops: taken,
 		destSettlementId: to.id,
 		originSettlementId: from.id,
-		hulls: hulls
+		hulls: hulls,
+		spindelTransport: !!useSpindel
 	});
-	state.turnLog.push(taken.length + " " + Space4x.peopleWord(taken.length) + " boarded freighters at " + from.name + " bound for " + to.name + ".");
+	const craft = useSpindel ? "Spindel Navigators" : "freighters";
+	state.turnLog.push(taken.length + " " + Space4x.peopleWord(taken.length) + " boarded " + craft +
+		" at " + from.name + " bound for " + to.name + ".");
 	return true;
 };
 
@@ -459,7 +493,9 @@ Space4x.unloadPopHauler = function (state, unit) {
 		Space4x.assignNewPop(state, dest, cargo[i]);
 	}
 	const empire = Space4x.empireById(state, unit.empireId);
-	empire.transport.freighters += unit.hulls || 0;
+	Space4x.ensureTransportPools(empire);
+	if (Space4x.isSpindelHauler(state, unit)) empire.transport.spindelNavigators += unit.hulls || 0;
+	else empire.transport.freighters += unit.hulls || 0;
 	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
 	if (cargo.length) {
 		state.turnLog.push(cargo.length + " " + Space4x.peopleWord(cargo.length) + " arrived at " + dest.name + ".");

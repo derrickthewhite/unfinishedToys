@@ -104,8 +104,8 @@ Space4x.designHost = function (state) {
 	return Space4x.playerEmpire(state);
 };
 
-Space4x.loadUnitSize = function (state, itemId) {
-	return Space4x.loadEntrySize(state, { itemId: itemId, count: 1 });
+Space4x.loadUnitSize = function (state, itemId, empire) {
+	return Space4x.loadEntrySize(state, { itemId: itemId, count: 1 }, empire);
 };
 
 Space4x.combatSpeedOf = function (state, empire, opts) {
@@ -115,9 +115,9 @@ Space4x.combatSpeedOf = function (state, empire, opts) {
 	const hullDefId = opts.hullDefId;
 	const load = opts.load;
 	if (hullDefId && load) {
-		const cap = Space4x.hullLoadCap(state, hullDefId);
+		const cap = Space4x.hullLoadCap(state, hullDefId, empire);
 		if (cap > 0) {
-			const used = Space4x.loadListUsed(state, load);
+			const used = Space4x.loadListUsed(state, load, empire);
 			const empty = Math.max(0, (cap - used) / cap);
 			speed = speed * (1 + empty);
 		}
@@ -125,14 +125,17 @@ Space4x.combatSpeedOf = function (state, empire, opts) {
 	return speed;
 };
 
-Space4x.hullLoadCap = function (state, defId) {
-	return Space4x.hullCombatBase(state, defId) * 50;
+Space4x.hullLoadCap = function (state, defId, empire) {
+	const base = Space4x.hullCombatBase(state, defId) * 50;
+	const pct = (empire && empire.modifiers && empire.modifiers.loadPct) || 0;
+	return Math.max(0, Math.round(base * (1 + pct / 100)));
 };
 
-Space4x.loadEntrySize = function (state, entry) {
+Space4x.loadEntrySize = function (state, entry, empire) {
 	const item = Space4x.spaceLoadItem(state, entry.itemId);
 	if (!item) return 0;
 	let n = item.size || 0;
+	if (item.sizePerN) n = item.sizePerN * Space4x.empireHullQualityN(state, empire);
 	const count = Math.max(1, Math.floor(entry.count != null ? entry.count : 1));
 	return n * count;
 };
@@ -203,15 +206,15 @@ Space4x.fighterCombatSpeed = function (state, shooter, item) {
 	return shipSpeed * mult;
 };
 
-Space4x.loadListUsed = function (state, load) {
+Space4x.loadListUsed = function (state, load, empire) {
 	let n = 0;
 	const list = load || [];
-	for (let i = 0; i < list.length; i++) n += Space4x.loadEntrySize(state, list[i]);
+	for (let i = 0; i < list.length; i++) n += Space4x.loadEntrySize(state, list[i], empire);
 	return n;
 };
 
-Space4x.designLoadUsed = function (state, design) {
-	return Space4x.loadListUsed(state, design && design.load);
+Space4x.designLoadUsed = function (state, design, empire) {
+	return Space4x.loadListUsed(state, design && design.load, empire);
 };
 
 Space4x.expandDesignLoad = function (load) {
@@ -284,6 +287,9 @@ Space4x.describeLoadItem = function (state, item) {
 	if (item.kind === "shield" && item.shieldPerFacing != null) {
 		lines.push("Shield +" + item.shieldPerFacing + " per facing");
 	}
+	if (item.armorPct) lines.push("Armor +" + item.armorPct + "%");
+	if (item.sizePerN) lines.push("Load " + item.sizePerN + "×N");
+	if (item.uniqueLoad) lines.push("Fit once");
 	if (item.attackSkill) lines.push("Attack skill +" + item.attackSkill);
 	if (item.stub) lines.push("Effect stub (not fully wired)");
 	if (item.summary) lines.push(item.summary);
@@ -314,7 +320,7 @@ Space4x.availableLoadItems = function (state, empire) {
 };
 
 Space4x.autoDesignLoad = function (state, empire, hullDefId) {
-	const cap = Space4x.hullLoadCap(state, hullDefId);
+	const cap = Space4x.hullLoadCap(state, hullDefId, empire);
 	const items = Space4x.availableLoadItems(state, empire);
 	const byId = {};
 	for (let i = 0; i < items.length; i++) byId[items[i].id] = items[i];
@@ -323,9 +329,10 @@ Space4x.autoDesignLoad = function (state, empire, hullDefId) {
 	function addGroup(id, count) {
 		const item = byId[id];
 		if (!item) return 0;
-		const unit = Space4x.loadUnitSize(state, id);
+		const unit = Space4x.loadUnitSize(state, id, empire);
 		if (!(unit > 0)) return 0;
 		let n = count != null ? count : 1;
+		if (item.uniqueLoad) n = Math.min(1, n);
 		while (n > 0 && used + unit * n > cap) n--;
 		if (n <= 0) return 0;
 		load.push({ itemId: id, count: n });
@@ -333,7 +340,7 @@ Space4x.autoDesignLoad = function (state, empire, hullDefId) {
 		return n;
 	}
 	function fillItem(id) {
-		const unit = Space4x.loadUnitSize(state, id);
+		const unit = Space4x.loadUnitSize(state, id, empire);
 		if (!(unit > 0) || !byId[id]) return 0;
 		const n = Math.floor((cap - used) / unit);
 		if (n > 0) return addGroup(id, n);
@@ -368,8 +375,8 @@ Space4x.autoDesignLoad = function (state, empire, hullDefId) {
 		}
 	}
 	if (launcherId && ammoId) {
-		const launchSize = Space4x.loadUnitSize(state, launcherId);
-		const ammoSize = Space4x.loadUnitSize(state, ammoId);
+		const launchSize = Space4x.loadUnitSize(state, launcherId, empire);
+		const ammoSize = Space4x.loadUnitSize(state, ammoId, empire);
 		const packSize = launchSize + ammoSize * 5;
 		let packs = packSize > 0 ? Math.floor((cap - used) / packSize) : 0;
 		if (packs < 1 && launchSize + ammoSize <= cap - used) packs = 1;
@@ -558,9 +565,14 @@ Space4x.addDesignLoadItem = function (state, empire, hullDefId, designId, itemId
 	const item = Space4x.spaceLoadItem(state, itemId);
 	if (!design || !item || !Space4x.loadItemAvailable(state, empire, item)) return false;
 	Space4x.normalizeDesignLoad(design);
-	const cap = Space4x.hullLoadCap(state, hullDefId);
+	if (item.uniqueLoad) {
+		for (let i = 0; i < design.load.length; i++) {
+			if (design.load[i].itemId === itemId) return false;
+		}
+	}
+	const cap = Space4x.hullLoadCap(state, hullDefId, empire);
 	const entry = { itemId: itemId, count: 1 };
-	if (Space4x.designLoadUsed(state, design) + Space4x.loadEntrySize(state, entry) > cap) return false;
+	if (Space4x.designLoadUsed(state, design, empire) + Space4x.loadEntrySize(state, entry, empire) > cap) return false;
 	design.load.push(entry);
 	return true;
 };
@@ -572,13 +584,15 @@ Space4x.removeDesignLoadAt = function (empire, hullDefId, designId, index) {
 	return true;
 };
 
-Space4x.designGroupMaxCount = function (state, design, hullDefId, index) {
+Space4x.designGroupMaxCount = function (state, design, hullDefId, index, empire) {
 	const entry = design && design.load ? design.load[index] : null;
 	if (!entry) return 1;
-	const unit = Space4x.loadUnitSize(state, entry.itemId);
+	const item = Space4x.spaceLoadItem(state, entry.itemId);
+	if (item && item.uniqueLoad) return 1;
+	const unit = Space4x.loadUnitSize(state, entry.itemId, empire);
 	if (!(unit > 0)) return 1;
-	const cap = Space4x.hullLoadCap(state, hullDefId);
-	const others = Space4x.designLoadUsed(state, design) - Space4x.loadEntrySize(state, entry);
+	const cap = Space4x.hullLoadCap(state, hullDefId, empire);
+	const others = Space4x.designLoadUsed(state, design, empire) - Space4x.loadEntrySize(state, entry, empire);
 	return Math.max(1, Math.floor((cap - others) / unit));
 };
 
@@ -586,7 +600,7 @@ Space4x.setDesignLoadCount = function (state, empire, hullDefId, designId, index
 	const design = Space4x.designById(empire, hullDefId, designId);
 	if (!design || index < 0 || index >= design.load.length) return false;
 	Space4x.normalizeDesignLoad(design);
-	const max = Space4x.designGroupMaxCount(state, design, hullDefId, index);
+	const max = Space4x.designGroupMaxCount(state, design, hullDefId, index, empire);
 	const n = Math.max(1, Math.min(max, Math.floor(count)));
 	design.load[index].count = n;
 	return true;
@@ -612,6 +626,16 @@ Space4x.shieldPerFacingFromLoad = function (state, empire, load) {
 	return Math.max(0, n * N + ((empire && empire.modifiers.shield) || 0));
 };
 
+Space4x.armorMultFromLoad = function (state, load) {
+	let mult = 1;
+	const list = load || [];
+	for (let i = 0; i < list.length; i++) {
+		const item = Space4x.spaceLoadItem(state, list[i].itemId);
+		if (item && item.armorPct) mult *= 1 + (item.armorPct / 100);
+	}
+	return mult;
+};
+
 Space4x.shipLayerHp = function (state, empire, hullDefId, layer, load) {
 	const B = Space4x.hullCombatBase(state, hullDefId);
 	const N = Space4x.empireHullQualityN(state, empire);
@@ -620,7 +644,15 @@ Space4x.shipLayerHp = function (state, empire, hullDefId, layer, load) {
 		const design = Space4x.activeDesign(empire, hullDefId);
 		return Space4x.shieldPerFacingFromLoad(state, empire, design && design.load);
 	}
-	if (layer === "armor") return Math.max(0, B * 50 * (N + ((empire && empire.modifiers.armor) || 0)));
+	if (layer === "armor") {
+		let hp = B * 50 * (N + ((empire && empire.modifiers.armor) || 0));
+		let fit = load;
+		if (!fit) {
+			const design = Space4x.activeDesign(empire, hullDefId);
+			fit = design && design.load;
+		}
+		return Math.max(0, Math.round(hp * Space4x.armorMultFromLoad(state, fit)));
+	}
 	if (layer === "structure") return Math.max(0, B * 50 * (N + ((empire && empire.modifiers.structure) || 0)));
 	return 0;
 };

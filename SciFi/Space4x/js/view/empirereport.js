@@ -44,49 +44,67 @@ Space4x.fillAttitudeBar = function (fillEl, attitude) {
 
 Space4x.syncEmpireReportStage = function (ui, state) {
 	if (!ui.stageEmpireReport) return;
+	const observing = Space4x.isObserver(state);
 	const player = Space4x.playerEmpire(state);
 	const selected = Space4x.empireById(state, state.ui.diploRivalId);
-	if (!player || !selected) {
+	if ((!observing && !player) || !selected) {
 		Space4x.setText(ui.empireReportTitle, "Empire report");
 		Space4x.setText(ui.empireReportMeta, "Select an empire in Diplomacy first.");
+		if (ui.empireReportStance) Space4x.setText(ui.empireReportStance, "");
 		return;
 	}
 	Space4x.setText(ui.empireReportTitle, selected.name);
 	const who = Space4x.cultureName(state, selected.cultureId);
-	const war = Space4x.atWar(player, selected);
-	Space4x.setText(ui.empireReportMeta,
-		(who ? who + " · " : "") + (war ? "At war" : "At peace") +
-		(selected.isRevoltPolity ? " · Revolt" : ""));
+	if (observing) {
+		const worlds = Space4x.settlementsOf(state, selected.id).length;
+		Space4x.setText(ui.empireReportMeta,
+			(who ? who + " · " : "") + worlds + " world" + (worlds === 1 ? "" : "s") +
+			(selected.isRevoltPolity ? " · Revolt" : "") + " · Observer");
+	} else {
+		const war = Space4x.atWar(player, selected);
+		Space4x.setText(ui.empireReportMeta,
+			(who ? who + " · " : "") + (war ? "At war" : "At peace") +
+			(selected.isRevoltPolity ? " · Revolt" : ""));
+	}
 
 	if (ui.empireReportArt) {
 		Space4x.setCultureImg(ui.empireReportArt, state, selected.cultureId);
 		ui.empireReportArt.hidden = false;
 	}
 
-	const playerRel = Space4x.relationOf(selected, player.id);
-	const attitude = playerRel ? (playerRel.attitude || 0) : 0;
-	if (ui.empireReportAttitude) {
-		ui.empireReportAttitude.hidden = false;
-		Space4x.setText(ui.empireReportAttitudeNum, String(attitude));
-		Space4x.setText(ui.empireReportAttitudeMood, Space4x.attitudeMood(attitude));
-		Space4x.fillAttitudeBar(ui.empireReportAttitudeFill, attitude);
+	if (ui.empireReportStance) {
+		Space4x.setText(ui.empireReportStance, "Stance: " + Space4x.aiStanceLabel(Space4x.aiStance(state, selected)));
 	}
 
-	if (ui.empireReportThreat) {
-		const threat = Space4x.threatAssessment(state, player, selected);
-		const bits = [
-			"Threat: you " + Space4x.formatThreatNumber(threat.viewerEffective) +
-				" vs them " + Space4x.formatThreatNumber(threat.targetEffective) +
-				" · ratio " + (Math.round(threat.ratio * 100) / 100),
-			"Fleet load " + Space4x.formatThreatNumber(threat.viewerLoad) + "/" +
-				Space4x.formatThreatNumber(threat.targetLoad) +
-				" · industry/turn " + Space4x.formatThreatNumber(threat.viewerIndustry) + "/" +
-				Space4x.formatThreatNumber(threat.targetIndustry) +
-				" · upgrades ×" + (Math.round(threat.viewerUpgrade * 100) / 100) + "/×" +
-				(Math.round(threat.targetUpgrade * 100) / 100)
-		];
-		if (threat.sharedWars) bits.push("Shared wars: " + threat.sharedWars);
-		Space4x.setText(ui.empireReportThreat, bits.join("\n"));
+	if (observing) {
+		if (ui.empireReportAttitude) ui.empireReportAttitude.hidden = true;
+		if (ui.empireReportThreat) Space4x.setText(ui.empireReportThreat, "");
+	} else {
+		const playerRel = Space4x.relationOf(selected, player.id);
+		const attitude = playerRel ? (playerRel.attitude || 0) : 0;
+		if (ui.empireReportAttitude) {
+			ui.empireReportAttitude.hidden = false;
+			Space4x.setText(ui.empireReportAttitudeNum, Space4x.formatAttitude(attitude));
+			Space4x.setText(ui.empireReportAttitudeMood, Space4x.attitudeMood(attitude));
+			Space4x.fillAttitudeBar(ui.empireReportAttitudeFill, attitude);
+		}
+
+		if (ui.empireReportThreat) {
+			const threat = Space4x.threatAssessment(state, player, selected);
+			const bits = [
+				"Threat " + Space4x.formatThreatPercent(threat.ratio) +
+					" · you " + Space4x.formatThreatNumber(threat.viewerEffective) +
+					" vs them " + Space4x.formatThreatNumber(threat.targetEffective),
+				"Fleet load " + Space4x.formatThreatNumber(threat.viewerLoad) + "/" +
+					Space4x.formatThreatNumber(threat.targetLoad) +
+					" · industry/turn " + Space4x.formatThreatNumber(threat.viewerIndustry) + "/" +
+					Space4x.formatThreatNumber(threat.targetIndustry) +
+					" · upgrades ×" + (Math.round(threat.viewerUpgrade * 100) / 100) + "/×" +
+					(Math.round(threat.targetUpgrade * 100) / 100)
+			];
+			if (threat.sharedWars) bits.push("Shared wars: " + threat.sharedWars);
+			Space4x.setText(ui.empireReportThreat, bits.join("\n"));
+		}
 	}
 
 	const techs = Space4x.empireCompletedTechs(state, selected);
@@ -110,8 +128,12 @@ Space4x.syncEmpireReportStage = function (ui, state) {
 		);
 	}
 
-	const spies = Space4x.spiesWorkingAgainst(state, selected.id, player.id);
-	if (ui.empireReportSpiesEmpty) ui.empireReportSpiesEmpty.hidden = spies.length > 0;
+	const spies = observing ? [] : Space4x.spiesWorkingAgainst(state, selected.id, player.id);
+	if (ui.empireReportSpiesEmpty) {
+		ui.empireReportSpiesEmpty.hidden = spies.length > 0;
+		if (observing) Space4x.setText(ui.empireReportSpiesEmpty, "Not shown in observer mode.");
+		else Space4x.setText(ui.empireReportSpiesEmpty, "None detected.");
+	}
 	if (ui.empireReportSpies) {
 		Space4x.syncKeyedList(ui.empireReportSpies, spies, function (s) { return s.id; },
 			function () {
@@ -132,9 +154,11 @@ Space4x.syncEmpireReportStage = function (ui, state) {
 		);
 	}
 
-	const foreign = Space4x.empireForeignRelations(state, selected).filter(function (row) {
-		return row.id !== player.id;
-	});
+	const foreign = observing
+		? Space4x.empireForeignRelations(state, selected, { all: true })
+		: Space4x.empireForeignRelations(state, selected).filter(function (row) {
+			return row.id !== player.id;
+		});
 	if (ui.empireReportForeignEmpty) ui.empireReportForeignEmpty.hidden = foreign.length > 0;
 	if (ui.empireReportForeign) {
 		Space4x.syncKeyedList(ui.empireReportForeign, foreign, function (r) { return r.id; },
@@ -173,18 +197,18 @@ Space4x.syncEmpireReportStage = function (ui, state) {
 				while (badge.firstChild) badge.removeChild(badge.firstChild);
 				badge.appendChild(Space4x.makeEmpireCultureBadge(state, item.id));
 				row.querySelector(".empire-report-foreign-name").textContent = item.name;
-				const noTreaties = !item.war && (!item.text || item.text === "No treaties");
+				const noTreaties = !item.war && (!item.text || item.text === "No treaties" || item.text === "No contact");
 				row.querySelector(".empire-report-foreign-rel").textContent = item.war
 					? "War"
-					: (noTreaties ? "No treaties" : item.text);
+					: (noTreaties ? item.text : item.text);
 				row.classList.toggle("is-war", !!item.war);
 				const theirRel = Space4x.relationOf(selected, item.id);
 				const att = theirRel ? (theirRel.attitude || 0) : 0;
 				Space4x.fillAttitudeBar(row.querySelector(".diplo-attitude-fill"), att);
-				let threatText = "Attitude " + att;
-				if (other) {
+				let threatText = item.contacted === false ? "No contact" : ("Attitude " + Space4x.formatAttitude(att));
+				if (other && item.contacted !== false) {
 					const t = Space4x.threatAssessment(state, selected, other);
-					threatText += " · threat ratio " + (Math.round(t.ratio * 100) / 100) +
+					threatText += " · threat " + Space4x.formatThreatPercent(t.ratio) +
 						" (them " + Space4x.formatThreatNumber(t.viewerEffective) +
 						" vs " + Space4x.formatThreatNumber(t.targetEffective) + ")";
 				}

@@ -10,8 +10,8 @@ Space4x.syncDesignStage = function (ui, state, cmds) {
 	const design = Space4x.designById(host, hull, state.ui.designId) || Space4x.activeDesign(host, hull);
 	if (design) state.ui.designId = design.id;
 	const N = Space4x.empireHullQualityN(state, host);
-	const cap = Space4x.hullLoadCap(state, hull);
-	const used = design ? Space4x.designLoadUsed(state, design) : 0;
+	const cap = Space4x.hullLoadCap(state, hull, host);
+	const used = design ? Space4x.designLoadUsed(state, design, host) : 0;
 	const emptyPct = cap > 0 ? Math.round(100 * Math.max(0, (cap - used) / cap)) : 0;
 	const speed = design
 		? Space4x.combatSpeedOf(state, host, { hullDefId: hull, load: design.load })
@@ -108,14 +108,14 @@ Space4x.syncDesignStage = function (ui, state, cmds) {
 		},
 		function (row, item) {
 			const spec = Space4x.spaceLoadItem(state, item.itemId);
-			const size = Space4x.loadEntrySize(state, item);
-			const unit = Space4x.loadUnitSize(state, item.itemId);
+			const size = Space4x.loadEntrySize(state, item, host);
+			const unit = Space4x.loadUnitSize(state, item.itemId, host);
 			row.querySelector(".design-load-label").textContent =
 				(spec ? spec.name : item.itemId) + " ×" + item.count +
 				" · " + size + " load (" + unit + " each)" +
 				(spec && spec.stub ? " · stub" : "");
 			row.title = Space4x.describeLoadItem(state, spec);
-			const max = design ? Space4x.designGroupMaxCount(state, design, hull, item.index) : 1;
+			const max = design ? Space4x.designGroupMaxCount(state, design, hull, item.index, host) : 1;
 			const btns = row.querySelectorAll(".design-load-controls button");
 			for (let i = 0; i < btns.length; i++) {
 				const act = btns[i].getAttribute("data-act");
@@ -139,7 +139,7 @@ Space4x.syncDesignStage = function (ui, state, cmds) {
 		function (row, item) {
 			const entry = { itemId: item.id, count: 1 };
 			const btn = row.querySelector("button");
-			btn.textContent = item.name + " · " + Space4x.loadEntrySize(state, entry) +
+			btn.textContent = item.name + " · " + Space4x.loadEntrySize(state, entry, host) +
 				" (" + item.kind + ")";
 			btn.title = Space4x.describeLoadItem(state, item);
 			row.title = btn.title;

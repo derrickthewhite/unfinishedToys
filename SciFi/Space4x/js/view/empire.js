@@ -141,18 +141,23 @@ Space4x.syncEmpireMoveCost = function (ui, state) {
 	const factor = Space4x.settingOf(state).popMoveFreighterFactor || 5;
 	const n = parseInt(ui.empireMoveCount.value, 10) || 0;
 	const need = n * factor;
-	const use = player ? Space4x.empireFreighterUse(state, player.id) : { idle: 0 };
 	const list = player ? Space4x.settlementsOf(state, player.id) : [];
 	const from = ui.empireMoveFrom ? Space4x.settlementById(state, ui.empireMoveFrom.value) : null;
 	const to = ui.empireMoveTo ? Space4x.settlementById(state, ui.empireMoveTo.value) : null;
-	const warpOk = !from || !to || Space4x.canLeaveSystem(state, player, from.location.starId, to.location.starId);
+	const useSpindel = !!(player && from && to && Space4x.canUseSpindelNavigators(state, player, from, to));
+	const use = player
+		? (useSpindel ? Space4x.empireSpindelNavigatorUse(state, player.id) : Space4x.empireFreighterUse(state, player.id))
+		: { idle: 0 };
+	const warpOk = !from || !to ||
+		Space4x.canLeaveSystem(state, player, from.location.starId, to.location.starId, { spindelWeb: useSpindel });
 	let cost = "";
 	let disabled = list.length < 2 || n < 1 || !from || !to || from.id === to.id;
 	if (!warpOk) {
 		cost = "Needs Warp Drive to move between stars";
 		disabled = true;
 	} else if (n > 0) {
-		cost = need + " freighters (in transit until arrival)";
+		const craft = useSpindel ? "Spindel Navigators" : "freighters";
+		cost = need + " " + craft + " (in transit until arrival)";
 		if (need > use.idle) {
 			cost += " · " + use.idle + " idle";
 			disabled = true;
@@ -250,11 +255,10 @@ Space4x.syncEmpireStage = function (ui, state, cmds) {
 		"Click troop glyphs in a lane, then click another colony to send them.");
 	const names = [];
 	for (let i = 0; i < state.empires.length; i++) {
-		if (!state.empires[i].isPlayer) {
-			const e = state.empires[i];
-			const who = Space4x.cultureName(state, e.cultureId);
-			names.push(e.name + (who ? " (" + who + ")" : ""));
-		}
+		const e = state.empires[i];
+		if (e.isPlayer || e.dormant) continue;
+		const who = Space4x.cultureName(state, e.cultureId);
+		names.push(e.name + (who ? " (" + who + ")" : ""));
 	}
 	Space4x.setText(ui.empireRivalsStage, names.length ? "Rivals: " + names.join(", ") : "No rivals");
 
@@ -394,10 +398,11 @@ Space4x.syncEmpireStage = function (ui, state, cmds) {
 				label = n + " " + Space4x.peopleWord(n);
 			}
 			const hulls = Space4x.unitFreighterHulls(state, unit);
+			const craft = Space4x.isSpindelHauler(state, unit) ? "Spindel Navigators" : "freighters";
 			const destLabel = unit.fleetMode ? "fleet" : (to ? Space4x.settlementLabel(state, to) : "?");
 			row.querySelector("span").textContent =
 				label +
-				" · " + hulls + " freighters in use" +
+				" · " + hulls + " " + craft + " in use" +
 				" · " + (from ? Space4x.settlementLabel(state, from) : "?") + " → " + destLabel +
 				" · " + Space4x.unitPlaceLabel(state, unit);
 		}

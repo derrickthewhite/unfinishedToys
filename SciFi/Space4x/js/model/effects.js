@@ -53,11 +53,23 @@ Space4x.richnessNames = function (state, ids) {
 	return names;
 };
 
+Space4x.effectMatchesBiome = function (state, settlement, fx) {
+	if (!fx || !fx.biomes || !fx.biomes.length) return true;
+	if (!settlement) return true;
+	const body = Space4x.bodyById(state, settlement.location.bodyId);
+	const biome = body && body.biome;
+	for (let i = 0; i < fx.biomes.length; i++) {
+		if (fx.biomes[i] === biome) return true;
+	}
+	return false;
+};
+
 Space4x.structureJobYield = function (state, settlement, job) {
 	let n = 0;
 	Space4x.eachStructureEffect(state, settlement, function (def, fx) {
 		if (fx.type !== "jobYield" || fx.job !== job) return;
 		if (!Space4x.effectMatchesRichness(state, settlement, fx)) return;
+		if (!Space4x.effectMatchesBiome(state, settlement, fx)) return;
 		n += fx.n || 0;
 	});
 	return n;
@@ -69,6 +81,7 @@ Space4x.structureJobYieldParts = function (state, settlement, job) {
 	Space4x.eachStructureEffect(state, settlement, function (def, fx) {
 		if (fx.type !== "jobYield" || fx.job !== job) return;
 		if (!Space4x.effectMatchesRichness(state, settlement, fx)) return;
+		if (!Space4x.effectMatchesBiome(state, settlement, fx)) return;
 		if (!seen[def.id]) {
 			seen[def.id] = { name: def.name, n: 0 };
 			parts.push(seen[def.id]);
@@ -227,6 +240,7 @@ Space4x.describeEffect = function (state, fx) {
 	const n = fx.n;
 	if (fx.type === "speed") return "+" + n + " ship speed";
 	if (fx.type === "range") return "+" + n + " ship range from friendly colonies";
+	if (fx.type === "loadPct") return "+" + n + "% ship load (of base hull load)";
 	if (fx.type === "commsRange") return "+" + n + " contact range beyond ship range";
 	if (fx.type === "industryPerPop") return "+" + n + " industry per industry worker";
 	if (fx.type === "researchPerPop") return (n > 0 ? "+" : "") + n + " research per scientist.";
@@ -243,6 +257,11 @@ Space4x.describeEffect = function (state, fx) {
 		if (mult === 0.5) return "Starve at half the normal rate.";
 		return "Starvation rate ×" + mult + ".";
 	}
+	if (fx.type === "vatSupport") {
+		const n = fx.n != null ? fx.n : 1;
+		return "Supports " + n + " unfed pop" + (n === 1 ? "" : "s") +
+			" (no growth, no starvation). Used only when food is short.";
+	}
 	if (fx.type === "researchPerShipTech" || fx.type === "researchPerTaggedTech") {
 		const tag = fx.tag || "ship";
 		const label = tag === "ship" ? "ship" : tag === "groundCombat" ? "ground-combat" : tag;
@@ -250,6 +269,15 @@ Space4x.describeEffect = function (state, fx) {
 	}
 	if (fx.type === "firstBuildDiscount") return "First structure on each world costs less (coming soon).";
 	if (fx.type === "squidlingBonus") return "Deep-ocean farming and espionage bonuses (coming soon).";
+	if (fx.type === "knackBuild") {
+		const pct = fx.pct || 0;
+		return "Knack: +" + pct + "% industry when " + Space4x.knackBuildConditionLabel(fx) + ".";
+	}
+	if (fx.type === "knackResearch") {
+		const names = Space4x.knackResearchCategoryNames(state, fx);
+		const who = names.length ? names.join(" and ") : "certain fields";
+		return "Knack: +" + (fx.n || 0) + " research per scientist while researching " + who + ".";
+	}
 	if (fx.type === "troopTsPct") return (fx.pct > 0 ? "+" : "") + (fx.pct || 0) + "% troop strength.";
 	if (fx.type === "negotiation") {
 		const pct = fx.pct || 0;
@@ -258,11 +286,26 @@ Space4x.describeEffect = function (state, fx) {
 		return "";
 	}
 	if (fx.type === "spySkill") return (n > 0 ? "+" : "") + n + " spy skill";
+	if (fx.type === "missileHitPct") {
+		return "+" + (fx.pct || 0) + "% missile hit chance (of base; best targeting tech wins)";
+	}
+	if (fx.type === "conquestHealMult") {
+		return "Conquered pops recover loyalty " + (fx.mult || 1) + "× as fast.";
+	}
+	if (fx.type === "toxicUpkeepExempt") return "No extra upkeep on toxic worlds.";
+	if (fx.type === "jobLoyalty") {
+		const who = fx.job ? Space4x.jobLabel(state, fx.job) : "workers";
+		return (n > 0 ? "+" : "") + n + " loyalty for " + who + " pops";
+	}
+	if (fx.type === "empireResearchPerPop") return "+" + n + " research per scientist empire-wide";
+	if (fx.type === "empireSpySkill") return "+" + n + " spy skill empire-wide";
 	if (fx.type === "agriBonusLowWorlds") {
 		const max = fx.maxPotential != null ? fx.maxPotential : 3;
 		return "+" + (fx.n || 0) + " food per farmer on worlds with fewer than " + max + " agriculture slots.";
 	}
 	if (fx.type === "shipBonus") return "Ship bonuses (coming soon).";
+	if (fx.type === "shipAttack") return "+" + (fx.n || 0) + " ship and fighter attack skill";
+	if (fx.type === "shipDefense") return "+" + (fx.n || 0) + " ship and fighter defense skill";
 	if (fx.type === "loyalty") return (n > 0 ? "+" : "") + n + " population loyalty";
 	if (fx.type === "militiaAsPolice") {
 		const who = fx.defId ? Space4x.structureName(state, fx.defId) : "some troops";
@@ -364,7 +407,17 @@ Space4x.describeEffect = function (state, fx) {
 		return "Cost ×" + fx.mult + " for " + who + " here";
 	}
 	if (fx.type === "grantFreighters") return "Adds " + n + " freighter" + (n === 1 ? "" : "s") + " to the empire pool";
-	if (fx.type === "foundSettlement") return "Founds a settlement on a legal empty world";
+	if (fx.type === "grantSpindelNavigators") {
+		return "Adds " + n + " Spindel Navigator" + (n === 1 ? "" : "s") + " to the empire pool";
+	}
+	if (fx.type === "spindelWeb") {
+		return "Spindel Web: Spindel Navigators and Spindel Colonies; see all Spindel systems; homeworld is Spindel with Predators I and +2 Militia.";
+	}
+	if (fx.type === "warriors") return "Can train Warriors (melee ground unit)";
+	if (fx.type === "foundSettlement") {
+		if (fx.spindelOnly) return "Founds a settlement on an empty Spindel world";
+		return "Founds a settlement on a legal empty world";
+	}
 	if (fx.type === "galaxyScan") return "Reveals every planet and ship";
 	if (fx.type === "combatStub") return "Combat is a stub in this slice";
 	return fx.type + " +" + n;
