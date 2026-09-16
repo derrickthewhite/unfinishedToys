@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="100"
+   height="100"
+   viewBox="0 0 26.458333 26.458333"
+   version="1.1"
+   id="svg34745"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   sodipodi:docname="Tunnel Worm.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview34747"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="8.4359982"
+     inkscape:cx="51.209115"
+     inkscape:cy="41.548136"
+     inkscape:window-width="2560"
+     inkscape:window-height="1369"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1">
+    <inkscape:grid
+       type="xygrid"
+       id="grid34866"
+       originx="0"
+       originy="0"
+       spacingy="1"
+       spacingx="1"
+       units="mm" />
+  </sodipodi:namedview>
+  <defs
+     id="defs34742" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       style="fill:#4d4d4d;stroke:#000000;stroke-width:0.499999"
+       d="M 7.1195388,12.388625 1.7249984,8.4681739 2.634543,9.9422634 4.0772688,11.259535 6.6177211,13.580441 Z"
+       id="path5"
+       sodipodi:nodetypes="cccccc" />
+    <path
+       style="fill:#4d4d4d;stroke:#000000;stroke-width:0.499999"
+       d="M 6.6490847,12.890442 6.2099941,1.034999 21.04498,0.90954459 18.535892,14.144987 11.790983,15.903063 6.8372664,14.364532 Z"
+       id="path4"
+       sodipodi:nodetypes="ccccccc" />
+    <path
+       style="fill:#4d4d4d;stroke:#000000;stroke-width:0.499999"
+       d="m 8.3740829,15.807258 c 0.4529734,0.344792 0.632053,1.119592 1.1918172,1.223181 0.5887479,0.108953 1.3259689,-0.237453 1.6309069,-0.752727 0.229508,-0.387815 0.07822,-0.932244 -0.09409,-1.348635 -0.201196,-0.486179 -0.55333,-0.980048 -1.034998,-1.191817 -2.1062718,-0.926037 -4.7807707,-0.70782 -6.8999938,0.188182 -0.5379469,0.227442 -1.0440162,0.678391 -1.2545442,1.22318 -0.1245871,0.322398 -0.050634,0.708486 0.062727,1.035 0.09607,0.276711 0.5018177,0.721363 0.5018177,0.721363 0,0 0.2183721,-1.265513 0.721363,-1.348636 0.4378561,-0.07236 0.9722719,0.909545 0.9722719,0.909545 0,0 0.5865214,-1.00596 1.0663626,-0.972272 0.3925745,0.02756 0.7527263,0.909545 0.7527263,0.909545 0,0 0.4076527,-0.706227 0.7527267,-0.878181 0.3000125,-0.1495 0.6765321,-0.13595 1.0036354,-0.06273 0.232867,0.05213 0.437392,0.20047 0.6272723,0.345002 z"
+       id="path2"
+       sodipodi:nodetypes="sssssssscscscsss" />
+    <path
+       style="fill:#4d4d4d;stroke:#000000;stroke-width:0.499999"
+       d="m 14.953483,15.681804 c -0.452973,0.344792 -0.632053,1.119592 -1.191817,1.223181 -0.588748,0.108953 -1.325969,-0.237453 -1.630907,-0.752727 -0.229508,-0.387815 -0.07822,-0.932244 0.09409,-1.348635 0.201196,-0.486179 0.55333,-0.980048 1.034998,-1.191817 2.106272,-0.926037 4.780771,-0.70782 6.899994,0.188182 0.537947,0.227442 1.044016,0.678391 1.254544,1.22318 0.124587,0.322398 0.05063,0.708486 -0.06273,1.035 -0.09607,0.276711 -0.501817,0.721363 -0.501817,0.721363 0,0 -0.218372,-1.265513 -0.721364,-1.348636 -0.437856,-0.07236 -0.972272,0.909545 -0.972272,0.909545 0,0 -0.586521,-1.00596 -1.066362,-0.972272 -0.392575,0.02756 -0.752726,0.909545 -0.752726,0.909545 0,0 -0.407653,-0.706227 -0.752727,-0.878181 -0.300013,-0.1495 -0.676532,-0.13595 -1.003636,-0.06273 -0.232867,0.05213 -0.437392,0.20047 -0.627272,0.345002 z"
+       id="path3"
+       sodipodi:nodetypes="sssssssscscscsss" />
+  </g>
+</svg>
