@@ -4,6 +4,7 @@ Space4x.SAVE_SCHEMA_VERSION = 1;
 Space4x.SAVE_SLOTS_KEY = "space4x-saves";
 Space4x.SAVE_AUTOSAVE_KEY = "space4x-autosave";
 Space4x.SAVE_CHECKPOINT_KEY = "space4x-autosave-checkpoint";
+Space4x.EDITOR_SAVE_KEY = "space4x-editor";
 Space4x.SAVE_SLOT_CAP = 12;
 Space4x.SAVE_AUTOSAVE_EVERY = 4;
 
@@ -92,7 +93,8 @@ Space4x.migrateState = function (state) {
 		if (Space4x.migrateDiplomacyRelations) Space4x.migrateDiplomacyRelations(state);
 		Space4x.ensureEmpireColors(state);
 		for (let e = 0; e < state.empires.length; e++) {
-			Space4x.ensureTransportPools(state.empires[e]);
+			if (state.empires[e].taxRate == null) state.empires[e].taxRate = 0;
+			else state.empires[e].taxRate = Space4x.clampTaxRate(state.empires[e].taxRate);
 			Space4x.ensureKnackState(state.empires[e]);
 			Space4x.backfillKnackFirstStructures(state, state.empires[e]);
 			Space4x.ensureEmpireDesigns(state, state.empires[e]);
@@ -286,4 +288,33 @@ Space4x.fromSaveFileText = function (text) {
 		return { ok: false, reason: "File is not valid JSON." };
 	}
 	return Space4x.validateSaveEnvelope(parsed);
+};
+
+Space4x.saveEditorState = function (state) {
+	if (!state || !state.editor) return { ok: false, reason: "Not an editor snapshot." };
+	return Space4x.writeStorageJson(Space4x.EDITOR_SAVE_KEY, {
+		schemaVersion: Space4x.SAVE_SCHEMA_VERSION,
+		savedAt: new Date().toISOString(),
+		state: Space4x.snapshotState(state)
+	});
+};
+
+Space4x.loadEditorState = function () {
+	const raw = Space4x.readStorageJson(Space4x.EDITOR_SAVE_KEY);
+	if (!raw || !raw.state || !raw.state.editor) return null;
+	const state = Space4x.snapshotState(raw.state);
+	state.screen = "editor";
+	state.editor = true;
+	Space4x.ensureUiInteraction(state);
+	if (Space4x.migrateState) Space4x.migrateState(state);
+	if (Space4x.ensureEditorNextPlanetRange) Space4x.ensureEditorNextPlanetRange(state);
+	if (Space4x.sanitizeEditorCombatState) Space4x.sanitizeEditorCombatState(state);
+	return state;
+};
+
+Space4x.clearEditorState = function () {
+	try {
+		if (typeof localStorage === "undefined") return;
+		localStorage.removeItem(Space4x.EDITOR_SAVE_KEY);
+	} catch (err) {}
 };

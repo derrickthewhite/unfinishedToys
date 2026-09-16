@@ -13,6 +13,10 @@ Space4x.rngDie = function (state, sides) {
 	return 1 + Space4x.rngInt(state, sides);
 };
 
+Space4x.roll2d4 = function (state) {
+	return Space4x.rngDie(state, 4) + Space4x.rngDie(state, 4);
+};
+
 Space4x.seedFromString = function (text) {
 	if (!text) return (Date.now() >>> 0) || 1;
 	let h = 2166136261;

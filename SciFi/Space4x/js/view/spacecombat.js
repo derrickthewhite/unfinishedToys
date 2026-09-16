@@ -99,6 +99,61 @@ Space4x.drawMissileToken = function (ctx, state, token, p, cell, color) {
 	return drew > 0;
 };
 
+Space4x.shipShieldFaces = function () {
+	const q = Math.PI / 4;
+	return [
+		{ id: "front", a0: -q, a1: q },
+		{ id: "right", a0: q, a1: 3 * q },
+		{ id: "back", a0: 3 * q, a1: 5 * q },
+		{ id: "left", a0: -3 * q, a1: -q }
+	];
+};
+
+Space4x.shipShieldStrokeWidth = function (token, face, cell) {
+	const max = token && token.shieldMax ? token.shieldMax : 0;
+	if (!(max > 0)) return 0;
+	const val = token.shields && token.shields[face] ? token.shields[face] : 0;
+	if (!(val > 0)) return 0;
+	return 1 + (val / max) * Math.max(2, cell * 0.2);
+};
+
+Space4x.drawShipShields = function (ctx, token, p, cell, heading) {
+	if (!ctx || !token || token.dead || token.kind === "missile") return;
+	const max = token.shieldMax || 0;
+	if (!(max > 0)) return;
+	const faces = Space4x.shipShieldFaces();
+	const rx = Math.max(8, cell * 0.62);
+	const ry = Math.max(5, cell * 0.4);
+	const gap = 0.18;
+	ctx.save();
+	ctx.translate(p.x, p.y);
+	ctx.rotate(heading || 0);
+	ctx.lineCap = "round";
+	ctx.lineJoin = "round";
+	for (let i = 0; i < faces.length; i++) {
+		const face = faces[i];
+		const width = Space4x.shipShieldStrokeWidth(token, face.id, cell);
+		if (!(width > 0)) continue;
+		const val = token.shields[face.id] || 0;
+		const t = Math.max(0, Math.min(1, val / max));
+		ctx.lineWidth = width;
+		ctx.strokeStyle = "rgba(120, 210, 255," + (0.28 + 0.62 * t) + ")";
+		const a0 = face.a0 + gap;
+		const a1 = face.a1 - gap;
+		ctx.beginPath();
+		const steps = 14;
+		for (let s = 0; s <= steps; s++) {
+			const a = a0 + (a1 - a0) * (s / steps);
+			const x = rx * Math.cos(a);
+			const y = ry * Math.sin(a);
+			if (s === 0) ctx.moveTo(x, y);
+			else ctx.lineTo(x, y);
+		}
+		ctx.stroke();
+	}
+	ctx.restore();
+};
+
 Space4x.drawSpaceCombat = function (ui, state) {
 	const battle = Space4x.spaceBattleById(state, state.ui.selectedSpaceBattleId);
 	const canvas = ui.spaceCanvas;
@@ -183,11 +238,13 @@ Space4x.drawSpaceCombat = function (ui, state) {
 	}
 	for (let i = 0; i < tokens.length; i++) {
 		const t = tokens[i];
-		if (t.dead) continue;
+		if (t.dead && !battle.done) continue;
+		if (t.left) continue;
 		const drawPos = Space4x.spaceTokenDrawPos(battle, t);
 		const p = Space4x.spaceCellToScreen(layout, drawPos.x, drawPos.y);
 		const emp = Space4x.empireById(state, t.empireId);
 		const color = Space4x.empireColor(state, t.empireId);
+		if (t.dead) ctx.globalAlpha = 0.38;
 		ctx.fillStyle = color;
 		if (t.kind === "missile") {
 			Space4x.drawMissileToken(ctx, state, t, p, cell, color);
@@ -198,6 +255,9 @@ Space4x.drawSpaceCombat = function (ui, state) {
 			ctx.lineTo(p.x - cell * 0.22, p.y + cell * 0.2);
 			ctx.closePath();
 			ctx.fill();
+			if (!t.dead) {
+				Space4x.drawShipShields(ctx, t, p, cell, drawPos.heading != null ? drawPos.heading : (t.heading || 0));
+			}
 		} else {
 			const rw = Math.max(4, cell * 0.7);
 			const rh = Math.max(3, cell * 0.4);
@@ -209,7 +269,9 @@ Space4x.drawSpaceCombat = function (ui, state) {
 				ctx.fillRect(-rw / 2, -rh / 2, rw, rh);
 				ctx.restore();
 			}
+			if (!t.dead) Space4x.drawShipShields(ctx, t, p, cell, heading);
 		}
+		if (t.dead) ctx.globalAlpha = 1;
 		if (t.id === sel) {
 			ctx.strokeStyle = "#fff";
 			ctx.lineWidth = 2;
@@ -223,7 +285,7 @@ Space4x.drawSpaceCombat = function (ui, state) {
 			ctx.setLineDash([]);
 		}
 		if (cell >= 10 && t.kind === "ship") {
-			ctx.fillStyle = "#c8d4ef";
+			ctx.fillStyle = t.dead ? "#8a94aa" : "#c8d4ef";
 			ctx.font = "10px sans-serif";
 			ctx.textAlign = "center";
 			ctx.fillText(t.name, p.x, p.y + cell * 0.7);
@@ -296,6 +358,60 @@ Space4x.drawSpaceCombatFx = function (ctx, battle, layout) {
 	battle.fx = keep;
 };
 
+Space4x.lerpAngle = function (a, b, t) {
+	let d = (b || 0) - (a || 0);
+	while (d > Math.PI) d -= Math.PI * 2;
+	while (d < -Math.PI) d += Math.PI * 2;
+	return (a || 0) + d * t;
+};
+
+Space4x.pruneCombatTweens = function (battle) {
+	if (!battle || !battle._tweens) return;
+	const now = Space4x.spaceCombatNow();
+	const keep = [];
+	for (let i = 0; i < battle._tweens.length; i++) {
+		const tw = battle._tweens[i];
+		if (now - tw.t0 < (tw.dur || Space4x.SPACE_MOVE_TWEEN_MS)) keep.push(tw);
+	}
+	battle._tweens = keep;
+};
+
+Space4x.spaceCombatNeedsAnim = function (battle) {
+	if (!battle) return false;
+	if (battle.fx && battle.fx.length) return true;
+	if (battle._tweens && battle._tweens.length) return true;
+	return false;
+};
+
+Space4x.beginCombatTweens = function (battle, fromPoses, dur) {
+	if (!battle || !fromPoses || !fromPoses.length) return;
+	const now = Space4x.spaceCombatNow();
+	const ms = dur != null ? dur : Space4x.SPACE_MOVE_TWEEN_MS;
+	if (!battle._tweens) battle._tweens = [];
+	for (let i = 0; i < fromPoses.length; i++) {
+		const pose = fromPoses[i];
+		if (!pose) continue;
+		const tok = Space4x.tokenById(battle, pose.id);
+		if (!tok) continue;
+		const dx = (tok.x || 0) - (pose.x || 0);
+		const dy = (tok.y || 0) - (pose.y || 0);
+		const dh = Math.abs(Space4x.lerpAngle(pose.heading || 0, tok.heading || 0, 1) - (pose.heading || 0));
+		if (dx * dx + dy * dy < 1e-8 && dh < 1e-4) continue;
+		battle._tweens.push({
+			tokenId: pose.id,
+			fromX: pose.x,
+			fromY: pose.y,
+			fromH: pose.heading || 0,
+			toX: tok.x,
+			toY: tok.y,
+			toH: tok.heading || 0,
+			t0: now,
+			dur: ms
+		});
+	}
+	if (Space4x.kickSpaceCombatFxLoop) Space4x.kickSpaceCombatFxLoop();
+};
+
 Space4x.kickSpaceCombatFxLoop = function () {
 	const app = Space4x.app;
 	if (!app || app._spaceFxLoop) return;
@@ -304,7 +420,8 @@ Space4x.kickSpaceCombatFxLoop = function () {
 		app._spaceFxLoop = false;
 		if (!app.state || app.state.ui.stage !== "spaceCombat") return;
 		const battle = Space4x.spaceBattleById(app.state, app.state.ui.selectedSpaceBattleId);
-		if (!battle || !(battle.fx && battle.fx.length)) {
+		if (battle) Space4x.pruneCombatTweens(battle);
+		if (!Space4x.spaceCombatNeedsAnim(battle)) {
 			if (app.sync) app.sync();
 			return;
 		}
@@ -336,9 +453,12 @@ Space4x.syncSpaceCombatStage = function (ui, state, cmds) {
 	const player = Space4x.playerEmpire(state);
 	const mySide = player && player.id === battle.attackerEmpireId ? "attacker" :
 		player && player.id === battle.defenderEmpireId ? "defender" : null;
-	const mine = mySide && battle.phase === mySide && !battle.done && !battle._aiAnim;
-	const ships = Space4x.livingTokens(battle, mySide);
-	Space4x.syncKeyedList(ui.spaceShipList, ships.filter(function (t) { return t.kind !== "missile"; }),
+	const inspectMode = !!battle.done;
+	const mine = mySide && battle.phase === mySide && !inspectMode && !battle._aiAnim;
+	const ships = inspectMode
+		? Space4x.inspectableShips(battle, mySide)
+		: Space4x.livingTokens(battle, mySide).filter(function (t) { return t.kind !== "missile"; });
+	Space4x.syncKeyedList(ui.spaceShipList, ships,
 		function (t) { return t.id; },
 		function () {
 			const li = document.createElement("li");
@@ -353,17 +473,18 @@ Space4x.syncSpaceCombatStage = function (ui, state, cmds) {
 		function (row, token) {
 			const btn = row.querySelector("button");
 			let label = token.name;
-			if (token.warping) label += " · Warping";
+			if (token.dead) label += " · wreck";
+			else if (token.warping) label += " · Warping";
 			else if (token.immobile) label += token.activated ? " · done" : " · fixed";
 			else label += token.activated ? " · done" : " · " + token.speedLeft.toFixed(1) + " spd";
 			btn.textContent = label;
 			row.classList.toggle("is-selected", token.id === state.ui.spaceTokenId);
 			row.classList.toggle("is-done", !!token.activated);
-			btn.disabled = !mine || token.activated;
+			btn.disabled = inspectMode ? false : (!mine || token.activated);
 		}
 	);
 	const token = Space4x.tokenById(battle, state.ui.spaceTokenId);
-	const weapons = token && token.side === mySide && !token.activated && !token.warping
+	const weapons = token && token.side === mySide && (inspectMode || (!token.activated && !token.warping))
 		? Space4x.spaceWeaponGroups(state, token.load || [])
 		: [];
 	Space4x.syncKeyedList(ui.spaceWeaponList, weapons, function (g) { return g.id; },
@@ -380,8 +501,8 @@ Space4x.syncSpaceCombatStage = function (ui, state, cmds) {
 		function (row, group) {
 			const btn = row.querySelector("button");
 			btn.textContent = Space4x.spaceWeaponGroupLabel(state, group, token);
-			row.classList.toggle("is-selected", group.id === state.ui.spaceWeaponId);
-			btn.disabled = !group.ready.length;
+			row.classList.toggle("is-selected", !inspectMode && group.id === state.ui.spaceWeaponId);
+			btn.disabled = inspectMode || !group.ready.length;
 		}
 	);
 	if (ui.btnSpaceEndSide) ui.btnSpaceEndSide.disabled = !mine || !!battle._aiAnim;
@@ -404,7 +525,7 @@ Space4x.syncSpaceCombatStage = function (ui, state, cmds) {
 	);
 	Space4x.syncSpaceStatusPanels(ui, state, cmds);
 	Space4x.drawSpaceCombat(ui, state);
-	if (battle.fx && battle.fx.length) Space4x.kickSpaceCombatFxLoop();
+	if (Space4x.spaceCombatNeedsAnim(battle)) Space4x.kickSpaceCombatFxLoop();
 	Space4x.maybeRunSpaceCombatAuto(state, battle);
 };
 
@@ -485,11 +606,12 @@ Space4x.drawSpaceStatusPortrait = function (canvas, state, token) {
 	ctx.clearRect(0, 0, w, h);
 	ctx.fillStyle = "#050814";
 	ctx.fillRect(0, 0, w, h);
-	if (!token || token.dead) {
+	if (!token) {
 		ctx.strokeStyle = "#243048";
 		ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
 		return;
 	}
+	if (token.dead) ctx.globalAlpha = 0.38;
 	const color = Space4x.empireColor(state, token.empireId);
 	const cx = w / 2;
 	const cy = h / 2;
@@ -523,12 +645,14 @@ Space4x.drawSpaceStatusPortrait = function (canvas, state, token) {
 		ctx.fill();
 		ctx.restore();
 	}
+	if (!token.dead) Space4x.drawShipShields(ctx, token, { x: cx, y: cy }, Math.min(w, h) * 0.42, token.heading || 0);
+	if (token.dead) ctx.globalAlpha = 1;
 };
 
 Space4x.syncSpaceStatusLoad = function (uiList, state, token, opts) {
 	if (!uiList) return;
 	opts = opts || {};
-	const groups = token && !token.dead ? Space4x.spaceWeaponGroups(state, token.load || []) : [];
+	const groups = token ? Space4x.spaceWeaponGroups(state, token.load || []) : [];
 	const cmds = opts.cmds;
 	const useButtons = !!opts.useButtons && !!cmds;
 	const selectable = !!opts.selectable && useButtons;
@@ -592,6 +716,20 @@ Space4x.syncSpaceStatusPanels = function (ui, state, cmds) {
 };
 
 Space4x.spaceTokenDrawPos = function (battle, token) {
+	if (!token) return { x: 0, y: 0, heading: 0 };
+	const now = Space4x.spaceCombatNow ? Space4x.spaceCombatNow() : Date.now();
+	const tweens = battle && battle._tweens ? battle._tweens : [];
+	for (let i = tweens.length - 1; i >= 0; i--) {
+		const tw = tweens[i];
+		if (tw.tokenId !== token.id) continue;
+		const dur = tw.dur || Space4x.SPACE_MOVE_TWEEN_MS;
+		const u = Math.max(0, Math.min(1, (now - tw.t0) / dur));
+		return {
+			x: tw.fromX + (tw.toX - tw.fromX) * u,
+			y: tw.fromY + (tw.toY - tw.fromY) * u,
+			heading: Space4x.lerpAngle(tw.fromH, tw.toH, u)
+		};
+	}
 	const tw = battle && battle._aiTween;
 	if (tw && tw.tokenId === token.id) {
 		return { x: tw.x, y: tw.y, heading: tw.heading };
@@ -677,37 +815,17 @@ Space4x.runAnimatedAiSide = function (state, battle, side, onDone) {
 		Space4x.drawSpaceCombat(app.ui, state);
 	}
 	function animateMoveTo(token, action, after) {
-		const fromX = token.x;
-		const fromY = token.y;
-		const fromH = token.heading || 0;
-		const toX = action.x;
-		const toY = action.y;
-		const toH = action.heading != null ? action.heading : fromH;
-		const duration = 500;
-		const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-		function frame(now) {
-			if (battle._aiGen !== gen || !battle._aiAnim) return;
-			const t = Math.min(1, (now - start) / duration);
-			battle._aiTween = {
-				tokenId: token.id,
-				x: fromX + (toX - fromX) * t,
-				y: fromY + (toY - fromY) * t,
-				heading: fromH + (toH - fromH) * t
-			};
-			Space4x.panSpaceCombatToToken(app.ui, battle, token);
-			redraw();
-			if (t < 1) {
-				battle._aiRaf = requestAnimationFrame(frame);
-				return;
-			}
-			battle._aiRaf = null;
-			battle._aiTween = null;
-			Space4x.spaceApplyAction(state, battle, token, action);
-			Space4x.panSpaceCombatToToken(app.ui, battle, token);
-			if (app.sync) app.sync();
-			after();
+		const incoming = Space4x.incomingMissiles(battle, token.id);
+		const from = [token].concat(incoming).map(function (t) { return Space4x.snapshotTokenPose(t); });
+		Space4x.spaceApplyAction(state, battle, token, action);
+		Space4x.beginCombatTweens(battle, from, Space4x.SPACE_MOVE_TWEEN_MS);
+		Space4x.panSpaceCombatToToken(app.ui, battle, token);
+		if (app.sync) app.sync();
+		if (Space4x.checkBattleEnd(state, battle)) {
+			schedule(finish, Space4x.SPACE_MOVE_TWEEN_MS);
+			return;
 		}
-		battle._aiRaf = requestAnimationFrame(frame);
+		schedule(after, Space4x.SPACE_MOVE_TWEEN_MS);
 	}
 	function runToken() {
 		try {
@@ -740,16 +858,21 @@ Space4x.runAnimatedAiSide = function (state, battle, side, onDone) {
 					}
 				}
 				token.activated = true;
+				Space4x.settleIncomingMissiles(state, battle, token);
 				if (Space4x.checkBattleEnd(state, battle)) {
 					finish();
 					return;
 				}
-				schedule(runToken, 250);
+				const wait = battle._fxNext != null
+					? Math.max(Space4x.SPACE_SHOT_FX_MS, battle._fxNext - Space4x.spaceCombatNow())
+					: Space4x.SPACE_SHOT_FX_MS;
+				schedule(runToken, wait);
 			}
 
 			if (!actions.length) {
 				token.activated = true;
-				schedule(runToken, 250);
+				Space4x.settleIncomingMissiles(state, battle, token);
+				schedule(runToken, Space4x.SPACE_MOVE_TWEEN_MS);
 				return;
 			}
 

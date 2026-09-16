@@ -295,8 +295,10 @@ Space4x.launchTroopHauler = function (state, from, to, taken, opts) {
 		unit.fleetMode = true;
 		unit.targetStarId = null;
 		unit.destSettlementId = null;
+		unit.arrivedThisTurn = true;
 		state.units.push(unit);
 		state.turnLog.push(Space4x.troopCargoLabel(state, taken) + " sent to fleet at " + from.name + ".");
+		Space4x.regroupOrbitTroopFleets(state, from.empireId, star.id);
 		return true;
 	}
 	if (!to || from.id === to.id || from.empireId !== to.empireId) return false;
@@ -390,6 +392,114 @@ Space4x.finishTroopFleet = function (state, unit) {
 		else empire.transport.freighters += unit.hulls || 0;
 	}
 	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
+};
+
+Space4x.dropPendingInvasionsForUnit = function (state, unitId) {
+	if (!state.pendingInvasions || !unitId) return;
+	const next = [];
+	for (let i = 0; i < state.pendingInvasions.length; i++) {
+		const order = state.pendingInvasions[i];
+		const ids = (order.fleetIds || []).filter(function (id) { return id !== unitId; });
+		if (!ids.length) {
+			const st = Space4x.settlementById(state, order.settlementId);
+			state.turnLog.push("Invasion of " + (st ? Space4x.settlementLabel(state, st) : "target") + " cancelled.");
+			continue;
+		}
+		order.fleetIds = ids;
+		next.push(order);
+	}
+	state.pendingInvasions = next;
+};
+
+Space4x.removeUnitNoRefund = function (state, unit) {
+	if (!unit) return;
+	Space4x.dropPendingInvasionsForUnit(state, unit.id);
+	if (state.ui) {
+		if (state.ui.selectedUnitId === unit.id) state.ui.selectedUnitId = null;
+		if (state.ui.selectedUnitIds) {
+			state.ui.selectedUnitIds = state.ui.selectedUnitIds.filter(function (id) { return id !== unit.id; });
+		}
+	}
+	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
+};
+
+Space4x.regroupOrbitTroopFleets = function (state, empireId, starId) {
+	if (!empireId || !starId) return;
+	const reserved = Space4x.pendingInvasionFleets(state, empireId);
+	const fleets = Space4x.troopFleetsAtStar(state, empireId, starId).filter(function (u) {
+		return !reserved[u.id] && !u.targetStarId;
+	});
+	if (fleets.length < 1) return;
+	let total = 0;
+	for (let i = 0; i < fleets.length; i++) total += (fleets[i].cargoTroops || []).length;
+	if (!total) return;
+	const cap = Space4x.troopFleetSizeCap(total);
+	const buckets = {};
+	const order = [];
+	const template = fleets[0];
+	const star = Space4x.starById(state, starId);
+	for (let f = 0; f < fleets.length; f++) {
+		const unit = fleets[f];
+		const cargo = unit.cargoTroops || [];
+		const spin = !!unit.spindelTransport;
+		for (let c = 0; c < cargo.length; c++) {
+			const t = cargo[c];
+			const key = Space4x.troopStackId(t.defId, t.culture) + (spin ? "|spin" : "|hull");
+			if (!buckets[key]) {
+				buckets[key] = { troops: [], spindel: spin };
+				order.push(key);
+			}
+			buckets[key].troops.push(t);
+		}
+	}
+	const chunks = [];
+	for (let i = 0; i < order.length; i++) {
+		const bucket = buckets[order[i]];
+		const list = bucket.troops;
+		for (let n = 0; n < list.length; n += cap) {
+			chunks.push({
+				troops: list.slice(n, n + cap),
+				spindel: bucket.spindel
+			});
+		}
+	}
+	const factor = Space4x.settingOf(state).troopMoveFreighterFactor || 1;
+	const keepIds = {};
+	for (let i = 0; i < chunks.length; i++) {
+		const chunk = chunks[i];
+		const hulls = chunk.troops.length * factor;
+		let unit = fleets[i];
+		if (!unit) {
+			unit = {
+				id: Space4x.nextId(state, "u"),
+				defId: Space4x.UNIT_ROLES.troopHauler,
+				role: Space4x.UNIT_ROLES.troopHauler,
+				empireId: empireId,
+				location: {
+					kind: "orbit",
+					x: star ? star.x : template.location.x,
+					y: star ? star.y : template.location.y,
+					starId: starId,
+					settlementId: null
+				},
+				fleetMode: true,
+				targetStarId: null,
+				destSettlementId: null,
+				arrivedThisTurn: !!template.arrivedThisTurn
+			};
+			state.units.push(unit);
+		}
+		unit.cargoTroops = chunk.troops;
+		unit.hulls = hulls;
+		unit.spindelTransport = chunk.spindel;
+		unit.fleetMode = true;
+		unit.defId = Space4x.UNIT_ROLES.troopHauler;
+		unit.role = Space4x.UNIT_ROLES.troopHauler;
+		keepIds[unit.id] = true;
+	}
+	for (let i = 0; i < fleets.length; i++) {
+		if (!keepIds[fleets[i].id]) Space4x.removeUnitNoRefund(state, fleets[i]);
+	}
 };
 
 Space4x.queueTroopFleet = function (state, fromId, defId, count, culture) {

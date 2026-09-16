@@ -821,7 +821,7 @@ Space4x.producedMoney = function (state, empire) {
 	let n = 0;
 	const homes = Space4x.settlementsOf(state, empire.id);
 	for (let i = 0; i < homes.length; i++) {
-		n += Space4x.produceSettlement(state, homes[i], empire).money;
+		n += Space4x.settlementYield(state, homes[i], empire).money;
 	}
 	return n;
 };

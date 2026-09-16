@@ -284,6 +284,7 @@ Space4x.checkVictory = function (state) {
 
 Space4x.finishTurnAfterSpace = function (state) {
 	state.turnHold = null;
+	Space4x.phaseUnarmedSweep(state);
 	Space4x.phaseProduction(state);
 	Space4x.phaseDiplomacyYields(state);
 	Space4x.phaseResearch(state);
@@ -292,6 +293,7 @@ Space4x.finishTurnAfterSpace = function (state) {
 	Space4x.phaseTransport(state);
 	Space4x.phaseDiplomacyFoodTributes(state);
 	Space4x.phaseUpkeep(state);
+	Space4x.phaseBankruptcy(state);
 	Space4x.phasePopulation(state);
 	Space4x.phaseRebellion(state);
 	Space4x.phaseEndEmptyRevolts(state);

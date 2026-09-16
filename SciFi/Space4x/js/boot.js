@@ -132,6 +132,14 @@ Space4x.bindUi = function (app) {
 	if (ui.btnCancelShipOrder) ui.btnCancelShipOrder.addEventListener("click", cmds.cancelShipOrders);
 	if (ui.btnEngageSpace) ui.btnEngageSpace.addEventListener("click", cmds.engageSpaceCombat);
 	ui.chromeResearch.addEventListener("click", cmds.showResearch);
+	if (ui.chromeMoneyLine) ui.chromeMoneyLine.addEventListener("click", cmds.showEconomy);
+	if (ui.economyTaxRates) {
+		ui.economyTaxRates.addEventListener("click", function (ev) {
+			const btn = ev.target.closest("[data-tax]");
+			if (!btn) return;
+			cmds.setTaxRate(Number(btn.getAttribute("data-tax")));
+		});
+	}
 	ui.btnResearchSelect.addEventListener("click", function () {
 		cmds.setResearch(app.state.ui.previewTechId);
 	});

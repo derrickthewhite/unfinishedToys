@@ -410,6 +410,7 @@ Space4x.describeEffect = function (state, fx) {
 	if (fx.type === "grantSpindelNavigators") {
 		return "Adds " + n + " Spindel Navigator" + (n === 1 ? "" : "s") + " to the empire pool";
 	}
+	if (fx.type === "sellIndustryPool") return "Sells this world's stored industry for money, one for one";
 	if (fx.type === "spindelWeb") {
 		return "Spindel Web: Spindel Navigators and Spindel Colonies; see all Spindel systems; homeworld is Spindel with Predators I and +2 Militia.";
 	}

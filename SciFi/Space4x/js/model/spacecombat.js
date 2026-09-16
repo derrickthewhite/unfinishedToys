@@ -109,7 +109,7 @@ Space4x.makeShipToken = function (state, battle, unit, side, slot, total) {
 		defId: unit.defId,
 		designId: fit.designId || null,
 		shipArt: fit.shipArt || null,
-		name: Space4x.unitLabel(state, unit),
+		name: (fit.designName) || Space4x.unitLabel(state, unit),
 		x: x,
 		y: y,
 		heading: Space4x.quantizeHeading(state, side === "attacker" ? 0 : Math.PI),
@@ -130,7 +130,8 @@ Space4x.makeShipToken = function (state, battle, unit, side, slot, total) {
 		warping: false,
 		retreatRound: null,
 		left: false,
-		immobile: Space4x.isStationHull(state, unit)
+		immobile: Space4x.isStationHull(state, unit),
+		autoRepair: Space4x.loadHasItem(expanded, "autoRepair")
 	};
 };
 
@@ -158,6 +159,19 @@ Space4x.livingTokens = function (battle, side) {
 		if (list[i].dead) continue;
 		if (side && list[i].side !== side) continue;
 		out.push(list[i]);
+	}
+	return out;
+};
+
+Space4x.inspectableShips = function (battle, side) {
+	const out = [];
+	const list = battle.tokens || [];
+	for (let i = 0; i < list.length; i++) {
+		const t = list[i];
+		if (t.kind !== "ship") continue;
+		if (t.left) continue;
+		if (side && t.side !== side) continue;
+		out.push(t);
 	}
 	return out;
 };
@@ -415,12 +429,14 @@ Space4x.spaceApplyAction = function (state, battle, token, action) {
 		token.y = action.y;
 		token.heading = action.heading;
 		token.speedLeft = action.speedLeft;
+		Space4x.payIncomingMissilesToShipUsed(state, battle, token);
 		return true;
 	}
 	if (action.type === "turn") {
 		if (action.cost > token.speedLeft + 1e-9) return false;
 		token.speedLeft -= action.cost;
 		token.heading = Space4x.headingFromIndex(state, action.hi);
+		Space4x.payIncomingMissilesToShipUsed(state, battle, token);
 		return true;
 	}
 	if (action.type === "forward") {
@@ -429,6 +445,7 @@ Space4x.spaceApplyAction = function (state, battle, token, action) {
 		token.x = action.x;
 		token.y = action.y;
 		token.speedLeft -= action.cost;
+		Space4x.payIncomingMissilesToShipUsed(state, battle, token);
 		return true;
 	}
 	if (action.type === "launch") {
@@ -673,11 +690,25 @@ Space4x.applyDamage = function (state, battle, target, fromX, fromY, amount) {
 	return out;
 };
 
+Space4x.SPACE_SHOT_FX_MS = 250;
+Space4x.SPACE_MOVE_TWEEN_MS = 450;
+
+Space4x.spaceCombatNow = function () {
+	return (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+};
+
+Space4x.nextSpaceShotFxTime = function (battle) {
+	const now = Space4x.spaceCombatNow();
+	const queued = battle && battle._fxNext != null ? battle._fxNext : now;
+	const t0 = Math.max(now, queued);
+	if (battle) battle._fxNext = t0 + Space4x.SPACE_SHOT_FX_MS;
+	return t0;
+};
+
 Space4x.pushSpaceCombatFx = function (battle, fx) {
 	if (!battle) return;
 	if (!battle.fx) battle.fx = [];
-	const now = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
-	fx.t0 = fx.t0 != null ? fx.t0 : now;
+	fx.t0 = fx.t0 != null ? fx.t0 : Space4x.spaceCombatNow();
 	battle.fx.push(fx);
 	if (Space4x.kickSpaceCombatFxLoop) Space4x.kickSpaceCombatFxLoop();
 };
@@ -685,14 +716,15 @@ Space4x.pushSpaceCombatFx = function (battle, fx) {
 Space4x.queueSpaceCombatHitFx = function (battle, shooter, target, result, opts) {
 	opts = opts || {};
 	if (!battle || !shooter || !target) return;
-	const now = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+	const t0 = opts.t0 != null ? opts.t0 : Space4x.nextSpaceShotFxTime(battle);
+	const dur = opts.dur != null ? opts.dur : Space4x.SPACE_SHOT_FX_MS;
 	Space4x.pushSpaceCombatFx(battle, {
 		type: "beam",
 		fromId: shooter.id,
 		toId: target.id,
 		miss: !!opts.miss,
-		t0: now,
-		dur: 500
+		t0: t0,
+		dur: dur
 	});
 	if (opts.miss) {
 		Space4x.pushSpaceCombatFx(battle, {
@@ -700,7 +732,7 @@ Space4x.queueSpaceCombatHitFx = function (battle, shooter, target, result, opts)
 			tokenId: target.id,
 			text: "Miss",
 			color: "#c8d0e0",
-			t0: now,
+			t0: t0,
 			dur: 3000,
 			rise: 28
 		});
@@ -713,7 +745,7 @@ Space4x.queueSpaceCombatHitFx = function (battle, shooter, target, result, opts)
 			tokenId: target.id,
 			text: "-" + total,
 			color: "#ff6b6b",
-			t0: now,
+			t0: t0,
 			dur: 3000,
 			rise: 34
 		});
@@ -721,8 +753,8 @@ Space4x.queueSpaceCombatHitFx = function (battle, shooter, target, result, opts)
 	Space4x.pushSpaceCombatFx(battle, {
 		type: "flash",
 		tokenId: target.id,
-		t0: now,
-		dur: 500
+		t0: t0,
+		dur: dur
 	});
 };
 
@@ -805,6 +837,7 @@ Space4x.launchMissile = function (state, battle, shooter, weapon, target) {
 	const ammoName = ammoItem.unlimitedAmmo ? item.name : ammoItem.name;
 	weapon.fired = true;
 	const id = Space4x.nextId(state, "m");
+	const missileSpeed = Space4x.missileCombatSpeed(state, shooter);
 	battle.tokens.push({
 		id: id,
 		empireId: shooter.empireId,
@@ -815,7 +848,8 @@ Space4x.launchMissile = function (state, battle, shooter, weapon, target) {
 		y: shooter.y,
 		heading: Math.atan2(target.y - shooter.y, target.x - shooter.x),
 		targetId: target.id,
-		speed: Space4x.missileCombatSpeed(state, shooter),
+		speed: missileSpeed,
+		speedLeft: missileSpeed,
 		damage: damage,
 		salvo: 4,
 		dead: false,
@@ -1003,7 +1037,12 @@ Space4x.resetRoundEnergy = function (battle) {
 	const list = battle.tokens || [];
 	for (let i = 0; i < list.length; i++) {
 		const t = list[i];
-		if (t.dead || t.left || t.kind === "missile") continue;
+		if (t.dead || t.left) continue;
+		if (t.kind === "missile") {
+			t.speedLeft = t.speed;
+			continue;
+		}
+		t.incomingMissilePaid = 0;
 		if (t.warping) {
 			t.activated = true;
 			t.speedLeft = 0;
@@ -1039,35 +1078,141 @@ Space4x.regenShields = function (state, battle) {
 	}
 };
 
-Space4x.advanceMissiles = function (state, battle) {
-	const list = (battle.tokens || []).slice();
+Space4x.autoRepairPool = function (token) {
+	if (!token) return 0;
+	const structureMax = token.structureMax || 0;
+	const armorMax = token.armorMax || 0;
+	return Math.max(0, Math.round((structureMax + armorMax) * 0.05));
+};
+
+Space4x.applyAutoRepair = function (state, battle) {
+	const list = battle.tokens || [];
 	for (let i = 0; i < list.length; i++) {
-		const m = list[i];
-		if (m.kind !== "missile" || m.dead) continue;
-		const target = Space4x.tokenById(battle, m.targetId);
-		if (!target || target.dead) {
-			m.dead = true;
-			continue;
-		}
-		m.speedLeft = m.speed;
-		Space4x.moveTokenToward(state, battle, m, target.x, target.y, 40);
-		if (Space4x.euclid(m.x, m.y, target.x, target.y) <= 1.01) {
-			const cfg = Space4x.spaceCombatCfg(state);
-			const empire = Space4x.empireById(state, m.empireId);
-			const pct = Space4x.empireMissileHitPct(state, empire);
-			const base = cfg.missileSkill || 70;
-			const chance = Math.max(0, Math.round(base * (1 + pct / 100)) - (cfg.missileEvasion || 0));
-			if (Space4x.rngInt(state, 100) < chance) {
-				const result = Space4x.applyDamage(state, battle, target, m.x, m.y, m.damage);
-				battle.log.push("Missile hits " + (target.name || "target") + " for " + m.damage + ".");
-				Space4x.queueSpaceCombatHitFx(battle, m, target, result, {});
-			} else {
-				battle.log.push("Missile misses " + (target.name || "target") + ".");
-				Space4x.queueSpaceCombatHitFx(battle, m, target, null, { miss: true });
-			}
-			m.dead = true;
+		const t = list[i];
+		if (t.dead || t.left || t.kind !== "ship" || !t.autoRepair) continue;
+		let pool = Space4x.autoRepairPool(t);
+		if (!(pool > 0)) continue;
+		const needS = Math.max(0, (t.structureMax || 0) - (t.structure || 0));
+		const healS = Math.min(needS, pool);
+		t.structure = (t.structure || 0) + healS;
+		pool -= healS;
+		const needA = Math.max(0, (t.armorMax || 0) - (t.armor || 0));
+		const healA = Math.min(needA, pool);
+		t.armor = (t.armor || 0) + healA;
+		if ((healS || healA) && battle.log) {
+			const bits = [];
+			if (healS) bits.push(healS + " structure");
+			if (healA) bits.push(healA + " armor");
+			battle.log.push((t.name || "Ship") + " auto-repairs " + bits.join(", ") + ".");
 		}
 	}
+};
+
+Space4x.snapshotTokenPose = function (token) {
+	if (!token) return null;
+	return { id: token.id, x: token.x, y: token.y, heading: token.heading || 0 };
+};
+
+Space4x.incomingMissiles = function (battle, targetId) {
+	const out = [];
+	if (!battle || !targetId) return out;
+	const list = battle.tokens || [];
+	for (let i = 0; i < list.length; i++) {
+		const t = list[i];
+		if (t.kind !== "missile" || t.dead || t.left) continue;
+		if (t.targetId === targetId) out.push(t);
+	}
+	return out;
+};
+
+Space4x.shipMoveFractionUsed = function (token) {
+	if (!token) return 0;
+	const max = token.speed || 0;
+	if (!(max > 1e-9)) return 0;
+	const used = Math.max(0, max - (token.speedLeft || 0));
+	return Math.max(0, Math.min(1, used / max));
+};
+
+Space4x.resolveMissileImpact = function (state, battle, m) {
+	if (!m || m.dead) return false;
+	const target = Space4x.tokenById(battle, m.targetId);
+	if (!target || target.dead || target.left) {
+		m.dead = true;
+		return false;
+	}
+	if (Space4x.euclid(m.x, m.y, target.x, target.y) > 1.01) return false;
+	const cfg = Space4x.spaceCombatCfg(state);
+	const empire = Space4x.empireById(state, m.empireId);
+	const pct = Space4x.empireMissileHitPct(state, empire);
+	const base = cfg.missileSkill || 70;
+	const chance = Math.max(0, Math.round(base * (1 + pct / 100)) - (cfg.missileEvasion || 0));
+	if (Space4x.rngInt(state, 100) < chance) {
+		const result = Space4x.applyDamage(state, battle, target, m.x, m.y, m.damage);
+		battle.log.push("Missile hits " + (target.name || "target") + " for " + m.damage + ".");
+		Space4x.queueSpaceCombatHitFx(battle, m, target, result, {});
+	} else {
+		battle.log.push("Missile misses " + (target.name || "target") + ".");
+		Space4x.queueSpaceCombatHitFx(battle, m, target, null, { miss: true });
+	}
+	m.dead = true;
+	return true;
+};
+
+Space4x.advanceIncomingMissilesByFraction = function (state, battle, ship, frac) {
+	if (!ship || !(frac > 1e-9)) return;
+	const list = Space4x.incomingMissiles(battle, ship.id);
+	for (let i = 0; i < list.length; i++) {
+		const m = list[i];
+		if (m.speedLeft == null) m.speedLeft = m.speed;
+		const budget = (m.speed || 0) * frac;
+		const spend = Math.min(m.speedLeft, budget);
+		if (spend > 1e-9) {
+			const leftover = m.speedLeft - spend;
+			m.speedLeft = spend;
+			Space4x.moveTokenToward(state, battle, m, ship.x, ship.y, 80);
+			m.speedLeft = leftover + (m.speedLeft || 0);
+		}
+		Space4x.resolveMissileImpact(state, battle, m);
+	}
+};
+
+Space4x.payIncomingMissilesToShipUsed = function (state, battle, ship) {
+	if (!ship || ship.kind === "missile") return;
+	const used = Space4x.shipMoveFractionUsed(ship);
+	const paid = ship.incomingMissilePaid || 0;
+	if (used > paid + 1e-9) {
+		Space4x.advanceIncomingMissilesByFraction(state, battle, ship, used - paid);
+		ship.incomingMissilePaid = used;
+	}
+};
+
+Space4x.settleIncomingMissiles = function (state, battle, ship) {
+	if (!ship || ship.kind === "missile") return;
+	const incoming = Space4x.incomingMissiles(battle, ship.id);
+	const from = incoming.map(function (m) { return Space4x.snapshotTokenPose(m); });
+	const paid = ship.incomingMissilePaid || 0;
+	if (paid < 1 - 1e-9) {
+		Space4x.advanceIncomingMissilesByFraction(state, battle, ship, 1 - paid);
+	}
+	ship.incomingMissilePaid = 1;
+	if (from.length && Space4x.beginCombatTweens) {
+		Space4x.beginCombatTweens(battle, from, Space4x.SPACE_MOVE_TWEEN_MS);
+	}
+};
+
+Space4x.settleSideIncomingMissiles = function (state, battle, side) {
+	const list = battle.tokens || [];
+	for (let i = 0; i < list.length; i++) {
+		const t = list[i];
+		if (t.kind !== "ship" && t.kind !== "fighter") continue;
+		if (t.dead || t.left) continue;
+		if (side && t.side !== side) continue;
+		Space4x.settleIncomingMissiles(state, battle, t);
+	}
+};
+
+Space4x.advanceMissiles = function (state, battle) {
+	Space4x.settleSideIncomingMissiles(state, battle, null);
 };
 
 Space4x.battleWeapons = function (token) {
@@ -1084,6 +1229,7 @@ Space4x.aiActivateToken = function (state, battle, token) {
 	const actions = Space4x.buildAiTokenActions(state, battle, token);
 	for (let i = 0; i < actions.length; i++) Space4x.spaceApplyAction(state, battle, token, actions[i]);
 	token.activated = true;
+	Space4x.settleIncomingMissiles(state, battle, token);
 };
 
 Space4x.fireFighterShot = function (state, battle, shooter, target, opts) {
@@ -1175,6 +1321,8 @@ Space4x.checkBattleEnd = function (state, battle) {
 
 Space4x.endSpaceSide = function (state, battle) {
 	if (battle.done) return;
+	Space4x.settleSideIncomingMissiles(state, battle, battle.phase);
+	if (Space4x.checkBattleEnd(state, battle)) return;
 	if (battle.phase === "attacker") {
 		battle.phase = "defender";
 		Space4x.resolveWarpDepartures(state, battle, "defender");
@@ -1188,7 +1336,6 @@ Space4x.endSpaceSide = function (state, battle) {
 		}
 		return;
 	}
-	Space4x.advanceMissiles(state, battle);
 	if (Space4x.checkBattleEnd(state, battle)) return;
 	Space4x.commitPhaseTurnMarks(battle);
 	battle.round += 1;
@@ -1205,6 +1352,7 @@ Space4x.endSpaceSide = function (state, battle) {
 		return;
 	}
 	Space4x.regenShields(state, battle);
+	Space4x.applyAutoRepair(state, battle);
 	battle.phase = "attacker";
 	Space4x.resetRoundEnergy(battle);
 	Space4x.resolveWarpDepartures(state, battle, "attacker");
@@ -1225,14 +1373,18 @@ Space4x.playerBattleSide = function (state, battle) {
 	return null;
 };
 
-Space4x.tokenAtCell = function (battle, x, y) {
+Space4x.tokenAtCell = function (battle, x, y, opts) {
+	opts = opts || {};
 	const list = battle.tokens || [];
+	let wreck = null;
 	for (let i = 0; i < list.length; i++) {
 		const t = list[i];
-		if (t.dead || t.kind === "missile") continue;
-		if (t.x === x && t.y === y) return t;
+		if (t.kind === "missile") continue;
+		if (t.x !== x || t.y !== y) continue;
+		if (!t.dead) return t;
+		if (opts.includeDead && !t.left) wreck = t;
 	}
-	return null;
+	return wreck;
 };
 
 Space4x.endSpaceShip = function (state, battle, tokenId) {
@@ -1241,6 +1393,7 @@ Space4x.endSpaceShip = function (state, battle, tokenId) {
 	const token = Space4x.tokenById(battle, tokenId);
 	if (!token || token.side !== side || token.activated) return false;
 	token.activated = true;
+	Space4x.settleIncomingMissiles(state, battle, token);
 	return true;
 };
 
@@ -1327,40 +1480,41 @@ Space4x.playerSpaceFire = function (state, battle, shooter, weapon, target, opts
 
 Space4x.playerSpaceFireGroup = function (state, battle, shooter, itemId, target) {
 	if (!shooter || !target || !itemId) return false;
-	const item = Space4x.spaceLoadItem(state, itemId);
-	const batchBeams = item && item.kind === "beam";
 	const load = shooter.load || [];
 	let any = false;
-	let shots = 0;
-	let hits = 0;
-	const combined = { absorbed: 0, leftover: 0, shield: 0, armor: 0, structure: 0, facing: null };
 	for (let i = 0; i < load.length; i++) {
 		const weapon = load[i];
 		if (weapon.itemId !== itemId) continue;
 		if (weapon.fired || weapon.launched) continue;
-		const shot = Space4x.playerSpaceFire(state, battle, shooter, weapon, target, batchBeams ? { noFx: true } : {});
+		const shot = Space4x.playerSpaceFire(state, battle, shooter, weapon, target);
 		if (!shot) continue;
 		any = true;
-		if (batchBeams) {
-			shots++;
-			if (!shot.miss && shot.result) {
-				hits++;
-				Space4x.mergeDamageResults(combined, shot.result);
-			}
-		}
 		if (target.dead) break;
-	}
-	if (batchBeams && shots > 0) {
-		if (hits === 0) Space4x.queueSpaceCombatHitFx(battle, shooter, target, null, { miss: true });
-		else Space4x.queueSpaceCombatHitFx(battle, shooter, target, combined, {});
 	}
 	return any;
 };
 
+Space4x.playerSpaceInspectAt = function (state, battle, x, y) {
+	const occ = Space4x.tokenAtCell(battle, x, y, { includeDead: true });
+	if (!occ) return false;
+	const side = Space4x.playerBattleSide(state, battle);
+	if (!side || occ.side === side) {
+		state.ui.spaceTokenId = occ.id;
+		state.ui.spaceWeaponId = null;
+	} else {
+		state.ui.spaceEnemyTokenId = occ.id;
+	}
+	return true;
+};
+
 Space4x.playerSpaceGridAct = function (state, battle, x, y) {
 	if (battle._aiAnim) return;
+	if (battle.done) {
+		Space4x.playerSpaceInspectAt(state, battle, x, y);
+		return;
+	}
 	const side = Space4x.playerBattleSide(state, battle);
-	if (!side || battle.done) return;
+	if (!side) return;
 	const occ = Space4x.tokenAtCell(battle, x, y);
 	if (occ && occ.side !== side && !occ.dead && occ.kind !== "missile") {
 		state.ui.spaceEnemyTokenId = occ.id;
@@ -1395,7 +1549,11 @@ Space4x.playerSpaceGridAct = function (state, battle, x, y) {
 		}
 		return;
 	}
+	const incoming = Space4x.incomingMissiles(battle, token.id);
+	const from = [token].concat(incoming).map(function (t) { return Space4x.snapshotTokenPose(t); });
 	Space4x.spaceNavigateTokenToCell(state, battle, token, x, y);
+	if (Space4x.beginCombatTweens) Space4x.beginCombatTweens(battle, from, Space4x.SPACE_MOVE_TWEEN_MS);
+	Space4x.checkBattleEnd(state, battle);
 };
 
 Space4x.autoResolveSpaceBattle = function (state, battle) {
@@ -1424,41 +1582,99 @@ Space4x.unarmedAtStar = function (state, empireId, starId) {
 	for (let i = 0; i < ships.length; i++) {
 		const u = ships[i];
 		if (u.empireId !== empireId) continue;
-		if (Space4x.isCombatHull(state, u)) continue;
-		if (Space4x.isTroopHauler(state, u)) continue;
+		if (!Space4x.needsEscort(state, u)) continue;
 		out.push(u);
 	}
 	return out;
 };
 
-Space4x.resolveUnarmedAtStar = function (state, battle) {
-	const winnerId = battle.winner === "attacker" ? battle.attackerEmpireId : battle.winner === "defender" ? battle.defenderEmpireId : null;
-	if (!winnerId) return;
-	const loserId = winnerId === battle.attackerEmpireId ? battle.defenderEmpireId : battle.attackerEmpireId;
-	const unarmed = Space4x.unarmedAtStar(state, loserId, battle.starId);
-	if (!unarmed.length) return;
-	if (Space4x.battleHasFighters(battle, loserId)) {
-		state.turnLog.push("Unarmed ships flee under fighter cover.");
+Space4x.escortCoverKey = function (empireId, starId) {
+	return empireId + ":" + starId;
+};
+
+Space4x.snapshotEscortCover = function (state) {
+	const cover = {};
+	const stars = {};
+	for (let i = 0; i < state.units.length; i++) {
+		const sid = Space4x.unitStarId(state, state.units[i]);
+		if (sid) stars[sid] = true;
+	}
+	const starIds = Object.keys(stars);
+	for (let s = 0; s < starIds.length; s++) {
+		const starId = starIds[s];
+		const ids = Space4x.empiresWithCombatAtStar(state, starId);
+		for (let i = 0; i < ids.length; i++) {
+			cover[Space4x.escortCoverKey(ids[i], starId)] = true;
+		}
+	}
+	if (!state.turnEvents) state.turnEvents = {};
+	state.turnEvents.escortCover = cover;
+};
+
+Space4x.hadEscortCover = function (state, empireId, starId) {
+	const cover = state.turnEvents && state.turnEvents.escortCover;
+	return !!(cover && cover[Space4x.escortCoverKey(empireId, starId)]);
+};
+
+Space4x.recordUnarmedStrike = function (state, starId, winnerId, loserId, names, kind) {
+	if (!names || !names.length) return;
+	const star = Space4x.starById(state, starId);
+	const where = star ? star.name : "a star";
+	const line = kind === "destroyed"
+		? names.join(", ") + " destroyed at " + where + " (no escort)."
+		: names.join(", ") + " retreated from " + where + " (no escort).";
+	if (!state.turnLog) state.turnLog = [];
+	state.turnLog.push(line);
+	if (!state.turnEvents) state.turnEvents = {};
+	if (kind === "destroyed") {
+		if (!state.turnEvents.spaceBattles) state.turnEvents.spaceBattles = [];
+		const cfg = Space4x.spaceCombatCfg(state);
+		state.turnEvents.spaceBattles.push({
+			id: Space4x.nextId(state, "sb"),
+			starId: starId,
+			attackerEmpireId: winnerId,
+			defenderEmpireId: loserId,
+			grid: { w: (cfg.grid && cfg.grid.w) || 120, h: (cfg.grid && cfg.grid.h) || 80 },
+			round: 1,
+			phase: "attacker",
+			tokens: [],
+			log: [line],
+			done: true,
+			winner: "attacker",
+			seen: false,
+			summary: line,
+			unarmedKind: kind,
+			view: { zoom: 1, panX: null, panY: null }
+		});
 		return;
 	}
-	const names = [];
-	const kill = {};
-	for (let i = 0; i < unarmed.length; i++) {
-		kill[unarmed[i].id] = true;
-		names.push(Space4x.unitLabel(state, unarmed[i]));
-	}
-	state.units = state.units.filter(function (u) { return !kill[u.id]; });
-	const star = Space4x.starById(state, battle.starId);
-	const line = names.join(", ") + " destroyed at " + (star ? star.name : "a star") + " (no fighter cover).";
-	state.turnLog.push(line);
 	if (!state.turnEvents.spaceLosses) state.turnEvents.spaceLosses = [];
 	state.turnEvents.spaceLosses.push({
 		id: Space4x.nextId(state, "sl"),
-		starId: battle.starId,
+		starId: starId,
 		empireId: loserId,
+		winnerId: winnerId,
 		text: line,
 		seen: false
 	});
+};
+
+Space4x.retreatVulnerableUnit = function (state, unit) {
+	if (!unit) return false;
+	Space4x.dropPendingInvasionsForUnit(state, unit.id);
+	const pos = Space4x.unitRangePos(unit);
+	const hereId = Space4x.unitStarId(state, unit);
+	const home = Space4x.nearestFriendlyStar(state, unit.empireId, pos.x, pos.y, { excludeStarId: hereId });
+	if (!home) return false;
+	const empire = Space4x.empireById(state, unit.empireId);
+	const stats = Space4x.shipStats(state, empire);
+	unit.targetStarId = null;
+	Space4x.walkUnitHome(state, unit, home, stats.speed);
+	return true;
+};
+
+Space4x.resolveUnarmedAtStar = function (state, battle) {
+	return;
 };
 
 Space4x.createSpaceBattle = function (state, starId, attackerId, defenderId, atkShips, defShips) {
@@ -1529,30 +1745,6 @@ Space4x.pickSpaceAttacker = function (state, starId, aId, bId) {
 	return aId;
 };
 
-Space4x.destroyUnarmedWithoutCover = function (state, starId, loserId, winnerId) {
-	const unarmed = Space4x.unarmedAtStar(state, loserId, starId);
-	if (!unarmed.length) return;
-	const names = [];
-	const kill = {};
-	for (let i = 0; i < unarmed.length; i++) {
-		kill[unarmed[i].id] = true;
-		names.push(Space4x.unitLabel(state, unarmed[i]));
-	}
-	state.units = state.units.filter(function (u) { return !kill[u.id]; });
-	const star = Space4x.starById(state, starId);
-	const line = names.join(", ") + " destroyed at " + (star ? star.name : "a star") + " (no fighter cover).";
-	state.turnLog.push(line);
-	if (!state.turnEvents.spaceLosses) state.turnEvents.spaceLosses = [];
-	state.turnEvents.spaceLosses.push({
-		id: Space4x.nextId(state, "sl"),
-		starId: starId,
-		empireId: loserId,
-		winnerId: winnerId,
-		text: line,
-		seen: false
-	});
-};
-
 Space4x.phaseUnarmedSweep = function (state) {
 	const stars = {};
 	for (let i = 0; i < state.units.length; i++) {
@@ -1573,14 +1765,45 @@ Space4x.phaseUnarmedSweep = function (state) {
 			if (Space4x.combatShipsAtStar(state, loserId, starId).length) continue;
 			const unarmed = Space4x.unarmedAtStar(state, loserId, starId);
 			if (!unarmed.length) continue;
+			let winnerId = null;
 			for (let c = 0; c < combatIds.length; c++) {
-				const winnerId = combatIds[c];
-				if (winnerId === loserId) continue;
-				const we = Space4x.empireById(state, winnerId);
+				const id = combatIds[c];
+				if (id === loserId) continue;
+				const we = Space4x.empireById(state, id);
 				const le = Space4x.empireById(state, loserId);
-				if (!Space4x.atWar(we, loserId) && !Space4x.atWar(le, winnerId)) continue;
-				Space4x.destroyUnarmedWithoutCover(state, starId, loserId, winnerId);
+				if (!Space4x.atWar(we, loserId) && !Space4x.atWar(le, id)) continue;
+				winnerId = id;
 				break;
+			}
+			if (!winnerId) continue;
+			const hadCover = Space4x.hadEscortCover(state, loserId, starId);
+			const kill = [];
+			const flee = [];
+			for (let u = 0; u < unarmed.length; u++) {
+				const unit = unarmed[u];
+				if (unit.arrivedThisTurn && !hadCover) kill.push(unit);
+				else flee.push(unit);
+			}
+			if (kill.length) {
+				const names = kill.map(function (unit) { return Space4x.unitLabel(state, unit); });
+				for (let k = 0; k < kill.length; k++) Space4x.removeUnitNoRefund(state, kill[k]);
+				Space4x.recordUnarmedStrike(state, starId, winnerId, loserId, names, "destroyed");
+			}
+			if (flee.length) {
+				const names = [];
+				const trapped = [];
+				for (let f = 0; f < flee.length; f++) {
+					const unit = Space4x.unitById(state, flee[f].id);
+					if (!unit) continue;
+					if (Space4x.retreatVulnerableUnit(state, unit)) names.push(Space4x.unitLabel(state, unit));
+					else trapped.push(unit);
+				}
+				if (trapped.length) {
+					const trappedNames = trapped.map(function (unit) { return Space4x.unitLabel(state, unit); });
+					for (let t = 0; t < trapped.length; t++) Space4x.removeUnitNoRefund(state, trapped[t]);
+					Space4x.recordUnarmedStrike(state, starId, winnerId, loserId, trappedNames, "destroyed");
+				}
+				if (names.length) Space4x.recordUnarmedStrike(state, starId, winnerId, loserId, names, "retreated");
 			}
 		}
 	}
@@ -1752,6 +1975,7 @@ Space4x.engageSpaceCombatAtStar = function (state, starId) {
 Space4x.phaseSpaceCombat = function (state) {
 	if (!state.turnEvents.spaceBattles) state.turnEvents.spaceBattles = [];
 	if (!state.turnEvents.spaceLosses) state.turnEvents.spaceLosses = [];
+	Space4x.snapshotEscortCover(state);
 	const stars = {};
 	for (let i = 0; i < state.units.length; i++) {
 		const sid = Space4x.unitStarId(state, state.units[i]);
@@ -1761,7 +1985,6 @@ Space4x.phaseSpaceCombat = function (state) {
 	for (let s = 0; s < starIds.length; s++) {
 		Space4x.resolveSpaceCombatAtStar(state, starIds[s]);
 	}
-	Space4x.phaseUnarmedSweep(state);
 	const player = Space4x.playerEmpire(state);
 	if (player && Space4x.playerOpenSpaceBattles(state).length) state.turnHold = "afterSpace";
 };

@@ -19,6 +19,49 @@ Space4x.fmtMoney = function (n) {
 	return (Math.abs(r % 1) < 1e-9) ? String(Math.round(r)) : r.toFixed(1);
 };
 
+Space4x.clampTaxRate = function (n) {
+	const v = Math.round((Number(n) || 0) / 10) * 10;
+	if (v < 0) return 0;
+	if (v > 50) return 50;
+	return v;
+};
+
+Space4x.empireTaxRate = function (empire) {
+	return Space4x.clampTaxRate(empire && empire.taxRate);
+};
+
+/** Round to a 1–2–5 × 10^n amount so debt cutoffs stay readable. */
+Space4x.niceAmount = function (n) {
+	n = Math.max(0, Math.round(Number(n) || 0));
+	if (n <= 10) return 10;
+	const mag = Math.pow(10, Math.floor(Math.log10(n)));
+	const steps = [1, 2, 5, 10];
+	let best = steps[0] * mag;
+	let bestD = Math.abs(n - best);
+	for (let i = 1; i < steps.length; i++) {
+		const v = steps[i] * mag;
+		const d = Math.abs(n - v);
+		if (d < bestD || (d === bestD && v > best)) {
+			best = v;
+			bestD = d;
+		}
+	}
+	return best;
+};
+
+Space4x.empireDebtLimit = function (state, empireId) {
+	const set = Space4x.settingOf(state);
+	const per = (set.economy && set.economy.debtPerPop) || 10;
+	const pops = Math.max(1, Space4x.empirePopCount(state, empireId));
+	return Space4x.niceAmount(pops * per);
+};
+
+Space4x.empireIsBankrupt = function (state, empire) {
+	if (!empire || empire.dormant) return false;
+	const money = Space4x.moneyRound((empire.stockpiles && empire.stockpiles.money) || 0);
+	return money <= -Space4x.empireDebtLimit(state, empire.id);
+};
+
 Space4x.UNIT_ROLES = {
 	popHauler: "popHauler",
 	troopHauler: "troopHauler"
@@ -161,6 +204,10 @@ Space4x.OBSERVER_ID = "__observer__";
 
 Space4x.isObserver = function (state) {
 	return !!(state && state.observerMode);
+};
+
+Space4x.isEditor = function (state) {
+	return !!(state && state.editor);
 };
 
 Space4x.empireById = function (state, id) {
@@ -725,6 +772,26 @@ Space4x.playerCanOrderUnit = function (state, unit) {
 
 Space4x.isScout = function (state, unit) {
 	return !!(unit && unit.defId === "scout");
+};
+
+Space4x.needsEscort = function (state, unit) {
+	if (!unit || Space4x.isCombatHull(state, unit) || Space4x.isStationHull(state, unit)) return false;
+	if (unit.location && unit.location.kind === "refit") return false;
+	if (Space4x.isPopHauler(state, unit)) return false;
+	if (Space4x.isTroopHauler(state, unit)) return true;
+	if (Space4x.isScout(state, unit) || Space4x.unitCanFound(state, unit)) return true;
+	return !Space4x.isHauler(state, unit);
+};
+
+Space4x.orbitTroopFleetCount = function (state, empireId, starId) {
+	let n = 0;
+	const fleets = Space4x.troopFleetsAtStar(state, empireId, starId);
+	for (let i = 0; i < fleets.length; i++) n += (fleets[i].cargoTroops || []).length;
+	return n;
+};
+
+Space4x.troopFleetSizeCap = function (troopCount) {
+	return troopCount > 20 ? 10 : 5;
 };
 
 Space4x.troopFleetsAtStar = function (state, empireId, starId) {

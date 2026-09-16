@@ -70,6 +70,7 @@ Space4x.createEmpire = function (state, opts) {
 		cultureId: opts.cultureId || Space4x.defaultCultureId(state),
 		colorId: opts.colorId != null ? opts.colorId : null,
 		stockpiles: { money: 0 },
+		taxRate: 0,
 		transport: { freighters: 0, spindelNavigators: 0 },
 		modifiers: Space4x.emptyModifiers(),
 		exploredStarIds: [],

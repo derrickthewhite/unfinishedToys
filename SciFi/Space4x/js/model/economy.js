@@ -117,6 +117,30 @@ Space4x.produceSettlement = function (state, settlement, empire) {
 	return { food: food, industry: industry, research: research, money: money };
 };
 
+Space4x.applyOutputTax = function (y, taxRate) {
+	const out = {
+		food: y.food || 0,
+		industry: y.industry || 0,
+		research: y.research || 0,
+		money: y.money || 0,
+		taxed: 0
+	};
+	const rate = Space4x.clampTaxRate(taxRate);
+	if (!rate) return out;
+	const frac = rate / 100;
+	const fromInd = Space4x.moneyRound(out.industry * frac);
+	const fromRes = Space4x.moneyRound(out.research * frac);
+	out.industry = Space4x.moneyRound(out.industry - fromInd);
+	out.research = Space4x.moneyRound(out.research - fromRes);
+	out.taxed = Space4x.moneyRound(fromInd + fromRes);
+	out.money = Space4x.moneyRound(out.money + out.taxed);
+	return out;
+};
+
+Space4x.settlementYield = function (state, settlement, empire) {
+	return Space4x.applyOutputTax(Space4x.produceSettlement(state, settlement, empire), Space4x.empireTaxRate(empire));
+};
+
 Space4x.outputExplain = function (state, settlement, job) {
 	const empire = Space4x.empireById(state, settlement.empireId);
 	const set = Space4x.settingOf(state);
@@ -302,27 +326,29 @@ Space4x.phaseProduction = function (state) {
 		state.empires[i]._pendingResearch = 0;
 		state.empires[i]._producedResearch = 0;
 		state.empires[i]._producedMoney = 0;
+		state.empires[i]._taxedOutput = 0;
 	}
 	for (let s = 0; s < state.settlements.length; s++) {
 		const st = state.settlements[s];
 		const empire = Space4x.empireById(state, st.empireId);
-		const y = Space4x.produceSettlement(state, st, empire);
+		const y = Space4x.settlementYield(state, st, empire);
 		st.lastFoodProduced = y.food;
 		st._producedFood = y.food;
-		st.industryPool += y.industry;
-		empire.stockpiles.money += y.money;
-		empire._producedMoney += y.money;
-		empire._pendingResearch += y.research;
-		empire._producedResearch += y.research;
+		st.industryPool = Space4x.moneyRound((st.industryPool || 0) + y.industry);
+		empire.stockpiles.money = Space4x.moneyRound((empire.stockpiles.money || 0) + y.money);
+		empire._producedMoney = Space4x.moneyRound((empire._producedMoney || 0) + y.money);
+		empire._pendingResearch = Space4x.moneyRound((empire._pendingResearch || 0) + y.research);
+		empire._producedResearch = Space4x.moneyRound((empire._producedResearch || 0) + y.research);
+		if (y.taxed) empire._taxedOutput = Space4x.moneyRound((empire._taxedOutput || 0) + y.taxed);
 		const colorMoney = Space4x.settlementColorMoney(state, st);
 		if (colorMoney) {
-			empire.stockpiles.money += colorMoney;
-			empire._producedMoney += colorMoney;
+			empire.stockpiles.money = Space4x.moneyRound(empire.stockpiles.money + colorMoney);
+			empire._producedMoney = Space4x.moneyRound(empire._producedMoney + colorMoney);
 		}
 		const colorResearch = Space4x.settlementColorResearch(state, st);
 		if (colorResearch) {
-			empire._pendingResearch += colorResearch;
-			empire._producedResearch += colorResearch;
+			empire._pendingResearch = Space4x.moneyRound(empire._pendingResearch + colorResearch);
+			empire._producedResearch = Space4x.moneyRound(empire._producedResearch + colorResearch);
 		}
 	}
 	for (let i = 0; i < state.empires.length; i++) {
@@ -429,16 +455,25 @@ Space4x.empireMoneyForecast = function (state, empireId) {
 	const empire = Space4x.empireById(state, empireId);
 	const homes = Space4x.settlementsOf(state, empireId);
 	let income = 0;
+	let taxed = 0;
 	for (let i = 0; i < homes.length; i++) {
-		income += Space4x.produceSettlement(state, homes[i], empire).money;
+		const y = Space4x.settlementYield(state, homes[i], empire);
+		income += y.money;
+		taxed += y.taxed || 0;
 	}
+	income = Space4x.moneyRound(income);
+	taxed = Space4x.moneyRound(taxed);
 	const preview = Space4x.previewEmpireFood(state, empireId);
 	const up = Space4x.empireUpkeep(state, empireId, preview.hullsUsed || 0);
 	const trade = Space4x.tradeTreatyPreview ? Space4x.tradeTreatyPreview(state, empire) : { total: 0, lines: [] };
 	const lines = up.lines.slice();
+	const taxRate = Space4x.empireTaxRate(empire);
+	if (taxRate) lines.unshift("Tax " + taxRate + "% +" + Space4x.fmtMoney(taxed));
 	for (let i = 0; i < (trade.lines || []).length; i++) lines.push(trade.lines[i]);
 	return {
 		income: income,
+		taxed: taxed,
+		taxRate: taxRate,
 		trade: trade.total,
 		buildings: up.buildings,
 		ships: up.ships,
@@ -457,6 +492,195 @@ Space4x.phaseUpkeep = function (state) {
 		if (!up.upkeep) continue;
 		empire.stockpiles.money = Space4x.moneyRound(empire.stockpiles.money - up.upkeep);
 		state.turnLog.push(empire.name + " paid " + Space4x.fmtMoney(up.upkeep) + " money in upkeep.");
+	}
+};
+
+Space4x.empireShouldHaltMilitarySpend = function (state, empire) {
+	if (!empire || empire.dormant) return false;
+	const f = Space4x.empireMoneyForecast(state, empire.id);
+	const money = f.stockpile || 0;
+	if (money <= 0) return true;
+	const limit = Space4x.empireDebtLimit(state, empire.id);
+	return money + (f.net || 0) <= -limit;
+};
+
+Space4x.bankruptcyShipDist = function (state, unit) {
+	const pos = Space4x.unitRangePos(unit);
+	const home = Space4x.nearestFriendlyStar(state, unit.empireId, pos.x, pos.y);
+	if (!home) return Infinity;
+	const w = Space4x.cellWorldPos(home.x, home.y);
+	return Space4x.dist(pos.x, pos.y, w.x, w.y);
+};
+
+Space4x.bankruptcyCanScrapShip = function (state, unit) {
+	if (!unit || Space4x.isHauler(state, unit) || unit.fleetMode) return false;
+	if (unit.location && unit.location.kind === "refit") return false;
+	if ((unit.cargoPops || []).length) return false;
+	return Space4x.shipUpkeep(state, unit) > 0 || Space4x.shipScrapValue(state, unit) > 0;
+};
+
+Space4x.pickBankruptcyShip = function (state, empireId) {
+	let best = null;
+	let bestStation = 0;
+	let bestDist = Infinity;
+	for (let i = 0; i < state.units.length; i++) {
+		const unit = state.units[i];
+		if (unit.empireId !== empireId) continue;
+		if (!Space4x.bankruptcyCanScrapShip(state, unit)) continue;
+		const station = Space4x.isStationHull(state, unit) ? 1 : 0;
+		const dist = Space4x.bankruptcyShipDist(state, unit);
+		if (!best || station < bestStation || (station === bestStation && dist < bestDist)) {
+			best = unit;
+			bestStation = station;
+			bestDist = dist;
+		}
+	}
+	return best;
+};
+
+Space4x.pickBankruptcyBuilding = function (state, empireId) {
+	const homes = Space4x.settlementsOf(state, empireId);
+	let best = null;
+	let bestUpkeep = -1;
+	let bestCost = -1;
+	for (let h = 0; h < homes.length; h++) {
+		const st = homes[h];
+		const list = st.structures || [];
+		for (let i = 0; i < list.length; i++) {
+			const def = Space4x.settingOf(state).builds[list[i].defId];
+			if (!def || def.unique || def.uniqueEmpire) continue;
+			if (def.id === "spaceDock") continue;
+			const upkeep = Space4x.defUpkeep(state, def.id);
+			const cost = Space4x.baseDefCost(def);
+			if (upkeep <= 0 && cost <= 0) continue;
+			if (upkeep > bestUpkeep || (upkeep === bestUpkeep && cost > bestCost)) {
+				best = { settlement: st, index: i, name: def.name, upkeep: upkeep };
+				bestUpkeep = upkeep;
+				bestCost = cost;
+			}
+		}
+	}
+	return best;
+};
+
+Space4x.empireTroopTs = function (state, empireId) {
+	const empire = Space4x.empireById(state, empireId);
+	let n = 0;
+	const homes = Space4x.settlementsOf(state, empireId);
+	for (let i = 0; i < homes.length; i++) {
+		n += Space4x.troopListTs(state, empire, homes[i].troops);
+	}
+	const haulers = Space4x.troopHaulers(state, empireId);
+	for (let h = 0; h < haulers.length; h++) {
+		n += Space4x.troopListTs(state, empire, haulers[h].cargoTroops);
+	}
+	return n;
+};
+
+Space4x.bankruptcyTroopRequired = function (state, settlement, troop) {
+	if (!settlement || !troop) return false;
+	const empire = Space4x.empireById(state, settlement.empireId);
+	const def = Space4x.settingOf(state).builds[troop.defId];
+	if (!Space4x.troopCountsAsPolice(state, empire, def)) return false;
+	return Space4x.countPolice(state, settlement) <= Space4x.policeNeed(state, settlement);
+};
+
+Space4x.pickBankruptcyTroop = function (state, empireId) {
+	const reserved = Space4x.pendingInvasionFleets(state, empireId);
+	let best = null;
+	let bestUpkeep = -1;
+	function consider(row) {
+		const defId = row.troop && row.troop.defId;
+		const upkeep = Space4x.defUpkeep(state, defId);
+		if (!upkeep) return;
+		if (row.settlement && Space4x.bankruptcyTroopRequired(state, row.settlement, row.troop)) return;
+		if (!best || upkeep > bestUpkeep) {
+			best = row;
+			bestUpkeep = upkeep;
+		}
+	}
+	const homes = Space4x.settlementsOf(state, empireId);
+	for (let h = 0; h < homes.length; h++) {
+		const st = homes[h];
+		const troops = st.troops || [];
+		for (let i = 0; i < troops.length; i++) {
+			consider({ troop: troops[i], settlement: st, index: i });
+		}
+	}
+	const haulers = Space4x.troopHaulers(state, empireId);
+	for (let u = 0; u < haulers.length; u++) {
+		const unit = haulers[u];
+		if (reserved[unit.id]) continue;
+		const cargo = unit.cargoTroops || [];
+		for (let i = 0; i < cargo.length; i++) {
+			consider({ troop: cargo[i], unit: unit, index: i });
+		}
+	}
+	return best;
+};
+
+Space4x.disbandBankruptcyTroop = function (state, pick) {
+	if (!pick || !pick.troop) return pick.troop;
+	if (pick.settlement) {
+		pick.settlement.troops.splice(pick.index, 1);
+		return pick.troop;
+	}
+	if (pick.unit) {
+		pick.unit.cargoTroops.splice(pick.index, 1);
+		if (!(pick.unit.cargoTroops || []).length) Space4x.finishTroopFleet(state, pick.unit);
+		return pick.troop;
+	}
+	return pick.troop;
+};
+
+Space4x.resolveEmpireBankruptcy = function (state, empire) {
+	if (!empire || empire.dormant || !Space4x.empireIsBankrupt(state, empire)) return;
+	const limit = Space4x.empireDebtLimit(state, empire.id);
+	let ships = 0;
+	let shipCash = 0;
+	let buildings = 0;
+	let buildingCash = 0;
+	let troops = 0;
+	let steps = 0;
+	while (Space4x.empireIsBankrupt(state, empire) && steps < 200) {
+		const ship = Space4x.pickBankruptcyShip(state, empire.id);
+		if (!ship) break;
+		steps += 1;
+		shipCash = Space4x.moneyRound(shipCash + Space4x.scrapUnitForCash(state, ship));
+		ships += 1;
+	}
+	const startTs = Space4x.empireTroopTs(state, empire.id);
+	const tsCap = startTs / 2;
+	let goneTs = 0;
+	while (Space4x.empireIsBankrupt(state, empire) && Space4x.empireMoneyForecast(state, empire.id).net < 0 &&
+		goneTs < tsCap && steps < 200) {
+		steps += 1;
+		const pick = Space4x.pickBankruptcyTroop(state, empire.id);
+		if (!pick) break;
+		const def = Space4x.settingOf(state).builds[pick.troop.defId];
+		goneTs += Space4x.troopTs(state, empire, def, pick.troop.culture);
+		Space4x.disbandBankruptcyTroop(state, pick);
+		troops += 1;
+	}
+	while (Space4x.empireIsBankrupt(state, empire) && steps < 200) {
+		const bld = Space4x.pickBankruptcyBuilding(state, empire.id);
+		if (!bld) break;
+		steps += 1;
+		buildingCash = Space4x.moneyRound(buildingCash + Space4x.scrapStructureForCash(state, bld.settlement, bld.index));
+		buildings += 1;
+	}
+	if (ships || buildings || troops) {
+		const bits = [];
+		if (troops) bits.push("disbanded " + troops + " " + Space4x.unitsWord(troops));
+		if (ships) bits.push("scrapped " + ships + " ship" + (ships === 1 ? "" : "s") + " (+" + Space4x.fmtMoney(shipCash) + ")");
+		if (buildings) bits.push("scrapped " + buildings + " building" + (buildings === 1 ? "" : "s") + " (+" + Space4x.fmtMoney(buildingCash) + ")");
+		state.turnLog.push(empire.name + " bankruptcy (−" + Space4x.fmtMoney(limit) + " limit): " + bits.join(", ") + ".");
+	}
+};
+
+Space4x.phaseBankruptcy = function (state) {
+	for (let i = 0; i < state.empires.length; i++) {
+		Space4x.resolveEmpireBankruptcy(state, state.empires[i]);
 	}
 };
 

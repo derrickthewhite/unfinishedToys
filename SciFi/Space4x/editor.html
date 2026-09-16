@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Space4x Editor</title>
+	<link rel="icon" href="favicon.svg" type="image/svg+xml">
+	<link rel="stylesheet" href="css/space4x.css">
+</head>
+<body class="editor-page">
+	<header id="editor-chrome">
+		<div id="editor-chrome-left">
+			<strong>Editor</strong>
+			<nav id="editor-nav">
+				<button type="button" data-stage="design">Designs</button>
+				<button type="button" data-stage="research">Research</button>
+				<button type="button" data-stage="editorCombat">Fleets</button>
+			</nav>
+		</div>
+		<div id="editor-chrome-right">
+			<span id="editor-status" class="muted">0 techs</span>
+			<button type="button" id="btn-editor-reset">Reset</button>
+			<a href="index.html">Game</a>
+		</div>
+	</header>
+	<div id="main-stage">
+		<div id="stage-design">
+			<div id="design-head">
+				<div>
+					<h2>Ship designs</h2>
+					<p id="design-meta" class="muted"></p>
+				</div>
+			</div>
+			<div id="design-layout">
+				<div>
+					<div id="design-hulls">
+						<button type="button" id="design-hull-cruiser">Cruiser</button>
+						<button type="button" id="design-hull-battleship">Battleship</button>
+						<button type="button" id="design-hull-station">Defense station</button>
+					</div>
+					<h3>Named classes</h3>
+					<ul id="design-class-list"></ul>
+					<div id="design-class-actions">
+						<button type="button" id="btn-design-new">New class</button>
+						<button type="button" id="btn-design-default">Make default</button>
+						<button type="button" id="btn-design-auto">Auto-update</button>
+						<button type="button" id="btn-design-export" hidden>Export</button>
+					</div>
+					<label>Name
+						<input id="design-name-input" type="text" maxlength="32">
+					</label>
+					<canvas id="design-ship-art" class="design-ship-art" width="400" height="220" aria-label="Class silhouette preview" title="Click to cycle silhouette"></canvas>
+					<div id="design-ship-art-controls" class="design-ship-art-controls">
+						<button type="button" id="btn-design-art-prev" aria-label="Previous silhouette">◀</button>
+						<span id="design-ship-art-label" class="muted">Silhouette</span>
+						<button type="button" id="btn-design-art-next" aria-label="Next silhouette">▶</button>
+					</div>
+				</div>
+				<div>
+					<h3>Fitted load</h3>
+					<ul id="design-load-list"></ul>
+				</div>
+				<div>
+					<h3>Add component</h3>
+					<ul id="design-catalog"></ul>
+				</div>
+			</div>
+		</div>
+		<div id="stage-research" hidden>
+			<div id="research-head">
+				<div>
+					<h2>Research</h2>
+					<p id="research-current" class="muted">No project.</p>
+				</div>
+			</div>
+			<div id="editor-research-tools" class="editor-tools">
+				<label>Next planet
+					<input id="editor-next-planet-range" type="number" min="1" max="30" step="1">
+				</label>
+				<button type="button" id="btn-editor-roll-range" title="Roll 2d4">Roll 2d4</button>
+				<span id="editor-reach-status" class="muted"></span>
+				<label>Stop at first tier
+					<input id="editor-stop-tier" type="number" min="0" max="8" placeholder="optional">
+				</label>
+				<label>Spend RP
+					<input id="editor-rp" type="number" min="1" value="200">
+				</label>
+				<button type="button" id="btn-editor-spend-rp">Spend</button>
+				<label>Complete techs
+					<input id="editor-n-techs" type="number" min="1" value="8">
+				</label>
+				<button type="button" id="btn-editor-n-techs">Complete</button>
+				<button type="button" id="btn-editor-until-tier">Until first tier</button>
+				<button type="button" id="btn-editor-reset-tech">Reset research</button>
+				<p id="editor-research-log" class="muted"></p>
+			</div>
+			<div id="research-layout">
+				<ul id="research-cat-list"></ul>
+				<div id="research-detail">
+					<div id="research-ladder"></div>
+					<h3 id="research-detail-name">Select a field</h3>
+					<p id="research-detail-meta" class="muted"></p>
+					<div id="research-detail-blurb">
+						<p id="research-detail-summary"></p>
+						<ul id="research-detail-effects"></ul>
+					</div>
+					<button type="button" id="btn-research-select">Grant tech</button>
+				</div>
+			</div>
+			<div id="research-overview-wrap">
+				<h3>All fields</h3>
+				<div id="research-overview"></div>
+			</div>
+		</div>
+		<div id="stage-editor-combat" hidden>
+			<div id="editor-fleet-head">
+				<div>
+					<h2>Fleets</h2>
+					<p class="muted">Build two sides from current Designs, then fight. Research and class fits apply at Fight.</p>
+				</div>
+			</div>
+			<div id="editor-fleet-tools" class="editor-tools">
+				<label>Hull
+					<select id="editor-fleet-hull">
+						<option value="cruiser">Cruiser</option>
+						<option value="battleship">Battleship</option>
+						<option value="defenseStation">Defense station</option>
+					</select>
+				</label>
+				<label>Class
+					<select id="editor-fleet-class"></select>
+				</label>
+				<label>Count
+					<input id="editor-fleet-count" type="number" min="1" max="20" value="1">
+				</label>
+				<button type="button" id="btn-editor-fleet-add-you">Add to You</button>
+				<button type="button" id="btn-editor-fleet-add-opp">Add to Opponent</button>
+				<button type="button" id="btn-editor-fleet-fight">Fight</button>
+				<button type="button" id="btn-editor-fleet-clear">Clear</button>
+				<p id="editor-fleet-note" class="muted"></p>
+			</div>
+			<div id="editor-fleet-layout">
+				<section>
+					<h3>You</h3>
+					<ul id="editor-fleet-you"></ul>
+					<p id="editor-fleet-you-empty" class="muted">No ships.</p>
+				</section>
+				<section>
+					<h3>Opponent</h3>
+					<ul id="editor-fleet-opp"></ul>
+					<p id="editor-fleet-opp-empty" class="muted">No ships.</p>
+				</section>
+			</div>
+		</div>
+		<div id="stage-space-combat" hidden>
+			<div id="space-combat-head">
+				<button type="button" id="btn-back-galaxy-space">Fleets</button>
+				<button type="button" id="btn-space-cancel">Cancel fight</button>
+				<button type="button" id="btn-space-ok" hidden>OK</button>
+				<div>
+					<h2 id="space-combat-title">Space combat</h2>
+					<p id="space-combat-meta" class="muted"></p>
+				</div>
+			</div>
+			<div id="space-combat-layout">
+				<canvas id="space-canvas" width="720" height="480"></canvas>
+				<div id="space-combat-side">
+					<h3>Your force</h3>
+					<ul id="space-ship-list"></ul>
+					<h3>Load</h3>
+					<ul id="space-weapon-list"></ul>
+					<div id="space-combat-actions">
+						<button type="button" id="btn-space-autocombat">Autocombat</button>
+						<button type="button" id="btn-space-retreat">Retreat</button>
+						<button type="button" id="btn-space-end-ship">Done with this ship</button>
+						<button type="button" id="btn-space-end-side">End side</button>
+					</div>
+					<p class="muted">Ships move straight ahead; turning costs 2 speed per 15°. Blue = reachable cells. Select a weapon group for orange range (brighter = enemy targets). Identical weapons fire together; each still rolls its own hit chance. Click an enemy to inspect it. Pan and zoom the grid.</p>
+					<ul id="space-combat-log"></ul>
+				</div>
+			</div>
+			<div id="space-combat-status">
+				<article id="space-status-friendly" class="space-status-card">
+					<canvas id="space-status-friendly-art" class="space-status-art" width="96" height="72"></canvas>
+					<div id="space-status-friendly-stats" class="space-status-stats muted">Select one of your ships.</div>
+					<ul id="space-status-friendly-load" class="space-status-load"></ul>
+				</article>
+				<article id="space-status-enemy" class="space-status-card is-enemy">
+					<ul id="space-status-enemy-load" class="space-status-load"></ul>
+					<div id="space-status-enemy-stats" class="space-status-stats muted">Click an enemy ship to inspect.</div>
+					<canvas id="space-status-enemy-art" class="space-status-art" width="96" height="72"></canvas>
+				</article>
+			</div>
+		</div>
+	</div>
+
+	<script src="js/lib/deep-space-background.js"></script>
+	<script src="config/settings/scratch-empire.js"></script>
+	<script src="js/rng.js"></script>
+	<script src="js/query.js"></script>
+	<script src="js/model/effects.js"></script>
+	<script src="js/model/culture.js"></script>
+	<script src="js/model/knacks.js"></script>
+	<script src="js/state.js"></script>
+	<script src="js/persistence.js"></script>
+	<script src="js/model/research.js"></script>
+	<script src="js/model/shipdesign.js"></script>
+	<script src="js/model/beamweapons.js"></script>
+	<script src="js/model/spacecombat.js"></script>
+	<script src="js/model/troops.js"></script>
+	<script src="js/model/diplomacy.js"></script>
+	<script src="js/ai/dumb.js"></script>
+	<script src="js/commands.js"></script>
+	<script src="js/view/ui.js"></script>
+	<script src="js/view/lists.js"></script>
+	<script src="js/view/research.js"></script>
+	<script src="js/view/shipart.js"></script>
+	<script src="js/view/map.js"></script>
+	<script src="js/view/spacebg.js"></script>
+	<script src="js/view/spacecombat.js"></script>
+	<script src="js/view/design.js"></script>
+	<script src="js/model/editor.js"></script>
+	<script src="js/editor.js"></script>
+</body>
+</html>

@@ -24,6 +24,13 @@ Space4x.DEFAULT_SHIP_ART = {
 		"assets/ships/Battleship/Battleship-4.svg",
 		"assets/ships/Battleship/Battleship-5.svg"
 	],
+	defenseStation: [
+		"assets/ships/Defense Station/Defense Station 1.svg",
+		"assets/ships/Defense Station/Defense Station 2.svg",
+		"assets/ships/Defense Station/Defense Station 3.svg",
+		"assets/ships/Defense Station/Defense Station 4.svg",
+		"assets/ships/Defense Station/Defense Station 5.svg"
+	],
 	missile: [
 		"assets/ships/missile.svg"
 	],
@@ -41,6 +48,7 @@ Space4x.DEFAULT_SHIP_ART = {
 Space4x.HULL_SHIP_ART_FALLBACK = {
 	cruiser: "assets/ships/cruiser.svg",
 	battleship: "assets/ships/battleship.svg",
+	defenseStation: "assets/ships/Defense Station/Defense Station 1.svg",
 	missile: "assets/ships/missile.svg",
 	scout: "assets/ships/scout.svg",
 	colonyShip: "assets/ships/colony.svg",
@@ -167,11 +175,15 @@ Space4x.canFetchShipArt = function () {
 	}
 };
 
+Space4x.shipArtSrc = function (path) {
+	return path ? encodeURI(path) : path;
+};
+
 Space4x.loadShipArtSvgViaObject = function (path) {
 	return new Promise(function (resolve, reject) {
 		const obj = document.createElement("object");
 		obj.type = "image/svg+xml";
-		obj.data = path;
+		obj.data = Space4x.shipArtSrc(path);
 		obj.setAttribute("aria-hidden", "true");
 		obj.tabIndex = -1;
 		obj.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none";
@@ -208,7 +220,7 @@ Space4x.loadShipArtSvgText = function (path) {
 	if (!path) return Promise.reject(new Error("missing"));
 	if (Space4x._shipArtSvgText[path]) return Promise.resolve(Space4x._shipArtSvgText[path]);
 	if (Space4x.canFetchShipArt()) {
-		return fetch(path).then(function (res) {
+		return fetch(Space4x.shipArtSrc(path)).then(function (res) {
 			if (!res.ok) throw new Error("missing");
 			return res.text();
 		}).then(function (text) {
@@ -225,7 +237,7 @@ Space4x.loadShipArtRaw = function (path) {
 	const raw = new Image();
 	Space4x._shipArtRawCache[path] = raw;
 	raw.decoding = "async";
-	raw.src = path;
+	raw.src = Space4x.shipArtSrc(path);
 	return raw;
 };
 

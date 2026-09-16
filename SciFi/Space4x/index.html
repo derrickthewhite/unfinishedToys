@@ -10,6 +10,7 @@
 	<section id="screen-generation">
 		<h1>Space4x</h1>
 		<p class="sub">Working title. Empire from scratch.</p>
+		<p class="muted"><a href="editor.html">Editor</a> — ship designs and research sandbox.</p>
 		<form id="generation-form">
 			<label>Game type
 				<select id="gen-setting">
@@ -95,7 +96,7 @@
 				<button type="button" id="btn-todos">Attention (<span id="chrome-todo-count">0</span>)</button>
 			</div>
 			<div id="chrome-right">
-				<span id="chrome-money-line">Money <span id="chrome-money">0</span></span>
+				<span id="chrome-money-line" class="chrome-link"><span id="chrome-money-label">Money</span> <span id="chrome-money">0</span></span>
 				<span>Food <span id="chrome-food-prod">0</span> / <span id="chrome-food-need">0</span></span>
 				<span title="Empire freighter pool. Hauls food (1 each), population (5 each), and ground units (1 each). In-transit hulls count as used, not gone. Not map warships.">Freighters <span id="chrome-freighters-used">0</span> / <span id="chrome-freighters">0</span></span>
 				<span id="chrome-spindel-wrap" hidden title="Spindel Navigators. Same cargo rules as freighters, but only Spindel world to Spindel world, any distance in one turn.">Navigators <span id="chrome-spindel-used">0</span> / <span id="chrome-spindel">0</span></span>
@@ -867,7 +868,7 @@
 					</section>
 					<section id="guide-upgrades" class="guide-section">
 						<h3>Ship upgrades</h3>
-						<p class="muted">Outfit combat hulls on the Designs screen. Load size is per unit unless noted.</p>
+						<p class="muted">Outfit combat hulls on the Designs screen. Load size is per unit unless noted. Beam accuracy is versus 50 defense with no scanners or empire bonuses: point-blank hit chance, hit chance at max range, and the percent lost per square.</p>
 						<div id="guide-upgrade-tables"></div>
 					</section>
 				</div>
@@ -918,6 +919,22 @@
 					<h2>Attention</h2>
 					<p id="todo-empty" class="muted">Nothing waiting.</p>
 					<ul id="todo-list"></ul>
+				</div>
+
+				<div id="panel-economy" class="panel" hidden>
+					<h2>Treasury</h2>
+					<p id="economy-money-summary" class="muted"></p>
+					<p>Tax skims industry and research into the treasury, one for one. Food is not taxed.</p>
+					<div id="economy-tax-rates" class="tax-rate-row">
+						<button type="button" data-tax="0">0%</button>
+						<button type="button" data-tax="10">10%</button>
+						<button type="button" data-tax="20">20%</button>
+						<button type="button" data-tax="30">30%</button>
+						<button type="button" data-tax="40">40%</button>
+						<button type="button" data-tax="50">50%</button>
+					</div>
+					<p id="economy-tax-hint" class="muted"></p>
+					<p class="muted">Worlds can also queue an Export Sale to dump stored industry for money.</p>
 				</div>
 
 				<div id="panel-combat" class="panel" hidden>

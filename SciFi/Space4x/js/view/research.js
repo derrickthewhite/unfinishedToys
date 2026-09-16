@@ -87,6 +87,11 @@ Space4x.fillTechDetail = function (ui, state, player, tech, catObj) {
 		Space4x.setText(ui.btnResearchSelect, "Observer — browse only");
 		return;
 	}
+	if (Space4x.isEditor(state)) {
+		ui.btnResearchSelect.disabled = false;
+		Space4x.setText(ui.btnResearchSelect, status === "done" ? "Revoke tech" : "Grant tech");
+		return;
+	}
 	if (status === "current") {
 		ui.btnResearchSelect.disabled = true;
 		Space4x.setText(ui.btnResearchSelect, "Current project");
@@ -109,7 +114,11 @@ Space4x.syncResearchStage = function (ui, state, cmds) {
 	const player = Space4x.researchViewEmpire(state);
 	if (!player) return;
 	const browsing = !!player.isObserverDraft || Space4x.isObserver(state);
-	if (browsing) {
+	if (Space4x.isEditor(state)) {
+		const n = (player.research.completedTechIds || []).length;
+		Space4x.setText(ui.researchCurrent, "Editor — " + n + " techs owned. Grant or revoke any node; Generate advances fields.");
+		if (ui.researchCurrent) ui.researchCurrent.title = "";
+	} else if (browsing) {
 		Space4x.setText(ui.researchCurrent, "Observer browse — all techs unlocked for viewing.");
 		if (ui.researchCurrent) ui.researchCurrent.title = "";
 	} else if (!player.research.currentProjectId) {

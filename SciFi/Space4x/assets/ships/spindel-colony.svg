@@ -1,8 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
-	<!-- Bare footprint silhouette (magenta for empire tint) -->
-	<path fill="#ff00ff" d="M9.2 2.4c1.35 0 2.45 1.15 2.45 2.7 0 2.05-1.55 3.85-2.85 5.15-.45.45-1.05.4-1.45 0C5.95 9 4.5 7.15 4.5 5.1c0-1.55 1.1-2.7 2.45-2.7.55 0 1.05.2 1.45.55.4-.35.9-.55 1.45-.55z"/>
-	<path fill="#ff00ff" d="M14.1 3.1c1.05 0 1.9.9 1.9 2.1 0 1.55-1.15 2.95-2.2 3.95-.35.35-.85.3-1.15 0-1.05-1-2.2-2.4-2.2-3.95 0-1.2.85-2.1 1.9-2.1.45 0 .85.15 1.15.45.35-.3.75-.45 1.2-.45z"/>
-	<path fill="#ff00ff" d="M17.6 5.2c.9 0 1.6.75 1.6 1.75 0 1.25-.95 2.4-1.8 3.2-.3.28-.7.25-.95 0-.85-.8-1.8-1.95-1.8-3.2 0-1 .7-1.75 1.6-1.75.35 0 .7.12.95.35.25-.23.55-.35.95-.35z"/>
-	<path fill="#ff00ff" d="M19.4 9.1c.7 0 1.25.55 1.25 1.3 0 .95-.7 1.8-1.35 2.4-.22.2-.55.18-.75 0-.65-.6-1.35-1.45-1.35-2.4 0-.75.55-1.3 1.25-1.3.28 0 .52.1.7.28.2-.18.45-.28.75-.28z"/>
-	<path fill="#ff00ff" d="M11.2 11.1c2.05 0 3.7 1.85 3.7 4.35 0 3.4-2.45 6.85-4.15 8.85-.4.45-1.05.4-1.4 0-1.7-2-4.15-5.45-4.15-8.85 0-2.5 1.65-4.35 3.7-4.35.7 0 1.35.25 1.85.7.5-.45 1.15-.7 1.85-.7z"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 24 24"
+   aria-hidden="true"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="spindel-colony.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs5" />
+  <sodipodi:namedview
+     id="namedview5"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="24.3125"
+     inkscape:cx="10.940874"
+     inkscape:cy="15.526992"
+     inkscape:window-width="2560"
+     inkscape:window-height="1369"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg5" />
+  <!-- Bare footprint silhouette (magenta for empire tint) -->
+  <path
+     fill="#ff00ff"
+     d="m 15.236729,11.438542 c 0,0.753593 -1.08569,3.033248 -1.127843,3.780019 -0.04694,0.831635 0.984567,3.459354 0.860205,4.242565 -0.299567,1.886631 -0.491995,1.515127 -1.502785,2.704292 -0.425225,0.478377 -5.444974,0.272188 -5.8170453,-0.153036 -1.8072032,-2.126122 -2.3129086,-5.68437 -2.3129086,-9.298776 0,-2.657652 1.7540502,-4.6243146 3.9333246,-4.6243146 0.7441423,0 1.2953373,-0.073351 2.0103863,-0.064762 0.735098,0.00882 1.379232,-0.275387 1.922937,0.064762 1.47819,0.9247885 2.033729,0.2198336 2.033729,3.3492506 z"
+     id="path5"
+     sodipodi:nodetypes="sssccsssss"
+     style="stroke-width:1.06306" />
+  <ellipse
+     style="fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:1.59459;stroke-linecap:round"
+     id="path6"
+     cx="6.6951017"
+     cy="5.3301759"
+     rx="1.9238939"
+     ry="3.3558831" />
+  <ellipse
+     style="fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:1.59459;stroke-linecap:round"
+     id="path7"
+     cx="10.455441"
+     cy="5.2419834"
+     rx="1.0712591"
+     ry="2.0222747" />
+  <ellipse
+     style="fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:1.59459;stroke-linecap:round"
+     id="path8"
+     cx="13.133588"
+     cy="5.4824696"
+     rx="1.2570899"
+     ry="2.1097245" />
+  <ellipse
+     style="fill:#ff00ff;fill-opacity:1;stroke:none;stroke-width:1.59459;stroke-linecap:round"
+     id="path9"
+     cx="15.604042"
+     cy="6.3897605"
+     rx="0.97287816"
+     ry="1.8145818" />
 </svg>

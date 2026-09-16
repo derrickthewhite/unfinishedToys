@@ -52,10 +52,10 @@ Space4x.completeBuild = function (state, settlement, defId, queueItem) {
 	} else if (def && def.kind === "spy") {
 		Space4x.spawnSpy(state, settlement);
 	}
-	Space4x.runCompleteEffects(state, settlement, def);
+	Space4x.runCompleteEffects(state, settlement, def, queueItem);
 };
 
-Space4x.runCompleteEffects = function (state, settlement, def) {
+Space4x.runCompleteEffects = function (state, settlement, def, queueItem) {
 	if (!def || !def.effects) return;
 	const empire = Space4x.empireById(state, settlement.empireId);
 	for (let i = 0; i < def.effects.length; i++) {
@@ -69,6 +69,14 @@ Space4x.runCompleteEffects = function (state, settlement, def) {
 			Space4x.ensureTransportPools(empire);
 			empire.transport.spindelNavigators += fx.n || 0;
 			state.turnLog.push(settlement.name + " launched " + (fx.n || 0) + " Spindel Navigators.");
+		}
+		if (fx.type === "sellIndustryPool") {
+			const leftover = Space4x.moneyRound(settlement.industryPool || 0);
+			settlement.industryPool = 0;
+			const spent = Space4x.moneyRound((queueItem && queueItem.progress) || 0);
+			const sold = Space4x.moneyRound(leftover + spent);
+			if (empire) empire.stockpiles.money = Space4x.moneyRound((empire.stockpiles.money || 0) + sold);
+			state.turnLog.push(settlement.name + " sold " + Space4x.fmtMoney(sold) + " industry for money.");
 		}
 	}
 };
@@ -102,8 +110,8 @@ Space4x.phaseConstruction = function (state) {
 				continue;
 			}
 			const spend = Math.min(need, st.industryPool);
-			st.industryPool -= spend;
-			item.progress = (item.progress || 0) + spend;
+			st.industryPool = Space4x.moneyRound(st.industryPool - spend);
+			item.progress = Space4x.moneyRound((item.progress || 0) + spend);
 			if (item.progress >= cost) Space4x.completeBuild(state, st, def.id, item);
 			else {
 				keep.push(item);
@@ -311,6 +319,28 @@ Space4x.shipScrapValue = function (state, unit) {
 	return Space4x.baseDefCost(def);
 };
 
+Space4x.scrapUnitForCash = function (state, unit) {
+	if (!unit) return 0;
+	const empire = Space4x.empireById(state, unit.empireId);
+	if (!empire) return 0;
+	const value = Space4x.moneyRound(Space4x.shipScrapValue(state, unit));
+	empire.stockpiles.money = Space4x.moneyRound((empire.stockpiles.money || 0) + value);
+	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
+	return value;
+};
+
+Space4x.scrapStructureForCash = function (state, settlement, index) {
+	if (!settlement || !settlement.structures || index < 0 || index >= settlement.structures.length) return 0;
+	const row = settlement.structures[index];
+	const empire = Space4x.empireById(state, settlement.empireId);
+	const def = Space4x.settingOf(state).builds[row.defId];
+	const value = Space4x.moneyRound(Space4x.baseDefCost(def));
+	settlement.structures.splice(index, 1);
+	if (empire) empire.stockpiles.money = Space4x.moneyRound((empire.stockpiles.money || 0) + value);
+	Space4x.enforceJobCaps(state, settlement);
+	return value;
+};
+
 Space4x.canRefitShip = function (state, unit) {
 	if (!unit || Space4x.isHauler(state, unit)) return false;
 	if (unit.fleetMode) return false;
@@ -384,9 +414,7 @@ Space4x.scrapShip = function (state, settlementId, unitId) {
 	if (Space4x.isHauler(state, unit) || unit.fleetMode) return false;
 	const empire = Space4x.empireById(state, st.empireId);
 	if (!empire) return false;
-	const value = Space4x.shipScrapValue(state, unit);
-	empire.stockpiles.money = Space4x.moneyRound((empire.stockpiles.money || 0) + value);
-	state.units = state.units.filter(function (u) { return u.id !== unit.id; });
+	const value = Space4x.scrapUnitForCash(state, unit);
 	state.turnLog.push(st.name + " scrapped " + Space4x.unitLabel(state, unit) +
 		" for " + Space4x.fmtMoney(value) + ".");
 	return true;

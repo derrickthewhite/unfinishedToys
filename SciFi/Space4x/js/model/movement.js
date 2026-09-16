@@ -136,10 +136,22 @@ Space4x.phaseMovement = function (state) {
 		const bodies = Space4x.emptyLegalBodies(state, star, unit.empireId, settleOpts);
 		if (bodies.length) Space4x.foundSettlement(state, unit.id, bodies[0].id);
 	}
+
+	const seen = {};
+	for (let i = 0; i < state.units.length; i++) {
+		const u = state.units[i];
+		if (!u.fleetMode || !Space4x.isTroopHauler(state, u)) continue;
+		if (u.location.kind !== "orbit" || !u.location.starId) continue;
+		const key = u.empireId + ":" + u.location.starId;
+		if (seen[key]) continue;
+		seen[key] = true;
+		Space4x.regroupOrbitTroopFleets(state, u.empireId, u.location.starId);
+	}
 };
 
 Space4x.arriveAtStar = function (state, unit, star, already) {
 	if (!star) return;
+	const walking = !!unit.walkingHome;
 	Space4x.enterOrbit(unit, star);
 	Space4x.markStarExplored(state, unit.empireId, star.id);
 	const empire = Space4x.empireById(state, unit.empireId);
@@ -150,11 +162,15 @@ Space4x.arriveAtStar = function (state, unit, star, already) {
 			state.turnEvents.arrivedColonyIds.push(unit.id);
 		}
 	}
-	if (!already) unit.arrivedThisTurn = true;
+	if (!already && !walking) unit.arrivedThisTurn = true;
 	if (Space4x.isPopHauler(state, unit)) Space4x.unloadPopHauler(state, unit);
 	if (Space4x.isTroopHauler(state, unit) && !unit.fleetMode) Space4x.unloadTroopHauler(state, unit);
 	if (Space4x.isTroopHauler(state, unit) && unit.fleetMode && !(unit.cargoTroops || []).length) {
 		Space4x.finishTroopFleet(state, unit);
+		return;
+	}
+	if (Space4x.isTroopHauler(state, unit) && unit.fleetMode) {
+		Space4x.regroupOrbitTroopFleets(state, unit.empireId, star.id);
 	}
 };
 

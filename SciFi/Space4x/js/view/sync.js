@@ -339,65 +339,108 @@ Space4x.syncChrome = function (ui, state) {
 		}
 	}
 	if (state.observerMode) {
-		Space4x.setText(ui.chromeMoney, "—");
-		if (ui.chromeMoneyLine) Space4x.setText(ui.chromeMoneyLine, "Observer mode");
+		if (ui.chromeMoneyLabel) Space4x.setText(ui.chromeMoneyLabel, "Observer mode");
+		Space4x.setText(ui.chromeMoney, "");
+		if (ui.chromeMoneyLine) {
+			ui.chromeMoneyLine.title = "";
+			ui.chromeMoneyLine.classList.remove("is-broke");
+		}
+		Space4x.setText(ui.chromeFoodProd, "—");
+		Space4x.setText(ui.chromeFoodNeed, "—");
+		if (ui.chromeFoodProd && ui.chromeFoodProd.parentElement) ui.chromeFoodProd.parentElement.title = "";
+		Space4x.setText(ui.chromeFreightersUsed, "—");
+		Space4x.setText(ui.chromeFreighters, "—");
+		if (ui.chromeFreighters && ui.chromeFreighters.parentElement) ui.chromeFreighters.parentElement.title = "";
+		if (ui.chromeSpindelWrap) ui.chromeSpindelWrap.hidden = true;
 		Space4x.setText(ui.chromeResearch, "Research");
-		return;
-	}
-	if (!player) return;
-	const f = Space4x.empireMoneyForecast(state, player.id);
-	Space4x.setText(ui.chromeMoney, (f.net >= 0 ? "+" : "") + Space4x.fmtMoney(f.net) + "/" + Space4x.fmtMoney(player.stockpiles.money));
-	if (ui.chromeMoneyLine) {
-		const bits = ["Stockpile " + Space4x.fmtMoney(f.stockpile), "Income +" + Space4x.fmtMoney(f.income)];
-		if (f.trade) bits.push("Trade +" + Space4x.fmtMoney(f.trade));
-		for (let i = 0; i < f.lines.length; i++) bits.push(f.lines[i]);
-		bits.push("Net " + (f.net >= 0 ? "+" : "") + Space4x.fmtMoney(f.net) + " this turn");
-		ui.chromeMoneyLine.title = bits.join("\n");
-	}
-	const food = Space4x.empireFoodSummary(state, player.id);
-	Space4x.setText(ui.chromeFoodProd, food.produced);
-	Space4x.setText(ui.chromeFoodNeed, food.need);
-	if (ui.chromeFoodProd && ui.chromeFoodProd.parentElement) {
-		const bits = [food.fed + " fed this turn"];
-		if (food.imported > 0) bits.push(food.imported + " imported");
-		if (food.surplus > 0) bits.push(food.surplus + " surplus");
-		if (food.deficit > 0) bits.push(food.deficit + " short");
-		ui.chromeFoodProd.parentElement.title = bits.join(" · ");
-	}
-	const hulls = Space4x.empireFreighterUse(state, player.id);
-	Space4x.setText(ui.chromeFreighters, hulls.owned);
-	Space4x.setText(ui.chromeFreightersUsed, hulls.busy);
-	if (ui.chromeFreighters && ui.chromeFreighters.parentElement) {
-		ui.chromeFreighters.parentElement.title =
-			hulls.busy + " in use (" + hulls.transit + " hauling, " + hulls.food + " food) · " +
-			hulls.idle + " idle · " + hulls.owned + " total";
-	}
-	if (ui.chromeSpindelWrap) {
-		const showSpindel = Space4x.empireHasSpindelWeb(state, player);
-		ui.chromeSpindelWrap.hidden = !showSpindel;
-		if (showSpindel) {
-			const nav = Space4x.empireSpindelNavigatorUse(state, player.id);
-			Space4x.setText(ui.chromeSpindel, nav.owned);
-			Space4x.setText(ui.chromeSpindelUsed, nav.busy);
-			ui.chromeSpindelWrap.title =
-				nav.busy + " in use · " + nav.idle + " idle · " + nav.owned + " total · Spindel↔Spindel only, 1 turn";
+	} else if (player) {
+		if (ui.chromeMoneyLabel) Space4x.setText(ui.chromeMoneyLabel, "Money");
+		const f = Space4x.empireMoneyForecast(state, player.id);
+		const broke = Space4x.empireIsBankrupt(state, player);
+		Space4x.setText(ui.chromeMoney, (f.net >= 0 ? "+" : "") + Space4x.fmtMoney(f.net) + "/" + Space4x.fmtMoney(player.stockpiles.money));
+		if (ui.chromeMoneyLine) {
+			ui.chromeMoneyLine.classList.toggle("is-broke", (player.stockpiles.money || 0) < 0 || broke);
+			const bits = ["Stockpile " + Space4x.fmtMoney(f.stockpile), "Income +" + Space4x.fmtMoney(f.income)];
+			if (f.trade) bits.push("Trade +" + Space4x.fmtMoney(f.trade));
+			for (let i = 0; i < f.lines.length; i++) bits.push(f.lines[i]);
+			bits.push("Net " + (f.net >= 0 ? "+" : "") + Space4x.fmtMoney(f.net) + " this turn");
+			const limit = Space4x.empireDebtLimit(state, player.id);
+			bits.push("Bankrupt at −" + Space4x.fmtMoney(limit) + " (" + ((Space4x.settingOf(state).economy && Space4x.settingOf(state).economy.debtPerPop) || 10) + "/pop)");
+			if (f.taxRate) bits.push("Tax " + f.taxRate + "%");
+			if (broke) bits.push("Over the line — unpaid troops, then ships, then buildings.");
+			else if ((player.stockpiles.money || 0) < 0) bits.push("In debt. Stay above −" + Space4x.fmtMoney(limit) + ".");
+			ui.chromeMoneyLine.title = bits.join("\n");
 		}
-	}
-	let researchText = "Research —";
-	if (player.research.currentProjectId) {
-		const tech = Space4x.techById(state, player.research.currentProjectId);
-		const pct = tech && tech.cost ? Math.floor(100 * player.research.progress / tech.cost) : 0;
-		researchText = (tech ? tech.name : "?") + " " + pct + "%";
-		if (pct >= 50) {
-			const chance = Math.round((pct - 50) * 2);
-			researchText += " early " + chance + "%";
+		const food = Space4x.empireFoodSummary(state, player.id);
+		Space4x.setText(ui.chromeFoodProd, food.produced);
+		Space4x.setText(ui.chromeFoodNeed, food.need);
+		if (ui.chromeFoodProd && ui.chromeFoodProd.parentElement) {
+			const bits = [food.fed + " fed this turn"];
+			if (food.imported > 0) bits.push(food.imported + " imported");
+			if (food.surplus > 0) bits.push(food.surplus + " surplus");
+			if (food.deficit > 0) bits.push(food.deficit + " short");
+			ui.chromeFoodProd.parentElement.title = bits.join(" · ");
 		}
+		const hulls = Space4x.empireFreighterUse(state, player.id);
+		Space4x.setText(ui.chromeFreighters, hulls.owned);
+		Space4x.setText(ui.chromeFreightersUsed, hulls.busy);
+		if (ui.chromeFreighters && ui.chromeFreighters.parentElement) {
+			ui.chromeFreighters.parentElement.title =
+				hulls.busy + " in use (" + hulls.transit + " hauling, " + hulls.food + " food) · " +
+				hulls.idle + " idle · " + hulls.owned + " total";
+		}
+		if (ui.chromeSpindelWrap) {
+			const showSpindel = Space4x.empireHasSpindelWeb(state, player);
+			ui.chromeSpindelWrap.hidden = !showSpindel;
+			if (showSpindel) {
+				const nav = Space4x.empireSpindelNavigatorUse(state, player.id);
+				Space4x.setText(ui.chromeSpindel, nav.owned);
+				Space4x.setText(ui.chromeSpindelUsed, nav.busy);
+				ui.chromeSpindelWrap.title =
+					nav.busy + " in use · " + nav.idle + " idle · " + nav.owned + " total · Spindel↔Spindel only, 1 turn";
+			}
+		}
+		let researchText = "Research —";
+		if (player.research.currentProjectId) {
+			const tech = Space4x.techById(state, player.research.currentProjectId);
+			const pct = tech && tech.cost ? Math.floor(100 * player.research.progress / tech.cost) : 0;
+			researchText = (tech ? tech.name : "?") + " " + pct + "%";
+			if (pct >= 50) {
+				const chance = Math.round((pct - 50) * 2);
+				researchText += " early " + chance + "%";
+			}
+		}
+		Space4x.setText(ui.chromeResearch, researchText);
 	}
-	Space4x.setText(ui.chromeResearch, researchText);
 	Space4x.setText(ui.chromeTodoCount, state.todos.length);
 	Space4x.setText(ui.btnAutoPlay, state.ui.autoPlaying ? "Pause" : "Auto Play");
 	ui.btnEndTurn.disabled = !!state.winnerEmpireId || Space4x.blockingTodos(state) || state.turnHold === "afterSpace";
 	ui.btnAutoPlay.disabled = !!state.winnerEmpireId || Space4x.blockingTodos(state) || state.turnHold === "afterSpace";
+};
+
+Space4x.syncEconomy = function (ui, state) {
+	if (!ui.economyMoneySummary) return;
+	if (state.observerMode || !Space4x.playerEmpire(state)) return;
+	const player = Space4x.playerEmpire(state);
+	const f = Space4x.empireMoneyForecast(state, player.id);
+	const rate = Space4x.empireTaxRate(player);
+	Space4x.setText(ui.economyMoneySummary,
+		"Stockpile " + Space4x.fmtMoney(f.stockpile) +
+		" · net " + (f.net >= 0 ? "+" : "") + Space4x.fmtMoney(f.net) +
+		" · tax " + rate + "%");
+	if (ui.economyTaxRates) {
+		const btns = ui.economyTaxRates.querySelectorAll("[data-tax]");
+		for (let i = 0; i < btns.length; i++) {
+			btns[i].classList.toggle("is-on", Number(btns[i].getAttribute("data-tax")) === rate);
+		}
+	}
+	if (ui.economyTaxHint) {
+		if (f.taxed) {
+			Space4x.setText(ui.economyTaxHint, "+" + Space4x.fmtMoney(f.taxed) + " money this turn from tax (industry and research, tenths).");
+		} else {
+			Space4x.setText(ui.economyTaxHint, "0% leaves all industry and research in place.");
+		}
+	}
 };
 
 Space4x.syncPanels = function (ui, state) {
@@ -1015,7 +1058,7 @@ Space4x.syncSettlement = function (ui, state, cmds) {
 	}
 	Space4x.drawPlanet(ui.settlePlanet, body);
 	Space4x.stylePlanetBox(ui.settlePlanet, empire ? Space4x.empireColor(state, empire.id) : null, 4);
-	Space4x.setText(ui.settleIndustry, st.industryPool);
+	Space4x.setText(ui.settleIndustry, Space4x.fmtMoney(st.industryPool));
 	Space4x.setText(ui.settlePopLine, st.pops.length + " " + Space4x.peopleWord(st.pops.length));
 	const outlook = Space4x.settlementPopOutlook(state, st);
 	Space4x.setText(ui.settleGrowth, Space4x.popOutlookText(outlook, state));
@@ -1233,6 +1276,7 @@ Space4x.syncUiFromState = function (app) {
 		Space4x.syncChrome(ui, state);
 		Space4x.syncStage(ui, state);
 		Space4x.syncPanels(ui, state);
+		Space4x.syncEconomy(ui, state);
 		Space4x.syncTodos(ui, state, app.cmds);
 		Space4x.syncSystem(ui, state, app.cmds);
 		Space4x.syncSettlement(ui, state, app.cmds);

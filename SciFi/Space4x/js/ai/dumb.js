@@ -202,10 +202,24 @@ Space4x.aiAvailableTechPool = function (state, empire) {
 	return pool;
 };
 
+/** Uniform over categories that have options, then uniform within the category. */
 Space4x.aiPickRandomTech = function (state, empire, pool) {
 	const list = pool || Space4x.aiAvailableTechPool(state, empire);
 	if (!list.length) return null;
-	return list[Space4x.rngInt(state, list.length)];
+	const byCat = {};
+	const catIds = [];
+	for (let i = 0; i < list.length; i++) {
+		const tech = list[i];
+		const id = tech.categoryId;
+		if (!byCat[id]) {
+			byCat[id] = [];
+			catIds.push(id);
+		}
+		byCat[id].push(tech);
+	}
+	const catId = catIds[Space4x.rngInt(state, catIds.length)];
+	const opts = byCat[catId];
+	return opts[Space4x.rngInt(state, opts.length)];
 };
 
 Space4x.aiPickRandomReachTech = function (state, empire) {
@@ -215,6 +229,14 @@ Space4x.aiPickRandomReachTech = function (state, empire) {
 		if (Space4x.aiReachScore(state, opts[i]) > 0) pool.push(opts[i]);
 	}
 	return Space4x.aiPickRandomTech(state, empire, pool);
+};
+
+Space4x.aiResearchStuck = function (state, empire) {
+	if (!empire) return false;
+	if (Space4x.isEditor(state) && Space4x.aiEditorNeedsReach) {
+		return Space4x.aiEditorNeedsReach(state, empire);
+	}
+	return !Space4x.aiHasColonizeTarget(state, empire);
 };
 
 Space4x.aiPickReachTech = function (state, empire) {
@@ -277,6 +299,20 @@ Space4x.aiPickResearch = function (state, empire, stuck) {
 	return Space4x.aiPickRandomTech(state, empire);
 };
 
+Space4x.aiSetTaxRate = function (state, empire) {
+	if (!empire || empire.isPlayer) return;
+	let pick = 0;
+	for (let r = 0; r <= 50; r += 10) {
+		empire.taxRate = r;
+		if (Space4x.empireMoneyForecast(state, empire.id).net >= 0) {
+			pick = r;
+			break;
+		}
+		pick = r;
+	}
+	empire.taxRate = pick;
+};
+
 Space4x.aiOffensiveTroopCount = function (settlement) {
 	const troops = (settlement && settlement.troops) || [];
 	let n = 0;
@@ -297,7 +333,9 @@ Space4x.dumbChoose = function (state, empireId) {
 	Space4x.autoUpdateDesign(state, empire, "battleship");
 	Space4x.autoUpdateDesign(state, empire, "defenseStation");
 	const stance = Space4x.aiStance(state, empire);
-	const canColonize = Space4x.aiHasColonizeTarget(state, empire);
+	Space4x.aiSetTaxRate(state, empire);
+	const broke = Space4x.empireShouldHaltMilitarySpend(state, empire);
+	const canColonize = !Space4x.aiResearchStuck(state, empire);
 	let pick = Space4x.aiPickResearch(state, empire, !canColonize);
 	if (stance === "conquer") {
 		const cur = empire.research.currentProjectId ? Space4x.techById(state, empire.research.currentProjectId) : null;
@@ -334,8 +372,8 @@ Space4x.dumbChoose = function (state, empireId) {
 		}
 		const offensive = Space4x.aiOffensiveTroopCount(st);
 		const troopFloor = Math.max(4, Math.floor(st.pops.length / 2));
-		const militaryFloor = cruisersHere > 0 || stationsHere > 0 || offensive >= troopFloor;
-		const wantColony = canColonize && stance !== "survive" && (stance !== "conquer" || militaryFloor);
+		const hasFleet = cruisersHere > 0 || stationsHere > 0;
+		const wantColony = canColonize && stance !== "survive" && (stance !== "conquer" || hasFleet);
 		if (wantColony) {
 			const homeStar = Space4x.starById(state, st.location.starId);
 			const hasSpindelTarget = !!(homeStar && Space4x.empireHasSpindelWeb(state, empire) &&
@@ -356,12 +394,33 @@ Space4x.dumbChoose = function (state, empireId) {
 			Space4x.queueBuild(state, st.id, "spindelNavigators");
 			continue;
 		}
+		if (broke) {
+			if (st.industryPool > 0 && Space4x.canQueueBuild(state, st, "exportSale")) {
+				Space4x.queueBuild(state, st.id, "exportSale");
+			}
+			continue;
+		}
 		if (Space4x.countStructure(st, "spaceDock") && Space4x.canQueueBuild(state, st, "defenseStation") &&
 			stationsHere < 1 && (stance === "survive" || stance === "conquer" || Space4x.rngInt(state, 100) < 35)) {
 			Space4x.queueBuild(state, st.id, "defenseStation");
 			continue;
 		}
-		if ((stance === "survive" || stance === "conquer") && offensive < troopFloor) {
+		if (stance === "survive" && offensive < troopFloor) {
+			if (Space4x.canQueueBuild(state, st, "warriors")) {
+				Space4x.queueBuild(state, st.id, "warriors");
+				continue;
+			}
+			if (Space4x.canQueueBuild(state, st, "infantry")) {
+				Space4x.queueBuild(state, st.id, "infantry");
+				continue;
+			}
+		}
+		if (!hasFleet && Space4x.countStructure(st, "spaceDock") && Space4x.canQueueBuild(state, st, "cruiser") &&
+			stance !== "survive") {
+			Space4x.queueBuild(state, st.id, "cruiser");
+			continue;
+		}
+		if (stance === "conquer" && hasFleet && offensive < troopFloor) {
 			if (Space4x.canQueueBuild(state, st, "warriors")) {
 				Space4x.queueBuild(state, st.id, "warriors");
 				continue;
@@ -376,7 +435,7 @@ Space4x.dumbChoose = function (state, empireId) {
 			Space4x.queueBuild(state, st.id, "cruiser");
 			continue;
 		}
-		if (Space4x.aiAtWar(state, empire) && Space4x.canQueueBuild(state, st, "infantry")) {
+		if (Space4x.aiAtWar(state, empire) && hasFleet && Space4x.canQueueBuild(state, st, "infantry")) {
 			const troops = (st.troops || []).length;
 			if (troops < troopFloor) {
 				Space4x.queueBuild(state, st.id, "infantry");
@@ -548,14 +607,44 @@ Space4x.aiSpareInvasionTroops = function (state, settlement) {
 
 Space4x.aiMoveTroopFleets = function (state, empireId) {
 	const empire = Space4x.empireById(state, empireId);
-	if (!empire || !Space4x.aiAtWar(state, empire)) return;
+	if (!empire) return;
+	const stance = Space4x.aiStance(state, empire);
+	if (stance === "survive" || !Space4x.aiAtWar(state, empire)) {
+		const homes = Space4x.settlementsOf(state, empireId);
+		const ids = [];
+		for (let i = 0; i < state.units.length; i++) {
+			const unit = state.units[i];
+			if (unit.empireId !== empireId || !unit.fleetMode) continue;
+			if (!(unit.cargoTroops || []).length) continue;
+			if (unit.location.kind !== "orbit") continue;
+			ids.push(unit.id);
+		}
+		for (let i = 0; i < ids.length; i++) {
+			const unit = Space4x.unitById(state, ids[i]);
+			if (!unit) continue;
+			let dest = null;
+			for (let h = 0; h < homes.length; h++) {
+				if (homes[h].location.starId === unit.location.starId) {
+					dest = homes[h];
+					break;
+				}
+			}
+			if (dest) Space4x.unloadTroopFleet(state, unit.id, dest.id);
+		}
+		return;
+	}
 	const homes = Space4x.settlementsOf(state, empireId);
 	for (let i = 0; i < homes.length; i++) {
 		const st = homes[i];
+		const escort = Space4x.combatShipsAtStar(state, empireId, st.location.starId).length;
+		if (!escort) continue;
 		const spareIds = Space4x.aiSpareInvasionTroops(state, st);
 		if (spareIds.length < 2) continue;
 		if ((empire.transport.freighters || 0) < 2) break;
-		Space4x.queueTroopFleetByIds(state, st.id, spareIds.slice(0, Math.min(8, spareIds.length)));
+		const orbiting = Space4x.orbitTroopFleetCount(state, empireId, st.location.starId);
+		if (orbiting >= 10) continue;
+		const cap = Space4x.troopFleetSizeCap(orbiting + spareIds.length);
+		Space4x.queueTroopFleetByIds(state, st.id, spareIds.slice(0, Math.min(cap, spareIds.length)));
 	}
 	const reserved = Space4x.pendingInvasionFleets(state, empireId);
 	const targets = Space4x.aiEnemyStars(state, empire);
@@ -568,6 +657,7 @@ Space4x.aiMoveTroopFleets = function (state, empireId) {
 		const hereId = Space4x.unitStarId(state, unit);
 		const here = hereId ? Space4x.starById(state, hereId) : null;
 		if (!here) continue;
+		if (!Space4x.combatShipsAtStar(state, empireId, here.id).length) continue;
 		let best = null;
 		let bestD = Infinity;
 		for (let t = 0; t < targets.length; t++) {
@@ -575,6 +665,8 @@ Space4x.aiMoveTroopFleets = function (state, empireId) {
 			if (!Space4x.canLeaveSystem(state, empire, here.id, star.id)) continue;
 			if (!Space4x.inRangeOfEmpireAtCell(state, empireId, star.x, star.y)) continue;
 			const enemyShips = Space4x.enemyCombatShipsAtStar(state, empireId, star.id).length;
+			const mineThere = Space4x.combatShipsAtStar(state, empireId, star.id).length;
+			if (enemyShips && !mineThere) continue;
 			const d = Space4x.dist(here.x, here.y, star.x, star.y) + enemyShips * 8;
 			if (d < bestD) {
 				bestD = d;

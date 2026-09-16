@@ -220,6 +220,20 @@ Space4x.createCommands = function (app) {
 		cmds.setPanel("menu");
 	};
 
+	cmds.showEconomy = function () {
+		if (Space4x.isObserver(app.state)) return;
+		if (!Space4x.playerEmpire(app.state)) return;
+		cmds.setPanel("economy");
+	};
+
+	cmds.setTaxRate = function (rate) {
+		if (Space4x.isObserver(app.state)) return;
+		const player = Space4x.playerEmpire(app.state);
+		if (!player) return;
+		player.taxRate = Space4x.clampTaxRate(rate);
+		after();
+	};
+
 	cmds.showGalaxy = function () {
 		app.state.ui.stage = "galaxy";
 		if (app.state.ui.selectedStarId) app.state.ui.panel = "system";
@@ -634,7 +648,7 @@ Space4x.createCommands = function (app) {
 		const battle = Space4x.spaceBattleById(app.state, app.state.ui.selectedSpaceBattleId);
 		if (!battle || battle._aiAnim) return;
 		Space4x.endSpaceSide(app.state, battle);
-		Space4x.rebuildTodos(app.state);
+		if (app.state.screen === "play" && Space4x.rebuildTodos) Space4x.rebuildTodos(app.state);
 		after();
 	};
 

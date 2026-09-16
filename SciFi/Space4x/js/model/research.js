@@ -58,6 +58,17 @@ Space4x.completeTech = function (state, empire, tech) {
 	state.turnLog.push(empire.name + " finished " + tech.name + ".");
 };
 
+Space4x.rebuildEmpireModifiers = function (state, empire) {
+	if (!empire) return;
+	empire.modifiers = Space4x.emptyModifiers();
+	const ids = empire.research && empire.research.completedTechIds || [];
+	for (let i = 0; i < ids.length; i++) {
+		const tech = Space4x.techById(state, ids[i]);
+		if (tech && tech.effects) Space4x.applyTechEffects(empire, tech);
+	}
+	Space4x.fitShipModules(state, empire);
+};
+
 Space4x.copyEmpireResearch = function (state, from, to) {
 	if (!from || !to || !from.research || !to.research) return;
 	const ids = (from.research.completedTechIds || []).slice();
@@ -71,11 +82,103 @@ Space4x.copyEmpireResearch = function (state, from, to) {
 	to.research.progress = 0;
 	to.research.cost = 0;
 	to.research.savedProgress = {};
-	to.modifiers = Space4x.emptyModifiers();
+	Space4x.rebuildEmpireModifiers(state, to);
+};
+
+Space4x.setEmpireTechOwned = function (state, empire, techId, owned) {
+	if (!empire || !empire.research) return false;
+	const tech = Space4x.techById(state, techId);
+	if (!tech) return false;
+	const ids = empire.research.completedTechIds || [];
+	const has = Space4x.empireHasTech(empire, techId);
+	if (!!owned === has) return false;
+	if (owned) {
+		ids.push(techId);
+		empire.research.completedTechIds = ids;
+		if (empire.research.currentProjectId === techId) {
+			empire.research.currentProjectId = null;
+			empire.research.progress = 0;
+			empire.research.cost = 0;
+		}
+	} else {
+		const next = [];
+		for (let i = 0; i < ids.length; i++) {
+			if (ids[i] !== techId) next.push(ids[i]);
+		}
+		empire.research.completedTechIds = next;
+	}
+	Space4x.rebuildEmpireModifiers(state, empire);
+	return true;
+};
+
+Space4x.toggleEmpireTech = function (state, empire, techId) {
+	return Space4x.setEmpireTechOwned(state, empire, techId, !Space4x.empireHasTech(empire, techId));
+};
+
+Space4x.resetEmpireResearch = function (state, empire) {
+	if (!empire) return;
+	const set = Space4x.settingOf(state);
+	const cats = (set && set.categories) || [];
+	const startTier = set && set.startTechTier != null ? set.startTechTier : 1;
+	const tier = {};
+	for (let i = 0; i < cats.length; i++) tier[cats[i].id] = startTier;
+	empire.research = {
+		model: "category",
+		currentProjectId: null,
+		progress: 0,
+		cost: 0,
+		categoryTier: tier,
+		completedTechIds: [],
+		savedProgress: {}
+	};
+	Space4x.rebuildEmpireModifiers(state, empire);
+};
+
+Space4x.empireHasResearchedTier = function (state, empire, tier) {
+	const ids = empire && empire.research ? empire.research.completedTechIds : [];
 	for (let i = 0; i < ids.length; i++) {
 		const tech = Space4x.techById(state, ids[i]);
-		if (tech && tech.effects) Space4x.applyTechEffects(to, tech);
+		if (tech && tech.tier === tier) return true;
 	}
+	return false;
+};
+
+Space4x.generateAiResearch = function (state, empire, opts) {
+	opts = opts || {};
+	const maxPoints = opts.points == null || opts.points === "" ? null : Number(opts.points);
+	const maxTechs = opts.techCount == null || opts.techCount === "" ? null : Number(opts.techCount);
+	const stopTier = opts.stopTier == null || opts.stopTier === "" ? null : Number(opts.stopTier);
+	let spent = 0;
+	let count = 0;
+	const names = [];
+	for (let step = 0; step < 400; step++) {
+		if (stopTier != null && !isNaN(stopTier) && Space4x.empireHasResearchedTier(state, empire, stopTier)) break;
+		if (maxTechs != null && !isNaN(maxTechs) && count >= maxTechs) break;
+		const stuck = Space4x.aiResearchStuck
+			? Space4x.aiResearchStuck(state, empire)
+			: Space4x.rngInt(state, 2) === 0;
+		let pick = Space4x.aiPickResearch(state, empire, stuck);
+		if (!pick && empire.research.currentProjectId) {
+			pick = Space4x.techById(state, empire.research.currentProjectId);
+		}
+		if (!pick) pick = Space4x.aiPickRandomTech(state, empire);
+		if (!pick) break;
+		if (maxPoints != null && !isNaN(maxPoints) && spent + pick.cost > maxPoints) {
+			const pool = Space4x.aiAvailableTechPool(state, empire);
+			let fit = null;
+			for (let i = 0; i < pool.length; i++) {
+				if (spent + pool[i].cost > maxPoints) continue;
+				if (!fit || pool[i].cost > fit.cost) fit = pool[i];
+			}
+			if (!fit) break;
+			pick = fit;
+		}
+		Space4x.completeTech(state, empire, pick);
+		spent += pick.cost;
+		count += 1;
+		names.push(pick.name);
+	}
+	return { spent: spent, count: count, names: names };
 };
 
 Space4x.phaseResearch = function (state) {

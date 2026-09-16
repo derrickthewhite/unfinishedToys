@@ -160,14 +160,64 @@ Space4x.buildMissileAmmoPool = function (state, expandedLoad) {
 	for (let i = 0; i < list.length; i++) {
 		const item = Space4x.spaceLoadItem(state, list[i].itemId);
 		if (!Space4x.isMissileAmmo(item)) continue;
-		const rounds = item.rounds == null ? 999999 : item.rounds;
+		const rounds = item.rounds == null ? 1 : item.rounds;
 		pool[item.id] = (pool[item.id] || 0) + rounds;
 	}
 	return pool;
 };
 
+Space4x.MAIN_WARHEAD_PAIRS = [
+	["conversionLauncher", "ammoConversion"],
+	["antimatterLauncher", "ammoAntimatter"],
+	["graviticLauncher", "ammoGravitic"],
+	["fusionLauncher", "ammoFusion"],
+	["chemicalLauncher", "ammoChemical"]
+];
+
 Space4x.missileAmmoPriority = function () {
-	return ["ammoConversion", "ammoGravitic", "ammoAntimatter", "ammoFusion", "ammoChemical"];
+	return ["ammoConversion", "ammoAntimatter", "ammoGravitic", "ammoFusion", "ammoChemical"];
+};
+
+Space4x.loadHasItem = function (load, itemId) {
+	const list = load || [];
+	for (let i = 0; i < list.length; i++) {
+		if (list[i].itemId === itemId) return true;
+	}
+	return false;
+};
+
+Space4x.loadItemTechTier = function (state, item) {
+	if (!item || !item.requireTech) return 0;
+	const tech = Space4x.techById(state, item.requireTech);
+	return tech && tech.tier != null ? tech.tier : 0;
+};
+
+Space4x.bestMainWarheadPair = function (byId) {
+	const pairs = Space4x.MAIN_WARHEAD_PAIRS;
+	for (let i = 0; i < pairs.length; i++) {
+		if (byId[pairs[i][0]] && byId[pairs[i][1]]) return pairs[i];
+	}
+	return null;
+};
+
+Space4x.highestTierBeams = function (state, byId) {
+	let best = -1;
+	const ids = [];
+	const keys = Object.keys(byId);
+	keys.sort();
+	for (let i = 0; i < keys.length; i++) {
+		const item = byId[keys[i]];
+		if (!item || item.kind !== "beam") continue;
+		const t = Space4x.loadItemTechTier(state, item);
+		if (t > best) {
+			best = t;
+			ids.length = 0;
+			ids.push(item.id);
+		} else if (t === best) {
+			ids.push(item.id);
+		}
+	}
+	return ids;
 };
 
 Space4x.launcherHasAmmo = function (state, pool, launcherItem) {
@@ -264,8 +314,7 @@ Space4x.describeLoadItem = function (state, item) {
 	}
 	if (item.kind === "missileAmmo") {
 		if (item.damage != null) lines.push("Damage " + item.damage);
-		if (item.rounds != null) lines.push("Rounds " + item.rounds);
-		else lines.push("Rounds unlimited");
+		lines.push("One shot");
 		if (item.launcherId) {
 			const launcher = Space4x.spaceLoadItem(state, item.launcherId);
 			if (launcher) lines.push("For " + launcher.name);
@@ -326,25 +375,26 @@ Space4x.autoDesignLoad = function (state, empire, hullDefId) {
 	for (let i = 0; i < items.length; i++) byId[items[i].id] = items[i];
 	const load = [];
 	let used = 0;
-	function addGroup(id, count) {
+	function addGroup(id, count, budget) {
 		const item = byId[id];
 		if (!item) return 0;
 		const unit = Space4x.loadUnitSize(state, id, empire);
 		if (!(unit > 0)) return 0;
 		let n = count != null ? count : 1;
 		if (item.uniqueLoad) n = Math.min(1, n);
-		while (n > 0 && used + unit * n > cap) n--;
+		const limit = budget != null ? Math.min(cap, used + budget) : cap;
+		while (n > 0 && used + unit * n > limit) n--;
 		if (n <= 0) return 0;
+		for (let i = 0; i < load.length; i++) {
+			if (load[i].itemId === id) {
+				load[i].count = (load[i].count || 1) + n;
+				used += unit * n;
+				return n;
+			}
+		}
 		load.push({ itemId: id, count: n });
 		used += unit * n;
 		return n;
-	}
-	function fillItem(id) {
-		const unit = Space4x.loadUnitSize(state, id, empire);
-		if (!(unit > 0) || !byId[id]) return 0;
-		const n = Math.floor((cap - used) / unit);
-		if (n > 0) return addGroup(id, n);
-		return 0;
 	}
 	const shields = ["shieldX", "shieldV", "hardShield", "deflector"];
 	for (let s = 0; s < shields.length; s++) {
@@ -352,67 +402,146 @@ Space4x.autoDesignLoad = function (state, empire, hullDefId) {
 	}
 	addGroup("radioScanner", 1);
 	addGroup("smartArmor", 1);
+	addGroup("autoRepair", 1);
 	if (hullDefId === "battleship" || hullDefId === "defenseStation") {
 		const fighters = ["assaultBay", "strikeBay", "interceptorBay", "fighterBay"];
 		for (let f = 0; f < fighters.length; f++) {
 			if (addGroup(fighters[f], 1)) break;
 		}
 	}
-	const missilePairs = [
-		["conversionLauncher", "ammoConversion"],
-		["graviticLauncher", "ammoGravitic"],
-		["antimatterLauncher", "ammoAntimatter"],
-		["fusionLauncher", "ammoFusion"],
-		["chemicalLauncher", "ammoChemical"]
-	];
-	let launcherId = null;
-	let ammoId = null;
-	for (let m = 0; m < missilePairs.length; m++) {
-		if (byId[missilePairs[m][0]] && byId[missilePairs[m][1]]) {
-			launcherId = missilePairs[m][0];
-			ammoId = missilePairs[m][1];
-			break;
+	const pair = Space4x.bestMainWarheadPair(byId);
+	const launcherId = pair ? pair[0] : null;
+	const ammoId = pair ? pair[1] : null;
+	const topBeams = Space4x.highestTierBeams(state, byId);
+	const leftover = cap - used;
+	let missileBudget = Math.floor(leftover / 2);
+	let beamBudget = leftover - missileBudget;
+	if (!launcherId && !byId.muonTorpedo) {
+		beamBudget = leftover;
+		missileBudget = 0;
+	} else if (!topBeams.length) {
+		missileBudget = leftover;
+		beamBudget = 0;
+	} else {
+		let minBeam = Infinity;
+		for (let b = 0; b < topBeams.length; b++) {
+			const sz = Space4x.loadUnitSize(state, topBeams[b], empire);
+			if (sz > 0 && sz < minBeam) minBeam = sz;
+		}
+		if (minBeam < Infinity && beamBudget < minBeam && leftover >= minBeam) {
+			beamBudget = minBeam;
+			missileBudget = leftover - beamBudget;
+		}
+		if (launcherId) {
+			const pack = Space4x.loadUnitSize(state, launcherId, empire) +
+				Space4x.loadUnitSize(state, ammoId, empire);
+			if (pack > 0 && missileBudget < pack && leftover - beamBudget >= pack) {
+				missileBudget = pack;
+				beamBudget = leftover - missileBudget;
+			}
 		}
 	}
+	const missileStart = used;
 	if (launcherId && ammoId) {
 		const launchSize = Space4x.loadUnitSize(state, launcherId, empire);
 		const ammoSize = Space4x.loadUnitSize(state, ammoId, empire);
 		const packSize = launchSize + ammoSize * 5;
-		let packs = packSize > 0 ? Math.floor((cap - used) / packSize) : 0;
-		if (packs < 1 && launchSize + ammoSize <= cap - used) packs = 1;
+		let packs = packSize > 0 ? Math.floor(missileBudget / packSize) : 0;
+		if (packs < 1 && launchSize + ammoSize <= missileBudget) packs = 1;
 		if (packs > 0) {
-			addGroup(launcherId, packs);
-			addGroup(ammoId, packs * 5);
+			addGroup(launcherId, packs, missileBudget);
+			addGroup(ammoId, packs * 5, missileBudget - (used - missileStart));
 		}
-		while (ammoSize > 0 && used + ammoSize <= cap) addGroup(ammoId, 1);
-		while (launchSize > 0 && used + launchSize + ammoSize * 5 <= cap) {
-			addGroup(launcherId, 1);
-			addGroup(ammoId, 5);
+		while (ammoSize > 0 && used - missileStart + ammoSize <= missileBudget) {
+			if (!addGroup(ammoId, 1, missileBudget - (used - missileStart))) break;
 		}
 	} else if (byId.muonTorpedo) {
-		fillItem("muonTorpedo");
+		const unit = Space4x.loadUnitSize(state, "muonTorpedo", empire);
+		const n = unit > 0 ? Math.floor(missileBudget / unit) : 0;
+		if (n > 0) addGroup("muonTorpedo", n, missileBudget);
 	}
-	const beams = [
-		"mesonGun", "gravitonLance", "antimatterBeam", "novaProjector", "gravitonBeam", "gravityGun",
-		"fusionBeam", "forceBolt", "graserBeam", "neutronBeam", "disintegrators", "destructors",
-		"protonBeam", "phaseCutter", "plasmaBeam", "blasters", "focusedBeam", "phasers",
-		"plasmaBolts", "gaussCannon", "pulseArray", "massDriver", "maserBeam", "ionBolt", "particleBeam", "lightCannon"
-	];
-	let beamId = null;
-	for (let b = 0; b < beams.length; b++) {
-		if (byId[beams[b]]) {
-			beamId = beams[b];
-			break;
+	const spentMissiles = used - missileStart;
+	beamBudget += Math.max(0, missileBudget - spentMissiles);
+	const beamStart = used;
+	if (topBeams.length) {
+		let left = beamBudget;
+		const share = Math.floor(left / topBeams.length);
+		for (let b = 0; b < topBeams.length; b++) {
+			const unit = Space4x.loadUnitSize(state, topBeams[b], empire);
+			const n = unit > 0 ? Math.floor(share / unit) : 0;
+			if (n > 0) addGroup(topBeams[b], n, left);
+		}
+		left = beamBudget - (used - beamStart);
+		let guard = 0;
+		while (left > 0 && guard < 80) {
+			let added = false;
+			for (let b = 0; b < topBeams.length; b++) {
+				const unit = Space4x.loadUnitSize(state, topBeams[b], empire);
+				if (!(unit > 0) || unit > left) continue;
+				if (addGroup(topBeams[b], 1, left)) {
+					left = beamBudget - (used - beamStart);
+					added = true;
+				}
+			}
+			if (!added) break;
+			guard += 1;
 		}
 	}
-	if (beamId) fillItem(beamId);
-	if (ammoId) fillItem(ammoId);
-	else if (byId.muonTorpedo) fillItem("muonTorpedo");
-	else if (beamId) fillItem(beamId);
+	function loadKindSize(pred) {
+		let n = 0;
+		for (let i = 0; i < load.length; i++) {
+			const item = Space4x.spaceLoadItem(state, load[i].itemId);
+			if (item && pred(item)) n += Space4x.loadEntrySize(state, load[i], empire);
+		}
+		return n;
+	}
+	function isMissileKind(item) {
+		return item.kind === "missileLauncher" || item.kind === "missileAmmo" || item.kind === "missile";
+	}
+	function lightestTopBeam() {
+		let best = null;
+		let bestN = Infinity;
+		for (let b = 0; b < topBeams.length; b++) {
+			let n = 0;
+			for (let i = 0; i < load.length; i++) {
+				if (load[i].itemId === topBeams[b]) n += load[i].count || 1;
+			}
+			if (n < bestN) {
+				bestN = n;
+				best = topBeams[b];
+			}
+		}
+		return best;
+	}
+	function tryAddMissile(budget) {
+		if (ammoId) return addGroup(ammoId, 1, budget);
+		if (byId.muonTorpedo) return addGroup("muonTorpedo", 1, budget);
+		return 0;
+	}
+	function tryAddBeam(budget) {
+		const id = lightestTopBeam();
+		return id ? addGroup(id, 1, budget) : 0;
+	}
+	let remain = cap - used;
+	let fillGuard = 0;
+	while (remain > 0 && fillGuard < 40) {
+		const missileSize = loadKindSize(isMissileKind);
+		const beamSize = loadKindSize(function (item) { return item.kind === "beam"; });
+		let added = 0;
+		if (missileSize <= beamSize) {
+			added = tryAddMissile(remain);
+			if (!added) added = tryAddBeam(remain);
+		} else {
+			added = tryAddBeam(remain);
+			if (!added) added = tryAddMissile(remain);
+		}
+		if (!added) break;
+		remain = cap - used;
+		fillGuard += 1;
+	}
 	if (!load.length && byId.chemicalLauncher && byId.ammoChemical) {
 		addGroup("chemicalLauncher", 1);
 		addGroup("ammoChemical", 5);
-		fillItem("ammoChemical");
 	}
 	return load;
 };

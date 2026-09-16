@@ -68,6 +68,9 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			peaceStrengthRatio: 0.7,
 			invadeStrengthRatio: 1.1
 		},
+		economy: {
+			debtPerPop: 10
+		},
 		shipArt: {
 			cruiser: [
 				"assets/ships/Cruiser/cruiser-1.svg",
@@ -80,9 +83,11 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				"assets/ships/Cruiser/cruiser-8.svg"
 			],
 			defenseStation: [
-				"assets/ships/Battleship/Battleship-1.svg",
-				"assets/ships/Battleship/Battleship-2.svg",
-				"assets/ships/Battleship/Battleship-3.svg"
+				"assets/ships/Defense Station/Defense Station 1.svg",
+				"assets/ships/Defense Station/Defense Station 2.svg",
+				"assets/ships/Defense Station/Defense Station 3.svg",
+				"assets/ships/Defense Station/Defense Station 4.svg",
+				"assets/ships/Defense Station/Defense Station 5.svg"
 			],
 			missile: [
 				"assets/ships/missile.svg"
@@ -105,15 +110,15 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			]
 		},
 		spaceLoad: {
-			lightCannon: { id: "lightCannon", name: "Laser Beam", kind: "beam", size: 10, range: 40, damage: [1, 5], requireTech: "pp0", summary: "Baseline optical beam. Long range." },
+			lightCannon: { id: "lightCannon", name: "Laser Beam", kind: "beam", size: 10, range: 40, damage: [1, 5], requireTech: "pp0", summary: "Baseline optical beam." },
 			particleBeam: {
 				id: "particleBeam", name: "Rail Gun", kind: "beam", size: 20, range: 40, damage: [4, 14],
 				damageFalloff: true, rangePenaltyMult: 1.25, requireTech: "ex1rg",
-				summary: "Heavy slug thrower. Half damage beyond half range; +25% range accuracy penalty."
+				summary: "Heavy slug thrower. Half damage beyond half range."
 			},
 			maserBeam: {
 				id: "maserBeam", name: "Maser Beam", kind: "beam", size: 12, range: 38, damage: [3, 11],
-				attackSkill: 20, requireTech: "pp1ms", summary: "Microwave laser. Very accurate."
+				attackSkill: 20, requireTech: "pp1ms", summary: "Microwave laser."
 			},
 			ionBolt: { id: "ionBolt", name: "Ion Bolt", kind: "beam", size: 10, range: 15, damage: [2, 9], disable: true, requireTech: "pp2ib", summary: "Short ion burst. Disable (stub)." },
 			massDriver: {
@@ -135,7 +140,7 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			plasmaBeam: {
 				id: "plasmaBeam", name: "Plasma Beam", kind: "beam", size: 18, range: 22, damage: [4, 10],
 				armorDamageMult: 1.5, burn: true, requireTech: "rx3pb",
-				summary: "+50% damage vs armor. Burn (stub). Medium accuracy."
+				summary: "+50% damage vs armor. Burn (stub)."
 			},
 			destructors: { id: "destructors", name: "Destructors", kind: "beam", size: 16, range: 24, damage: [6, 16], requireTech: "pp4ds", summary: "Pure-energy destructor beam." },
 			protonBeam: { id: "protonBeam", name: "Proton Beam", kind: "beam", size: 18, range: 30, damage: [5, 14], requireTech: "pp4pb", summary: "Long-range proton stream." },
@@ -146,7 +151,7 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			graserBeam: {
 				id: "graserBeam", name: "Graser Beam", kind: "beam", size: 16, range: 32, damage: [7, 17],
 				splitArmorStructure: true, attackSkill: 8, requireTech: "pp5gr",
-				summary: "Gamma laser. Splits damage between armor and structure. High accuracy."
+				summary: "Gamma laser. Splits damage between armor and structure."
 			},
 			neutronBeam: {
 				id: "neutronBeam", name: "Neutron Beam", kind: "beam", size: 20, range: 30, damage: [7, 18],
@@ -170,17 +175,17 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			antimatterBeam: {
 				id: "antimatterBeam", name: "Anti-matter Beam", kind: "beam", size: 22, range: 28, damage: [9, 22],
 				shieldDamageMult: 0.5, attackSkill: -10, requireTech: "pp8amb",
-				summary: "Antimatter annihilation. Half damage to shields. Low accuracy."
+				summary: "Antimatter annihilation. Half damage to shields."
 			},
 			gravitonLance: {
 				id: "gravitonLance", name: "Graviton Lance", kind: "beam", size: 26, range: 34, damage: [8, 20],
 				ignoreShields: true, requireTech: "pp8gl",
-				summary: "Heavy graviton lance. Ignores shields. Medium accuracy."
+				summary: "Heavy graviton lance. Ignores shields."
 			},
 			mesonGun: {
 				id: "mesonGun", name: "Meson Gun", kind: "beam", size: 20, range: 24, damage: [5, 14],
 				ignoreArmor: true, attackSkill: -25, requireTech: "pp8mg",
-				summary: "Meson decay. Bypasses armor. Low accuracy."
+				summary: "Meson decay. Bypasses armor."
 			},
 			deflector: { id: "deflector", name: "Shield I", kind: "shield", size: 8, shieldPerFacing: 1, requireTech: "wp1sh", summary: "Light deflectors." },
 			hardShield: { id: "hardShield", name: "Shield III", kind: "shield", size: 16, shieldPerFacing: 3, requireTech: "wp4sh", summary: "Hard shield lattice." },
@@ -191,8 +196,8 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				size: 6, range: 48, summary: "Chemical warhead tube. Needs chemical magazines. Missile speed is 2× ship combat speed."
 			},
 			ammoChemical: {
-				id: "ammoChemical", name: "Chemical magazine", kind: "missileAmmo", size: 6, rounds: 3, damage: 12,
-				launcherId: "chemicalLauncher", summary: "Chemical warhead magazines. 3 shots each."
+				id: "ammoChemical", name: "Chemical magazine", kind: "missileAmmo", size: 4, rounds: 1, damage: 12,
+				launcherId: "chemicalLauncher", summary: "Chemical warhead. One shot."
 			},
 			fusionLauncher: {
 				id: "fusionLauncher", name: "Fusion launcher", kind: "missileLauncher", ammoId: "ammoFusion",
@@ -200,8 +205,8 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				summary: "Fusion warhead tube. Needs fusion magazines."
 			},
 			ammoFusion: {
-				id: "ammoFusion", name: "Fusion magazine", kind: "missileAmmo", size: 6, rounds: 4, damage: 20,
-				launcherId: "fusionLauncher", requireTech: "rx1wh", summary: "Fusion warhead magazines. 4 shots each."
+				id: "ammoFusion", name: "Fusion magazine", kind: "missileAmmo", size: 4, rounds: 1, damage: 20,
+				launcherId: "fusionLauncher", requireTech: "rx1wh", summary: "Fusion warhead. One shot."
 			},
 			graviticLauncher: {
 				id: "graviticLauncher", name: "Gravitic launcher", kind: "missileLauncher", ammoId: "ammoGravitic",
@@ -209,8 +214,8 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				summary: "Gravitic warhead tube. Needs gravitic magazines."
 			},
 			ammoGravitic: {
-				id: "ammoGravitic", name: "Gravitic magazine", kind: "missileAmmo", size: 6, rounds: 2, damage: 55,
-				launcherId: "graviticLauncher", requireTech: "rx3wh", summary: "Gravitic warhead magazines. 2 shots each."
+				id: "ammoGravitic", name: "Gravitic magazine", kind: "missileAmmo", size: 4, rounds: 1, damage: 55,
+				launcherId: "graviticLauncher", requireTech: "rx3wh", summary: "Gravitic warhead. One shot."
 			},
 			antimatterLauncher: {
 				id: "antimatterLauncher", name: "Antimatter launcher", kind: "missileLauncher", ammoId: "ammoAntimatter",
@@ -218,8 +223,8 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				summary: "Antimatter warhead tube. Needs antimatter magazines."
 			},
 			ammoAntimatter: {
-				id: "ammoAntimatter", name: "Antimatter magazine", kind: "missileAmmo", size: 6, rounds: 3, damage: 35,
-				launcherId: "antimatterLauncher", requireTech: "rx5wh", summary: "Antimatter warhead magazines. 3 shots each."
+				id: "ammoAntimatter", name: "Antimatter magazine", kind: "missileAmmo", size: 4, rounds: 1, damage: 35,
+				launcherId: "antimatterLauncher", requireTech: "rx5wh", summary: "Antimatter warhead. One shot."
 			},
 			conversionLauncher: {
 				id: "conversionLauncher", name: "Conversion launcher", kind: "missileLauncher", ammoId: "ammoConversion",
@@ -227,8 +232,8 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				summary: "Conversion warhead tube. Needs conversion magazines."
 			},
 			ammoConversion: {
-				id: "ammoConversion", name: "Conversion magazine", kind: "missileAmmo", size: 6, rounds: 2, damage: 70,
-				launcherId: "conversionLauncher", requireTech: "rx6wh", summary: "Conversion warhead magazines. 2 shots each."
+				id: "ammoConversion", name: "Conversion magazine", kind: "missileAmmo", size: 4, rounds: 1, damage: 70,
+				launcherId: "conversionLauncher", requireTech: "rx6wh", summary: "Conversion warhead. One shot."
 			},
 			muonTorpedo: {
 				id: "muonTorpedo", name: "Muon torpedo", kind: "missileLauncher", size: 6, range: 48,
@@ -240,8 +245,8 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			strikeBay: { id: "strikeBay", name: "Strike bay", kind: "fighter", size: 20, fighterBeam: [2, 6], fighterRange: 16, fighterStructure: 22, requireTech: "wp4fi", summary: "Strike craft with harder guns." },
 			assaultBay: { id: "assaultBay", name: "Assault bay", kind: "fighter", size: 24, fighterBeam: [3, 8], fighterRange: 18, fighterStructure: 28, fighterSpeedMult: 1.4, requireTech: "wp6fi", summary: "Heavy assault fighters." },
 			autoRepair: {
-				id: "autoRepair", name: "Auto repair", kind: "device", size: 8, stub: true, requireTech: "ro1ar",
-				summary: "Stub. Intended mid-combat or post-battle structure repair."
+				id: "autoRepair", name: "Auto repair", kind: "device", size: 8, uniqueLoad: true, requireTech: "ro1ar",
+				summary: "Fit once. At the start of each combat turn, repair 5% of structure+armor (structure first, leftover to armor)."
 			},
 			radioScanner: {
 				id: "radioScanner", name: "Radio scanner", kind: "device", sizePerN: 5, attackSkill: 15,
@@ -269,7 +274,7 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				requireTech: "ro5sa", summary: "Fit once. Load 10×N. +50% armor."
 			},
 			ammoGremlin: {
-				id: "ammoGremlin", name: "Gremlin magazine", kind: "missileAmmo", size: 6, rounds: 2, damage: 24,
+				id: "ammoGremlin", name: "Gremlin magazine", kind: "missileAmmo", size: 4, rounds: 1, damage: 24,
 				launcherId: "chemicalLauncher", stub: true, requireTech: "ro5gw",
 				summary: "Stub. Damage over 10 rounds; about double expected warhead-tier total."
 			},
@@ -795,6 +800,12 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 				effects: [{ type: "grantFreighters", n: 5 }],
 				summary: "Adds five hulls to the empire freighter pool. Each hull hauls 1 food. Five hulls move one person. One hull moves one ground unit. 1 money if any hulls haul food, people, or troops this turn."
 			},
+			exportSale: {
+				id: "exportSale", name: "Export Sale", kind: "abstract",
+				cost: { industry: 1 },
+				effects: [{ type: "sellIndustryPool" }],
+				summary: "Sells this world's stored industry for money, one for one. Completes with 1 industry, then dumps the rest of the pool."
+			},
 			spindelNavigators: {
 				id: "spindelNavigators", name: "Spindel Navigators (×5)", kind: "abstract",
 				cost: { industry: 50 }, upkeep: 1, requireCultureEffect: "spindelWeb",
@@ -1007,7 +1018,7 @@ Space4x.SETTINGS["scratch-empire"] = (function () {
 			tech("ex8", "Hyperdense Matter", "exoticMaterials", 8, [{ type: "stub", n: 1 }], "Placeholder tier-8 exotic materials tech."),
 			tech("ro0rf", "Robo Factories", "robotics", 0, [{ type: "unlockBuild", id: "roboticFactory" }, { type: "unlockLoad", id: "fighterBay" }], "Automated shops. Unlocks the Robotic factory: each building gives +2 industry to one Industry worker. Unlocks fighter bays."),
 			tech("ro1at", "Auto-transport", "robotics", 1, [{ type: "unlockBuild", id: "autoTransport" }], "Unlocks Auto-transport network: unique 100-industry building, upkeep 2. Each Industry worker on that world produces +1 industry."),
-			tech("ro1ar", "Auto Repair", "robotics", 1, [{ type: "unlockLoad", id: "autoRepair" }], "Unlocks Auto Repair as a ship device. Effect still a stub."),
+			tech("ro1ar", "Auto Repair", "robotics", 1, [{ type: "unlockLoad", id: "autoRepair" }], "Unlocks Auto Repair: one per hull. Repairs 5% of structure+armor at the start of each combat turn (structure first)."),
 			tech("ro1dr", "Drones", "robotics", 1, [{ type: "troopArmorPct", tags: ["Infantry", "Armor", "Air", "Police", "Defensive"], pct: 20 }], "+20% troop strength for non-melee units."),
 			tech("ro2ms", "Mass Surveillance", "robotics", 2, [{ type: "unlockBuild", id: "surveillanceCenter" }], "Unlocks Surveillance center: unique 100-industry building, upkeep 2. +20 settlement loyalty."),
 			tech("ro2at", "Auto Targeter", "robotics", 2, [{ type: "unlockLoad", id: "autoTargeter" }], "Unlocks Auto Targeter (beam fire-control stub)."),
