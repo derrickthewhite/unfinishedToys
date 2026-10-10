@@ -27,9 +27,25 @@ DE.factionName = function (state, species, used) {
 };
 
 DE.leaderName = function (state, used) {
-	var a = DE.rngPick(state, DE.LEADER_FIRST);
-	var b = DE.rngPick(state, DE.LEADER_SECOND);
-	return DE.uniqueName(state, [a, b], used);
+	return DE.unitName(state, "human", used);
+};
+
+DE.unitNameLists = function (species) {
+	var table = DE.UNIT_NAMES || {};
+	var pack = table[species];
+	if (!pack || !pack.first || !pack.first.length) pack = table.human;
+	if (!pack || !pack.first || !pack.first.length) {
+		return { first: DE.LEADER_FIRST, second: DE.LEADER_SECOND };
+	}
+	return pack;
+};
+
+DE.unitName = function (state, species, used) {
+	var pack = DE.unitNameLists(species);
+	var a = DE.rngPick(state, pack.first);
+	var second = pack.second && pack.second.length ? DE.rngPick(state, pack.second) : "";
+	var parts = second ? [a, second] : [a];
+	return DE.uniqueName(state, parts, used);
 };
 
 DE.villageName = function (state, used) {

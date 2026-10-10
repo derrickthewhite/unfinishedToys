@@ -668,6 +668,8 @@ function startRound() {
 }
 
 function startInitialGame() {
+  resumeSharedAudio();
+
   const setupValues = readSetupValues();
   selectedRoundCount = setupValues.roundCount;
   applyLevelSettings(setupValues.level);
@@ -684,6 +686,8 @@ function startInitialGame() {
 }
 
 function startNextRound() {
+  resumeSharedAudio();
+
   if (!activeChallenge) {
     activeChallenge = createChallengeFromSetup();
   }
@@ -710,10 +714,40 @@ function endRound(title, message, buttonLabel, action, options = {}) {
   setOverlay(title, message, buttonLabel, action, options);
 }
 
+let sharedAudioContext = null;
+
+function getSharedAudioContext() {
+  const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextCtor) {
+    return null;
+  }
+
+  if (!sharedAudioContext || sharedAudioContext.state === "closed") {
+    sharedAudioContext = new AudioContextCtor();
+  }
+
+  return sharedAudioContext;
+}
+
+function resumeSharedAudio() {
+  const audioCtx = getSharedAudioContext();
+  if (!audioCtx) {
+    return null;
+  }
+
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume().catch(() => {});
+  }
+
+  return audioCtx;
+}
+
 function handleAnswer(answer) {
   if (gameState !== "playing" || cooldown) {
     return;
   }
+
+  resumeSharedAudio();
 
   const target = asteroids.find((asteroid) => !asteroid.destroyed && asteroid.problem.answer === answer);
   if (target) {
@@ -739,7 +773,11 @@ function handleAnswer(answer) {
 }
 
 function playLaserSound() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioCtx = resumeSharedAudio();
+  if (!audioCtx) {
+    return;
+  }
+
   const oscillator = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
 
@@ -758,7 +796,11 @@ function playLaserSound() {
 }
 
 function playLaserMissSound() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioCtx = resumeSharedAudio();
+  if (!audioCtx) {
+    return;
+  }
+
   const oscillator = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
 
@@ -777,7 +819,11 @@ function playLaserMissSound() {
 }
 
 function playBuildingCollapseSound() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioCtx = resumeSharedAudio();
+  if (!audioCtx) {
+    return;
+  }
+
   const now = audioCtx.currentTime;
   const duration = 2;
   const bufferSize = audioCtx.sampleRate * duration;
@@ -825,7 +871,11 @@ function playBuildingCollapseSound() {
 }
 
 function playVictorySong() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioCtx = resumeSharedAudio();
+  if (!audioCtx) {
+    return;
+  }
+
   const now = audioCtx.currentTime;
   const melody = [
     { note: 523.25, duration: 0.3 },
@@ -856,7 +906,11 @@ function playVictorySong() {
 }
 
 function playDefeatSong() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const audioCtx = resumeSharedAudio();
+  if (!audioCtx) {
+    return;
+  }
+
   const now = audioCtx.currentTime;
   const melody = [
     { note: 880, duration: 0.3 },

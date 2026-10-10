@@ -1,0 +1,33 @@
+PLANET BROKER
+Manage an interplanetary empire by buying, building up, and defending planets.
+
+PLANET COSTS
+Compensating:
+
+Gear
+
+Medicine
+
+Buildings
+Settler's comfort / morale
+Quarantine
+
+POPULATION
+Soldiers, Farmers, Miners, Workers, Researchers, Educators, Cultural, Service
+
+SPACE INFRASTRUCTURE
+Fighters, Freighters, Shuttles
+
+PLANET INFRASTRUCTURE
+Stations, Space Elevators, Orbital Rings, Farms, Mines, Factories, Fortifications, Transport, Jump Beacon
+
+PLANET STATS
+Gravity, Pressure, Season length, Oxygen, Contaminants*, Temperature (amino acids / biosphere), DNA / MRL / ABC / UGC, Predator / Pest / Parasite, Protein: Chirality / hydrophobic / charged / reactive
+
+MINE TYPES
+Organic, Silicate, Structural, Rare (x10?), Ultra-Rare (x20) (Planet specific?)
+
+QUESTIONS & LOGISTICS
+What do you trade? Chips (Barter only?)
+What do you ship? Organics, silicates, structural, rare, food, chips?, mines*, factories*
+Factory Level / Mine Status: Powered, Automated, Auto-maintained

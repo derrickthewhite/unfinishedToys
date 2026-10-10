@@ -1,5 +1,34 @@
 var DE = DE || {};
 
+DE.CIVILIAN_ASSAULT_CV = 2;
+DE.SITE_ASSAULT_BONUS = 0.5;
+
+DE.civilianCount = function (units) {
+	var n = 0;
+	var list = units || [];
+	for (var i = 0; i < list.length; i++) {
+		if (!list[i] || list[i].dead || list[i].wounded) continue;
+		if (list[i].type === "civilian") n++;
+	}
+	return n;
+};
+
+DE.civilianFightValue = function (units) {
+	return DE.civilianCount(units) * DE.CIVILIAN_ASSAULT_CV;
+};
+
+DE.combatSideOpts = function (encounter, playerAct, aiAct, side) {
+	var pA = DE.actionClass(playerAct) === "assault";
+	var aA = DE.actionClass(aiAct) === "assault";
+	var garrison = (side === "player" && encounter && encounter.campRaid) ||
+		(side === "ai" && encounter && encounter.village);
+	var opponentAssault = side === "player" ? aA : pA;
+	return {
+		civiliansFight: !!(garrison && opponentAssault),
+		siteBonus: !!(garrison && opponentAssault)
+	};
+};
+
 DE.hasFlag = function (units, flag) {
 	var list = DE.fightingUnits(units);
 	for (var i = 0; i < list.length; i++) {
@@ -17,43 +46,29 @@ DE.sideHasMage = function (units) {
 	return false;
 };
 
-DE.applyMindMages = function (state, sideA, sideB) {
-	function stealCount(units) {
-		var n = 0;
-		var list = DE.fightingUnits(units);
-		for (var i = 0; i < list.length; i++) {
-			var def = DE.unitDef(list[i].type);
-			if (def && def.flags && def.flags.mindMage) n++;
-		}
-		return n;
+DE.mindMageCount = function (units) {
+	var n = 0;
+	var list = DE.fightingUnits(units);
+	for (var i = 0; i < list.length; i++) {
+		var def = DE.unitDef(list[i].type);
+		if (def && def.flags && def.flags.mindMage) n++;
 	}
-	function stealFrom(src, dest, n) {
-		var taken = [];
-		for (var i = 0; i < n; i++) {
-			var pool = [];
-			for (var j = 0; j < src.length; j++) {
-				if (!src[j].dead && !src[j].wounded && !DE.isMageType(src[j].type)) pool.push(src[j]);
-			}
-			if (!pool.length) {
-				for (var k = 0; k < src.length; k++) {
-					if (!src[k].dead && !src[k].wounded) pool.push(src[k]);
-				}
-			}
-			if (!pool.length) break;
-			var u = DE.rngPick(state, pool);
-			u.factionId = dest.length && dest[0].factionId ? dest[0].factionId : u.factionId;
-			taken.push(u);
-			var idx = src.indexOf(u);
-			if (idx >= 0) src.splice(idx, 1);
-			dest.push(u);
-		}
-		return taken;
-	}
-	var aN = stealCount(sideA);
-	var bN = stealCount(sideB);
-	var stolenByA = stealFrom(sideB, sideA, aN);
-	var stolenByB = stealFrom(sideA, sideB, bN);
-	return { stolenByA: stolenByA, stolenByB: stolenByB };
+	return n;
+};
+
+/* Each mind mage moves up to 10 CV from the enemy side to its own (capped by enemy raw CV). */
+DE.mindMageTransfer = function (ownUnits, enemyUnits, ownRaw, enemyRaw) {
+	var ownMM = DE.mindMageCount(ownUnits);
+	var enemyMM = DE.mindMageCount(enemyUnits);
+	var stealOwn = Math.min(10 * ownMM, Math.max(0, enemyRaw));
+	var stealEnemy = Math.min(10 * enemyMM, Math.max(0, ownRaw));
+	return {
+		ownMages: ownMM,
+		enemyMages: enemyMM,
+		gained: stealOwn,
+		lost: stealEnemy,
+		delta: stealOwn - stealEnemy
+	};
 };
 
 DE.rangedShare = function (units) {
@@ -72,7 +87,8 @@ DE.rangedShare = function (units) {
 	return ranged / combat;
 };
 
-DE.unitContribution = function (unit, ownUnits, enemyUnits, state) {
+DE.unitContribution = function (unit, ownUnits, enemyUnits, state, opts) {
+	opts = opts || {};
 	var def = DE.unitDef(unit.type);
 	if (!def || unit.dead || unit.wounded) return 0;
 	if (def.role === "civilian") return 0;
@@ -91,17 +107,26 @@ DE.unitContribution = function (unit, ownUnits, enemyUnits, state) {
 		else if (share >= 0.5) v = 5;
 		else v = 2;
 	}
-	if (!mixed && def.role === "melee") {
+	var mKey = DE.monsterKeyForUnit(unit);
+	if (mKey) v += DE.monsterTrueWorthBonus(state, mKey);
+	if (!mixed && def.role === "melee" && !(def.flags && def.flags.skeleton) && !(def.flags && def.flags.ooze)) {
 		if (ownEarth) v = v * 2;
 		if (enemyMG) v = 0;
 		if (enemySpider) v = v * 0.5;
 	}
+	if (def.flags && def.flags.skeleton) {
+		if (ownEarth) v = v * 2;
+		if (enemySpider) v = v * 0.5;
+	}
 	if (!mixed && def.role === "ranged") {
+		if (def.flags && def.flags.ranger) {
+			/* Stub: rangers later counter extra monster abilities. */
+		}
 		if (enemyOoze) v = 0;
 		else if (enemyTunnel) v = v * 0.5;
 	}
 	if (unit.foreignWeapons) v = v * 0.8;
-	if (DE.monsterKeyForUnit(unit) && !DE.isMonsterKnown(state, DE.monsterKeyForUnit(unit))) {
+	if (!opts.skipUnknownMonsterBonus && mKey && !DE.isMonsterKnown(state, mKey)) {
 		v = v * 1.5;
 	}
 	return v;
@@ -123,10 +148,34 @@ DE.isMonsterKnown = function (state, key) {
 	return !!state.player.knownMonsters[key];
 };
 
+DE.monsterIsIntelligent = function (state, key) {
+	if (!key || !state || !state.factions) return false;
+	for (var i = 0; i < state.factions.length; i++) {
+		var f = state.factions[i];
+		if (f.kind === "loner" && f.monsterType === key) return true;
+	}
+	return false;
+};
+
+DE.monsterTrueWorthBonus = function (state, key) {
+	if (!key || key === "undead") return 0;
+	if (!state) return 0;
+	var bonus = Number(state.monsterCvBump) || 0;
+	if (DE.monsterIsIntelligent(state, key)) bonus += Number(state.intelligentCvBump) || 0;
+	return bonus;
+};
+
+DE.formatMonsterAdvice = function (state, key) {
+	var label = DE.SPECIES_LABELS[key] || key;
+	return label + (DE.monsterIsIntelligent(state, key) ? " (intelligent)" : " (not intelligent)");
+};
+
 DE.markMonsterKnown = function (state, key) {
 	if (!key || !state || !state.player) return;
 	state.player.knownMonsters = state.player.knownMonsters || {};
-	state.player.knownMonsters[key] = true;
+	state.player.knownMonsters[key] = {
+		intelligent: DE.monsterIsIntelligent(state, key)
+	};
 };
 
 DE.markMonstersKnownFromUnits = function (state, units) {
@@ -137,12 +186,11 @@ DE.markMonstersKnownFromUnits = function (state, units) {
 	}
 };
 
-DE.sideStrength = function (units, enemyUnits, state) {
+DE.rawSideStrength = function (units, enemyUnits, state) {
 	var list = DE.fightingUnits(units);
 	var sum = 0;
 	var maxUnitWorth = 0;
 	var hasHealer = false;
-	var hasIllusionist = DE.hasFlag(units, "illusionist") && !DE.hasFlag(enemyUnits, "spider");
 	for (var i = 0; i < list.length; i++) {
 		var def = DE.unitDef(list[i].type);
 		var c = DE.unitContribution(list[i], units, enemyUnits, state);
@@ -155,12 +203,53 @@ DE.sideStrength = function (units, enemyUnits, state) {
 		}
 	}
 	if (hasHealer) sum += maxUnitWorth;
+	return sum;
+};
+
+DE.sideStrength = function (units, enemyUnits, state, opts) {
+	opts = opts || {};
+	var ownRaw = DE.rawSideStrength(units, enemyUnits, state);
+	var enemyRaw = DE.rawSideStrength(enemyUnits, units, state);
+	var mind = DE.mindMageTransfer(units, enemyUnits, ownRaw, enemyRaw);
+	var sum = ownRaw + mind.delta;
+	var hasIllusionist = DE.hasFlag(units, "illusionist") && !DE.hasFlag(enemyUnits, "spider");
 	if (hasIllusionist) sum = sum * 1.5;
+	if (state && state.mission && units === state.mission.party) {
+		sum *= (1 - DE.hungerPenalty(state));
+	}
+	if (opts.civiliansFight) sum += DE.civilianFightValue(units);
+	if (opts.siteBonus) sum *= (1 + DE.SITE_ASSAULT_BONUS);
 	return sum;
 };
 
 DE.ghostWins = function (units, enemyUnits) {
 	return DE.hasFlag(units, "ghost") && !DE.sideHasMage(enemyUnits);
+};
+
+DE.fearWidthFromUnits = function (ownUnits, enemyUnits) {
+	var swing = DE.hasFlag(ownUnits, "illusionist") || DE.hasFlag(enemyUnits, "illusionist") ||
+		DE.hasFlag(ownUnits, "ghost") || DE.hasFlag(enemyUnits, "ghost") ||
+		DE.fightingUnits(ownUnits).some(function (u) { var d = DE.unitDef(u.type); return d && d.kind === "monster"; }) ||
+		DE.fightingUnits(enemyUnits).some(function (u) { var d = DE.unitDef(u.type); return d && d.kind === "monster"; }) ||
+		DE.sideHasMage(ownUnits) || DE.sideHasMage(enemyUnits);
+	return swing ? 0.3 : 0.15;
+};
+
+DE.fearFromCvPair = function (own, enemy, leader, width) {
+	var pWin;
+	if (own <= 0 && enemy <= 0) pWin = 0.5;
+	else if (own <= 0) pWin = 0.02;
+	else if (enemy <= 0) pWin = 0.98;
+	else {
+		var lr = Math.log(own / enemy);
+		pWin = 1 / (1 + Math.exp(-3 * lr));
+	}
+	var center = 1 - pWin;
+	if (leader && leader.deltaFear) center += leader.deltaFear;
+	center = DE.clamp(center, 0, 1);
+	var lo = DE.clamp(center - width / 2, 0, 1);
+	var hi = DE.clamp(center + width / 2, 0, 1);
+	return { lo: lo, hi: hi, center: (lo + hi) / 2, width: hi - lo, own: own, enemy: enemy };
 };
 
 DE.fearFromStrength = function (ownUnits, enemyUnits, leader, state) {
@@ -173,26 +262,164 @@ DE.fearFromStrength = function (ownUnits, enemyUnits, leader, state) {
 		own = Math.max(own, 1);
 		enemy = 0;
 	}
-	var pWin;
-	if (own <= 0 && enemy <= 0) pWin = 0.5;
-	else if (own <= 0) pWin = 0.02;
-	else if (enemy <= 0) pWin = 0.98;
-	else {
-		var lr = Math.log(own / enemy);
-		pWin = 1 / (1 + Math.exp(-3 * lr));
+	return DE.fearFromCvPair(own, enemy, leader, DE.fearWidthFromUnits(ownUnits, enemyUnits));
+};
+
+DE.UNKNOWN_SPECIAL_CV = 15;
+DE.UNKNOWN_MONSTER_CV = 60;
+DE.UNKNOWN_SMALL_CV = 5;
+
+DE.isPlayerObserver = function (state, observer) {
+	if (!observer) return false;
+	if (observer === "player") return true;
+	if (state && observer === state.player) return true;
+	return observer.kind === "player" || observer.id === "player";
+};
+
+DE.observerOwnsUnit = function (observer, unit) {
+	if (!observer || !unit) return false;
+	var oid = null;
+	if (observer === "player" || observer.kind === "player" || observer.id === "player") oid = "player";
+	else if (observer.id) oid = observer.id;
+	return !!(oid && unit.factionId === oid);
+};
+
+DE.unitInHomeList = function (unit, homeUnits) {
+	if (!unit || !homeUnits) return false;
+	for (var i = 0; i < homeUnits.length; i++) {
+		if (homeUnits[i] === unit) return true;
+		if (unit.id && homeUnits[i] && homeUnits[i].id === unit.id) return true;
 	}
-	var center = 1 - pWin;
-	if (leader && leader.deltaFear) center += leader.deltaFear;
-	center = DE.clamp(center, 0, 1);
-	var swing = DE.hasFlag(ownUnits, "illusionist") || DE.hasFlag(enemyUnits, "illusionist") ||
-		DE.hasFlag(ownUnits, "ghost") || DE.hasFlag(enemyUnits, "ghost") ||
-		DE.fightingUnits(ownUnits).some(function (u) { var d = DE.unitDef(u.type); return d && d.kind === "monster"; }) ||
-		DE.fightingUnits(enemyUnits).some(function (u) { var d = DE.unitDef(u.type); return d && d.kind === "monster"; }) ||
-		DE.sideHasMage(ownUnits) || DE.sideHasMage(enemyUnits);
-	var width = swing ? 0.3 : 0.15;
-	var lo = DE.clamp(center - width / 2, 0, 1);
-	var hi = DE.clamp(center + width / 2, 0, 1);
-	return { lo: lo, hi: hi, center: (lo + hi) / 2, width: hi - lo, own: own, enemy: enemy };
+	return false;
+};
+
+DE.unknownUnitEstimate = function (def) {
+	if (!def || def.role === "civilian") return 0;
+	if (def.monster || def.undead) return DE.UNKNOWN_MONSTER_CV;
+	if (def.kind === "special" || (def.flags && def.flags.ranger)) return DE.UNKNOWN_SPECIAL_CV;
+	return DE.UNKNOWN_SMALL_CV;
+};
+
+DE.observerKnowsUnitType = function (state, observer, type) {
+	if (!type) return false;
+	var def = DE.unitDef(type);
+	var mKey = null;
+	if (def) {
+		if (def.undead) mKey = "undead";
+		else if (def.monster) mKey = type;
+	}
+	if (DE.isPlayerObserver(state, observer)) {
+		if (mKey) return DE.isMonsterKnown(state, mKey);
+		return DE.hasFacedType(state, type);
+	}
+	if (!observer) return false;
+	if (mKey) return false;
+	if (typeof DE.factionKnowsHumanType === "function") return DE.factionKnowsHumanType(observer, type);
+	return !!(observer.knownHumanTypes && observer.knownHumanTypes[type]);
+};
+
+DE.observerKnowsUnit = function (state, observer, unit, homeUnits) {
+	if (!unit) return false;
+	if (unit.type === "civilian") return true;
+	if (DE.observerOwnsUnit(observer, unit) || DE.unitInHomeList(unit, homeUnits)) return true;
+	return DE.observerKnowsUnitType(state, observer, unit.type);
+};
+
+DE.knownUnitsForObserver = function (units, state, observer, homeUnits) {
+	var list = units || [];
+	var out = [];
+	for (var i = 0; i < list.length; i++) {
+		if (DE.observerKnowsUnit(state, observer, list[i], homeUnits)) out.push(list[i]);
+	}
+	return out;
+};
+
+DE.sideHasUnknownForObserver = function (units, state, observer, homeUnits) {
+	var list = DE.fightingUnits(units);
+	for (var i = 0; i < list.length; i++) {
+		var def = DE.unitDef(list[i].type);
+		if (!def || def.role === "civilian") continue;
+		if (!DE.observerKnowsUnit(state, observer, list[i], homeUnits)) return true;
+	}
+	return false;
+};
+
+DE.perceivedUnitContribution = function (unit, ownUnits, enemyUnits, state, observer, homeUnits) {
+	var def = DE.unitDef(unit.type);
+	if (!def || unit.dead || unit.wounded) return 0;
+	if (def.role === "civilian") return 0;
+	if (!DE.observerKnowsUnit(state, observer, unit, homeUnits)) {
+		return DE.unknownUnitEstimate(def);
+	}
+	var knownOwn = DE.knownUnitsForObserver(ownUnits, state, observer, homeUnits);
+	var knownEnemy = DE.knownUnitsForObserver(enemyUnits, state, observer, homeUnits);
+	return DE.unitContribution(unit, knownOwn, knownEnemy, state, { skipUnknownMonsterBonus: true });
+};
+
+DE.perceivedRawSideStrength = function (units, enemyUnits, state, observer, homeUnits) {
+	var list = DE.fightingUnits(units);
+	var sum = 0;
+	var maxUnitWorth = 0;
+	var hasHealer = false;
+	for (var i = 0; i < list.length; i++) {
+		var u = list[i];
+		var def = DE.unitDef(u.type);
+		var known = DE.observerKnowsUnit(state, observer, u, homeUnits);
+		var c = DE.perceivedUnitContribution(u, units, enemyUnits, state, observer, homeUnits);
+		sum += c;
+		if (known && def && def.flags && def.flags.healer) hasHealer = true;
+		if (known && def && def.worth > maxUnitWorth && !(def.flags && def.flags.healer)) maxUnitWorth = def.worth;
+		if (known && def && def.flags && def.flags.skeleton) {
+			if (c > maxUnitWorth) maxUnitWorth = c;
+		}
+	}
+	if (hasHealer) sum += maxUnitWorth;
+	return sum;
+};
+
+DE.perceivedSideStrength = function (units, enemyUnits, state, observer, homeUnits) {
+	var ownRaw = DE.perceivedRawSideStrength(units, enemyUnits, state, observer, homeUnits);
+	var enemyRaw = DE.perceivedRawSideStrength(enemyUnits, units, state, observer, homeUnits);
+	var knownOwn = DE.knownUnitsForObserver(units, state, observer, homeUnits);
+	var knownEnemy = DE.knownUnitsForObserver(enemyUnits, state, observer, homeUnits);
+	var mind = DE.mindMageTransfer(knownOwn, knownEnemy, ownRaw, enemyRaw);
+	var sum = ownRaw + mind.delta;
+	var hasIllusionist = DE.hasFlag(knownOwn, "illusionist") && !DE.hasFlag(knownEnemy, "spider");
+	if (hasIllusionist) sum = sum * 1.5;
+	if (state && state.mission && units === state.mission.party) {
+		sum *= (1 - DE.hungerPenalty(state));
+	}
+	return sum;
+};
+
+DE.perceivedGhostWins = function (units, enemyUnits, state, observer, homeUnits) {
+	var knownOwn = DE.knownUnitsForObserver(units, state, observer, homeUnits);
+	var knownEnemy = DE.knownUnitsForObserver(enemyUnits, state, observer, homeUnits);
+	return DE.ghostWins(knownOwn, knownEnemy);
+};
+
+DE.formatPerceivedCv = function (value, uncertain) {
+	var n = Math.round(Number(value) || 0);
+	return uncertain ? n + " +??" : String(n);
+};
+
+DE.perceivedFearFromStrength = function (ownUnits, enemyUnits, leader, state, observer) {
+	var homeUnits = ownUnits;
+	var own = DE.perceivedSideStrength(ownUnits, enemyUnits, state, observer, homeUnits);
+	var enemy = DE.perceivedSideStrength(enemyUnits, ownUnits, state, observer, homeUnits);
+	if (DE.perceivedGhostWins(enemyUnits, ownUnits, state, observer, homeUnits) &&
+		!DE.perceivedGhostWins(ownUnits, enemyUnits, state, observer, homeUnits)) {
+		own = 0;
+		enemy = Math.max(enemy, 1);
+	} else if (DE.perceivedGhostWins(ownUnits, enemyUnits, state, observer, homeUnits) &&
+		!DE.perceivedGhostWins(enemyUnits, ownUnits, state, observer, homeUnits)) {
+		own = Math.max(own, 1);
+		enemy = 0;
+	}
+	var fear = DE.fearFromCvPair(own, enemy, leader, DE.fearWidthFromUnits(ownUnits, enemyUnits));
+	fear.uncertainOwn = DE.sideHasUnknownForObserver(ownUnits, state, observer, homeUnits);
+	fear.uncertainEnemy = DE.sideHasUnknownForObserver(enemyUnits, state, observer, homeUnits);
+	return fear;
 };
 
 DE.casualtyCost = function (unit) {
@@ -200,12 +427,15 @@ DE.casualtyCost = function (unit) {
 	return def ? def.casualty : 5;
 };
 
-DE.pickCasualties = function (state, units, budget, preferIds) {
+DE.pickCasualties = function (state, units, budget, preferIds, opts) {
+	opts = opts || {};
 	var remaining = budget;
 	var picked = [];
 	var pool = [];
 	for (var i = 0; i < units.length; i++) {
-		if (!units[i].dead && !units[i].wounded) pool.push(units[i]);
+		if (!units[i] || units[i].dead) continue;
+		if (opts.skipCivilians && units[i].type === "civilian") continue;
+		pool.push(units[i]);
 	}
 	function take(u) {
 		picked.push(u);
@@ -231,6 +461,11 @@ DE.pickCasualties = function (state, units, budget, preferIds) {
 };
 
 DE.applyCasualtyFate = function (state, unit, winner) {
+	if (unit.wounded) {
+		unit.dead = true;
+		unit.wounded = false;
+		return "dead";
+	}
 	var deadChance = winner ? 0.2 : 0.5;
 	if (DE.rngNext(state) < deadChance) {
 		unit.dead = true;
@@ -241,7 +476,9 @@ DE.applyCasualtyFate = function (state, unit, winner) {
 	return "wounded";
 };
 
-DE.healSide = function (units) {
+DE.healSide = function (units, opts) {
+	opts = opts || {};
+	units = units || [];
 	var has = false;
 	for (var i = 0; i < units.length; i++) {
 		if (units[i].dead) continue;
@@ -251,6 +488,7 @@ DE.healSide = function (units) {
 	if (!has) return 0;
 	var n = 0;
 	for (var j = 0; j < units.length; j++) {
+		if (opts.skipPlayer && DE.isPlayerControlledUnit(units[j])) continue;
 		if (units[j].wounded && !units[j].dead) {
 			units[j].wounded = false;
 			n++;
@@ -263,9 +501,14 @@ DE.resolveBattle = function (state, playerUnits, aiUnits, opts) {
 	opts = opts || {};
 	var player = playerUnits;
 	var ai = aiUnits;
-	var stolen = DE.applyMindMages(state, player, ai);
-	var pStr = DE.sideStrength(player, ai, state);
-	var aStr = DE.sideStrength(ai, player, state);
+	var pOpts = opts.playerCombat || DE.combatSideOpts(opts.encounter, opts.playerAction, opts.aiAction, "player");
+	var aOpts = opts.aiCombat || DE.combatSideOpts(opts.encounter, opts.playerAction, opts.aiAction, "ai");
+	var pRaw = DE.rawSideStrength(player, ai, state);
+	var aRaw = DE.rawSideStrength(ai, player, state);
+	var mindP = DE.mindMageTransfer(player, ai, pRaw, aRaw);
+	var mindA = DE.mindMageTransfer(ai, player, aRaw, pRaw);
+	var pStr = DE.sideStrength(player, ai, state, pOpts);
+	var aStr = DE.sideStrength(ai, player, state, aOpts);
 	var ghostP = DE.ghostWins(player, ai);
 	var ghostA = DE.ghostWins(ai, player);
 	var pVar = opts.playerVariance != null ? opts.playerVariance : DE.rngRange(state, 0.8, 1.2);
@@ -301,8 +544,12 @@ DE.resolveBattle = function (state, playerUnits, aiUnits, opts) {
 	var aBudget = pStr * aRate;
 	var preferP = opts.preferPlayerIds || [];
 	var preferA = opts.preferAiIds || [];
-	var pHit = DE.pickCasualties(state, player, pBudget, preferP);
-	var aHit = DE.pickCasualties(state, ai, aBudget, preferA);
+	var pHit = DE.pickCasualties(state, player, pBudget, preferP, {
+		skipCivilians: DE.actionClass(opts.aiAction) !== "assault"
+	});
+	var aHit = DE.pickCasualties(state, ai, aBudget, preferA, {
+		skipCivilians: DE.actionClass(opts.playerAction) !== "assault"
+	});
 	var pFate = [];
 	var aFate = [];
 	for (var i = 0; i < pHit.units.length; i++) {
@@ -331,7 +578,8 @@ DE.resolveBattle = function (state, playerUnits, aiUnits, opts) {
 		aiBudget: aBudget,
 		playerCasualties: pFate,
 		aiCasualties: aFate,
-		stolen: stolen,
+		mindTransfer: { player: mindP, ai: mindA },
+		stolen: { stolenByA: [], stolenByB: [] },
 		healedPlayer: healP,
 		healedAi: healA,
 		display: !!opts.display
@@ -355,6 +603,17 @@ DE.strengthBreakdown = function (units, enemyUnits, state) {
 			count: g.count,
 			type: g.type,
 			subtotal: sub
+		});
+	}
+	var ownRaw = DE.rawSideStrength(units, enemyUnits, state);
+	var enemyRaw = DE.rawSideStrength(enemyUnits, units, state);
+	var mind = DE.mindMageTransfer(units, enemyUnits, ownRaw, enemyRaw);
+	if (mind.delta) {
+		rows.push({
+			label: mind.delta > 0 ? "Mind Mage (+CV)" : "Mind Mage (−CV)",
+			count: mind.ownMages || mind.enemyMages,
+			type: "mindMage",
+			subtotal: mind.delta
 		});
 	}
 	return { total: DE.sideStrength(units, enemyUnits, state), rows: rows };
@@ -385,11 +644,13 @@ DE.logCombatMath = function (playerUnits, aiUnits, result, state) {
 	console.log(msg);
 };
 
-DE.weaponDropsFromFates = function (units, fates) {
+DE.weaponDropsFromFates = function (units, fates, skipIds) {
 	var drops = [];
 	fates = fates || [];
+	skipIds = skipIds || {};
 	for (var i = 0; i < fates.length; i++) {
 		if (fates[i].fate !== "dead") continue;
+		if (skipIds[fates[i].id]) continue;
 		var u = null;
 		for (var j = 0; j < units.length; j++) {
 			if (units[j].id === fates[i].id) {
@@ -405,5 +666,7 @@ DE.weaponDropsFromFates = function (units, fates) {
 DE.addWeaponDrops = function (stuff, drops) {
 	if (!stuff || !drops || !drops.length) return;
 	stuff.weapons = stuff.weapons || [];
-	for (var i = 0; i < drops.length; i++) stuff.weapons.push(drops[i]);
+	for (var i = 0; i < drops.length; i++) {
+		if (DE.isWeaponKitType(drops[i])) stuff.weapons.push(drops[i]);
+	}
 };

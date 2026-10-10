@@ -1,0 +1,56 @@
+Polity
+- Economy ? 100
+- War ? 100
+- Luxury ? 100
+- Prestige ? 100
+- Identity
+
+Dispute
+Truthfulness [2d6 - 2x10]%
+Truth     Boolean from T
+Demand
+  Gain [1d6] [R Quality]
+  Loose [Gain - 2+d3] [75% G | R Quality]
+Importance | 7 - 2d6 |
+
+NPC Leader
+- Good will
+- Perceived Fairness
+- Fear
+
+On Resolution:
+Fairness += (Base + Bias) * Importance
+  Bias is 1.5 if you rule for them
+          +1 if you loose
+Good will += Importance
+Truth to Fairness
+
+Value  Fairness
+0      -5
+1      -4
+2      -3
+3      -2
+4      -1
+5       0
+6       5
+7       4
+8       3
+9       2
+10      1
+
+Event
+[+/-] [1d6] [R Quality]
+OR Dispute
+
+Raid
+Score = A War / A war + B war
+Roll score x3
+Roll 2d6 per hit,
+winner looses higher in war
+looser looses lower in war
+Loot Max (d6, d6) + loose min(d6, d6)
+add a target per hit
+
+Treaty
++1 on truth for 2 sets
+Trade
