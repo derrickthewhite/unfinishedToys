@@ -65,7 +65,7 @@ document.getElementById("noEdit").addEventListener("click", () => {
 });
 
 document.getElementById("takeTurn").addEventListener("click", () => {
-	console.log("next unit!");
+	advanceTurn();
 });
 
 document.getElementById("edit").addEventListener("click", () => {
@@ -125,11 +125,7 @@ function displayUnit(unit) {
 	`).join("");
 	defenseDisplay.style.display = "block";
 	
-	if(unit == activeUnit) {
-		
-		document.getElementById("activeUnitImage").style.backgroundImage = `url('${unit.image.src}')`;;
-		setManueverOptions(["do nothing","attack","move","move and attack","ready", "concentrate","ready", "all-out-attack", "all-out-defense"]);
-	}
+	showActiveUnitActions();
 }
 
 document.getElementById("maneuverDropdown").addEventListener("change", event => {
@@ -180,6 +176,19 @@ document.getElementById("maneuverDropdown").addEventListener("change", event => 
 	} else {
 		console.log("manuever not recognized!", value);
 	}
+	updateTakeActionButton();
+});
+
+document.getElementById("submaneuverDropdown").addEventListener("change", updateTakeActionButton);
+document.getElementById("weaponDropdown").addEventListener("change", updateTakeActionButton);
+document.getElementById("takeAction").addEventListener("click", takeAction);
+document.getElementById("hexChoiceMove").addEventListener("click", event => {
+	event.stopPropagation();
+	chooseHexMark("move");
+});
+document.getElementById("hexChoiceTarget").addEventListener("click", event => {
+	event.stopPropagation();
+	chooseHexMark("target");
 });
 
 function clearUnitDisplay() {

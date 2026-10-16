@@ -21,6 +21,7 @@ for (let q = -10; q <= 10; q++) {
         }
     }
 }
+const hexKeys = new Set(hexGrid.map(h => `${h.q},${h.r}`));
 
 // Function to load images with callback
 function loadImage(src, callback) {
@@ -50,9 +51,7 @@ for (const key in terrainData) {
     });
 }
 
-function drawHex(x, y, color = "black", width = 1) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
+function traceHex(x, y) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         const angle = Math.PI / 3 * i;
@@ -62,7 +61,19 @@ function drawHex(x, y, color = "black", width = 1) {
         else ctx.lineTo(px, py);
     }
     ctx.closePath();
+}
+
+function drawHex(x, y, color = "black", width = 1) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    traceHex(x, y);
     ctx.stroke();
+}
+
+function fillHex(x, y, color) {
+    ctx.fillStyle = color;
+    traceHex(x, y);
+    ctx.fill();
 }
 
 function drawUnits() {
@@ -83,33 +94,135 @@ function drawTerrain() {
     }
 }
 
+function highlightActiveUnit() {
+    if (!activeUnit || !units.includes(activeUnit)) return;
+    const hex = hexGrid.find(h => h.q === activeUnit.q && h.r === activeUnit.r);
+    if (!hex) return;
+    fillHex(hex.x, hex.y, "#b3e0ff");
+    drawHex(hex.x, hex.y, "#7eb6e6", 2);
+}
+
+function drawArrow(x1, y1, x2, y2, color = "#16324f") {
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const headLength = 16;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "white";
+    ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(
+        x2 - headLength * Math.cos(angle - Math.PI / 7),
+        y2 - headLength * Math.sin(angle - Math.PI / 7)
+    );
+    ctx.lineTo(
+        x2 - headLength * Math.cos(angle + Math.PI / 7),
+        y2 - headLength * Math.sin(angle + Math.PI / 7)
+    );
+    ctx.closePath();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "white";
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawDistanceLabel(x, y, text) {
+    ctx.save();
+    ctx.font = "bold 22px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const width = ctx.measureText(text).width + 16;
+    const height = 30;
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "#16324f";
+    ctx.lineWidth = 2;
+    ctx.fillRect(x - width / 2, y - height / 2, width, height);
+    ctx.strokeRect(x - width / 2, y - height / 2, width, height);
+    ctx.fillStyle = "#16324f";
+    ctx.fillText(text, x, y);
+    ctx.restore();
+}
+
+function drawDistanceArrow() {
+    if (!selectedUnit || !hoveredHex || !hoveredHexMessage || editMode) return;
+    const from = hexGrid.find(h => h.q === selectedUnit.q && h.r === selectedUnit.r);
+    if (!from) return;
+    drawArrow(from.x, from.y, hoveredHex.x, hoveredHex.y);
+    const angle = Math.atan2(hoveredHex.y - from.y, hoveredHex.x - from.x);
+    const labelX = hoveredHex.x - Math.sin(angle) * 22;
+    const labelY = hoveredHex.y + Math.cos(angle) * 22;
+    drawDistanceLabel(labelX, labelY, hoveredHexMessage);
+}
+
+function drawPlanFills() {
+    for (const hex of attackHexes) {
+        const spot = hexGrid.find(item => item.q === hex.q && item.r === hex.r);
+        if (!spot) continue;
+        fillHex(spot.x, spot.y, "#f4a3a3");
+        drawHex(spot.x, spot.y, "#c0392b", 3);
+    }
+    moveHexes.forEach(hex => {
+        const spot = hexGrid.find(item => item.q === hex.q && item.r === hex.r);
+        if (!spot) return;
+        fillHex(spot.x, spot.y, "#a8e6a8");
+        drawHex(spot.x, spot.y, "#1e8f3e", 3);
+    });
+}
+
+function drawPlanArrows() {
+    if (!activeUnit || !moveHexes.length) return;
+    const points = [];
+    const start = hexGrid.find(item => item.q === activeUnit.q && item.r === activeUnit.r);
+    if (start) points.push(start);
+    moveHexes.forEach(hex => {
+        const spot = hexGrid.find(item => item.q === hex.q && item.r === hex.r);
+        if (spot) points.push(spot);
+    });
+    for (let i = 1; i < points.length; i++) {
+        const from = points[i - 1];
+        const to = points[i];
+        drawArrow(from.x, from.y, to.x, to.y, "#1e8f3e");
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        drawDistanceLabel(to.x - Math.sin(angle) * 22, to.y + Math.cos(angle) * 22, String(i));
+    }
+}
+
 function drawGrid() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (const hex of hexGrid) {
         drawHex(hex.x, hex.y);
     }
     drawTerrain();
+    highlightActiveUnit();
+    drawPlanFills();
     drawUnits();
-    if (lastHex) drawHex(lastHex.x, lastHex.y, "blue", 2);
-    if (secondLastHex) drawHex(secondLastHex.x, secondLastHex.y, "red", 2);
-	if (hoveredHex) {
-		drawHex(hoveredHex.x, hoveredHex.y, "green", 2);
-		if(hoveredHexMessage){
-			ctx.font = "30px ariel"
-            ctx.fillText(hoveredHexMessage, hoveredHex.x, hoveredHex.y);
-		}
-	}
+    if (hoveredHex) drawHex(hoveredHex.x, hoveredHex.y, "#555", 2);
+    drawPlanArrows();
+    drawDistanceArrow();
 }
 
-drawGrid();
-setManueverOptions([],[],[],[],[]);
+startTurns();
 
 function hexDistance(hex1, hex2) {
     return (Math.abs(hex1.q - hex2.q) + Math.abs(hex1.r - hex2.r) + Math.abs(hex1.q + hex1.r - (hex2.q + hex2.r))) / 2;
 }
 
-function pathDistanceAroundTerrain(from, to) {
+function pathDistanceAroundTerrain(from, to, blocked) {
     const key = (q, r) => `${q},${r}`;
+    if (!from || !to || !hexKeys.has(key(to.q, to.r))) return Infinity;
+    if (from.q === to.q && from.r === to.r) return 0;
+
     const directions = [
         { q: +1, r:  0 }, { q: +1, r: -1 }, { q:  0, r: -1 },
         { q: -1, r:  0 }, { q: -1, r: +1 }, { q:  0, r: +1 }
@@ -117,9 +230,14 @@ function pathDistanceAroundTerrain(from, to) {
 
     const terrainMap = {};
     terrain.forEach(t => terrainMap[key(t.q, t.r)] = t.effects || []);
+    if ((terrainMap[key(to.q, to.r)] || []).includes("blocking")) return Infinity;
+    if (blocked && blocked.has(key(to.q, to.r))) return Infinity;
 
     function getCost(q, r) {
-        const effects = terrainMap[key(q, r)] || [];
+        const id = key(q, r);
+        if (!hexKeys.has(id)) return Infinity;
+        if (blocked && blocked.has(id)) return Infinity;
+        const effects = terrainMap[id] || [];
         if (effects.includes("blocking")) return Infinity;
         if (effects.includes("elevated")) return 3;
         if (effects.includes("bad-footing")) return 2;
@@ -144,7 +262,7 @@ function pathDistanceAroundTerrain(from, to) {
             const nq = current.q + d.q;
             const nr = current.r + d.r;
             const nextKey = key(nq, nr);
-            if (visited.has(nextKey)) continue;
+            if (visited.has(nextKey) || !hexKeys.has(nextKey)) continue;
 
             const stepCost = getCost(nq, nr);
             if (stepCost === Infinity) continue;
@@ -174,7 +292,7 @@ canvas.addEventListener("click", (event) => {
     }
     
     if (clickedHex) {
-        trackClick(clickedHex);
+        trackClick(clickedHex, event);
 		if(editMode) editHex(clickedHex);
 		drawGrid(); // Redraw the grid to update highlights
 		const contextMenu = document.getElementById("context-menu")
@@ -184,22 +302,20 @@ canvas.addEventListener("click", (event) => {
 
 canvas.addEventListener("mousemove", (event) => {
 	const { offsetX, offsetY } = event;
-	let hoveredHex = null;
-	
+	let found = null;
+
 	for (const hex of hexGrid) {
         const dx = hex.x - offsetX;
         const dy = hex.y - offsetY;
         if (Math.sqrt(dx * dx + dy * dy) < hexRadius) {
-            hoveredHex = hex;
+            found = hex;
             break;
         }
     }
-	
-	if(hoveredHex) {
-		setHoverHex(hoveredHex);
-	}
-	drawGrid(); // Redraw the grid to update highlights
 
+	if (!found || (hoveredHex && found.q === hoveredHex.q && found.r === hoveredHex.r)) return;
+	setHoverHex(found);
+	drawGrid();
 });
 
 canvas.addEventListener("contextmenu", (event) => {

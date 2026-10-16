@@ -1,6 +1,7 @@
         body {
             margin: 0;
             overflow: hidden;
+            background: white;
         }
         canvas {
             display: block;
@@ -128,6 +129,8 @@
 			top: 0;
 			left: 0;
 			width: 100%;
+			min-height: 52px;
+			box-sizing: border-box;
 			display: flex;
 			gap: 10px;
 			padding: 10px;
@@ -156,5 +159,79 @@
 			height: 40px;
 			width: 40px;
 			background-size: contain;
+			background-repeat: no-repeat;
+			background-position: center;
+			flex: 0 0 40px;
+		}
+		#activeUnitName {
+			font: bold 16px Arial, sans-serif;
+			min-width: 8em;
+		}
+		#takeAction {
+			font: bold 16px Arial, sans-serif;
+			padding: 8px 14px;
+			border-radius: 8px;
+			border: 2px solid #f0d2a8;
+			background: #c0392b;
+			color: white;
+			cursor: pointer;
+		}
+		#takeAction:disabled {
+			background: #777;
+			color: #ddd;
+			border-color: #666;
+			cursor: default;
+		}
+		#hexChoice {
+			position: fixed;
+			z-index: 2000;
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+			padding: 8px;
+			background: white;
+			border: 2px solid #16324f;
+			border-radius: 8px;
+			box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.35);
+		}
+		#hexChoice[hidden] {
+			display: none;
+		}
+		#hexChoice button {
+			font: bold 16px Arial, sans-serif;
+			padding: 8px 14px;
+			cursor: pointer;
+		}
+		#hitLocationList {
+			position: fixed;
+			top: 70px;
+			right: 10px;
+			z-index: 1000;
+			max-width: 280px;
+			background: rgba(0, 0, 0, 0.9);
+			color: white;
+			padding: 10px;
+			border: 2px solid white;
+			border-radius: 8px;
+		}
+		#hitLocationList[hidden] {
+			display: none;
+		}
+		.hitGroup {
+			margin-bottom: 8px;
+		}
+		.hitLoc {
+			display: block;
+			width: 100%;
+			margin-top: 4px;
+			text-align: left;
+			font: 14px Arial, sans-serif;
+			padding: 4px 8px;
+			cursor: pointer;
+		}
+		.hitLoc.chosen {
+			background: #f4a3a3;
+			color: #111;
+			font-weight: bold;
 		}
 
