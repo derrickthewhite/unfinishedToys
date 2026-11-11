@@ -976,6 +976,27 @@ test('ensureDraft blocks movement while active player is computer-controlled', (
     assert.equal(app.lastStatus, 'Movement is unavailable while the active side is computer-controlled.');
 });
 
+test('ensureDraft lets the computer draft its own move against a local opponent', () => {
+    const unit = createBlade('u1', 100, 220, 'player-2');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-2',
+            remainingMoves: 4,
+            units: [unit],
+            selectedIds: ['u1']
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+
+    const started = app.ensureDraft(['u1'], { allowComputer: true });
+
+    assert.equal(started, true);
+    assert.ok(app.state.draft);
+});
+
 test('ensureDraft allows computer moves in an all-computer match', () => {
     const unit = createBlade('u1', 100, 220, 'player-2');
     const app = createAppHarness({
@@ -1197,6 +1218,36 @@ test('convertSelection rejects illegal final formations', () => {
     assert.equal(app.state.selectionAnalysis.type, 'rank');
     assert.equal(geometry.sameFootprint(before.u1, app.getUnitById('u1')), true);
     assert.equal(app.state.draft.history.length, 0);
+});
+
+test('exportGameJson builds a downloadable save payload', () => {
+    const app = createAppHarness({
+        state: {
+            phase: 'move',
+            activePlayerId: 'player-1',
+            units: [createBlade('unit-1', 100, 220)],
+            remainingMoves: 3
+        },
+        nextUnitId: 7,
+        ui: {
+            storageNameInput: { value: 'Bug report' }
+        }
+    });
+    const downloads = [];
+    app.downloadJsonFile = (filename, payload) => {
+        downloads.push({ filename, payload });
+        return JSON.stringify(payload);
+    };
+
+    const payload = app.exportGameJson();
+
+    assert.equal(downloads.length, 1);
+    assert.equal(downloads[0].payload, payload);
+    assert.equal(payload.name, 'Bug report');
+    assert.equal(payload.snapshot.phase, 'move');
+    assert.equal(payload.snapshot.remainingMoves, 3);
+    assert.equal(payload.snapshot.nextUnitId, 7);
+    assert.match(downloads[0].filename, /^Bug-report-.*\.json$/);
 });
 
 test('saveCurrentGame stores named snapshots in local storage', () => {
@@ -1595,6 +1646,7 @@ test('handleShootingClick rejects moved and inactive artillery', () => {
             terrain: { roads: [], features: [] }
         }
     });
+    app.state.players['player-2'].controller = 'local';
 
     app.handleShootingClick(artillery);
 
@@ -1651,6 +1703,102 @@ test('handleShootingClick allows shooters to fire on the opposing side turn', ()
     assert.equal(app.state.shooting.focusedAttackerId, 's1');
     assert.deepEqual(app.state.shooting.validTargetIds, ['t1']);
     assert.equal(app.lastStatus, 'Shooter selected for shooting.');
+});
+
+test('a shooter who fired last phase can fire again on the opponent turn', () => {
+    const shooter = {
+        ...createBlade('s1', 100, 220),
+        type: 'Shooter',
+        depth: 20,
+        attackedThisTurn: true,
+        ranged: { phase: 'shooting', range: 50, width: 120 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const artillery = {
+        ...createArtillery('a1', 160, 220),
+        attackedThisTurn: true
+    };
+    const target = { ...createBlade('t1', 100, 170), playerId: 'player-2', rotation: Math.PI };
+    const app = createAppHarness({
+        state: {
+            activePlayerId: 'player-2',
+            phase: 'form-up',
+            units: [shooter, artillery, target],
+            terrain: { roads: [], features: [] }
+        }
+    });
+
+    app.setPhase('shooting');
+
+    assert.equal(shooter.attackedThisTurn, false);
+    assert.equal(artillery.attackedThisTurn, false);
+    assert.equal(app.canDeclareShootingAttack(shooter), true);
+    assert.equal(app.canDeclareShootingAttack(artillery), false);
+});
+
+test('handleShootingClick can retarget an already declared shot without spending again', () => {
+    const shooter = {
+        ...createBlade('s1', 100, 220),
+        type: 'Shooter',
+        ranged: { phase: 'shooting', range: 80, width: 120 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const firstTarget = { ...createBlade('t1', 100, 170), playerId: 'player-2', rotation: Math.PI };
+    const secondTarget = { ...createBlade('t2', 140, 170), playerId: 'player-2', rotation: Math.PI };
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'shooting',
+            remainingMoves: 4,
+            units: [shooter, firstTarget, secondTarget],
+            terrain: { roads: [], features: [] },
+            shooting: { focusedAttackerId: null, validTargetIds: [], attacksByAttacker: {} }
+        }
+    });
+
+    app.handleShootingClick(shooter);
+    app.handleShootingClick(firstTarget);
+    assert.equal(app.state.shooting.attacksByAttacker.s1, 't1');
+    assert.equal(shooter.attackedThisTurn, true);
+
+    app.handleShootingClick(shooter);
+    assert.equal(app.state.shooting.focusedAttackerId, 's1');
+    assert.ok(app.state.shooting.validTargetIds.includes('t2'));
+    app.handleShootingClick(secondTarget);
+
+    assert.equal(app.state.shooting.attacksByAttacker.s1, 't2');
+    assert.equal(app.state.remainingMoves, 4);
+    assert.equal(app.lastStatus, 'Shooting target changed.');
+});
+
+test('handleShootingClick retargeting a magician does not charge declare cost twice', () => {
+    const magician = data.createUnit('Magician', 'player-1', 'Undead', { x: 280, y: 520, rotation: 0 }, () => 'mag');
+    const firstTarget = data.createUnit('Hero', 'player-2', 'Undead', { x: 280, y: 400, rotation: Math.PI }, () => 'hero');
+    const secondTarget = data.createUnit('Blade', 'player-2', 'Undead', { x: 340, y: 400, rotation: Math.PI }, () => 'blade');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'shooting',
+            remainingMoves: 2,
+            units: [magician, firstTarget, secondTarget],
+            terrain: { roads: [], features: [] },
+            shooting: { focusedAttackerId: null, validTargetIds: [], attacksByAttacker: {} }
+        }
+    });
+
+    app.handleShootingClick(magician);
+    app.handleShootingClick(firstTarget);
+    assert.equal(app.state.shooting.attacksByAttacker.mag, 'hero');
+    assert.equal(app.state.remainingMoves, 0);
+
+    app.handleShootingClick(magician);
+    assert.equal(app.state.shooting.focusedAttackerId, 'mag');
+    app.handleShootingClick(secondTarget);
+
+    assert.equal(app.state.shooting.attacksByAttacker.mag, 'blade');
+    assert.equal(app.state.remainingMoves, 0);
 });
 
 test('needsShootingDeclaration identifies eligible undeclared shooters', () => {
@@ -1744,12 +1892,16 @@ test('drawCombatResolutionOverlays still renders summaries for destroyed partici
         roundRect() {},
         fill() {},
         stroke() {},
+        translate() {},
+        moveTo() {},
+        lineTo() {},
         fillText(text, x, y) {
             labels.push({ text, x, y });
         },
         set fillStyle(value) {},
         set strokeStyle(value) {},
         set lineWidth(value) {},
+        set lineCap(value) {},
         set font(value) {},
         set textAlign(value) {},
         set textBaseline(value) {}
@@ -1812,6 +1964,87 @@ test('combat labels use ghost positions for ensorcelled participants', () => {
     assert.ok(Math.abs(labels[0].x - expected.x) < 0.01);
     assert.ok(Math.abs(labels[0].y - expected.y) < 0.01);
     assert.ok(labels[0].x > 0, 'label should stay on the board, not over the reserve lot');
+});
+
+test('combat acknowledgement places strength, dice, and modifier marks on the units', () => {
+    const attacker = createBlade('a', 100, 200);
+    const defender = { ...createBlade('d', 140, 200, 'player-2'), rotation: Math.PI };
+    const support = createBlade('s', 100, 220);
+    const app = createAppHarness({
+        state: {
+            units: [attacker, defender, support],
+            combatResolution: {
+                phase: 'melee',
+                participantIds: new Set(['a', 'd', 's']),
+                destroyedIds: new Set(),
+                ghostSnapshot: {},
+                movedUnitIds: [],
+                results: [{
+                    leftPrimaryId: 'a',
+                    rightPrimaryId: 'd',
+                    leftRoll: 4,
+                    rightRoll: 2,
+                    leftTotal: 9,
+                    rightTotal: 7,
+                    leftModifiers: [],
+                    rightModifiers: [
+                        { id: 'flank-attacked', value: -1, sources: [{ unitId: 's', value: -1 }] },
+                        { id: 'bad-going', value: -2, terrainKind: 'forest' }
+                    ]
+                }]
+            }
+        }
+    });
+    const marks = app.getCombatReadoutMarks();
+    const mark = (unitId, kind) => marks.find((entry) => entry.unitId === unitId && entry.kind === kind);
+
+    assert.equal(mark('a', 'strength').value, 5);
+    assert.deepEqual(mark('a', 'strength').position, { x: 110, y: 210 });
+    assert.equal(mark('a', 'strength').color, data.PLAYER_COLORS.blue.fill);
+    assert.equal(mark('a', 'strength').fill, '#ffffff');
+    assert.deepEqual(mark('a', 'die').position, { x: 130, y: 210 });
+    assert.equal(mark('a', 'die').value, 4);
+    assert.equal(mark('a', 'die').fill, '#161616');
+    assert.ok(Math.abs(mark('d', 'strength').position.x - 130) < 0.01);
+    assert.ok(Math.abs(mark('d', 'strength').position.y - 190) < 0.01);
+    assert.equal(mark('d', 'strength').color, data.PLAYER_COLORS.red.fill);
+    assert.equal(mark('d', 'terrain').value, -2);
+    assert.equal(mark('d', 'terrain').color, data.TERRAIN_STYLE.forest.fill);
+    assert.deepEqual(mark('d', 'terrain').position, { x: 120, y: 180 });
+    assert.equal(mark('s', 'modifier').value, -1);
+    assert.equal(mark('s', 'modifier').color, data.PLAYER_COLORS.blue.fill);
+    assert.deepEqual(mark('s', 'modifier').position, { x: 120, y: 230 });
+
+    const texts = [];
+    const arcs = [];
+    app.drawCombatReadoutMarks({
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        closePath() {},
+        fill() {},
+        stroke() {},
+        arc(x, y) {
+            arcs.push({ x, y });
+        },
+        fillText(text) {
+            texts.push(text);
+        },
+        set fillStyle(value) {},
+        set strokeStyle(value) {},
+        set lineWidth(value) {},
+        set font(value) {},
+        set textAlign(value) {},
+        set textBaseline(value) {}
+    }, app.state.combatResolution);
+
+    assert.ok(texts.includes('5'));
+    assert.ok(texts.includes('-1'));
+    assert.ok(texts.includes('-2'));
+    assert.equal(texts.includes('4'), false);
+    assert.equal(arcs.length, 6);
 });
 
 test('render draws combat summaries after units', () => {
@@ -1961,4 +2194,472 @@ test('attacker auto deploy uses the enemy line for matchup-biased placement', ()
     const shooterMean = shooters.reduce((sum, unit) => sum + geometry.getUnitCenter(unit).x, 0) / shooters.length;
     const knightMean = knights.reduce((sum, unit) => sum + geometry.getUnitCenter(unit).x, 0) / knights.length;
     assert.ok(Math.abs(knightMean - shooterMean) < 160);
+});
+
+test('finish-move boot sits between reverse and side-turn and commits the move', () => {
+    const units = [
+        createBlade('u1', 100, 220),
+        createBlade('u2', 140, 220)
+    ];
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            setupStage: 'game',
+            remainingMoves: 4,
+            activePlayerId: 'player-1',
+            units,
+            selectedIds: ['u1', 'u2'],
+            terrain: { roads: [], features: [] }
+        }
+    });
+    app.scheduleControllerAction = () => {};
+    app.updateSelectionAnalysis();
+    assert.equal(app.getSelectionHandles().some((handle) => handle.kind === 'finish-move'), false);
+
+    assert.equal(app.ensureDraft(['u1', 'u2']), true);
+    units.forEach((unit) => {
+        unit.y -= 15;
+    });
+    app.updateSelectionAnalysis();
+    const handles = app.getSelectionHandles();
+    const finish = handles.find((handle) => handle.kind === 'finish-move');
+    const reverse = handles.find((handle) => handle.kind === 'formation-reverse');
+    const convert = handles.find((handle) => handle.kind === 'formation-convert');
+    assert.ok(finish);
+    assert.ok(reverse);
+    assert.ok(convert);
+    assert.ok(Math.abs(finish.position.x - ((reverse.position.x + convert.position.x) / 2)) < 0.01);
+    assert.ok(Math.abs(finish.position.y - ((reverse.position.y + convert.position.y) / 2)) < 0.01);
+
+    const positions = handles.map((handle) => ({ kind: handle.kind, x: handle.position.x, y: handle.position.y }));
+    app.state.hover = { handleKind: 'formation-reverse', unitId: null };
+    app.getSelectionHandles().forEach((handle) => {
+        const position = positions.find((entry) => entry.kind === handle.kind);
+        assert.equal(handle.position.x, position.x);
+        assert.equal(handle.position.y, position.y);
+    });
+
+    app.onPointerDown({
+        pointerId: 3,
+        button: 0,
+        clientX: finish.position.x,
+        clientY: finish.position.y,
+        shiftKey: false
+    });
+    app.onPointerUp({ pointerId: 3, clientX: finish.position.x, clientY: finish.position.y });
+
+    assert.equal(app.state.draft, null);
+    assert.equal(units[0].movedThisTurn, true);
+    assert.equal(units[1].movedThisTurn, true);
+    assert.equal(app.shouldMarkMovedUnit(units[0]), true);
+    const enemy = createBlade('enemy', 300, 220, 'player-2');
+    enemy.movedThisTurn = true;
+    app.state.units.push(enemy);
+    assert.equal(app.shouldMarkMovedUnit(enemy), false);
+    app.state.players['player-1'].controller = 'computer';
+    assert.equal(app.shouldMarkMovedUnit(units[0]), false);
+    app.state.players['player-1'].controller = 'local';
+    app.state.phase = 'shooting';
+    assert.equal(app.shouldMarkMovedUnit(units[0]), false);
+});
+
+test('acknowledge button names the phase it closes', () => {
+    const app = createAppHarness();
+    app.state.phase = 'form-up';
+    assert.equal(app.acknowledgeButtonLabel(), 'Acknowledge Forming Up');
+    app.state.phase = 'shooting';
+    app.state.combatResolution = { phase: 'shooting' };
+    assert.equal(app.acknowledgeButtonLabel(), 'Acknowledge Shooting');
+    app.state.phase = 'melee';
+    app.state.combatResolution = { phase: 'melee' };
+    assert.equal(app.acknowledgeButtonLabel(), 'Acknowledge Melee');
+    app.state.victory = { winnerPlayerId: 'player-1' };
+    app.state.victoryModalDismissed = true;
+    assert.equal(app.acknowledgeButtonLabel(), 'Victory');
+});
+
+test('victory acknowledge button reopens the victory modal', () => {
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            victory: { winnerPlayerId: 'player-1', loserPlayerId: 'player-2' },
+            victoryModalDismissed: true
+        }
+    });
+    app.acknowledgePhase();
+    assert.equal(app.state.victoryModalDismissed, false);
+});
+
+test('resolve shooting button reports assigned shot progress', () => {
+    const shooter = {
+        ...createBlade('s1', 100, 220),
+        type: 'Shooter',
+        ranged: { phase: 'shooting', range: 50, width: 120 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const target = { ...createBlade('t1', 100, 170), playerId: 'player-2', rotation: Math.PI };
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'shooting',
+            units: [shooter, target],
+            terrain: { roads: [], features: [] },
+            shooting: {
+                focusedAttackerId: null,
+                validTargetIds: [],
+                attacksByAttacker: {}
+            }
+        }
+    });
+    assert.deepEqual(app.getShootingAssignmentProgress(), { assigned: 0, total: 1 });
+    app.state.shooting.attacksByAttacker.s1 = 't1';
+    assert.deepEqual(app.getShootingAssignmentProgress(), { assigned: 1, total: 1 });
+});
+
+test('drawCombatResolutionOverlays marks destroyed, ensorcelled, and pushed units', () => {
+    const destroyed = createBlade('dead', 100, 220);
+    const ensorcelled = createBlade('hexed', 160, 220);
+    const pushedBefore = createBlade('pushed', 220, 220);
+    const pushedAfter = { ...pushedBefore, y: 260 };
+    const app = createAppHarness({
+        state: {
+            units: [pushedAfter],
+            combatResolution: {
+                phase: 'melee',
+                participantIds: new Set(['dead', 'hexed', 'pushed']),
+                destroyedIds: new Set(['dead']),
+                ensorcelledIds: new Set(['hexed']),
+                ensorcelledUnits: [{ ...ensorcelled }],
+                ghostSnapshot: {
+                    dead: { ...destroyed },
+                    hexed: { ...ensorcelled },
+                    pushed: { ...pushedBefore }
+                },
+                movedUnitIds: ['dead', 'hexed', 'pushed'],
+                results: []
+            }
+        }
+    });
+    const calls = [];
+    app.drawDestroyedMark = () => calls.push('destroyed');
+    app.drawEnsorcelledMark = () => calls.push('ensorcelled');
+    app.drawPushbackArrow = () => calls.push('pushback');
+    app.drawCombatResolutionOverlays({
+        save() {},
+        restore() {},
+        beginPath() {},
+        roundRect() {},
+        fill() {},
+        stroke() {},
+        fillText() {},
+        set fillStyle(value) {},
+        set strokeStyle(value) {},
+        set lineWidth(value) {},
+        set font(value) {},
+        set textAlign(value) {},
+        set textBaseline(value) {}
+    });
+    assert.deepEqual(calls, ['destroyed', 'ensorcelled', 'pushback']);
+});
+
+test('shooting recoil aftermath draws a centerline pushback arrow', () => {
+    const shooter = {
+        ...createBlade('s1', 300, 400),
+        type: 'Shooter',
+        ranged: { phase: 'shooting', range: 300, width: 120 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const target = { ...createBlade('t1', 300, 250), playerId: 'player-2', rotation: 0 };
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'shooting',
+            units: [shooter, target],
+            terrain: { roads: [], features: [] },
+            shooting: {
+                focusedAttackerId: null,
+                validTargetIds: [],
+                attacksByAttacker: { s1: 't1' }
+            }
+        }
+    });
+    let roll = 0;
+    const rolls = [6, 1];
+    app.rollDie = () => rolls[roll++];
+    app.resolveShootingPhase({ skipUndeclared: true });
+
+    assert.equal(app.state.combatResolution.results[0].outcome, 'recoil');
+    assert.equal(app.state.combatResolution.destroyedIds.has('t1'), false);
+    assert.ok(app.state.combatResolution.movedUnitIds.includes('t1'));
+
+    const arrows = [];
+    app.drawPushbackArrow = (ctx, from, to) => arrows.push({ from, to });
+    app.drawDestroyedMark = () => {};
+    app.drawEnsorcelledMark = () => {};
+    app.drawCombatResolutionOverlays({
+        save() {},
+        restore() {},
+        beginPath() {},
+        moveTo() {},
+        lineTo() {},
+        closePath() {},
+        arc() {},
+        roundRect() {},
+        fill() {},
+        stroke() {},
+        fillText() {},
+        set fillStyle(value) {},
+        set strokeStyle(value) {},
+        set lineWidth(value) {},
+        set font(value) {},
+        set textAlign(value) {},
+        set textBaseline(value) {}
+    });
+
+    assert.equal(arrows.length, 1);
+    assert.ok(Math.abs(arrows[0].to.y - arrows[0].from.y) > 15);
+    assert.ok(Math.abs(arrows[0].from.x - 320) < 0.01);
+    assert.ok(Math.abs(arrows[0].to.x - 320) < 0.01);
+});
+
+test('shooting overlays keep declared attack lines during acknowledge', () => {
+    const attacker = createBlade('a1', 100, 220);
+    const target = createBlade('t1', 100, 80);
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'shooting',
+            units: [attacker],
+            combatResolution: {
+                phase: 'shooting',
+                participantIds: new Set(['a1', 't1']),
+                destroyedIds: new Set(['t1']),
+                ensorcelledIds: new Set(),
+                ghostSnapshot: { t1: { ...target } },
+                movedUnitIds: ['t1'],
+                attacksByAttacker: { a1: 't1' },
+                results: []
+            }
+        }
+    });
+    const arrows = [];
+    app.drawShootingArrow = (ctx, fromUnit, toUnit) => {
+        arrows.push({ from: fromUnit.id, to: toUnit.id });
+    };
+    app.drawShootingOverlays({});
+    assert.deepEqual(arrows, [{ from: 'a1', to: 't1' }]);
+});
+
+test('end move prompt appears when nothing legal can still be spent', () => {
+    const blade = createBlade('blade', 100, 220);
+    const mage = createBlade('mage', 160, 220);
+    mage.type = 'Magician';
+    mage.combat = { moveCost: 2 };
+    const reserve = createBlade('reserve', 40, 40);
+    reserve.inReserve = true;
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            setupStage: 'game',
+            remainingMoves: 1,
+            units: [blade, mage],
+            reserveUnits: [reserve]
+        }
+    });
+
+    assert.equal(app.hasLegalMoveRemaining(), true);
+    blade.movedThisTurn = true;
+    assert.equal(app.hasLegalMoveRemaining(), true);
+    app.state.reserveUnits = [];
+    assert.equal(app.hasLegalMoveRemaining(), false);
+    app.state.remainingMoves = 2;
+    assert.equal(app.hasLegalMoveRemaining(), true);
+    app.state.remainingMoves = 0;
+    assert.equal(app.hasLegalMoveRemaining(), false);
+});
+
+test('unaffordable move mark covers blades, magicians, deployments, and ensorcelled returns', () => {
+    const blade = createBlade('blade', 100, 220);
+    const mage = createBlade('mage', 160, 220);
+    mage.type = 'Magician';
+    mage.combat = { moveCost: 2 };
+    const caster = createBlade('caster', 220, 220);
+    const reserve = createBlade('reserve', 40, 40);
+    reserve.inReserve = true;
+    const ensorcelled = createBlade('ensorcelled', 80, 40);
+    ensorcelled.inReserve = true;
+    ensorcelled.ensorcelledByUnitId = 'caster';
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            setupStage: 'game',
+            remainingMoves: 1,
+            units: [blade, mage, caster],
+            reserveUnits: [reserve, ensorcelled]
+        }
+    });
+
+    assert.equal(app.shouldMarkUnaffordableUnit(blade), false);
+    assert.equal(app.shouldMarkUnaffordableUnit(reserve), false);
+    assert.equal(app.shouldMarkUnaffordableUnit(mage), true);
+    assert.equal(app.shouldMarkUnaffordableUnit(ensorcelled), true);
+
+    app.state.remainingMoves = 0;
+    assert.equal(app.shouldMarkUnaffordableUnit(blade), true);
+    assert.equal(app.shouldMarkUnaffordableUnit(reserve), true);
+    blade.movedThisTurn = true;
+    assert.equal(app.shouldMarkUnaffordableUnit(blade), false);
+
+    app.state.remainingMoves = 6;
+    assert.equal(app.shouldMarkUnaffordableUnit(ensorcelled), false);
+    app.state.players['player-1'].controller = 'computer';
+    app.state.remainingMoves = 0;
+    assert.equal(app.shouldMarkUnaffordableUnit(reserve), false);
+});
+
+test('single-unit finish boot sits on the rear beside reverse', () => {
+    const unit = createBlade('u1', 100, 220);
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            setupStage: 'game',
+            remainingMoves: 4,
+            units: [unit],
+            selectedIds: ['u1']
+        }
+    });
+    app.updateSelectionAnalysis();
+    assert.equal(app.ensureDraft(['u1']), true);
+    unit.y -= 10;
+    const handles = app.getSelectionHandles();
+    const finish = handles.find((handle) => handle.kind === 'finish-move');
+    const reverse = handles.find((handle) => handle.kind === 'single-reverse');
+    const right = geometry.getRightVector(unit.rotation);
+    assert.ok(finish);
+    assert.ok(reverse);
+    assert.ok(Math.abs(finish.position.x - (reverse.position.x - (right.x * 24))) < 0.01);
+    assert.ok(Math.abs(finish.position.y - (reverse.position.y - (right.y * 24))) < 0.01);
+});
+
+test('middle-button drag pans the board like a right-button drag', () => {
+    const app = createAppHarness();
+    app.state.camera = { x: 100, y: 80, scale: 1, minScale: 0.6, maxScale: 6 };
+    let prevented = false;
+    app.onPointerDown({
+        pointerId: 8,
+        button: 1,
+        clientX: 10,
+        clientY: 20,
+        shiftKey: false,
+        preventDefault() {
+            prevented = true;
+        }
+    });
+    assert.equal(prevented, true);
+    assert.equal(app.state.interaction.type, 'pan');
+    app.onPointerMove({ pointerId: 8, clientX: 40, clientY: 25 });
+    assert.equal(app.state.camera.x, 70);
+    assert.equal(app.state.camera.y, 75);
+});
+
+test('hover marks selectable units and handle buttons', () => {
+    const friendly = createBlade('u1', 100, 220);
+    const enemy = createBlade('u2', 100, 120, 'player-2');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            setupStage: 'game',
+            units: [friendly, enemy],
+            selectedIds: ['u1']
+        }
+    });
+    app.updateSelectionAnalysis();
+    app.getHandleHit = () => null;
+    app.pickUnit = (world) => (world.x < 50 ? enemy : friendly);
+    app.updatePointerHover({ clientX: 80, clientY: 80 });
+    assert.equal(app.state.hover.unitId, 'u1');
+    app.updatePointerHover({ clientX: 10, clientY: 10 });
+    assert.equal(app.state.hover.unitId, 'u2');
+
+    const reverse = app.getSelectionHandles().find((handle) => handle.kind === 'single-reverse');
+    app.getHandleHit = () => reverse;
+    app.updatePointerHover({ clientX: reverse.position.x, clientY: reverse.position.y });
+    assert.equal(app.state.hover.handleKind, 'single-reverse');
+    assert.equal(app.state.hover.unitId, null);
+    assert.equal(app.handleBorderWidth(reverse), 4.5);
+
+    app.state.hover = null;
+    app.state.setupStage = 'unit-deployment';
+    app.state.setup = { deployment: { activePlayerId: 'player-1' } };
+    app.getHandleHit = () => null;
+    app.pickUnit = () => enemy;
+    app.updatePointerHover({ clientX: 1, clientY: 1 });
+    assert.equal(app.state.hover.unitId, 'u2');
+});
+
+test('phase changes announce the phase the turn lands on in the active player color', async () => {
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            setupStage: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1'
+        }
+    });
+    const shown = [];
+    app.showPhaseBanner = (playerId, phase) => {
+        shown.push(`${playerId}:${phase}`);
+    };
+    app.setPhase('shooting');
+    app.state.activePlayerId = 'player-2';
+    app.setPhase('melee');
+    app.setPhase('move');
+    await Promise.resolve();
+    assert.deepEqual(shown, ['player-2:move']);
+
+    const classNames = new Set();
+    const title = { textContent: '' };
+    const player = { textContent: '' };
+    app.showPhaseBanner = HordesPrototype.prototype.showPhaseBanner;
+    app.ui.phaseBanner = {
+        hidden: true,
+        dataset: {},
+        style: {
+            setProperty(name, value) {
+                this[name] = value;
+            }
+        },
+        classList: {
+            remove(name) {
+                classNames.delete(name);
+            },
+            add(name) {
+                classNames.add(name);
+            }
+        },
+        querySelector(selector) {
+            if (selector === '.phase-banner-title') {
+                return title;
+            }
+            if (selector === '.phase-banner-player') {
+                return player;
+            }
+            return null;
+        },
+        offsetWidth: 12
+    };
+    app.showPhaseBanner('player-2', 'form-up');
+    assert.equal(app.ui.phaseBanner.hidden, false);
+    assert.equal(title.textContent, 'Form Up Phase');
+    assert.equal(player.textContent, 'Red Undead');
+    assert.equal(app.ui.phaseBanner.style['--phase-ink'], data.PLAYER_COLORS.red.stroke);
+    assert.equal(classNames.has('is-showing'), true);
+    clearTimeout(app._phaseBannerTimer);
 });

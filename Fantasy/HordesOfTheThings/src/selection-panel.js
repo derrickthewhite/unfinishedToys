@@ -110,12 +110,14 @@
             if (!unit) {
                 return [];
             }
-            const movement = [
-                `Road ${this.formatPaces(unit.moves.road)}`,
-                `Good ${this.formatPaces(unit.moves.good)}`,
-                `Bad ${this.formatPaces(unit.moves.bad)}`,
-                `Water ${this.formatPaces(unit.moves.water)}`
-            ].join(' / ');
+            const movement = unit.combat?.stationary
+                ? 'Stationary'
+                : [
+                    `Road ${this.formatPaces(unit.moves.road)}`,
+                    `Good ${this.formatPaces(unit.moves.good)}`,
+                    `Bad ${this.formatPaces(unit.moves.bad)}`,
+                    `Water ${this.formatPaces(unit.moves.water)}`
+                ].join(' / ');
             const ranged = unit.ranged
                 ? `${this.formatPaces(unit.ranged.range)} range, ${unit.ranged.width || data.SHOOTING_BOX_WIDTH}mm frontage`
                 : 'None';
@@ -128,6 +130,9 @@
                 { label: 'Ranged', value: ranged },
                 { label: 'Bad Going', value: unit.combat?.ignoresBadGoingPenalty ? 'Ignores penalty' : 'Normal penalty' }
             ];
+            if (unit.combat?.lossEndsGame) {
+                details.push({ label: 'Base', value: 'Losing a conflict loses the battle' });
+            }
             if (rules.isMagicianUnit(unit)) {
                 details.push({
                     label: 'Action cost',

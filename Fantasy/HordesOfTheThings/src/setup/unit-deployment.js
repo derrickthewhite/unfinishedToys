@@ -77,6 +77,7 @@
                 };
                 delete this.state.setupCameras?.deployment;
                 this.state.units = [];
+                this.spawnDefenderBase();
                 this.state.selectedIds = [];
                 this.state.draft = null;
                 this.state.formUp = null;
@@ -99,6 +100,16 @@
                     this.ui.deploymentCanvas.addEventListener('pointerup', (event) => this.onDeploymentPointerUp(event));
                     this.ui.deploymentCanvas.addEventListener('pointercancel', (event) => this.onDeploymentPointerUp(event));
                     this.ui.deploymentCanvas.addEventListener('contextmenu', (event) => event.preventDefault());
+                    this.ui.deploymentCanvas.addEventListener('mousedown', (event) => {
+                        if (event.button === 1) {
+                            event.preventDefault();
+                        }
+                    });
+                    this.ui.deploymentCanvas.addEventListener('auxclick', (event) => {
+                        if (event.button === 1) {
+                            event.preventDefault();
+                        }
+                    });
                     this.ui.deploymentCanvas.addEventListener('wheel', (event) => {
                         event.preventDefault();
                         this.zoomSetupAt(event, 'deployment', this.ui.deploymentCanvas);
@@ -166,31 +177,25 @@
             },
 
             isUnitPlacementInZone(unit, playerId) {
-                const zone = this.getDeploymentZone(playerId);
-                if (!zone) {
+                const bounds = this.getDeploymentZoneBounds(playerId);
+                if (!bounds) {
                     return false;
                 }
-                const boundary = zone === 'bottom'
-                    ? { minY: data.BOARD_SIZE * 0.75, maxY: data.BOARD_SIZE }
-                    : { minY: 0, maxY: data.BOARD_SIZE * 0.25 };
                 const corners = Object.values(geometry.getUnitCorners(unit));
                 return corners.every((corner) => (
                     corner.x >= 0
                     && corner.x <= data.BOARD_SIZE
-                    && corner.y >= 0
-                    && corner.y <= data.BOARD_SIZE
-                    && corner.y >= boundary.minY
-                    && corner.y <= boundary.maxY
+                    && corner.y >= bounds.minY
+                    && corner.y <= bounds.maxY
                 ));
             },
 
             findDeploymentOverlap(candidateUnit, skipId) {
-                const candidateCorners = geometry.getUnitCorners(candidateUnit);
                 return this.state.units.find((unit) => {
                     if (skipId && unit.id === skipId) {
                         return false;
                     }
-                    return geometry.polygonsOverlap(candidateCorners, geometry.getUnitCorners(unit));
+                    return geometry.unitsOverlap(candidateUnit, unit);
                 }) || null;
             },
 
@@ -271,6 +276,23 @@
                 };
             },
 
+            spawnDefenderBase() {
+                const base = this.getTerrainSetup()?.base;
+                if (!base) {
+                    return null;
+                }
+                if (!Number.isFinite(this.nextUnitId)) {
+                    this.nextUnitId = 1;
+                }
+                const unit = data.createUnit('Base', base.playerId, base.faction, {
+                    x: base.x,
+                    y: base.y,
+                    rotation: base.rotation || 0
+                }, () => this.allocateUnitId());
+                this.state.units.push(unit);
+                return unit;
+            },
+
             returnDeployedUnitsToTray(unitIds) {
                 const deployment = this.getDeploymentSetup();
                 if (!deployment || this.state.setupStage !== 'unit-deployment') {
@@ -280,7 +302,7 @@
                 const returnedIds = [];
                 (unitIds || []).forEach((unitId) => {
                     const unit = this.getUnitById(unitId);
-                    if (!unit || this.getUnitPlayerId(unit) !== activePlayerId) {
+                    if (!unit || unit.combat?.stationary || this.getUnitPlayerId(unit) !== activePlayerId) {
                         return;
                     }
                     const trayEntry = this.buildTrayEntryFromUnit(unit);
@@ -401,7 +423,10 @@
                 if (!deployment) {
                     return;
                 }
-                if (event.button === 2) {
+                if (event.button === 1 || event.button === 2) {
+                    if (event.button === 1 && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
                     this.withDeploymentView(() => this.onPointerDown(event));
                     return;
                 }
@@ -556,6 +581,15 @@
                 this.syncUiFromState();
                 this.requestRender();
                 this.updateStatus(`Deployment complete. ${this.getPlayerLabel(firstPlayerId)} takes the first turn with ${this.state.remainingMoves} moves.`);
+                if (typeof this.queuePhaseAnnouncement === 'function') {
+                    this.queuePhaseAnnouncement();
+                }
+                if (typeof this.captureGameStartCheckpoint === 'function') {
+                    this.captureGameStartCheckpoint();
+                }
+                if (typeof this.captureLocalTurnCheckpoint === 'function') {
+                    this.captureLocalTurnCheckpoint();
+                }
                 this.scheduleControllerAction();
             },
 
@@ -571,26 +605,26 @@
                     this.drawBoard(ctx);
                     this.drawTerrain(ctx);
 
-                    const topBoundary = data.BOARD_SIZE * 0.25;
-                    const bottomBoundary = data.BOARD_SIZE * 0.75;
+                    const attackerBounds = this.getDeploymentZoneBounds(deployment.attackerPlayerId);
+                    const defenderBounds = this.getDeploymentZoneBounds(deployment.defenderPlayerId);
                     ctx.save();
                     ctx.fillStyle = 'rgba(71, 101, 143, 0.2)';
-                    ctx.fillRect(0, 0, data.BOARD_SIZE, topBoundary);
+                    ctx.fillRect(0, attackerBounds.minY, data.BOARD_SIZE, attackerBounds.maxY - attackerBounds.minY);
                     ctx.fillStyle = 'rgba(143, 82, 71, 0.2)';
-                    ctx.fillRect(0, bottomBoundary, data.BOARD_SIZE, data.BOARD_SIZE - bottomBoundary);
+                    ctx.fillRect(0, defenderBounds.minY, data.BOARD_SIZE, defenderBounds.maxY - defenderBounds.minY);
                     ctx.strokeStyle = 'rgba(51, 43, 38, 0.45)';
                     ctx.lineWidth = 2 / scale;
                     ctx.beginPath();
-                    ctx.moveTo(0, topBoundary);
-                    ctx.lineTo(data.BOARD_SIZE, topBoundary);
-                    ctx.moveTo(0, bottomBoundary);
-                    ctx.lineTo(data.BOARD_SIZE, bottomBoundary);
+                    ctx.moveTo(0, attackerBounds.maxY);
+                    ctx.lineTo(data.BOARD_SIZE, attackerBounds.maxY);
+                    ctx.moveTo(0, defenderBounds.minY);
+                    ctx.lineTo(data.BOARD_SIZE, defenderBounds.minY);
                     ctx.stroke();
                     ctx.restore();
 
                     this.state.units.forEach((unit) => {
                         const selected = this.state.selectedIds.includes(unit.id);
-                        const invalid = selected && !this.areDeploymentUnitsLegal([unit]);
+                        const invalid = selected && !unit.combat?.stationary && !this.areDeploymentUnitsLegal([unit]);
                         this.drawUnitBase(ctx, unit, {
                             selected,
                             invalid,

@@ -19,6 +19,8 @@ test('new games begin with empty 24 AP army drafts instead of a seeded battle', 
     app.state = app.createInitialState();
 
     assert.equal(app.state.setupStage, 'army-builder');
+    assert.equal(app.state.players['player-1'].controller, 'local');
+    assert.equal(app.state.players['player-2'].controller, 'computer');
     assert.deepEqual(app.state.units, []);
     assert.deepEqual(app.state.terrain, { roads: [], features: [] });
     assert.deepEqual(app.getArmyDraft('player-1').counts, {});
@@ -47,7 +49,7 @@ test('army drafts require exactly 24 AP for both players before terrain placemen
     assert.equal(app.state.setup.confirmation, null);
 });
 
-test('army builder cannot accept matching colors or matching factions', () => {
+test('army builder accepts matching factions when colors differ', () => {
     const app = createAppHarness({
         state: {
             setupStage: 'army-builder',
@@ -58,17 +60,14 @@ test('army builder cannot accept matching colors or matching factions', () => {
     app.adjustArmyUnit('player-2', 'Blade', 12);
     assert.equal(app.canAcceptArmies(), true);
 
+    app.updateArmyPlayer('player-1', 'faction', 'Undead');
+    assert.equal(app.state.players['player-1'].faction, app.state.players['player-2'].faction);
+    assert.equal(app.getArmyIdentityConflict(), null);
+    assert.equal(app.canAcceptArmies(), true);
+
     app.updateArmyPlayer('player-1', 'colorId', 'red');
     assert.equal(app.getArmyIdentityConflict(), 'Each army needs its own color.');
     assert.equal(app.canAcceptArmies(), false);
-
-    app.updateArmyPlayer('player-1', 'colorId', 'blue');
-    app.updateArmyPlayer('player-1', 'faction', 'Undead');
-    assert.equal(app.getArmyIdentityConflict(), 'Each army needs its own faction.');
-    assert.equal(app.canAcceptArmies(), false);
-
-    app.updateArmyPlayer('player-1', 'colorId', 'red');
-    assert.equal(app.getArmyIdentityConflict(), 'Each army needs its own color and faction.');
     app.openArmyConfirmation();
     assert.equal(app.state.setup.confirmation, null);
 });
@@ -466,6 +465,83 @@ test('deployment rejects overlap and restores moved unit position on invalid mov
 
     assert.equal(Math.round(second.x), Math.round(originalSecond.x));
     assert.equal(Math.round(second.y), Math.round(originalSecond.y));
+});
+
+test('deployment can inspect enemy units without move handles', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'local';
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    app.adjustArmyUnit('player-2', 'Spear', 1);
+    app.initializeUnitDeployment();
+    const deployment = app.getDeploymentSetup();
+    const defenderTrayId = deployment.tray.find((entry) => entry.playerId === 'player-1').draftId;
+    app.selectDeploymentTrayUnit(defenderTrayId);
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.finishDeploymentTurn();
+
+    const attackerTrayId = app.getDeploymentSetup().tray.find((entry) => entry.playerId === 'player-2').draftId;
+    app.selectDeploymentTrayUnit(attackerTrayId);
+    app.onDeploymentPointerDown({ pointerId: 2, clientX: 260, clientY: 80 });
+    app.onDeploymentPointerUp({ pointerId: 2, clientX: 260, clientY: 80 });
+
+    const enemy = app.state.units.find((unit) => unit.playerId === 'player-1');
+    const friendly = app.state.units.find((unit) => unit.playerId === 'player-2');
+    assert.ok(enemy);
+    assert.ok(friendly);
+    assert.equal(app.getDeploymentSetup().activePlayerId, 'player-2');
+
+    const enemyCenter = geometry.getUnitCenter(enemy);
+    app.onDeploymentPointerDown({
+        pointerId: 3,
+        button: 0,
+        clientX: enemyCenter.x,
+        clientY: enemyCenter.y,
+        shiftKey: false
+    });
+    app.onDeploymentPointerUp({
+        pointerId: 3,
+        clientX: enemyCenter.x,
+        clientY: enemyCenter.y,
+        shiftKey: false
+    });
+
+    assert.deepEqual(app.state.selectedIds, [enemy.id]);
+    assert.equal(app.canManipulateSelection(), false);
+    assert.equal(app.getSelectionHandles().length, 0);
+    assert.equal(app.getInspectedUnit()?.id, enemy.id);
+
+    const before = { x: enemy.x, y: enemy.y, rotation: enemy.rotation };
+    app.onDeploymentPointerDown({
+        pointerId: 4,
+        button: 0,
+        clientX: enemyCenter.x,
+        clientY: enemyCenter.y,
+        shiftKey: false
+    });
+    app.onDeploymentPointerMove({
+        pointerId: 4,
+        clientX: enemyCenter.x + 40,
+        clientY: enemyCenter.y + 30
+    });
+    app.onDeploymentPointerUp({
+        pointerId: 4,
+        clientX: enemyCenter.x + 40,
+        clientY: enemyCenter.y + 30
+    });
+    assert.equal(enemy.x, before.x);
+    assert.equal(enemy.y, before.y);
+    assert.equal(enemy.rotation, before.rotation);
 });
 
 test('deployment shift-click and marquee select only the active player, without convert handles', () => {

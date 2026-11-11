@@ -289,7 +289,7 @@
                     return { invalid: true, reason: 'Reserve deployment must contact the home board edge.' };
                 }
                 const others = (boardUnits || this.state.units || []).filter((other) => other.id !== unit.id);
-                const overlaps = others.some((other) => geometry.polygonsOverlap(corners, geometry.getUnitCorners(other)));
+                const overlaps = others.some((other) => geometry.unitsOverlap(unit, other));
                 if (overlaps) {
                     return { invalid: true, reason: 'Reserve deployment overlaps another unit.' };
                 }
@@ -302,7 +302,7 @@
                     if (this.getUnitPlayerId(other) === playerId) {
                         return false;
                     }
-                    return geometry.minDistanceBetweenPolygons(corners, geometry.getUnitCorners(other)) < clearance - 0.01;
+                    return geometry.unitsMinDistance(unit, other) < clearance - 0.01;
                 });
                 if (tooClose) {
                     return { invalid: true, reason: 'Reserve deployment cannot end within 200 paces of an enemy.' };
@@ -348,7 +348,7 @@
                     return { invalid: true, reason: 'Ensorcelled return must stay on the board.' };
                 }
                 const others = (boardUnits || this.state.units || []).filter((other) => other.id !== unit.id);
-                if (others.some((other) => geometry.polygonsOverlap(corners, geometry.getUnitCorners(other)))) {
+                if (others.some((other) => geometry.unitsOverlap(unit, other))) {
                     return { invalid: true, reason: 'Ensorcelled return overlaps another unit.' };
                 }
                 const terrainTypes = rules.sampleUnitTerrain(unit, terrain || this.state.terrain);
@@ -405,7 +405,7 @@
                     return { invalid: true, reason: 'Ensorcelled return must contact the enemy board edge.' };
                 }
                 const others = (boardUnits || this.state.units || []).filter((other) => other.id !== unit.id);
-                if (others.some((other) => geometry.polygonsOverlap(corners, geometry.getUnitCorners(other)))) {
+                if (others.some((other) => geometry.unitsOverlap(unit, other))) {
                     return { invalid: true, reason: 'Ensorcelled return overlaps another unit.' };
                 }
                 const terrainTypes = rules.sampleUnitTerrain(unit, terrain || this.state.terrain);

@@ -17,6 +17,9 @@
             if (selectedUnits.length === 0) {
                 return false;
             }
+            if (selectedUnits.some((unit) => unit.combat?.stationary)) {
+                return false;
+            }
             if (this.state.setupStage === 'unit-deployment') {
                 const activePlayerId = this.getDeploymentSetup()?.activePlayerId;
                 if (typeof this.isComputerPlayer === 'function' && this.isComputerPlayer(activePlayerId)) {
@@ -55,6 +58,11 @@
 
 
         getSelectionHandles() {
+            return this.withFinishMoveHandle(this.getBaseSelectionHandles());
+        }
+
+
+        getBaseSelectionHandles() {
             if (!this.canManipulateSelection()) {
                 return [];
             }
@@ -186,6 +194,82 @@
                 radius: data.HANDLE_RADIUS,
                 position: geometry.add(backCenter, geometry.scaleVector(analysis.right, 24)),
                 rotation: geometry.normalizeAngle(Math.atan2(analysis.forward.y, analysis.forward.x) + (Math.PI / 2))
+            };
+        }
+
+
+        withFinishMoveHandle(handles) {
+            if (!this.shouldShowFinishMoveHandle()) {
+                return handles;
+            }
+            const finish = this.getFinishMoveHandle();
+            return finish ? [...handles, finish] : handles;
+        }
+
+
+        shouldShowFinishMoveHandle() {
+            const draft = this.state.draft;
+            if (!draft || this.state.mode !== 'game' || this.state.phase !== 'move' || this.state.setupStage === 'unit-deployment') {
+                return false;
+            }
+            if (typeof this.canLocallyControl === 'function' && !this.canLocallyControl(this.state.activePlayerId)) {
+                return false;
+            }
+            return draft.unitIds.some((unitId) => {
+                const unit = this.getUnitById(unitId);
+                const before = draft.initialOrigin?.[unitId];
+                return Boolean(unit && before && this.hasUnitMoved(before, unit));
+            });
+        }
+
+
+        getFinishMoveHandle() {
+            const analysis = this.state.selectionAnalysis;
+            const radius = data.HANDLE_RADIUS;
+            if (analysis && !analysis.invalid && (analysis.type === 'rank' || analysis.type === 'file') && analysis.forward) {
+                const info = this.getFormationCenterInfo(analysis);
+                const backCenter = geometry.add(info.formationCenter, geometry.scaleVector(analysis.forward, -info.backOffset));
+                return {
+                    kind: 'finish-move',
+                    radius,
+                    position: backCenter,
+                    rotation: Math.atan2(analysis.forward.y, analysis.forward.x)
+                };
+            }
+            const unitIds = (this.state.draft && this.state.draft.unitIds) || this.state.selectedIds || [];
+            const units = unitIds.map((unitId) => this.getUnitById(unitId)).filter(Boolean);
+            if (units.length === 0) {
+                return null;
+            }
+            const primary = units[0];
+            const forward = geometry.getForwardVector(primary.rotation);
+            const right = geometry.getRightVector(primary.rotation);
+            if (units.length === 1) {
+                const center = geometry.getUnitCenter(primary);
+                const back = geometry.add(center, geometry.scaleVector(forward, -((primary.depth / 2) + 12)));
+                return {
+                    kind: 'finish-move',
+                    radius,
+                    position: geometry.add(back, geometry.scaleVector(right, -24)),
+                    rotation: Math.atan2(forward.y, forward.x)
+                };
+            }
+            const centers = units.map((unit) => geometry.getUnitCenter(unit));
+            const center = {
+                x: geometry.average(centers.map((point) => point.x)),
+                y: geometry.average(centers.map((point) => point.y))
+            };
+            const projections = units
+                .flatMap((unit) => geometry.cornersToPoints(geometry.getUnitCorners(unit)))
+                .map((point) => geometry.dot(point, forward));
+            const backDistance = Math.min(...projections);
+            const centerDistance = geometry.dot(center, forward);
+            const backOffset = Math.max(18, centerDistance - backDistance + 12);
+            return {
+                kind: 'finish-move',
+                radius,
+                position: geometry.add(center, geometry.scaleVector(forward, -backOffset)),
+                rotation: Math.atan2(forward.y, forward.x)
             };
         }
 

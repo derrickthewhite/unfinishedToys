@@ -6,6 +6,13 @@
     root.HordesPersistence = factory(root.HordesData);
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (data) {
     const STORAGE_KEY = 'hordes-of-the-things-saves';
+    const CHECKPOINT_KEY = 'hordes-of-the-things-checkpoints';
+    const CHECKPOINT_SLOTS = ['gameStart', 'lastTurn', 'endMove'];
+    const CHECKPOINT_META = {
+        gameStart: { id: 'checkpoint-game-start', name: 'Start of game' },
+        lastTurn: { id: 'checkpoint-last-turn', name: 'Last turn' },
+        endMove: { id: 'checkpoint-end-move', name: 'End of move' }
+    };
 
     class PersistenceMethods {
         getStorageRecords() {
@@ -188,6 +195,141 @@
             this.updateStatus(`Saved game as ${name}.`);
         }
 
+        getExportFileName(name, now = new Date()) {
+            const stamp = now.toISOString().replace(/[:.]/g, '-');
+            const safeName = String(name || 'hordes-export')
+                .trim()
+                .replace(/[<>:"/\\|?*\u0000-\u001f]+/g, '-')
+                .replace(/\s+/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '')
+                .slice(0, 48) || 'hordes-export';
+            return `${safeName}-${stamp}.json`;
+        }
+
+        downloadJsonFile(filename, payload) {
+            const text = `${JSON.stringify(payload, null, 2)}\n`;
+            if (typeof document === 'undefined') {
+                return text;
+            }
+            const blob = new Blob([text], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.rel = 'noopener';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+            return text;
+        }
+
+        emptyCheckpointStore() {
+            return { gameStart: null, lastTurn: null, endMove: null };
+        }
+
+        getCheckpointStore() {
+            const store = this.emptyCheckpointStore();
+            if (typeof window === 'undefined' || !window.localStorage) {
+                return store;
+            }
+            try {
+                const raw = window.localStorage.getItem(CHECKPOINT_KEY);
+                const parsed = raw ? JSON.parse(raw) : {};
+                CHECKPOINT_SLOTS.forEach((slot) => {
+                    const record = parsed?.[slot];
+                    if (record?.snapshot) {
+                        store[slot] = record;
+                    }
+                });
+                return store;
+            } catch (error) {
+                console.warn('Unable to read checkpoints from local storage.', error);
+                return this.emptyCheckpointStore();
+            }
+        }
+
+        writeCheckpointStore(store) {
+            if (typeof window === 'undefined' || !window.localStorage) {
+                return false;
+            }
+            const payload = this.emptyCheckpointStore();
+            CHECKPOINT_SLOTS.forEach((slot) => {
+                payload[slot] = store?.[slot]?.snapshot ? store[slot] : null;
+            });
+            window.localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(payload));
+            return true;
+        }
+
+        captureCheckpoint(slot) {
+            if (this._restoringSave || !CHECKPOINT_META[slot]) {
+                return false;
+            }
+            if (this.state.mode !== 'game' || this.state.setupStage !== 'game') {
+                return false;
+            }
+            try {
+                const record = this.buildSavePayload(CHECKPOINT_META[slot].name);
+                record.id = CHECKPOINT_META[slot].id;
+                const store = this.getCheckpointStore();
+                store[slot] = record;
+                return this.writeCheckpointStore(store);
+            } catch (error) {
+                console.warn('Unable to store checkpoint.', error);
+                return false;
+            }
+        }
+
+        captureGameStartCheckpoint() {
+            return this.captureCheckpoint('gameStart');
+        }
+
+        captureLocalTurnCheckpoint() {
+            if (typeof this.canLocallyControl === 'function' && !this.canLocallyControl(this.state.activePlayerId)) {
+                return false;
+            }
+            return this.captureCheckpoint('lastTurn');
+        }
+
+        captureEndMoveCheckpoint() {
+            if (this.state.phase !== 'move') {
+                return false;
+            }
+            return this.captureCheckpoint('endMove');
+        }
+
+        loadCheckpoint(slot) {
+            const record = this.getCheckpointStore()[slot];
+            if (!record?.snapshot) {
+                this.updateStatus('That checkpoint has not been saved yet.');
+                return;
+            }
+            if (typeof this.closeGameSettingsModal === 'function') {
+                this.closeGameSettingsModal(false);
+            }
+            const label = CHECKPOINT_META[slot]?.name || record.name;
+            this.restoreSavedRecord(record, `Returned to ${label}.`);
+            if (typeof this.canLocallyControl === 'function' && !this.canLocallyControl(this.state.activePlayerId)) {
+                this.state.controllerPaused = true;
+                this._controllerActionToken = (this._controllerActionToken || 0) + 1;
+                if (typeof this.syncUiFromState === 'function') {
+                    this.syncUiFromState();
+                }
+                this.updateStatus(`Returned to ${label}. Computer paused.`);
+            }
+        }
+
+        exportGameJson() {
+            const named = (this.ui.storageNameInput?.value || '').trim();
+            const name = named || this.getDefaultSaveName();
+            const payload = this.buildSavePayload(name);
+            const filename = this.getExportFileName(name);
+            this.downloadJsonFile(filename, payload);
+            this.updateStatus(`Exported ${filename}.`);
+            return payload;
+        }
+
         deriveNextUnitId(units) {
             const maxNumericId = units.reduce((maxId, unit) => {
                 const match = /^unit-(\d+)$/.exec(unit.id);
@@ -202,14 +344,21 @@
         normalizeSavedUnit(unit) {
             const playerId = unit.playerId || (unit.side === 'red' ? 'player-2' : 'player-1');
             const { side, ...normalized } = unit;
+            const footprint = unit.type === 'Base' ? data.getBaseFootprint(unit.faction || normalized.faction) : null;
             return {
                 ...normalized,
                 playerId,
-                depth: data.UNIT_TYPES[unit.type]?.depth ?? unit.depth,
+                width: footprint ? footprint.width : normalized.width,
+                depth: footprint ? footprint.depth : (data.UNIT_TYPES[unit.type]?.depth ?? unit.depth),
+                outline: footprint ? footprint.points.map((point) => ({ x: point.x, y: point.y })) : (normalized.outline || null),
                 moves: unit.moves ? { ...unit.moves } : undefined,
-                strength: unit.strength ? { ...unit.strength } : undefined,
+                strength: footprint ? { infantry: 6, mounted: 6 } : (unit.strength ? { ...unit.strength } : undefined),
                 ranged: unit.ranged ? { ...unit.ranged } : null,
-                combat: unit.combat ? { ...unit.combat } : {}
+                combat: footprint
+                    ? { ...(unit.combat || {}), stationary: true, lossEndsGame: true, unpurchasable: true }
+                    : (unit.combat ? { ...unit.combat } : {}),
+                value: footprint ? 0 : normalized.value,
+                troopClass: footprint ? 'infantry' : normalized.troopClass
             };
         }
 
@@ -238,6 +387,12 @@
                 this.renderStorageList();
                 return;
             }
+            this.restoreSavedRecord(record, `Loaded saved game ${record.name}.`);
+        }
+
+        restoreSavedRecord(record, statusMessage) {
+            this._restoringSave = true;
+            try {
             const snapshot = record.snapshot || {};
             const setupStage = this.normalizeSetupStage(snapshot.setupStage);
             this.state.mode = snapshot.mode || (setupStage === 'game' ? 'game' : 'edit');
@@ -321,8 +476,11 @@
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.requestRender();
-            this.updateStatus(`Loaded saved game ${record.name}.`);
+            this.updateStatus(statusMessage);
             this.scheduleControllerAction();
+            } finally {
+                this._restoringSave = false;
+            }
         }
 
         deleteGame(recordId) {

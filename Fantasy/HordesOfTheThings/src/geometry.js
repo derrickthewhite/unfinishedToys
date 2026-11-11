@@ -105,7 +105,7 @@
         if (pointInPolygon(start, polygon) || pointInPolygon(end, polygon)) {
             return true;
         }
-        const points = cornersToPoints(polygon);
+        const points = coercePolygonPoints(polygon);
         for (let index = 0; index < points.length; index += 1) {
             const next = points[(index + 1) % points.length];
             if (segmentsIntersect(start, end, points[index], next)) {
@@ -178,6 +178,250 @@
             x: (corners.frontLeft.x + corners.backRight.x) / 2,
             y: (corners.frontLeft.y + corners.backRight.y) / 2
         };
+    }
+
+    function hasOutline(unit) {
+        return Array.isArray(unit?.outline) && unit.outline.length >= 3;
+    }
+
+    function getUnitFootprintPoints(unit) {
+        if (!hasOutline(unit)) {
+            return cornersToPoints(getUnitCorners(unit));
+        }
+        const forward = getForwardVector(unit.rotation || 0);
+        const right = getRightVector(unit.rotation || 0);
+        const origin = { x: unit.x, y: unit.y };
+        return unit.outline.map((point) => add(
+            add(origin, scaleVector(right, point.x)),
+            scaleVector(forward, -point.y)
+        ));
+    }
+
+    function coercePolygonPoints(polygon) {
+        if (Array.isArray(polygon)) {
+            return polygon;
+        }
+        return cornersToPoints(polygon);
+    }
+
+    function segmentDistance(a1, a2, b1, b2) {
+        if (segmentsIntersect(a1, a2, b1, b2)) {
+            return 0;
+        }
+        return Math.min(
+            distancePointToSegment(a1, b1, b2),
+            distancePointToSegment(a2, b1, b2),
+            distancePointToSegment(b1, a1, a2),
+            distancePointToSegment(b2, a1, a2)
+        );
+    }
+
+    function pointPolygonDistance(point, points) {
+        if (pointInPolygon(point, points)) {
+            return 0;
+        }
+        let min = Infinity;
+        for (let index = 0; index < points.length; index += 1) {
+            min = Math.min(min, distancePointToSegment(point, points[index], points[(index + 1) % points.length]));
+        }
+        return min;
+    }
+
+    function segmentNearPolygon(start, end, points, epsilon) {
+        if (pointInPolygon(start, points) || pointInPolygon(end, points)) {
+            return true;
+        }
+        for (let index = 0; index < points.length; index += 1) {
+            if (segmentDistance(start, end, points[index], points[(index + 1) % points.length]) <= epsilon) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function classifyOutlineEdge(unit, worldPoint) {
+        const center = getUnitCenter(unit);
+        const delta = subtract(worldPoint, center);
+        const forward = dot(delta, getForwardVector(unit.rotation || 0));
+        const right = dot(delta, getRightVector(unit.rotation || 0));
+        if (Math.abs(forward) >= Math.abs(right)) {
+            return forward >= 0 ? 'front' : 'back';
+        }
+        return right >= 0 ? 'right' : 'left';
+    }
+
+    function segmentMeaningfullyNearPolygon(start, end, points, epsilon) {
+        const length = Math.hypot(end.x - start.x, end.y - start.y);
+        if (length <= epsilon) {
+            return pointPolygonDistance(lerpPoint(start, end, 0.5), points) <= epsilon;
+        }
+        const inset = Math.min(1, length * 0.25);
+        const usable = length - (inset * 2);
+        const samples = Math.max(3, Math.ceil(usable / 4));
+        for (let step = 0; step <= samples; step += 1) {
+            const distance = inset + ((usable * step) / samples);
+            const point = lerpPoint(start, end, distance / length);
+            if (pointPolygonDistance(point, points) <= epsilon) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function outlineEdgeName(unit, start, end) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const length = Math.hypot(dx, dy);
+        if (length < 0.001) {
+            return classifyOutlineEdge(unit, start);
+        }
+        let normalX = -dy / length;
+        let normalY = dx / length;
+        const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+        if (pointInPolygon({ x: midpoint.x + (normalX * 0.4), y: midpoint.y + (normalY * 0.4) }, getUnitFootprintPoints(unit))) {
+            normalX = -normalX;
+            normalY = -normalY;
+        }
+        const forward = getForwardVector(unit.rotation || 0);
+        const right = getRightVector(unit.rotation || 0);
+        const ahead = (normalX * forward.x) + (normalY * forward.y);
+        const sideways = (normalX * right.x) + (normalY * right.y);
+        if (Math.abs(ahead) >= Math.abs(sideways)) {
+            return ahead >= 0 ? 'front' : 'back';
+        }
+        return sideways >= 0 ? 'right' : 'left';
+    }
+
+    function outlineIsRectangular(unit) {
+        const points = unit?.outline;
+        if (!Array.isArray(points) || points.length !== 4) {
+            return false;
+        }
+        for (let index = 0; index < points.length; index += 1) {
+            const start = points[index];
+            const end = points[(index + 1) % points.length];
+            if (Math.min(Math.abs(end.x - start.x), Math.abs(end.y - start.y)) > 1) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function combatContactEpsilon(unit, other) {
+        const curvedBase = [unit, other].some((candidate) => (
+            candidate?.type === 'Base' && hasOutline(candidate) && !outlineIsRectangular(candidate)
+        ));
+        return curvedBase ? data.BASE_CONTACT_FUZZ : data.COLLISION_EPSILON;
+    }
+
+    function unitTouchEdges(unit, other) {
+        const epsilon = combatContactEpsilon(unit, other);
+        const otherPoints = getUnitFootprintPoints(other);
+        const edges = new Set();
+        if (!hasOutline(unit)) {
+            const corners = getUnitCorners(unit);
+            [
+                ['front', corners.frontLeft, corners.frontRight],
+                ['right', corners.frontRight, corners.backRight],
+                ['back', corners.backRight, corners.backLeft],
+                ['left', corners.backLeft, corners.frontLeft]
+            ].forEach(([name, start, end]) => {
+                if (segmentMeaningfullyNearPolygon(start, end, otherPoints, epsilon)) {
+                    edges.add(name);
+                }
+            });
+            return [...edges];
+        }
+        const points = getUnitFootprintPoints(unit);
+        for (let index = 0; index < points.length; index += 1) {
+            const start = points[index];
+            const end = points[(index + 1) % points.length];
+            if (segmentMeaningfullyNearPolygon(start, end, otherPoints, epsilon)) {
+                edges.add(outlineEdgeName(unit, start, end));
+            }
+        }
+        return [...edges];
+    }
+
+    function unitsOverlap(left, right) {
+        return polygonsOverlap(getUnitFootprintPoints(left), getUnitFootprintPoints(right));
+    }
+
+    function unitsMinDistance(left, right) {
+        return minDistanceBetweenPolygons(getUnitFootprintPoints(left), getUnitFootprintPoints(right));
+    }
+
+    function translateUnitOntoBoard(unit, boardSize) {
+        const limit = boardSize || data.BOARD_SIZE;
+        const points = getUnitFootprintPoints(unit);
+        if (points.length === 0) {
+            return unit;
+        }
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        points.forEach((point) => {
+            minX = Math.min(minX, point.x);
+            maxX = Math.max(maxX, point.x);
+            minY = Math.min(minY, point.y);
+            maxY = Math.max(maxY, point.y);
+        });
+        let dx = 0;
+        let dy = 0;
+        if (minX < 0) {
+            dx = -minX;
+        }
+        if (maxX + dx > limit) {
+            dx += limit - (maxX + dx);
+        }
+        if (minY < 0) {
+            dy = -minY;
+        }
+        if (maxY + dy > limit) {
+            dy += limit - (maxY + dy);
+        }
+        if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
+            return unit;
+        }
+        return { ...unit, x: unit.x + dx, y: unit.y + dy };
+    }
+
+    function footprintInsideBoard(unit, boardSize) {
+        const limit = boardSize || data.BOARD_SIZE;
+        return getUnitFootprintPoints(unit).every((point) => (
+            point.x >= -0.05
+            && point.y >= -0.05
+            && point.x <= limit + 0.05
+            && point.y <= limit + 0.05
+        ));
+    }
+
+    function defendedEdgeCenter() {
+        return { x: data.BOARD_SIZE / 2, y: data.BOARD_SIZE };
+    }
+
+    function baseClearanceFromDefendedEdge(unit) {
+        return pointPolygonDistance(defendedEdgeCenter(), getUnitFootprintPoints(unit));
+    }
+
+    function baseMeetsEdgeClearance(unit) {
+        return baseClearanceFromDefendedEdge(unit) <= data.BASE_EDGE_CLEARANCE + 0.05;
+    }
+
+    function positionBaseOnHomeEdge(unit) {
+        const fitted = translateUnitOntoBoard(unit);
+        if (baseMeetsEdgeClearance(fitted)) {
+            return fitted;
+        }
+        const direction = Math.sign((data.BOARD_SIZE / 2) - fitted.x) || -1;
+        for (let step = 1; step <= data.BOARD_SIZE; step += 1) {
+            const candidate = translateUnitOntoBoard({ ...fitted, x: fitted.x + (direction * step) });
+            if (baseMeetsEdgeClearance(candidate) && footprintInsideBoard(candidate)) {
+                return candidate;
+            }
+        }
+        return fitted;
     }
 
     function buildUnitFromCenter(unit, center, rotation) {
@@ -260,8 +504,19 @@
         ctx.closePath();
     }
 
+    function tracePointPolygon(ctx, points) {
+        if (!points || points.length === 0) {
+            return;
+        }
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let index = 1; index < points.length; index += 1) {
+            ctx.lineTo(points[index].x, points[index].y);
+        }
+        ctx.closePath();
+    }
+
     function pointInPolygon(point, corners) {
-        const polygon = cornersToPoints(corners);
+        const polygon = coercePolygonPoints(corners);
         let inside = false;
         for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
             const current = polygon[index];
@@ -298,7 +553,7 @@
         if (polygonsOverlap(aCorners, bCorners)) {
             return 0;
         }
-        const polygons = [cornersToPoints(aCorners), cornersToPoints(bCorners)];
+        const polygons = [coercePolygonPoints(aCorners), coercePolygonPoints(bCorners)];
         let min = Infinity;
         polygons.forEach((source, sourceIndex) => {
             const target = polygons[1 - sourceIndex];
@@ -312,7 +567,7 @@
     }
 
     function polygonsOverlap(aCorners, bCorners) {
-        const polygons = [cornersToPoints(aCorners), cornersToPoints(bCorners)];
+        const polygons = [coercePolygonPoints(aCorners), coercePolygonPoints(bCorners)];
         for (const polygon of polygons) {
             for (let index = 0; index < polygon.length; index += 1) {
                 const current = polygon[index];
@@ -650,7 +905,7 @@
     }
 
     function anyFriendlyCollision(movingUnits, stationaryUnits) {
-        return movingUnits.some((movingUnit) => stationaryUnits.some((stationaryUnit) => polygonsOverlap(getUnitCorners(movingUnit), getUnitCorners(stationaryUnit))));
+        return movingUnits.some((movingUnit) => stationaryUnits.some((stationaryUnit) => unitsOverlap(movingUnit, stationaryUnit)));
     }
 
     function findFriendlySnapOffset(movingUnits, stationaryUnits) {
@@ -666,6 +921,9 @@
             const movingPoints = cornersToPoints(movingCorners);
 
             stationaryUnits.forEach((stationaryUnit) => {
+                if (hasOutline(stationaryUnit)) {
+                    return;
+                }
                 const stationaryCorners = getUnitCorners(stationaryUnit);
                 const stationaryPoints = cornersToPoints(stationaryCorners);
 
@@ -784,6 +1042,17 @@
         sameFootprint,
         interpolateUnitPose,
         tracePolygon,
+        tracePointPolygon,
+        hasOutline,
+        getUnitFootprintPoints,
+        unitTouchEdges,
+        unitsOverlap,
+        unitsMinDistance,
+        translateUnitOntoBoard,
+        footprintInsideBoard,
+        baseClearanceFromDefendedEdge,
+        baseMeetsEdgeClearance,
+        positionBaseOnHomeEdge,
         pointInPolygon,
         polygonInsideRect,
         polygonsOverlap,

@@ -59,6 +59,7 @@ Unfavorable new contacts (e.g. a lone Horde stepping into a Spear) score badly h
 - **formationSize** — more units stacked in combat
 - **stackBreak** — penalty for breaking an existing stack
 - **formationApproach** — moving closer to same-type, same-facing friendlies without yet dressing
+- **lineStep** — closing up to a same-facing friendly front that is already ahead, so the rest of the line matches a step. Withheld when that move loses the fight, shuffles an existing fight, or adds recoil risk
 
 ### Terrain (`terrain`)
 
@@ -92,10 +93,10 @@ Shooters that ignore bad going (e.g. Shooter) invert the preference.
 
 ## Selection thresholds
 
-Default **MIN_BENEFIT = 0.25**. If nothing clears that, fallbacks apply in order:
+Default **MIN_BENEFIT = 0.2**. If nothing clears that, fallbacks apply in order:
 
-1. Best **ensorcelled return** with score ≥ 0.25
-2. Best **reserve deploy** with score ≥ 0.25 when board moves fall short
+1. Best **ensorcelled return** with score ≥ 0.2
+2. Best **reserve deploy** with score ≥ 0.2 when board moves fall short
 3. Best move that **improves bad terrain** (swamp+ or leaves water) with score > 0
 4. Best move that **fully clears water** from the unit footprint (any positive score)
 5. Best **reserve deploy** or **ensorcelled return** with any positive score
@@ -154,5 +155,5 @@ node --test test/move-ai.test.js
 | Side | Unit | Problem | Chosen move |
 |------|------|---------|-------------|
 | Undead | Magician (unit-20) | In water, forward stays wet | `sidestep-left` 25 mm — fully off water |
-| Undead | Blade (unit-11) | Forward ~0.16, bad center position | `sidestep-left` when other units already moved |
+| Undead | Blade (unit-11) | Sitting behind the Spear | `forward` to close up on that front |
 | Panda | Knights (unit-7/8) | In water at home edge | `sidestep-left` — clears water before Hero/Spear advances |

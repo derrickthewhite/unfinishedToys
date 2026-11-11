@@ -32,6 +32,7 @@
         cohesion: 2,
         terrain: 1.5,
         formationApproach: 1.2,
+        lineStep: 1.2,
         lateralReposition: 1,
         ensorcelledReturn: 1,
         stationaryShooter: 2,
@@ -54,6 +55,11 @@
     const DRESS_PARTNER_SCALE = 0.2;
 
     const FORMATION_APPROACH_SCALE = 0.8;
+
+    const LINE_STEP_SCALE = 0.9;
+
+    // Far enough to see the next group in a battle line, not a unit on the other flank.
+    const LINE_STEP_LATERAL_REACH = 160;
 
     const LATERAL_REPOSITION_BONUS = 0.2;
 
@@ -203,6 +209,11 @@
 
         let fight = getCombatAdvantageForPlayer(afterPreviews, activePlayerId)
             - getCombatAdvantageForPlayer(beforePreviews, activePlayerId);
+        const baseContactBonus = (previews) => previews.reduce((sum, preview) => {
+            const sides = getActivePreviewSide(preview, activePlayerId);
+            return sides?.opponent?.primaryType === 'Base' ? sum + 8 : sum;
+        }, 0);
+        fight += baseContactBonus(afterPreviews) - baseContactBonus(beforePreviews);
 
         let matchup = 0;
         let modifiers = 0;
@@ -348,6 +359,69 @@
                 return sum;
             }
             return sum + (delta / 100) * FORMATION_APPROACH_SCALE;
+        }, 0);
+        return gain / movedUnitIds.length;
+    }
+
+
+    function getFrontMidpoint(unit) {
+        const corners = geometry.getUnitCorners(unit);
+        return geometry.midpoint(corners.frontLeft, corners.frontRight);
+    }
+
+
+    /**
+     * Reward closing up to a same-facing friendly front that is already ahead.
+     * Credit stops once the mover is level with that front, so the bonus pays
+     * for matching a step rather than for starting the next one.
+     * A move that loses the fight, shuffles a bad contact, or adds recoil risk
+     * does not get the bonus.
+     */
+    function scoreLineStep(beforeUnits, afterUnits, activePlayerId, getPlayerId, movedUnitIds, quality) {
+        if (movedUnitIds.length === 0) {
+            return 0;
+        }
+        if (quality && (quality.fight < 0 || quality.newContact < 0 || quality.recoilDeath < 0)) {
+            return 0;
+        }
+        const movedSet = new Set(movedUnitIds);
+        const gain = movedUnitIds.reduce((sum, unitId) => {
+            const before = beforeUnits.find((unit) => unit.id === unitId);
+            const after = afterUnits.find((unit) => unit.id === unitId);
+            if (!before || !after) {
+                return sum;
+            }
+            const forward = geometry.getForwardVector(before.rotation);
+            const right = geometry.getRightVector(before.rotation);
+            const beforeFront = getFrontMidpoint(before);
+            const leadProjection = beforeUnits.reduce((lead, other) => {
+                if (other.id === unitId || movedSet.has(other.id) || other.inReserve) {
+                    return lead;
+                }
+                if (getPlayerId(other) !== activePlayerId) {
+                    return lead;
+                }
+                if (Math.abs(geometry.normalizeAngle(other.rotation - before.rotation)) > 0.12) {
+                    return lead;
+                }
+                const otherFront = getFrontMidpoint(other);
+                const lateral = Math.abs(geometry.dot(geometry.subtract(otherFront, beforeFront), right));
+                if (lateral > LINE_STEP_LATERAL_REACH) {
+                    return lead;
+                }
+                return Math.max(lead, geometry.dot(otherFront, forward));
+            }, -Infinity);
+            if (!Number.isFinite(leadProjection)) {
+                return sum;
+            }
+            const beforeDeficit = Math.max(0, leadProjection - geometry.dot(beforeFront, forward));
+            const afterFront = getFrontMidpoint(after);
+            const afterDeficit = Math.max(0, leadProjection - geometry.dot(afterFront, forward));
+            const closed = beforeDeficit - afterDeficit;
+            if (closed <= data.FORMATION_GAP_TOLERANCE) {
+                return sum;
+            }
+            return sum + (closed / 100) * LINE_STEP_SCALE;
         }, 0);
         return gain / movedUnitIds.length;
     }
@@ -779,6 +853,18 @@
                 getPlayerId,
                 movedUnitIds
             ),
+            lineStep: scoreLineStep(
+                beforeUnits,
+                afterUnits,
+                activePlayerId,
+                getPlayerId,
+                movedUnitIds,
+                {
+                    fight: fightQuality.fight,
+                    newContact: fightQuality.newContact,
+                    recoilDeath: recoilQuality.recoilDeath
+                }
+            ),
             lateralReposition: scoreLateralReposition(opts.moveKind, {
                 fight: fightQuality.fight,
                 newContact: fightQuality.newContact
@@ -810,6 +896,7 @@
             + breakdown.cohesion * AUTO_MOVE_WEIGHTS.cohesion
             + breakdown.terrain * AUTO_MOVE_WEIGHTS.terrain
             + breakdown.formationApproach * AUTO_MOVE_WEIGHTS.formationApproach
+            + breakdown.lineStep * AUTO_MOVE_WEIGHTS.lineStep
             + breakdown.lateralReposition * AUTO_MOVE_WEIGHTS.lateralReposition
             + breakdown.ensorcelledReturn * AUTO_MOVE_WEIGHTS.ensorcelledReturn
         );

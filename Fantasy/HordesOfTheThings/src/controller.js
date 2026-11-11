@@ -60,17 +60,74 @@
                 this._lastComputerActionAt = this.nowMs();
             },
 
-            setComputerThinking(playerId, message) {
+            setComputerThinking(playerId, message, progress = null) {
                 this.state.controllerThinking = {
                     playerId: playerId || null,
-                    message: message || 'Thinking…'
+                    message: message || 'Thinking…',
+                    current: Number.isFinite(progress?.current) ? progress.current : null,
+                    total: Number.isFinite(progress?.total) ? progress.total : null,
+                    showMoveProgress: Boolean(progress?.showMoveProgress)
                 };
                 this.syncControllerHud();
+                this.syncAiMoveOverlay();
             },
 
             clearComputerThinking() {
                 this.state.controllerThinking = null;
                 this.syncControllerHud();
+                this.syncAiMoveOverlay();
+            },
+
+            syncAiMoveOverlay() {
+                const overlay = this.ui.aiMoveOverlay;
+                if (!overlay) {
+                    return;
+                }
+                const thinking = this.state.controllerThinking;
+                const show = Boolean(thinking?.showMoveProgress)
+                    && this.state.mode === 'game'
+                    && this.state.setupStage === 'game';
+                overlay.hidden = !show;
+                if (!show) {
+                    return;
+                }
+                const playerId = thinking.playerId || this.state.activePlayerId;
+                const colors = this.getPlayerColors(playerId);
+                const sideLabel = this.getPlayerLabel(playerId);
+                const total = Math.max(0, thinking.total || 0);
+                const current = Math.max(0, thinking.current || 0);
+                const percent = total > 0
+                    ? Math.min(100, Math.round((current / total) * 100))
+                    : 0;
+                const movesSpent = (this.state.moveHistory || []).reduce(
+                    (sum, entry) => sum + (Number(entry.moveCost) || 0),
+                    0
+                );
+                const movesRemaining = Math.max(0, Number(this.state.remainingMoves) || 0);
+                const movesTotal = movesSpent + movesRemaining;
+                const moveIndex = movesTotal > 0
+                    ? Math.min(movesSpent + (movesRemaining > 0 ? 1 : 0), movesTotal)
+                    : 0;
+                const moveProgress = movesTotal > 0 ? ` (${moveIndex}/${movesTotal})` : '';
+                overlay.style.setProperty('--ai-move-fill', colors.fill);
+                overlay.style.setProperty('--ai-move-stroke', colors.stroke);
+                if (this.ui.aiMoveOverlayTitle) {
+                    this.ui.aiMoveOverlayTitle.textContent = this.state.controllerPaused
+                        ? `Paused — ${sideLabel}${moveProgress}`
+                        : `Calculating Moves for ${sideLabel}${moveProgress}`;
+                }
+                if (this.ui.aiMoveOverlayBar) {
+                    this.ui.aiMoveOverlayBar.style.width = `${percent}%`;
+                }
+                if (this.ui.aiMoveOverlayPercent) {
+                    this.ui.aiMoveOverlayPercent.textContent = `${percent}%`;
+                }
+                if (this.ui.aiMoveOverlayDetail) {
+                    this.ui.aiMoveOverlayDetail.textContent = thinking.message || '';
+                }
+                if (this.ui.aiMoveOverlayPauseButton) {
+                    this.ui.aiMoveOverlayPauseButton.textContent = this.state.controllerPaused ? 'Resume' : 'Pause';
+                }
             },
 
             setControllerPaused(paused) {
@@ -81,9 +138,24 @@
                 this.state.controllerPaused = next;
                 this._controllerActionToken = (this._controllerActionToken || 0) + 1;
                 if (next) {
-                    this.clearComputerThinking();
+                    if (this.state.controllerThinking?.showMoveProgress) {
+                        this.setComputerThinking(
+                            this.state.controllerThinking.playerId,
+                            'Paused.',
+                            {
+                                current: this.state.controllerThinking.current,
+                                total: this.state.controllerThinking.total,
+                                showMoveProgress: true
+                            }
+                        );
+                    } else {
+                        this.clearComputerThinking();
+                    }
                     this.updateStatus('Computer paused.');
                     return;
+                }
+                if (this.state.controllerThinking?.showMoveProgress) {
+                    this.clearComputerThinking();
                 }
                 this.scheduleControllerAction();
                 this.updateStatus('Computer resumed.');
@@ -299,7 +371,6 @@
                     return;
                 }
                 if (decision.kind === 'move') {
-                    this.setComputerThinking(decision.playerId, `${label} is considering a move…`);
                     const result = await this.playComputerMove();
                     if (!this.isControllerActionCurrent(await this.waitForComputerDelay(startedAt))) {
                         return;
@@ -389,11 +460,13 @@
                 if (this.ui.gameThinkingText) {
                     const show = this.hasComputerPlayer()
                         && this.state.setupStage === 'game'
-                        && this.state.mode === 'game';
+                        && this.state.mode === 'game'
+                        && !thinking?.showMoveProgress;
                     this.ui.gameThinkingText.hidden = !show;
                     this.ui.gameThinkingText.textContent = thinking?.message
                         || (this.state.controllerPaused ? 'Computer paused.' : 'Computer ready.');
                 }
+                this.syncAiMoveOverlay();
             }
         });
     }

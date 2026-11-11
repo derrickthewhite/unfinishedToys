@@ -327,7 +327,7 @@
         }
         const unitCorners = geometry.getUnitCorners(unit);
         for (const blocker of blockers) {
-            if (geometry.polygonsOverlap(unitCorners, geometry.getUnitCorners(blocker))) {
+            if (geometry.unitsOverlap(unit, blocker)) {
                 return false;
             }
         }
@@ -335,7 +335,7 @@
             if (otherId === unit.id) {
                 continue;
             }
-            if (geometry.polygonsOverlap(unitCorners, geometry.getUnitCorners(otherUnit))) {
+            if (geometry.unitsOverlap(unit, otherUnit)) {
                 return false;
             }
         }

@@ -18,13 +18,16 @@
         sideMidpoint,
         hasMeaningfulSharedEdge,
         cloneUnit,
+        isStationaryUnit,
         isEnsorcellableType,
         buildEnsorcelledUnit,
         rotateUnitInPlace
     } = core;
 
     const {
-        isUnitInBadGoing
+        isUnitInBadGoing,
+        getTerrainTypeAt,
+        sampleUnitTerrain
     } = terrain;
 
     const {
@@ -61,17 +64,19 @@
     function getCombatModifierLabel(id) {
         return {
             'bad-going': 'In bad going',
+            'shot-in-cover': 'Shot at in woods',
             'mounted-into-bad-going': 'Mounted against enemy in bad going',
             'multiple-shooters': 'Multiple shooters',
             'stacked': 'Supporting element',
             'flank-attacked': 'Attacked in flank',
             'rear-attacked': 'Attacked in rear',
-            'overlapped': 'Overlap from idle enemy'
+            'overlapped': 'Overlap from idle enemy',
+            'stronghold-support': 'Supporting attacker'
         }[id] || id;
     }
 
 
-    function combatModifier(id, value, detail) {
+    function combatModifier(id, value, detail, extra) {
         const modifier = {
             id,
             value,
@@ -80,7 +85,251 @@
         if (detail) {
             modifier.detail = detail;
         }
+        if (extra?.sources?.length) {
+            modifier.sources = extra.sources;
+        }
+        if (extra?.terrainKind) {
+            modifier.terrainKind = extra.terrainKind;
+        }
         return modifier;
+    }
+
+
+    function isRearEdgeName(edgeName) {
+        return edgeName === 'rear' || edgeName === 'back';
+    }
+
+
+    function badGoingKind(unit, terrainContext) {
+        if (!unit || !terrainContext) {
+            return null;
+        }
+        const centerKind = getTerrainTypeAt(geometry.getUnitCenter(unit), terrainContext);
+        if (centerKind === 'forest' || centerKind === 'swamp') {
+            return centerKind;
+        }
+        const sample = sampleUnitTerrain(unit, terrainContext);
+        if (sample.has('forest')) {
+            return 'forest';
+        }
+        if (sample.has('swamp')) {
+            return 'swamp';
+        }
+        return null;
+    }
+
+
+    function shootingCoverKind(unit, terrainContext) {
+        if (!unit || !terrainContext) {
+            return null;
+        }
+        if (getTerrainTypeAt(geometry.getUnitCenter(unit), terrainContext) === 'forest') {
+            return 'forest';
+        }
+        if (sampleUnitTerrain(unit, terrainContext).has('forest')) {
+            return 'forest';
+        }
+        return null;
+    }
+
+
+    function unitsWhoseFrontTouches(combatant, targetUnits, edgeNames) {
+        const wanted = new Set(edgeNames);
+        const found = [];
+        (combatant?.units || []).forEach((unit) => {
+            const touches = (targetUnits || []).some((target) => {
+                const edges = getFrontTouchedEdges(unit, target);
+                return [...edges].some((edgeName) => wanted.has(edgeName));
+            });
+            if (touches) {
+                found.push(unit);
+            }
+        });
+        return found;
+    }
+
+
+    function flankProviderUnits(context) {
+        const sides = (context.incomingEdges || []).filter((edgeName) => edgeName === 'left' || edgeName === 'right');
+        if (sides.length === 0) {
+            return [];
+        }
+        const targetUnits = context.combatant?.units || [];
+        const providers = [];
+        const seen = new Set();
+        const addUnits = (units) => {
+            units.forEach((unit) => {
+                if (!unit || seen.has(unit.id)) {
+                    return;
+                }
+                seen.add(unit.id);
+                providers.push(unit);
+            });
+        };
+        (context.supportContacts || []).forEach((contact) => {
+            const contactSides = (contact.edgesOnTarget || []).filter((edgeName) => sides.includes(edgeName));
+            if (contactSides.length === 0) {
+                return;
+            }
+            const combatant = (context.combatants || []).find((entry) => entry.id === contact.combatantId);
+            const touched = unitsWhoseFrontTouches(combatant, targetUnits, contactSides);
+            addUnits(touched.length > 0 ? touched : (combatant?.units || []).slice(0, 1));
+        });
+        const supportEdges = new Set((context.supportContacts || []).flatMap((contact) => contact.edgesOnTarget || []));
+        const opponentSides = sides.filter((side) => !supportEdges.has(side));
+        if (opponentSides.length > 0 && context.opponentCombatant) {
+            const touched = unitsWhoseFrontTouches(context.opponentCombatant, targetUnits, opponentSides);
+            addUnits(touched.length > 0 ? touched : context.opponentCombatant.units.slice(0, 1));
+        }
+        return providers;
+    }
+
+
+    function rearProviderUnits(context) {
+        const targetUnits = context.combatant?.units || [];
+        const providers = [];
+        const seen = new Set();
+        const addUnits = (units) => {
+            units.forEach((unit) => {
+                if (!unit || seen.has(unit.id)) {
+                    return;
+                }
+                seen.add(unit.id);
+                providers.push(unit);
+            });
+        };
+        const supportRears = (context.supportContacts || []).filter((contact) => (contact.edgesOnTarget || []).some(isRearEdgeName));
+        if (supportRears.length > 0) {
+            supportRears.forEach((contact) => {
+                if (hasFrontContactOnCombatant(contact.combatantId, context.combats || [])) {
+                    return;
+                }
+                const combatant = (context.combatants || []).find((entry) => entry.id === contact.combatantId);
+                const touched = unitsWhoseFrontTouches(combatant, targetUnits, ['rear', 'back']);
+                addUnits(touched.length > 0 ? touched : (combatant?.units || []).slice(0, 1));
+            });
+            return providers;
+        }
+        if (context.opponentCombatant && !hasFrontContactOnCombatant(context.opponentCombatant.id, context.combats || [])) {
+            const touched = unitsWhoseFrontTouches(context.opponentCombatant, targetUnits, ['rear', 'back']);
+            addUnits(touched.length > 0 ? touched : context.opponentCombatant.units.slice(0, 1));
+        }
+        return providers;
+    }
+
+
+    function sharesRankContact(left, right) {
+        if (isStationaryUnit(left) || isStationaryUnit(right)) {
+            return false;
+        }
+        if (getPlayerId(left) !== getPlayerId(right)) {
+            return false;
+        }
+        if (!areSameFacing(left, right)) {
+            return false;
+        }
+        const forward = geometry.getForwardVector(left.rotation);
+        const rightVector = geometry.getRightVector(left.rotation);
+        const delta = geometry.subtract(geometry.getUnitCenter(right), geometry.getUnitCenter(left));
+        const alongRank = geometry.dot(delta, rightVector);
+        const alongFile = geometry.dot(delta, forward);
+        const lateralGap = Math.abs(Math.abs(alongRank) - ((left.width + right.width) / 2));
+        const depthOverlap = Math.min(left.depth / 2, alongFile + (right.depth / 2))
+            - Math.max(-(left.depth / 2), alongFile - (right.depth / 2));
+        return lateralGap <= data.FORMATION_GAP_TOLERANCE && depthOverlap > data.COLLISION_EPSILON;
+    }
+
+
+    function rankMates(seedUnits, units) {
+        const found = new Map(seedUnits.map((unit) => [unit.id, unit]));
+        const queue = [...seedUnits];
+        while (queue.length > 0) {
+            const current = queue.pop();
+            units.forEach((other) => {
+                if (found.has(other.id) || !sharesRankContact(current, other)) {
+                    return;
+                }
+                found.set(other.id, other);
+                queue.push(other);
+            });
+        }
+        seedUnits.forEach((unit) => found.delete(unit.id));
+        return [...found.values()];
+    }
+
+
+    function frontageExtensionSide(anchorUnit, otherUnit) {
+        const right = geometry.getRightVector(anchorUnit.rotation);
+        const origin = geometry.getUnitCorners(anchorUnit).frontLeft;
+        const project = (point) => geometry.dot(geometry.subtract(point, origin), right);
+        const anchorCorners = geometry.getUnitCorners(anchorUnit);
+        const anchorMin = Math.min(project(anchorCorners.frontLeft), project(anchorCorners.frontRight));
+        const anchorMax = Math.max(project(anchorCorners.frontLeft), project(anchorCorners.frontRight));
+        const projections = geometry.cornersToPoints(geometry.getUnitCorners(otherUnit)).map(project);
+        const otherMin = Math.min(...projections);
+        const otherMax = Math.max(...projections);
+        const pastLeft = otherMin < anchorMin - data.COLLISION_EPSILON;
+        const pastRight = otherMax > anchorMax + data.COLLISION_EPSILON;
+        if (pastLeft && !pastRight) {
+            return 'left';
+        }
+        if (pastRight && !pastLeft) {
+            return 'right';
+        }
+        if (pastLeft && pastRight) {
+            return (anchorMin - otherMin) >= (otherMax - anchorMax) ? 'left' : 'right';
+        }
+        return null;
+    }
+
+
+    function overlapSources(context) {
+        const sources = [];
+        const usedSides = new Set();
+        const ignoredUnitIds = context.unit?.type === 'Base'
+            ? new Set((context.strongholdSupporters || []).map((unit) => unit.id))
+            : null;
+        const record = (unitId, side) => {
+            if (!side || usedSides.has(side)) {
+                return;
+            }
+            usedSides.add(side);
+            sources.push({ unitId, value: -1 });
+        };
+        const idleEnemyCombatants = context.combatants.filter((combatant) => combatant.playerId === context.opponentCombatant.playerId);
+        idleEnemyCombatants.forEach((enemyCombatant) => {
+            if (enemyCombatant.id === context.combatant.id || context.fightingCombatantIds.has(enemyCombatant.id)) {
+                return;
+            }
+            enemyCombatant.units.forEach((enemyUnit) => {
+                if (ignoredUnitIds?.has(enemyUnit.id)) {
+                    return;
+                }
+                context.combatant.units.forEach((anchorUnit) => {
+                    record(enemyUnit.id, getFlankContactDirection(anchorUnit, enemyUnit));
+                });
+            });
+        });
+        const sameSideUnits = context.combatants
+            .filter((combatant) => combatant.playerId === context.opponentCombatant.playerId)
+            .flatMap((combatant) => combatant.units);
+        const fightingUnitIds = new Set();
+        context.combatants.forEach((combatant) => {
+            if (context.fightingCombatantIds.has(combatant.id)) {
+                combatant.unitIds.forEach((unitId) => fightingUnitIds.add(unitId));
+            }
+        });
+        context.combatant.units.forEach((anchorUnit) => {
+            const touching = (context.opponentCombatant.units || []).filter((unit) => getFrontTouchedEdges(unit, anchorUnit).has('front'));
+            const seeds = touching.length > 0 ? touching : (context.opponentCombatant.units || []);
+            rankMates(seeds, sameSideUnits).forEach((mate) => {
+                if (fightingUnitIds.has(mate.id) || ignoredUnitIds?.has(mate.id)) {
+                    return;
+                }
+                record(mate.id, frontageExtensionSide(anchorUnit, mate));
+            });
+        });
+        return sources;
     }
 
 
@@ -100,40 +349,63 @@
         const modifiers = [];
         const unitInBadGoing = isUnitInBadGoing(context.unit, context.terrain);
         if (unitInBadGoing && !context.unit.combat?.ignoresBadGoingPenalty) {
-            modifiers.push(combatModifier('bad-going', -2));
+            modifiers.push(combatModifier('bad-going', -2, null, { terrainKind: badGoingKind(context.unit, context.terrain) }));
+        } else if (context.role === 'attacker' && context.unit.troopClass === 'mounted' && !unitInBadGoing && isUnitInBadGoing(context.opponent, context.terrain)) {
+            modifiers.push(combatModifier('mounted-into-bad-going', -2, null, { terrainKind: badGoingKind(context.opponent, context.terrain) }));
         }
-        if (context.role === 'attacker' && context.unit.troopClass === 'mounted' && isUnitInBadGoing(context.opponent, context.terrain)) {
-            const hasBadGoingPenalty = modifiers.some((modifier) => modifier.value === -2);
-            if (!hasBadGoingPenalty) {
-                modifiers.push(combatModifier('mounted-into-bad-going', -2));
+        if (context.phase === 'shooting' && context.shotAtUnit) {
+            const cover = shootingCoverKind(context.shotAtUnit, context.terrain);
+            if (cover) {
+                modifiers.push(combatModifier('shot-in-cover', 2, null, { terrainKind: cover }));
             }
         }
         if (context.phase === 'shooting' && context.role === 'defender' && context.attackers) {
             const extraShooterPenalty = getExtraShooterPenalty(context.attackers.length);
             if (extraShooterPenalty > 0) {
-                modifiers.push(combatModifier('multiple-shooters', -extraShooterPenalty));
+                const primary = choosePrimaryAttacker(context.attackers, context.opponent || context.unit);
+                const extras = context.attackers.filter((unit) => unit.id !== primary.id).slice(0, extraShooterPenalty);
+                modifiers.push(combatModifier('multiple-shooters', -extraShooterPenalty, null, {
+                    sources: extras.map((unit) => ({ unitId: unit.id, value: -1 }))
+                }));
             }
         }
         if (context.phase === 'melee') {
             if (context.combatant && context.combatant.unitIds.length > 1) {
-                const supports = (context.combatant.units || [])
-                    .filter((unit) => unit.id !== context.unit.id)
-                    .map((unit) => unit.type);
-                modifiers.push(combatModifier('stacked', 1, supports.length > 0 ? supports.join(', ') : null));
+                const supports = (context.combatant.units || []).filter((unit) => unit.id !== context.unit.id);
+                modifiers.push(combatModifier('stacked', 1, supports.map((unit) => unit.type).join(', ') || null, {
+                    sources: supports.slice(0, 1).map((unit) => ({ unitId: unit.id, value: 1 }))
+                }));
             }
             const incomingEdges = context.incomingEdges || [];
-            if (incomingEdges.includes('left') || incomingEdges.includes('right')) {
+            if (context.unit?.type !== 'Base' && (incomingEdges.includes('left') || incomingEdges.includes('right'))) {
                 const sides = incomingEdges.filter((edge) => edge === 'left' || edge === 'right');
-                modifiers.push(combatModifier('flank-attacked', -1, sides.join(' and ')));
+                const providers = flankProviderUnits(context);
+                modifiers.push(combatModifier('flank-attacked', -1, sides.join(' and '), {
+                    sources: providers.map((unit) => ({ unitId: unit.id, value: -1 }))
+                }));
             }
-            if (incomingEdges.includes('rear') && context.opponentCombatant && !hasFrontContactOnCombatant(context.opponentCombatant.id, context.combats || [])) {
-                modifiers.push(combatModifier('rear-attacked', -1));
+            if (rearAttackApplies(context)) {
+                modifiers.push(combatModifier('rear-attacked', -1, null, {
+                    sources: rearProviderUnits(context).map((unit) => ({ unitId: unit.id, value: -1 }))
+                }));
+            }
+            if (context.unit?.type === 'Base' && context.strongholdSupporters?.length) {
+                modifiers.push(combatModifier(
+                    'stronghold-support',
+                    -context.strongholdSupporters.length,
+                    context.strongholdSupporters.map((unit) => unit.type).join(', '),
+                    { sources: context.strongholdSupporters.map((unit) => ({ unitId: unit.id, value: -1 })) }
+                ));
             }
             if (context.combatant && context.opponentCombatant && context.combatants && context.fightingCombatantIds) {
-                const idleEnemyCombatants = context.combatants.filter((combatant) => combatant.playerId === context.opponentCombatant.playerId);
-                const overlapCount = countOverlapsOnCombatant(context.combatant, idleEnemyCombatants, context.fightingCombatantIds);
-                if (overlapCount > 0) {
-                    modifiers.push(combatModifier('overlapped', -overlapCount, overlapCount === 1 ? 'one flank' : 'both flanks'));
+                const sources = overlapSources(context);
+                if (sources.length > 0) {
+                    modifiers.push(combatModifier(
+                        'overlapped',
+                        -sources.length,
+                        sources.length === 1 ? 'one flank' : 'both flanks',
+                        { sources }
+                    ));
                 }
             }
         }
@@ -146,13 +418,15 @@
     }
 
 
+    const BASE_FALL_RULE = 'The base falls, and its army loses the battle.';
+
     function getMinorLossResolution(winner, loser, phase, terrain) {
+        if (loser?.combat?.lossEndsGame) {
+            return { outcome: 'base-fall', destructionRule: BASE_FALL_RULE };
+        }
         const loserInBadGoing = isUnitInBadGoing(loser, terrain);
         const loserIsSpear = loser.type === 'Spear' || loser.type === 'Heavy-Spear';
         const winnerIsWarband = winner.type === 'Warband' || winner.type === 'Heavy-Warband';
-        if (loser.type === 'Flyers') {
-            return { outcome: 'flee', destructionRule: null };
-        }
         if (loser.type === 'Behemoth' && winner.type === 'Artillery') {
             return { outcome: 'flee', destructionRule: null };
         }
@@ -206,7 +480,45 @@
     }
 
 
+    function flyerDestroyedBy(winner) {
+        return winner?.type === 'Hero'
+            || winner?.type === 'Magician'
+            || winner?.type === 'Flyers'
+            || winner?.type === 'Shooter';
+    }
+
+
+    function resolveCombatLoss(winner, loser, phase, terrain, isDouble) {
+        if (loser?.combat?.lossEndsGame) {
+            return { outcome: 'base-fall', destructionRule: BASE_FALL_RULE };
+        }
+        if (loser?.type === 'Flyers') {
+            if (isDouble && flyerDestroyedBy(winner)) {
+                return {
+                    outcome: 'destroy',
+                    destructionRule: 'A double from a Hero, Magician, Flyers, or Shooters destroys Flyers.'
+                };
+            }
+            if (isDouble) {
+                return { outcome: 'flee', destructionRule: null };
+            }
+            return { outcome: 'recoil', destructionRule: null };
+        }
+        if (isDouble) {
+            return { outcome: 'destroy', destructionRule: 'Double total destroys the loser.' };
+        }
+        return getMinorLossResolution(winner, loser, phase, terrain);
+    }
+
+
     function getFrontTouchedEdges(attacker, defender) {
+        if (geometry.hasOutline(attacker) || geometry.hasOutline(defender)) {
+            const attackerEdges = geometry.unitTouchEdges(attacker, defender);
+            if (!attackerEdges.includes('front')) {
+                return new Set();
+            }
+            return new Set(geometry.unitTouchEdges(defender, attacker));
+        }
         const attackerFront = getSideByName(attacker, 'front');
         const touched = new Set();
         getUnitSides(defender).forEach((side) => {
@@ -347,8 +659,13 @@
         const edgesOnRight = new Set();
 
         leftCombatant.units.forEach((leftUnit) => {
-            const leftSides = getUnitSides(leftUnit);
             rightCombatant.units.forEach((rightUnit) => {
+                if (geometry.hasOutline(leftUnit) || geometry.hasOutline(rightUnit)) {
+                    geometry.unitTouchEdges(leftUnit, rightUnit).forEach((edgeName) => edgesOnLeft.add(edgeName));
+                    geometry.unitTouchEdges(rightUnit, leftUnit).forEach((edgeName) => edgesOnRight.add(edgeName));
+                    return;
+                }
+                const leftSides = getUnitSides(leftUnit);
                 const rightSides = getUnitSides(rightUnit);
                 leftSides.forEach((leftSide) => {
                     rightSides.forEach((rightSide) => {
@@ -505,6 +822,19 @@
     }
 
 
+    function rearAttackApplies(context) {
+        if (!(context.incomingEdges || []).some(isRearEdgeName)) {
+            return false;
+        }
+        const supportRears = (context.supportContacts || []).filter((contact) => (contact.edgesOnTarget || []).some(isRearEdgeName));
+        if (supportRears.length > 0) {
+            return supportRears.some((contact) => !hasFrontContactOnCombatant(contact.combatantId, context.combats || []));
+        }
+        return Boolean(context.opponentCombatant)
+            && !hasFrontContactOnCombatant(context.opponentCombatant.id, context.combats || []);
+    }
+
+
     function getSideContactDirection(anchorUnit, otherUnit) {
         if (!areSameFacing(anchorUnit, otherUnit)) {
             return null;
@@ -536,7 +866,7 @@
     }
 
 
-    function countOverlapsOnCombatant(combatant, idleEnemyCombatants, fightingCombatantIds) {
+    function countOverlapsOnCombatant(combatant, idleEnemyCombatants, fightingCombatantIds, ignoredUnitIds) {
         const overlappedSides = new Set();
         idleEnemyCombatants.forEach((enemyCombatant) => {
             if (enemyCombatant.id === combatant.id || fightingCombatantIds.has(enemyCombatant.id)) {
@@ -544,6 +874,9 @@
             }
             combatant.units.forEach((anchorUnit) => {
                 enemyCombatant.units.forEach((enemyUnit) => {
+                    if (ignoredUnitIds?.has(enemyUnit.id)) {
+                        return;
+                    }
                     const side = getFlankContactDirection(anchorUnit, enemyUnit);
                     if (side) {
                         overlappedSides.add(side);
@@ -587,7 +920,20 @@
             const leftCombatant = combatantsById.get(combat.leftCombatantId);
             const rightCombatant = combatantsById.get(combat.rightCombatantId);
             const sharedEdge = findCombatantSharedEdge(leftCombatant, rightCombatant);
-            if (!hasFrontContactOnCombatant(leftCombatant.id, combatSetup.combats) && combatCountByCombatant.get(leftCombatant.id) === 1) {
+            const frontToSide = sharedEdge && describeFrontToSideContact(sharedEdge, leftCombatant, rightCombatant);
+            if (frontToSide) {
+                if (canTurnToFace(frontToSide.mover, combatSetup.combats, combatCountByCombatant)) {
+                    const attackerFront = getSideByName(frontToSide.attackerUnit, 'front');
+                    plans.set(frontToSide.mover.id, {
+                        kind: 'match-front',
+                        rotation: geometry.normalizeAngle(frontToSide.attackerUnit.rotation + Math.PI),
+                        anchorUnitId: frontToSide.moverUnitId,
+                        targetFrontMid: sideMidpoint(attackerFront)
+                    });
+                }
+                return;
+            }
+            if (canTurnToFace(leftCombatant, combatSetup.combats, combatCountByCombatant)) {
                 const rotation = getFacingRotationTowardOpponent(leftCombatant, rightCombatant);
                 if (rotation !== null && sharedEdge) {
                     plans.set(leftCombatant.id, {
@@ -597,7 +943,7 @@
                     });
                 }
             }
-            if (!hasFrontContactOnCombatant(rightCombatant.id, combatSetup.combats) && combatCountByCombatant.get(rightCombatant.id) === 1) {
+            if (canTurnToFace(rightCombatant, combatSetup.combats, combatCountByCombatant)) {
                 const rotation = getFacingRotationTowardOpponent(rightCombatant, leftCombatant);
                 if (rotation !== null && sharedEdge) {
                     plans.set(rightCombatant.id, {
@@ -609,6 +955,42 @@
             }
         });
         return plans;
+    }
+
+
+    function isSideOrRearEdge(sideName) {
+        return sideName === 'left' || sideName === 'right' || sideName === 'back';
+    }
+
+
+    function canTurnToFace(combatant, combats, combatCountByCombatant) {
+        return !combatant.units.some((unit) => isStationaryUnit(unit))
+            && !hasFrontContactOnCombatant(combatant.id, combats)
+            && combatCountByCombatant.get(combatant.id) === 1;
+    }
+
+
+    function describeFrontToSideContact(sharedEdge, leftCombatant, rightCombatant) {
+        const leftUnit = leftCombatant.units.find((unit) => unit.id === sharedEdge.leftUnitId);
+        const rightUnit = rightCombatant.units.find((unit) => unit.id === sharedEdge.rightUnitId);
+        if (!leftUnit || !rightUnit) {
+            return null;
+        }
+        if (sharedEdge.leftSideName === 'front' && isSideOrRearEdge(sharedEdge.rightSideName)) {
+            return {
+                attackerUnit: leftUnit,
+                mover: rightCombatant,
+                moverUnitId: rightUnit.id
+            };
+        }
+        if (sharedEdge.rightSideName === 'front' && isSideOrRearEdge(sharedEdge.leftSideName)) {
+            return {
+                attackerUnit: rightUnit,
+                mover: leftCombatant,
+                moverUnitId: leftUnit.id
+            };
+        }
+        return null;
     }
 
 
@@ -635,7 +1017,8 @@
 
             const anchorFront = getSideByName(anchorUnit, 'front');
             const anchorFrontMid = sideMidpoint(anchorFront);
-            const delta = geometry.subtract(plan.anchorMidpoint, anchorFrontMid);
+            const targetMid = plan.kind === 'match-front' ? plan.targetFrontMid : plan.anchorMidpoint;
+            const delta = geometry.subtract(targetMid, anchorFrontMid);
             rotatedUnits.forEach((unit) => {
                 transformedUnitsById.set(unit.id, {
                     ...unit,
@@ -707,52 +1090,274 @@
     }
 
 
-    function buildMeleeCombatSide(combatant, opponentCombatant, incomingEdges, role, adjustedCombats, combatants, fightingCombatantIds, terrain) {
-        const strength = getUnitStrengthAgainst(combatant.primaryUnit, opponentCombatant.primaryUnit);
+    function fightingUnit(combatant, combat) {
+        const fighterId = combat?.strongholdFighterId;
+        if (!fighterId || !combatant.unitIds.includes(fighterId)) {
+            return combatant.primaryUnit;
+        }
+        return combatant.units.find((unit) => unit.id === fighterId) || combatant.primaryUnit;
+    }
+
+
+    function strongholdSupporters(combat, combatants) {
+        const ids = new Set(combat?.strongholdSupportIds || []);
+        if (ids.size === 0) {
+            return [];
+        }
+        const supporters = [];
+        combatants.forEach((combatant) => {
+            combatant.units.forEach((unit) => {
+                if (ids.has(unit.id)) {
+                    supporters.push(unit);
+                }
+            });
+        });
+        return supporters;
+    }
+
+
+    function unitsTouching(unit, others) {
+        const self = { units: [unit] };
+        return others.filter((other) => {
+            if (other.id === unit.id || getPlayerId(other) === getPlayerId(unit)) {
+                return false;
+            }
+            return Boolean(collectCombatantEdgeContact(self, { units: [other] }));
+        });
+    }
+
+
+    function assaultContact(fighter, base) {
+        const pair = [{ units: [fighter] }, { units: [base] }];
+        return collectCombatantContact(pair[0], pair[1]) || collectCombatantEdgeContact(pair[0], pair[1]);
+    }
+
+
+    function isAerialUnit(unit) {
+        return unit?.type === 'Flyers';
+    }
+
+
+    function chooseStrongholdAttacker(attackers, base, random) {
+        const ground = attackers.filter((unit) => !isAerialUnit(unit));
+        const candidates = ground.length > 0 ? ground : attackers;
+        const ranked = candidates.map((unit) => ({
+            unit,
+            strength: getUnitStrengthAgainst(unit, base),
+            value: Number.isFinite(unit.value) ? unit.value : 0
+        }));
+        const bestStrength = Math.max(...ranked.map((entry) => entry.strength));
+        let pool = ranked.filter((entry) => entry.strength === bestStrength);
+        const cheapest = Math.min(...pool.map((entry) => entry.value));
+        pool = pool.filter((entry) => entry.value === cheapest);
+        pool.sort((left, right) => left.unit.id.localeCompare(right.unit.id));
+        if (pool.length === 1 || typeof random !== 'function') {
+            return pool[0].unit;
+        }
+        const index = Math.min(pool.length - 1, Math.floor(random() * pool.length));
+        return pool[index].unit;
+    }
+
+
+    function fightingIdsFrom(combats) {
+        return new Set(combats.flatMap((combat) => [
+            combat.leftCombatantId,
+            combat.rightCombatantId,
+            ...(combat.supportCombatantIds || [])
+        ]));
+    }
+
+
+    function collapseStrongholdAssaults(setup, random) {
+        const baseCombatants = setup.combatants.filter((combatant) => combatant.units.some((unit) => unit.type === 'Base'));
+        if (baseCombatants.length === 0) {
+            return {
+                ...setup,
+                fightingCombatantIds: fightingIdsFrom(setup.combats)
+            };
+        }
+        let combats = setup.combats.slice();
+        const participantIds = new Set(setup.participantIds);
+        baseCombatants.forEach((baseCombatant) => {
+            const base = baseCombatant.units.find((unit) => unit.type === 'Base');
+            const attackers = unitsTouching(base, setup.facedUnits);
+            if (attackers.length === 0) {
+                return;
+            }
+            const fighter = chooseStrongholdAttacker(attackers, base, random);
+            const fighterCombatant = setup.combatants.find((combatant) => combatant.unitIds.includes(fighter.id));
+            const contact = assaultContact(fighter, base);
+            if (!fighterCombatant || !contact) {
+                return;
+            }
+            combats = combats.filter((combat) => combat.leftCombatantId !== baseCombatant.id && combat.rightCombatantId !== baseCombatant.id);
+            const support = attackers.filter((unit) => unit.id !== fighter.id);
+            const fighterFirst = setup.combatants.indexOf(fighterCombatant) < setup.combatants.indexOf(baseCombatant);
+            const leftCombatant = fighterFirst ? fighterCombatant : baseCombatant;
+            const rightCombatant = fighterFirst ? baseCombatant : fighterCombatant;
+            combats.push({
+                id: `${leftCombatant.id}::${rightCombatant.id}`,
+                leftCombatantId: leftCombatant.id,
+                rightCombatantId: rightCombatant.id,
+                leftUnitIds: [...leftCombatant.unitIds],
+                rightUnitIds: [...rightCombatant.unitIds],
+                leftPrimaryId: fighterFirst ? fighter.id : base.id,
+                rightPrimaryId: fighterFirst ? base.id : fighter.id,
+                edgesOnLeft: fighterFirst ? contact.edgesOnLeft : contact.edgesOnRight,
+                edgesOnRight: fighterFirst ? contact.edgesOnRight : contact.edgesOnLeft,
+                strongholdFighterId: fighter.id,
+                strongholdSupportIds: support.map((unit) => unit.id)
+            });
+            participantIds.add(base.id);
+            participantIds.add(fighter.id);
+            support.forEach((unit) => participantIds.add(unit.id));
+        });
+            return {
+                ...setup,
+                combats,
+                fightingCombatantIds: fightingIdsFrom(combats),
+                participantIds
+            };
+    }
+
+
+    function buildMeleeCombatSide(combatant, opponentCombatant, incomingEdges, role, adjustedCombats, combatants, fightingCombatantIds, terrain, combat) {
+        const unit = fightingUnit(combatant, combat);
+        const opponent = fightingUnit(opponentCombatant, combat);
+        const supporters = unit.type === 'Base' ? strongholdSupporters(combat, combatants) : [];
+        const supportContacts = combat?.supportTargetCombatantId === combatant.id
+            ? (combat.supportContacts || [])
+            : [];
+        const strength = getUnitStrengthAgainst(unit, opponent);
         const modifiers = getCombatModifiers({
             phase: 'melee',
             role,
-            unit: combatant.primaryUnit,
-            opponent: opponentCombatant.primaryUnit,
+            unit,
+            opponent,
             combatant,
             opponentCombatant,
             incomingEdges,
+            supportContacts,
             combats: adjustedCombats,
             combatants,
             fightingCombatantIds,
-            terrain
+            terrain,
+            strongholdSupporters: supporters
         });
         return {
             combatantId: combatant.id,
             playerId: combatant.playerId,
-            primaryId: combatant.primaryUnit.id,
-            primaryType: combatant.primaryUnit.type,
-            troopClass: combatant.primaryUnit.troopClass,
+            primaryId: unit.id,
+            primaryType: unit.type,
+            troopClass: unit.troopClass,
             unitIds: [...combatant.unitIds],
-            unitTypes: combatant.units.map((unit) => unit.type),
+            unitTypes: combatant.units.map((entry) => entry.type),
             strength,
             modifiers,
             factor: strength + sumModifiers(modifiers),
-            center: geometry.getUnitCenter(combatant.primaryUnit)
+            center: geometry.getUnitCenter(unit)
         };
     }
 
 
-    function buildPostFacingCombatSetup(units) {
+    function unionEdgeNames(left, right) {
+        return [...new Set([...(left || []), ...(right || [])])];
+    }
+
+
+    function collapseSharedAssaults(setup) {
+        const combatantsById = setup.combatantsById;
+        let combats = setup.combats.map((combat) => ({
+            ...combat,
+            edgesOnLeft: [...(combat.edgesOnLeft || [])],
+            edgesOnRight: [...(combat.edgesOnRight || [])]
+        }));
+        const consumed = new Set();
+        const grouped = new Map();
+        combats.forEach((combat) => {
+            [combat.leftCombatantId, combat.rightCombatantId].forEach((combatantId) => {
+                if (!grouped.has(combatantId)) {
+                    grouped.set(combatantId, []);
+                }
+                grouped.get(combatantId).push(combat);
+            });
+        });
+
+        grouped.forEach((group, combatantId) => {
+            const shared = combatantsById.get(combatantId);
+            if (!shared || shared.units.some((unit) => unit.type === 'Base') || shared.units.some((unit) => isStationaryUnit(unit))) {
+                return;
+            }
+            const live = group.filter((combat) => !consumed.has(combat.id));
+            if (live.length < 2) {
+                return;
+            }
+            const opponents = live.map((combat) => {
+                const sharedIsLeft = combat.leftCombatantId === combatantId;
+                return {
+                    combat,
+                    opponentId: sharedIsLeft ? combat.rightCombatantId : combat.leftCombatantId,
+                    edgesOnShared: sharedIsLeft ? combat.edgesOnLeft : combat.edgesOnRight,
+                    edgesOnOpponent: sharedIsLeft ? combat.edgesOnRight : combat.edgesOnLeft
+                };
+            });
+            const facingFront = opponents.filter((entry) => entry.edgesOnShared.includes('front'));
+            const pool = (facingFront.length > 0 ? facingFront : opponents).slice().sort((left, right) => {
+                const leftFront = left.edgesOnOpponent.includes('front') ? 0 : 1;
+                const rightFront = right.edgesOnOpponent.includes('front') ? 0 : 1;
+                if (leftFront !== rightFront) {
+                    return leftFront - rightFront;
+                }
+                return left.opponentId.localeCompare(right.opponentId);
+            });
+            const main = pool[0];
+            const supports = opponents.filter((entry) => entry.opponentId !== main.opponentId);
+            const sharedIsLeft = main.combat.leftCombatantId === combatantId;
+            const supportEdges = supports.flatMap((entry) => entry.edgesOnShared);
+            if (sharedIsLeft) {
+                main.combat.edgesOnLeft = unionEdgeNames(main.combat.edgesOnLeft, supportEdges);
+            } else {
+                main.combat.edgesOnRight = unionEdgeNames(main.combat.edgesOnRight, supportEdges);
+            }
+            main.combat.supportTargetCombatantId = combatantId;
+            main.combat.supportCombatantIds = supports.map((entry) => entry.opponentId);
+            main.combat.supportContacts = supports.map((entry) => ({
+                combatantId: entry.opponentId,
+                edgesOnTarget: [...entry.edgesOnShared]
+            }));
+            supports.forEach((entry) => consumed.add(entry.combat.id));
+        });
+
+        combats = combats.filter((combat) => !consumed.has(combat.id));
+        const participantIds = new Set(setup.participantIds);
+        combats.forEach((combat) => {
+            (combat.supportCombatantIds || []).forEach((combatantId) => {
+                const combatant = combatantsById.get(combatantId);
+                combatant?.unitIds.forEach((unitId) => participantIds.add(unitId));
+            });
+        });
+        return {
+            ...setup,
+            combats,
+            participantIds
+        };
+    }
+
+
+    function buildPostFacingCombatSetup(units, random) {
         const combatSetup = detectMeleeCombats(units);
         const facingPlans = buildCombatFacingPlans(combatSetup);
         const facedUnits = applyCombatFacing(units, combatSetup, facingPlans);
         const postFacingSetup = detectMeleeCombats(facedUnits);
         const combatantsById = new Map(postFacingSetup.combatants.map((combatant) => [combatant.id, combatant]));
-        const fightingCombatantIds = new Set(postFacingSetup.combats.flatMap((combat) => [combat.leftCombatantId, combat.rightCombatantId]));
-        return {
+        const shared = collapseSharedAssaults({
             facedUnits,
             combats: postFacingSetup.combats,
             combatants: postFacingSetup.combatants,
             combatantsById,
-            fightingCombatantIds,
             participantIds: postFacingSetup.participantIds
-        };
+        });
+        return collapseStrongholdAssaults(shared, random);
     }
 
 
@@ -769,7 +1374,8 @@
                 combats,
                 combatants,
                 fightingCombatantIds,
-                terrain
+                terrain,
+                combat
             );
             const right = buildMeleeCombatSide(
                 rightCombatant,
@@ -779,7 +1385,8 @@
                 combats,
                 combatants,
                 fightingCombatantIds,
-                terrain
+                terrain,
+                combat
             );
             return {
                 id: combat.id,
@@ -791,52 +1398,69 @@
     }
 
 
-    function resolveMelee(units, terrain, rollDie) {
-        const { facedUnits: mutableStartingUnits, combats: adjustedCombats, combatantsById, fightingCombatantIds, participantIds } = buildPostFacingCombatSetup(units);
+    function resolveMelee(units, terrain, rollDie, random = Math.random) {
+        const { facedUnits: mutableStartingUnits, combats: adjustedCombats, combatantsById, fightingCombatantIds, participantIds } = buildPostFacingCombatSetup(units, random);
         const results = [];
         const recoilDestructions = [];
+        const combatants = [...combatantsById.values()];
 
         adjustedCombats.forEach((combat) => {
             const leftCombatant = combatantsById.get(combat.leftCombatantId);
             const rightCombatant = combatantsById.get(combat.rightCombatantId);
+            const leftUnit = fightingUnit(leftCombatant, combat);
+            const rightUnit = fightingUnit(rightCombatant, combat);
+            const leftSupporters = leftUnit.type === 'Base' ? strongholdSupporters(combat, combatants) : [];
+            const rightSupporters = rightUnit.type === 'Base' ? strongholdSupporters(combat, combatants) : [];
             const leftModifiers = getCombatModifiers({
                 phase: 'melee',
                 role: 'attacker',
-                unit: leftCombatant.primaryUnit,
-                opponent: rightCombatant.primaryUnit,
+                unit: leftUnit,
+                opponent: rightUnit,
                 combatant: leftCombatant,
                 opponentCombatant: rightCombatant,
                 incomingEdges: combat.edgesOnLeft,
+                supportContacts: combat.supportTargetCombatantId === leftCombatant.id ? (combat.supportContacts || []) : [],
                 combats: adjustedCombats,
-                combatants: [...combatantsById.values()],
+                combatants,
                 fightingCombatantIds,
-                terrain
+                terrain,
+                strongholdSupporters: leftSupporters
             });
             const rightModifiers = getCombatModifiers({
                 phase: 'melee',
                 role: 'defender',
-                unit: rightCombatant.primaryUnit,
-                opponent: leftCombatant.primaryUnit,
+                unit: rightUnit,
+                opponent: leftUnit,
                 combatant: rightCombatant,
                 opponentCombatant: leftCombatant,
                 incomingEdges: combat.edgesOnRight,
+                supportContacts: combat.supportTargetCombatantId === rightCombatant.id ? (combat.supportContacts || []) : [],
                 combats: adjustedCombats,
-                combatants: [...combatantsById.values()],
+                combatants,
                 fightingCombatantIds,
-                terrain
+                terrain,
+                strongholdSupporters: rightSupporters
             });
-            const leftRoll = rollDie({ role: 'left', combatId: combat.id, leftPrimaryId: leftCombatant.primaryUnit.id, rightPrimaryId: rightCombatant.primaryUnit.id });
-            const rightRoll = rollDie({ role: 'right', combatId: combat.id, leftPrimaryId: leftCombatant.primaryUnit.id, rightPrimaryId: rightCombatant.primaryUnit.id });
-            const leftTotal = leftRoll + getUnitStrengthAgainst(leftCombatant.primaryUnit, rightCombatant.primaryUnit) + sumModifiers(leftModifiers);
-            const rightTotal = rightRoll + getUnitStrengthAgainst(rightCombatant.primaryUnit, leftCombatant.primaryUnit) + sumModifiers(rightModifiers);
+            const leftRoll = rollDie({ role: 'left', combatId: combat.id, leftPrimaryId: leftUnit.id, rightPrimaryId: rightUnit.id });
+            const rightRoll = rollDie({ role: 'right', combatId: combat.id, leftPrimaryId: leftUnit.id, rightPrimaryId: rightUnit.id });
+            const leftTotal = leftRoll + getUnitStrengthAgainst(leftUnit, rightUnit) + sumModifiers(leftModifiers);
+            const rightTotal = rightRoll + getUnitStrengthAgainst(rightUnit, leftUnit) + sumModifiers(rightModifiers);
+            const supportIds = (combat.supportCombatantIds || []).flatMap((combatantId) => combatantsById.get(combatantId)?.unitIds || []);
+            const leftUnitIds = [...leftCombatant.unitIds];
+            const rightUnitIds = [...rightCombatant.unitIds];
+            if (combat.supportTargetCombatantId === leftCombatant.id) {
+                rightUnitIds.push(...supportIds);
+            } else if (combat.supportTargetCombatantId === rightCombatant.id) {
+                leftUnitIds.push(...supportIds);
+            }
             const result = {
                 combatId: combat.id,
                 leftCombatantId: leftCombatant.id,
                 rightCombatantId: rightCombatant.id,
-                leftUnitIds: [...leftCombatant.unitIds],
-                rightUnitIds: [...rightCombatant.unitIds],
-                leftPrimaryId: leftCombatant.primaryUnit.id,
-                rightPrimaryId: rightCombatant.primaryUnit.id,
+                leftUnitIds,
+                rightUnitIds,
+                leftPrimaryId: leftUnit.id,
+                rightPrimaryId: rightUnit.id,
                 leftRoll,
                 rightRoll,
                 leftModifiers,
@@ -855,21 +1479,34 @@
             const leftWon = leftTotal > rightTotal;
             const winnerCombatant = leftWon ? leftCombatant : rightCombatant;
             const loserCombatant = leftWon ? rightCombatant : leftCombatant;
+            const winnerUnit = leftWon ? leftUnit : rightUnit;
+            const loserUnit = leftWon ? rightUnit : leftUnit;
             result.loserCombatantId = loserCombatant.id;
             const highTotal = Math.max(leftTotal, rightTotal);
             const lowTotal = Math.min(leftTotal, rightTotal);
-            if (highTotal >= lowTotal * 2) {
-                result.outcome = 'destroy';
-                result.destructionRule = 'Double total destroys the loser.';
+            const lossResolution = resolveCombatLoss(
+                winnerUnit,
+                loserUnit,
+                'melee',
+                terrain,
+                highTotal >= lowTotal * 2
+            );
+            result.outcome = lossResolution.outcome;
+            result.destructionRule = lossResolution.destructionRule;
+            if (lossResolution.outcome === 'base-fall' && isAerialUnit(winnerUnit)) {
+                result.outcome = 'tie';
+                result.loserCombatantId = null;
+                result.destructionRule = 'Aerials alone cannot capture a base.';
                 results.push(result);
                 return;
             }
-            const lossResolution = getMinorLossResolution(winnerCombatant.primaryUnit, loserCombatant.primaryUnit, 'melee', terrain);
-            result.outcome = lossResolution.outcome;
-            result.destructionRule = lossResolution.destructionRule;
+            if (lossResolution.outcome === 'destroy' || lossResolution.outcome === 'base-fall') {
+                results.push(result);
+                return;
+            }
             const incomingEdges = leftWon ? combat.edgesOnRight : combat.edgesOnLeft;
-            if (incomingEdges.includes('rear')) {
-                result.recoilRotation = winnerCombatant.primaryUnit.rotation;
+            if (incomingEdges.some(isRearEdgeName)) {
+                result.recoilRotation = winnerUnit.rotation;
             }
             results.push(result);
         });
@@ -877,6 +1514,7 @@
         const destroyedIds = new Set();
         const ensorcelledIds = new Map();
         const recoilQueue = [];
+        let baseFellPlayerId = null;
         results.forEach((result) => {
             if (!result.loserCombatantId) {
                 return;
@@ -885,8 +1523,11 @@
             const winnerCombatant = result.loserCombatantId === result.leftCombatantId
                 ? combatantsById.get(result.rightCombatantId)
                 : combatantsById.get(result.leftCombatantId);
-            if (result.outcome === 'destroy') {
+            if (result.outcome === 'destroy' || result.outcome === 'base-fall') {
                 loserCombatant.unitIds.forEach((unitId) => destroyedIds.add(unitId));
+                if (result.outcome === 'base-fall') {
+                    baseFellPlayerId = getPlayerId(loserCombatant.primaryUnit);
+                }
                 return;
             }
             if (result.outcome === 'ensorcel') {
@@ -954,6 +1595,7 @@
             ensorcelledUnits,
             results,
             recoilDestructions,
+            baseFellPlayerId,
             combats: adjustedCombats,
             combatants: [...combatantsById.values()],
             participantIds
@@ -969,6 +1611,7 @@
         formatSignedModifier,
         getExtraShooterPenalty,
         getMinorLossResolution,
+        resolveCombatLoss,
         getUnitStrengthAgainst,
         choosePrimaryAttacker,
         sumModifiers,

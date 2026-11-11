@@ -145,10 +145,50 @@
                 }
             },
 
+            describeCheckpoint(record) {
+                if (!record?.snapshot) {
+                    return 'Not saved yet.';
+                }
+                const snapshot = record.snapshot;
+                const playerId = snapshot.activePlayerId === 'player-2' ? 'player-2' : 'player-1';
+                const colorId = snapshot.players?.[playerId]?.colorId;
+                const label = data.PLAYER_COLORS[colorId]?.label || 'Player';
+                const phaseLabels = {
+                    move: 'Move',
+                    'form-up': 'Form up',
+                    shooting: 'Shooting',
+                    melee: 'Melee'
+                };
+                const phase = phaseLabels[snapshot.phase] || snapshot.phase || 'Move';
+                const moves = Number.isFinite(snapshot.remainingMoves) ? `${snapshot.remainingMoves} moves` : '';
+                const savedAt = record.savedAt ? new Date(record.savedAt) : null;
+                const when = savedAt && !Number.isNaN(savedAt.getTime()) ? savedAt.toLocaleString() : '';
+                return [label, phase, moves, when].filter(Boolean).join(' · ');
+            },
+
+            renderCheckpointButton(button, hint, record) {
+                if (button) {
+                    button.disabled = !record?.snapshot;
+                }
+                if (hint) {
+                    hint.textContent = this.describeCheckpoint(record);
+                }
+            },
+
+            renderCheckpointSettings() {
+                const store = typeof this.getCheckpointStore === 'function'
+                    ? this.getCheckpointStore()
+                    : { gameStart: null, lastTurn: null, endMove: null };
+                this.renderCheckpointButton(this.ui.checkpointGameStartButton, this.ui.checkpointGameStartHint, store.gameStart);
+                this.renderCheckpointButton(this.ui.checkpointLastTurnButton, this.ui.checkpointLastTurnHint, store.lastTurn);
+                this.renderCheckpointButton(this.ui.checkpointEndMoveButton, this.ui.checkpointEndMoveHint, store.endMove);
+            },
+
             renderGameSettings() {
                 if (this.ui.limitFactionRostersCheckbox) {
                     this.ui.limitFactionRostersCheckbox.checked = this.areFactionRostersLimited();
                 }
+                this.renderCheckpointSettings();
                 const list = this.ui.terrainSettingsList;
                 if (!list) {
                     return;

@@ -48,14 +48,28 @@ Name, class, value, depth, movement in paces (road / good / bad / water), streng
 | Beasts | Mounted | 2 | 30 mm | 400 | 400 | 400 | 100 | +3 | +4 |
 | Flyers | Mounted | 2 | 30 mm | 1200 | 1200 | 1200 | 1200 | +2 | +2 |
 | Behemoth | Mounted | 4 | 40 mm | 400 | 300 | 200 | 100 | +4 | +5 |
+| Base | Infantry | 0 | varies | 0 | 0 | 0 | 0 | +6 | +6 |
 
 Heavy-Spear and Heavy-Warband use their corresponding base type's combat-loss behavior. They cannot stack.
+
+## Bases
+
+A base is a stationary stronghold, not an army-list purchase. Only the defender has one. It is placed during terrain placement, before the armies deploy, and it stays where it was put.
+
+- Each faction's base uses that faction's artwork. The shape is the art's outer edge, so curved and non-rectangular outlines block movement and count as contact. Against a curved base, a unit within 2 mm of that outline counts as touching it. It must fit inside 180 mm by 140 mm.
+- It fights as infantry at +6 against both infantry and mounted troops, so enemies use their factor against foot. It does not move, form up, or join a formation.
+- Everyone in contact with the base is one assault. Only the strongest enemy fights: the highest factor against foot, then the cheapest of those, then a random choice if several remain. Each other enemy in contact supports and gives the base -1. Supporters do not roll, recoil, or get destroyed by that assault. A file lined up behind the fighting unit still gives that unit its usual support.
+- Flyers help as support whenever a ground unit is in contact. They fight the base only when no other enemy is touching it, and that assault cannot capture the base.
+- A base has no flanks. Contact on any side is frontal, so it does not take the flank penalty.
+- If the base loses a shooting or melee conflict, including a minor loss, its army loses the battle immediately.
+- The base's nearest point stays within 400 paces of the center of the defender's board edge.
+- The defender's deployment area stays the bottom quarter when the base leaves enough room. If the base fills that quarter, the defender may deploy farther forward, up to 120 mm in front of the base and no farther than the board's midline.
 
 ## Terrain
 
 - The board is good going unless a feature covers it.
 - Implemented types: road, good going, forest, swamp, water, and impassable. Roads are full-board horizontal or vertical strips. Other features use blob shapes.
-- Forest and swamp are both bad going and rough terrain. They have the same movement, combat, and line-of-sight effects.
+- Forest and swamp are both bad going and rough terrain. They have the same movement and line-of-sight effects. A target shot at in a wood also takes +2. Swamp does not. There is no built-up area terrain yet.
 - A unit samples its corners, center, and front and rear midpoints to determine the terrain it occupies. For movement, the path is sampled and the relevant allowance applies to the whole move.
 - Any road sample takes precedence over every other sampled type, including water and impassable, so the unit uses its road allowance for that move.
 - Impassable terrain cannot be entered or occupied. Water can be entered using the unit's water allowance.
@@ -81,7 +95,7 @@ Heavy-Spear and Heavy-Warband use their corresponding base type's combat-loss be
 
 ## Form-up
 
-After ordinary moves, any active-side unit or maintained formation that can reach an enemy by moving the form-up distance (20 mm) or less may form up while keeping formation. A single front corner getting close enough is enough to trigger the check, even when the final alignment needs rotation.
+After ordinary moves, any active-side unit or maintained formation that can reach an enemy by moving the form-up distance (20 mm) or less may form up while keeping formation. A single front corner getting close enough is enough to trigger the check, even when the final alignment needs rotation. Against a base, that distance is measured to the base outline. Every side of the base is a front: the formation faces the nearest side squarely and finishes with its front touching the outline.
 
 Default form-up prefers face-to-face contact. A unit approaching from the side may instead finish with its front against the enemy side if both of its starting front corners are at or just barely past the enemy front line from the enemy's point of view.
 
@@ -97,7 +111,7 @@ Destroyed Hordes go to that player's reserve instead of being removed, and count
 
 - Recoil is a combat result: the unit moves backward by its own depth. A directly lined-up friendly rear element may be pushed.
 - Recoil destroys the original recoiling unit if the destination or path would enter water or impassable terrain, or if it would run into rear or side enemy contact or an obstructing unit.
-- Flyers that lose a battle first recoil normally, then flee 600 paces straight backward. Flee movement ignores terrain and units.
+- Flyers that lose a minor battle recoil. A double destroys them only when the winner is a Hero, Magician, Flyers, or Shooters. A double from any other unit makes them recoil, then flee 600 paces straight backward. That flee ignores terrain and units.
 - A Behemoth that loses to Artillery in shooting or melee first recoils normally, then flees 600 paces. It chooses the shallowest heading from straight backward that avoids enemies, bad going, water, and impassable terrain. It may pass through friends but cannot finish overlapping one. It is destroyed if every legal path needs more than a 90-degree turn from straight backward.
 
 ## Magicians
@@ -114,30 +128,33 @@ Magicians are mounted 4 AP units. Undead armies may include them.
 
 ## Combat
 
-Each side in a fight rolls 1d6 and adds its strength against the opponent's class plus modifiers. The higher total wins. A double (winner's total at least twice the loser's) destroys the loser. A minor win uses the type table below.
+Each side in a fight rolls 1d6 and adds its strength against the opponent's class plus modifiers. The higher total wins. A double (winner's total at least twice the loser's) destroys the loser, except Flyers: a double destroys them only when the winner is a Hero, Magician, Flyers, or Shooters, and any other double makes them flee 600 paces. A minor win uses the type table below.
 
 The shooting attacker does not suffer a loss result for losing its own ranged exchange. It can still be destroyed or recoiled when it is the target of enemy shooting.
 
 ### Shooting
 
 - Only ranged units with a ranged profile and no current enemy front contact shoot.
-- Shooters fire in the shooting phase. Their firing area is a 200-pace deep box, 120 mm wide, projected from the front edge of the base.
+- Shooters fire in every shooting phase, including the opponent's turn. A shot in one phase does not spend the shot for the other. Their firing area is a 200-pace deep box, 120 mm wide, projected from the front edge of the base.
 - Artillery fires only during its own shooting phase, only if it did not move that turn, and uses a 500-pace deep, 120 mm-wide firing box.
 - Line of sight is checked from the shooter's front edge to the nearest side of the target. Impassable terrain, other units, and rough ground block shots. Water and roads do not.
 - A shot may travel through up to 50 paces of rough terrain at the shooter's end when the shooter is in bad going, and independently up to 50 paces at the target's end when the target is in bad going. Rough terrain farther from both endpoints blocks the shot.
-- Shooting resolves once per defender. If several shooters target the same enemy, the strongest single shooter supplies the attack strength. Two shooters give the defender −1; three or more give −2.
+- Shooting resolves once per target. Two units that shoot each other make one exchange and each side rolls once; the lower total suffers the result. If several shooters target the same enemy, the strongest single shooter supplies the attack strength. Two shooters give the defender −1; three or more give −2.
+- A target in a wood takes +2 while being shot at. Shooters still ignore the bad-going penalty, but they do get this +2. Swamp does not give it.
 
 ### Melee
 
 - Melee is auto-detected. Every enemy pair whose fronts touch forms a combat. Front-to-rear contact also counts. Two otherwise idle enemies that only touch side-to-side are pulled into melee.
-- When a combatant is in exactly one melee and does not already have enemy contact on its own front, it turns to face that opponent as combat starts, anchoring the turn on the shared contact edge rather than spinning around its center.
+- When two or more elements touch the same enemy, that is one combat. The element facing that enemy's front is the fighter. The other contacts support the combat and still count as flank or rear attacks. They do not roll a second fight.
+- When one unit's front is already on the contact, against an enemy side or rear, that unit stays put. The unit that was contacted turns square to that front and slides so the two fronts coincide. It does all of the moving, including when its side is as long as the enemy front.
+- Otherwise, a combatant in exactly one melee and without enemy contact on its own front turns to face that opponent as combat starts, anchoring the turn on the shared contact edge rather than spinning around its center.
 - Spears and Warbands can stack when two same-side, same-type elements share a facing and one element's front is flush against the other's side. Stacked pairs fight as one combatant and gain +1 in melee. Heavy-Spears and Heavy-Warbands cannot stack.
 
 ### Combat modifiers
 
-- Forest and swamp are bad going for combat. A unit in bad going takes −2 unless its type ignores that penalty. Warbands, Heavy-Warbands, Shooters, and Beasts ignore it.
-- A mounted attacker also takes −2 when fighting an opponent in bad going, unless it is already receiving the same −2 bad-going penalty.
-- Melee-only: −1 for flank attack; −1 for rear attack when the rear attacker is not frontally engaged elsewhere; −1 per overlap from an idle enemy element touching the fighter's left or right flank without being in melee itself.
+- Forest and swamp are bad going for combat. A unit in bad going takes −2 unless its type ignores that penalty. Warbands, Heavy-Warbands, Shooters, and Beasts ignore it. A unit takes that terrain penalty at most once.
+- A mounted attacker in good going takes −2 when fighting an opponent in bad going. A mounted unit already standing in bad going does not take a second terrain penalty.
+- Melee-only: −1 for flank attack; −1 for rear attack when the rear attacker is not frontally engaged elsewhere; −1 per overlap on a flank. An idle enemy overlaps by touching that flank, or by standing in the fighting enemy's rank where that rank extends past the fighter. A gap or a step in the rank still counts. One overlap per side.
 
 ### Minor-loss outcomes
 
@@ -145,7 +162,9 @@ First matching row wins. Heavy-Spear counts as Spear; Heavy-Warband counts as Wa
 
 | Loser | Condition | Outcome |
 |---|---|---|
-| Flyers | Any loss | Recoil, then flee 600 paces |
+| Flyers | Minor loss | Recoil |
+| Flyers | Double by Hero, Magician, Flyers, or Shooters | Destroyed |
+| Flyers | Double by any other unit | Recoil, then flee 600 paces |
 | Behemoth | Winner is Artillery | Recoil, then flee 600 paces |
 | Magician | Winner is Hero, melee | Destroyed |
 | Hero or Magician | Winner is Magician | Ensorcelled |
@@ -175,7 +194,7 @@ Unused Magician moves carry into shooting. Magicians who cannot afford the 2 lef
 
 ## Victory
 
-A side loses when it has lost at least half of its starting army value **and** has lost more AP than the opponent. Starting army value is captured when deployment finishes.
+A side loses when it has lost at least half of its starting army value **and** has lost more AP than the opponent. Starting army value is captured when deployment finishes. The defender also loses immediately if its base loses a conflict.
 
 Victory is checked once per turn, after melee, not after individual shooting or melee resolutions. Reserve and ensorcelled units count toward losses while they remain off the board. Returning a unit from reserve clears its loss entry.
 
@@ -199,7 +218,7 @@ Implemented roads are one full-board horizontal or vertical strip. Crooked route
 
 ### Retreat
 
-Retreat is a combat movement result: the unit moves backward a specified distance, with limited maneuver allowed. It is not the same as recoil (one base depth, no maneuver) or Flyer/Behemoth flee.
+Retreat is a combat movement result: the unit moves backward a specified distance, with limited maneuver allowed. It is not the same as recoil (one base depth, no maneuver) or Behemoth flee.
 
 ### Lurkers
 

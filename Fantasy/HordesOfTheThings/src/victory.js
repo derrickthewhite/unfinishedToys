@@ -12,6 +12,13 @@
                 const winnerArmy = app.getArmyIdentity(victory.winnerPlayerId).label;
                 return `${loserArmy} has lost more than half its army (${victory.loserLostPoints} of ${victory.loserStartingValue} AP) and more than ${winnerArmy} (${victory.winnerLostPoints} AP lost).`;
             }
+        },
+        'base-lost': {
+            buildMessage(app, victory) {
+                const loserArmy = app.getArmyIdentity(victory.loserPlayerId).label;
+                const winnerArmy = app.getArmyIdentity(victory.winnerPlayerId).label;
+                return `${loserArmy}'s base has fallen. ${winnerArmy} wins the battle.`;
+            }
         }
     });
 
@@ -79,14 +86,14 @@
             return candidates[0] || null;
         }
 
-        buildVictorySnapshot(loserPlayerId) {
+        buildVictorySnapshot(loserPlayerId, reasonId = 'casualty-lead') {
             const winnerPlayerId = this.getOpponentPlayerId(loserPlayerId);
             const loserLostPoints = this.getLossSummary(loserPlayerId).points;
             const winnerLostPoints = this.getLossSummary(winnerPlayerId).points;
             const loserStartingValue = this.state.startingArmyValueByPlayerId[loserPlayerId];
             const winnerStartingValue = this.state.startingArmyValueByPlayerId[winnerPlayerId];
             return {
-                reasonId: 'casualty-lead',
+                reasonId,
                 loserPlayerId,
                 winnerPlayerId,
                 loserLostPoints,
@@ -105,11 +112,12 @@
             return reason ? reason.buildMessage(this, victory) : 'Victory achieved.';
         }
 
-        declareVictory(loserPlayerId) {
+        declareVictory(loserPlayerId, reasonId = 'casualty-lead') {
             if (this.state.victory || this.state.mode !== 'game') {
                 return false;
             }
-            this.state.victory = this.buildVictorySnapshot(loserPlayerId);
+            this.ensureStartingArmyValues();
+            this.state.victory = this.buildVictorySnapshot(loserPlayerId, reasonId);
             this.state.victoryModalDismissed = false;
             this.state.confirmation = null;
             this.state.draft = null;
@@ -150,12 +158,11 @@
             this.syncUiFromState();
         }
 
-        openVictoryNewGameConfirmation() {
+        reopenVictoryModal() {
             if (!this.state.victory) {
                 return;
             }
-            this.state.setup = this.state.setup || {};
-            this.state.setup.confirmation = 'new-game';
+            this.state.victoryModalDismissed = false;
             this.syncUiFromState();
         }
 

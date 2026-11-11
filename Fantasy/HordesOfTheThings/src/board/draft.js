@@ -133,7 +133,7 @@
         }
 
 
-        ensureDraft(unitIds) {
+        ensureDraft(unitIds, options = {}) {
             if (this.state.mode !== 'game') {
                 return false;
             }
@@ -144,7 +144,8 @@
                 this.updateStatus('Movement is only available during the move phase.');
                 return false;
             }
-            if (typeof this.hasLocalHuman === 'function'
+            if (!options.allowComputer
+                && typeof this.hasLocalHuman === 'function'
                 && this.hasLocalHuman()
                 && typeof this.canLocallyControl === 'function'
                 && !this.canLocallyControl(this.state.activePlayerId)) {

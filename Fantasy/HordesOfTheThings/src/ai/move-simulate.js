@@ -432,7 +432,7 @@
         }
         const corners = geometry.getUnitCorners(unit);
         const others = boardUnits.filter((other) => other.id !== unit.id);
-        if (others.some((other) => geometry.polygonsOverlap(corners, geometry.getUnitCorners(other)))) {
+        if (others.some((other) => geometry.unitsOverlap(unit, other))) {
             return false;
         }
         const terrainTypes = rules.sampleUnitTerrain(unit, terrain);
@@ -449,7 +449,7 @@
         const clearance = data.pacesToMm(data.RESERVE_ENEMY_CLEARANCE_PACES);
         return !others.some((other) => (
             getPlayerId(other) !== playerId
-            && geometry.minDistanceBetweenPolygons(corners, geometry.getUnitCorners(other)) < clearance - 0.01
+            && geometry.unitsMinDistance(unit, other) < clearance - 0.01
         ));
     }
 

@@ -9,7 +9,7 @@
     }
     root.HordesBoardRender = factory(root.HordesData, root.HordesGeometry, root.HordesRules);
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules) {
-    const EVAL_MIN_BENEFIT = 0.25;
+    const EVAL_MIN_BENEFIT = 0.2;
 
     const UNIT_ASSET_PATHS = Object.freeze({
         Blade: 'assets/Blade.svg',
@@ -209,7 +209,10 @@
             if (!this.state.showRangedArea && !this.state.combatResolution && (this.state.mode !== 'game' || this.state.phase !== 'shooting')) {
                 return;
             }
-            const shooting = this.state.mode === 'game' && this.state.phase === 'shooting'
+            const resolution = this.state.combatResolution?.phase === 'shooting'
+                ? this.state.combatResolution
+                : null;
+            const shooting = !resolution && this.state.mode === 'game' && this.state.phase === 'shooting'
                 ? this.getShootingState()
                 : null;
             if (this.state.showRangedArea) {
@@ -250,10 +253,14 @@
                     ctx.restore();
                 });
             }
-            const attacks = shooting ? shooting.attacksByAttacker || {} : {};
+            const attacks = resolution
+                ? (resolution.attacksByAttacker || {})
+                : (shooting?.attacksByAttacker || {});
             Object.entries(attacks).forEach(([attackerId, targetId]) => {
-                const attacker = this.getUnitById(attackerId);
-                const target = this.getUnitById(targetId);
+                const attacker = this.getCombatPoseUnit(resolution, attackerId)
+                    || this.getUnitById(attackerId);
+                const target = this.getCombatPoseUnit(resolution, targetId)
+                    || this.getUnitById(targetId);
                 if (!attacker || !target) {
                     return;
                 }
@@ -263,7 +270,194 @@
         }
 
         getCombatLabelUnit(resolution, unitId) {
-            return resolution.ghostSnapshot?.[unitId] || this.getUnitById(unitId);
+            return this.getCombatPoseUnit(resolution, unitId);
+        }
+
+        getCombatPoseUnit(resolution, unitId) {
+            if (!unitId) {
+                return null;
+            }
+            if (resolution?.ghostSnapshot?.[unitId]) {
+                return resolution.ghostSnapshot[unitId];
+            }
+            const ensorcelled = (resolution?.ensorcelledUnits || []).find((unit) => unit.id === unitId);
+            if (ensorcelled && !ensorcelled.inReserve) {
+                return ensorcelled;
+            }
+            const live = this.getUnitById(unitId);
+            if (live && !live.inReserve) {
+                return live;
+            }
+            return ensorcelled || live || null;
+        }
+
+        combatMarkPosition(unit, across, back) {
+            const forward = geometry.getForwardVector(unit.rotation || 0);
+            const right = geometry.getRightVector(unit.rotation || 0);
+            return geometry.add(
+                { x: unit.x, y: unit.y },
+                geometry.add(
+                    geometry.scaleVector(right, across),
+                    geometry.scaleVector(forward, -back)
+                )
+            );
+        }
+
+        makeCombatReadoutMark(unit, kind, value, color, fill, across, back) {
+            return {
+                kind,
+                value,
+                color,
+                fill,
+                unitId: unit.id,
+                rotation: unit.rotation || 0,
+                position: this.combatMarkPosition(unit, across, back)
+            };
+        }
+
+        factionMarkColor(unit) {
+            return this.getPlayerColors(this.getUnitPlayerId(unit)).fill;
+        }
+
+        terrainMarkColor(kind) {
+            return data.TERRAIN_STYLE[kind]?.fill || '#54704d';
+        }
+
+        getCombatReadoutMarks(resolution = this.state.combatResolution) {
+            if (!resolution?.results) {
+                return [];
+            }
+            const marks = [];
+            const rolled = new Set();
+            const terrainSlots = new Map();
+            const modifierSlots = new Map();
+            const pose = (unitId) => this.getCombatPoseUnit(resolution, unitId);
+            const addRoll = (unitId, total, roll, modifiers) => {
+                const unit = pose(unitId);
+                if (!unit || roll == null || total == null || rolled.has(unit.id)) {
+                    return;
+                }
+                rolled.add(unit.id);
+                const strength = total - roll - rules.sumModifiers(modifiers || []);
+                const color = this.factionMarkColor(unit);
+                marks.push(this.makeCombatReadoutMark(unit, 'strength', strength, color, '#ffffff', 10, 10));
+                marks.push(this.makeCombatReadoutMark(unit, 'die', roll, '#f4f1ea', '#161616', 30, 10));
+                (modifiers || []).forEach((modifier) => {
+                    if (!modifier.terrainKind) {
+                        return;
+                    }
+                    const slot = terrainSlots.get(unit.id) || 0;
+                    terrainSlots.set(unit.id, slot + 1);
+                    marks.push(this.makeCombatReadoutMark(
+                        unit,
+                        'terrain',
+                        modifier.value,
+                        this.terrainMarkColor(modifier.terrainKind),
+                        '#ffffff',
+                        20,
+                        20 + (slot * 12)
+                    ));
+                });
+            };
+            const addSources = (modifiers) => {
+                (modifiers || []).forEach((modifier) => {
+                    (modifier.sources || []).forEach((source) => {
+                        const unit = pose(source.unitId);
+                        if (!unit || !source.value) {
+                            return;
+                        }
+                        const slot = modifierSlots.get(unit.id) || 0;
+                        modifierSlots.set(unit.id, slot + 1);
+                        marks.push(this.makeCombatReadoutMark(
+                            unit,
+                            'modifier',
+                            source.value,
+                            this.factionMarkColor(unit),
+                            '#ffffff',
+                            20,
+                            10 + (slot * 12)
+                        ));
+                    });
+                });
+            };
+            resolution.results.forEach((entry) => {
+                if (resolution.phase === 'shooting') {
+                    addRoll(entry.primaryAttackerId, entry.attackerTotal, entry.attackerRoll, entry.attackerModifiers);
+                    addRoll(entry.returnPrimaryId || entry.defenderId, entry.defenderTotal, entry.defenderRoll, entry.defenderModifiers);
+                    addSources(entry.attackerModifiers);
+                    addSources(entry.defenderModifiers);
+                    return;
+                }
+                addRoll(entry.leftPrimaryId, entry.leftTotal, entry.leftRoll, entry.leftModifiers);
+                addRoll(entry.rightPrimaryId, entry.rightTotal, entry.rightRoll, entry.rightModifiers);
+                addSources(entry.leftModifiers);
+                addSources(entry.rightModifiers);
+            });
+            return marks;
+        }
+
+        drawCombatReadoutMarks(ctx, resolution) {
+            const size = 10;
+            this.getCombatReadoutMarks(resolution).forEach((mark) => {
+                this.drawCombatReadoutBox(ctx, mark, size);
+                if (mark.kind === 'die') {
+                    this.drawDiePips(ctx, mark);
+                    return;
+                }
+                ctx.save();
+                ctx.fillStyle = mark.color;
+                ctx.font = `${mark.kind === 'strength' ? 6.4 : 5.2}px Georgia, serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const text = mark.kind === 'strength' ? String(mark.value) : rules.formatSignedModifier(mark.value);
+                ctx.fillText(text, mark.position.x, mark.position.y);
+                ctx.restore();
+            });
+        }
+
+        drawCombatReadoutBox(ctx, mark, size) {
+            const forward = geometry.getForwardVector(mark.rotation || 0);
+            const right = geometry.getRightVector(mark.rotation || 0);
+            const half = size / 2;
+            const corner = (across, along) => geometry.add(
+                mark.position,
+                geometry.add(geometry.scaleVector(right, across), geometry.scaleVector(forward, along))
+            );
+            ctx.save();
+            ctx.beginPath();
+            geometry.tracePointPolygon(ctx, [
+                corner(-half, half),
+                corner(half, half),
+                corner(half, -half),
+                corner(-half, -half)
+            ]);
+            ctx.fillStyle = mark.fill;
+            ctx.strokeStyle = mark.kind === 'die' ? mark.fill : mark.color;
+            ctx.lineWidth = 0.7;
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        drawDiePips(ctx, mark) {
+            const faces = {
+                1: [[0, 0]],
+                2: [[-1, -1], [1, 1]],
+                3: [[-1, -1], [0, 0], [1, 1]],
+                4: [[-1, -1], [1, -1], [-1, 1], [1, 1]],
+                5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]],
+                6: [[-1, -1], [-1, 0], [-1, 1], [1, -1], [1, 0], [1, 1]]
+            };
+            const pips = faces[mark.value] || faces[1];
+            const spread = 2.55;
+            ctx.save();
+            ctx.fillStyle = mark.color;
+            pips.forEach(([column, row]) => {
+                ctx.beginPath();
+                ctx.arc(mark.position.x + (column * spread), mark.position.y + (row * spread), 1.05, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.restore();
         }
 
         drawCombatResolutionOverlays(ctx) {
@@ -271,6 +465,9 @@
             if (!resolution) {
                 return;
             }
+            this.drawCombatOutcomeMarks(ctx, resolution);
+            this.drawCombatPushbackArrows(ctx, resolution);
+            this.drawCombatReadoutMarks(ctx, resolution);
             resolution.results.forEach((entry) => {
                 let leftUnit = null;
                 let rightUnit = null;
@@ -308,6 +505,133 @@
                 ctx.fillText(`${leftTotal} vs ${rightTotal}`, labelPosition.x, labelPosition.y);
                 ctx.restore();
             });
+        }
+
+        drawCombatOutcomeMarks(ctx, resolution) {
+            const destroyedIds = resolution.destroyedIds || new Set();
+            const ensorcelledIds = resolution.ensorcelledIds
+                || new Set((resolution.ensorcelledUnits || []).map((unit) => unit.id));
+            destroyedIds.forEach((unitId) => {
+                const unit = this.getCombatPoseUnit(resolution, unitId);
+                if (unit) {
+                    this.drawDestroyedMark(ctx, unit);
+                }
+            });
+            ensorcelledIds.forEach((unitId) => {
+                const unit = this.getCombatPoseUnit(resolution, unitId);
+                if (unit) {
+                    this.drawEnsorcelledMark(ctx, unit);
+                }
+            });
+        }
+
+        drawCombatPushbackArrows(ctx, resolution) {
+            const destroyedIds = resolution.destroyedIds || new Set();
+            const ensorcelledIds = resolution.ensorcelledIds
+                || new Set((resolution.ensorcelledUnits || []).map((unit) => unit.id));
+            (resolution.movedUnitIds || []).forEach((unitId) => {
+                if (destroyedIds.has(unitId) || ensorcelledIds.has(unitId)) {
+                    return;
+                }
+                const before = resolution.ghostSnapshot?.[unitId];
+                const after = this.state.units.find((unit) => unit.id === unitId);
+                if (!before || !after || !this.hasUnitMoved(before, after)) {
+                    return;
+                }
+                this.drawPushbackArrow(ctx, geometry.getUnitCenter(before), geometry.getUnitCenter(after));
+            });
+        }
+
+        drawDestroyedMark(ctx, unit) {
+            const center = geometry.getUnitCenter(unit);
+            const size = Math.min(unit.width, unit.depth) * 0.72;
+            ctx.save();
+            ctx.translate(center.x, center.y);
+            ctx.strokeStyle = 'rgba(196, 28, 28, 0.92)';
+            ctx.lineWidth = Math.max(4, size * 0.14) / this.state.camera.scale;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-size / 2, -size / 2);
+            ctx.lineTo(size / 2, size / 2);
+            ctx.moveTo(size / 2, -size / 2);
+            ctx.lineTo(-size / 2, size / 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        drawEnsorcelledMark(ctx, unit) {
+            const center = geometry.getUnitCenter(unit);
+            const radius = Math.min(unit.width, unit.depth) * 0.38;
+            ctx.save();
+            ctx.translate(center.x, center.y);
+            ctx.strokeStyle = 'rgba(48, 92, 210, 0.95)';
+            ctx.lineWidth = Math.max(3, radius * 0.22) / this.state.camera.scale;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            const turns = 2.35;
+            const steps = 56;
+            for (let index = 0; index <= steps; index += 1) {
+                const t = index / steps;
+                const angle = t * turns * Math.PI * 2;
+                const spiralRadius = radius * (0.18 + (0.82 * t));
+                const x = Math.cos(angle) * spiralRadius;
+                const y = Math.sin(angle) * spiralRadius;
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        drawPushbackArrow(ctx, from, to) {
+            const delta = geometry.subtract(to, from);
+            const distance = geometry.distance(from, to);
+            if (distance < 0.5) {
+                return;
+            }
+            const direction = geometry.normalize(delta);
+            const desiredHead = Math.min(16, Math.max(10, distance * 0.28)) / this.state.camera.scale;
+            const headLength = Math.min(desiredHead, distance * 0.42);
+            const headWidth = headLength * 0.72;
+            const tip = to;
+            const base = geometry.add(tip, geometry.scaleVector(direction, -headLength));
+            const ortho = { x: -direction.y, y: direction.x };
+            const shaftWidth = Math.max(3.2, Math.min(5.5, distance * 0.12)) / this.state.camera.scale;
+            ctx.save();
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = 'rgba(255, 248, 230, 0.95)';
+            ctx.lineWidth = shaftWidth + (2.4 / this.state.camera.scale);
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(base.x, base.y);
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(196, 92, 18, 0.96)';
+            ctx.fillStyle = 'rgba(196, 92, 18, 0.96)';
+            ctx.lineWidth = shaftWidth;
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(base.x, base.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(tip.x, tip.y);
+            ctx.lineTo(
+                base.x + ortho.x * headWidth,
+                base.y + ortho.y * headWidth
+            );
+            ctx.lineTo(
+                base.x - ortho.x * headWidth,
+                base.y - ortho.y * headWidth
+            );
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 248, 230, 0.95)';
+            ctx.lineWidth = 1.6 / this.state.camera.scale;
+            ctx.stroke();
+            ctx.restore();
         }
 
         getBattlePreviewUnits() {
@@ -651,21 +975,29 @@
         }
 
         drawUnitBase(ctx, unit, options) {
-            const corners = geometry.getUnitCorners(unit);
+            const outlined = geometry.hasOutline(unit);
             const colors = this.getPlayerColors(this.getUnitPlayerId(unit));
             ctx.save();
             if (options.ghost) {
                 ctx.globalAlpha = 0.35;
             }
             ctx.beginPath();
-            geometry.tracePolygon(ctx, corners);
+            if (outlined) {
+                geometry.tracePointPolygon(ctx, geometry.getUnitFootprintPoints(unit));
+            } else {
+                geometry.tracePolygon(ctx, geometry.getUnitCorners(unit));
+            }
             ctx.fillStyle = colors.fill;
             ctx.shadowColor = colors.glow;
             ctx.shadowBlur = options.selected ? 22 / this.state.camera.scale : 0;
             ctx.fill();
             ctx.shadowBlur = 0;
             const drewAsset = this.drawUnitAsset(ctx, unit);
-            ctx.lineWidth = (options.selected || options.needsShootingDeclaration ? 4 : 2) / this.state.camera.scale;
+            const hovered = !options.ghost
+                && this.state.hover?.unitId === unit.id
+                && (typeof this.canCurrentlySelectUnit !== 'function' || this.canCurrentlySelectUnit(unit));
+            const borderWidth = (options.selected || options.needsShootingDeclaration ? 4 : 2) + (hovered ? 2.5 : 0);
+            ctx.lineWidth = borderWidth / this.state.camera.scale;
             if (options.ghost) {
                 ctx.setLineDash([6 / this.state.camera.scale, 4 / this.state.camera.scale]);
             }
@@ -675,6 +1007,149 @@
                 this.drawUnitArrow(ctx, unit);
                 this.drawUnitText(ctx, unit);
             }
+            if (!options.ghost && this.shouldMarkMovedUnit(unit)) {
+                this.drawMovedBoot(ctx, unit);
+            } else if (!options.ghost && this.shouldMarkUnaffordableUnit(unit)) {
+                this.drawNoMoveMark(ctx, unit);
+            }
+            ctx.restore();
+        }
+
+        shouldMarkMovedUnit(unit) {
+            if (!unit || this.state.mode !== 'game' || this.state.phase !== 'move' || this.state.setupStage === 'unit-deployment') {
+                return false;
+            }
+            if (!unit.movedThisTurn || unit.inReserve) {
+                return false;
+            }
+            if (this.getUnitPlayerId(unit) !== this.state.activePlayerId) {
+                return false;
+            }
+            return typeof this.canLocallyControl !== 'function' || this.canLocallyControl(this.getUnitPlayerId(unit));
+        }
+
+        drawMovedBoot(ctx, unit) {
+            const center = geometry.getUnitCenter(unit);
+            ctx.save();
+            ctx.translate(center.x, center.y);
+            ctx.rotate(Math.atan2(geometry.getForwardVector(unit.rotation).y, geometry.getForwardVector(unit.rotation).x));
+            ctx.globalAlpha = 0.48;
+            this.drawBootprintIcon(ctx, Math.min(unit.width, unit.depth) * 0.95, 'rgb(112, 112, 112)', 'boot', 'assets/boot-print.svg');
+            ctx.restore();
+        }
+
+        unitMoveCost(unit) {
+            if (unit.inReserve && typeof this.isEnsorcelledInReserve === 'function' && this.isEnsorcelledInReserve(unit)) {
+                return typeof this.getEnsorcelledReturnCost === 'function' ? this.getEnsorcelledReturnCost(unit) : 0;
+            }
+            if (unit.inReserve) {
+                return 1;
+            }
+            return rules.getMoveCost(unit);
+        }
+
+        shouldMarkUnaffordableUnit(unit) {
+            if (!unit || this.state.mode !== 'game' || this.state.phase !== 'move' || this.state.setupStage === 'unit-deployment') {
+                return false;
+            }
+            if (unit.movedThisTurn || unit.combat?.stationary) {
+                return false;
+            }
+            if (this.getUnitPlayerId(unit) !== this.state.activePlayerId) {
+                return false;
+            }
+            if (typeof this.canLocallyControl === 'function' && !this.canLocallyControl(this.getUnitPlayerId(unit))) {
+                return false;
+            }
+            if (this.state.draft?.unitIds?.includes(unit.id)) {
+                return false;
+            }
+            const cost = this.unitMoveCost(unit);
+            return cost > 0 && this.state.remainingMoves < cost;
+        }
+
+        drawNoMoveMark(ctx, unit) {
+            const center = geometry.getUnitCenter(unit);
+            ctx.save();
+            ctx.translate(center.x, center.y);
+            ctx.rotate(Math.atan2(geometry.getForwardVector(unit.rotation).y, geometry.getForwardVector(unit.rotation).x));
+            ctx.globalAlpha = 0.48;
+            this.drawBootprintIcon(ctx, Math.min(unit.width, unit.depth) * 0.95, 'rgb(72, 72, 72)', 'no-move', 'assets/noMove.svg', true);
+            ctx.restore();
+        }
+
+        getSvgAsset(key, src) {
+            if (typeof Image === 'undefined') {
+                return null;
+            }
+            if (!this.svgAssets) {
+                this.svgAssets = new Map();
+            }
+            let entry = this.svgAssets.get(key);
+            if (!entry) {
+                const image = new Image();
+                entry = { image, status: 'loading' };
+                image.addEventListener('load', () => {
+                    entry.status = 'ready';
+                    this.requestRender();
+                });
+                image.addEventListener('error', () => {
+                    entry.status = 'error';
+                });
+                image.src = src;
+                this.svgAssets.set(key, entry);
+            }
+            return entry.status === 'ready' ? entry.image : null;
+        }
+
+        getTintedSvgAsset(key, src, color) {
+            const image = this.getSvgAsset(key, src);
+            if (!image || typeof document === 'undefined') {
+                return null;
+            }
+            if (!this.svgTints) {
+                this.svgTints = new Map();
+            }
+            const tintKey = `${key}\n${color}`;
+            let tinted = this.svgTints.get(tintKey);
+            if (!tinted) {
+                const canvas = document.createElement('canvas');
+                canvas.width = image.naturalWidth || image.width;
+                canvas.height = image.naturalHeight || image.height;
+                const tintCtx = canvas.getContext('2d');
+                tintCtx.drawImage(image, 0, 0);
+                tintCtx.globalCompositeOperation = 'source-in';
+                tintCtx.fillStyle = color;
+                tintCtx.fillRect(0, 0, canvas.width, canvas.height);
+                tinted = canvas;
+                this.svgTints.set(tintKey, tinted);
+            }
+            return tinted;
+        }
+
+        drawBootprintIcon(ctx, length, color, assetKey = 'boot', src = 'assets/boot-print.svg', crossed = false) {
+            const tinted = this.getTintedSvgAsset(assetKey, src, color);
+            if (tinted && tinted.width && tinted.height) {
+                const scale = length / Math.max(tinted.width, tinted.height);
+                const drawW = tinted.width * scale;
+                const drawH = tinted.height * scale;
+                ctx.drawImage(tinted, -drawW / 2, -drawH / 2, drawW, drawH);
+                return;
+            }
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = Math.max(length * 0.12, 1.5 / (this.state.camera?.scale || 1));
+            ctx.beginPath();
+            ctx.ellipse(-length * 0.22, -length * 0.16, length * 0.28, length * 0.12, -0.35, 0, Math.PI * 2);
+            ctx.ellipse(length * 0.22, length * 0.16, length * 0.28, length * 0.12, -0.35, 0, Math.PI * 2);
+            ctx.fill();
+            if (crossed) {
+                ctx.beginPath();
+                ctx.moveTo(-length * 0.42, -length * 0.42);
+                ctx.lineTo(length * 0.42, length * 0.42);
+                ctx.stroke();
+            }
             ctx.restore();
         }
 
@@ -683,6 +1158,9 @@
                 return null;
             }
             const type = unit.type;
+            if (type === 'Base' && unit.faction && data.FACTIONS.includes(unit.faction)) {
+                return `assets/${unit.faction}/Base.svg`;
+            }
             // Prefer faction-specific asset sets when available
             if (unit.faction && data.FACTION_ROSTERS[unit.faction]?.includes(type)) {
                 return `assets/${String(unit.faction).toLowerCase()}/${type}.svg`;
@@ -801,6 +1279,10 @@
             }
             ctx.save();
             handles.forEach((handle) => {
+                if (handle.kind === 'finish-move') {
+                    this.drawFinishMoveHandle(ctx, handle);
+                    return;
+                }
                 if (handle.kind === 'formation-convert') {
                     this.drawConvertHandle(ctx, handle);
                     return;
@@ -818,6 +1300,27 @@
             ctx.restore();
         }
 
+        handleBorderWidth(handle) {
+            const extra = this.state.hover?.handleKind === handle.kind ? 2.5 : 0;
+            return (2 + extra) / this.state.camera.scale;
+        }
+
+        drawFinishMoveHandle(ctx, handle) {
+            ctx.save();
+            ctx.translate(handle.position.x, handle.position.y);
+            ctx.rotate(handle.rotation || 0);
+            const size = handle.radius * 2;
+            ctx.beginPath();
+            ctx.rect(-handle.radius, -handle.radius, size, size);
+            ctx.fillStyle = '#fff7dd';
+            ctx.fill();
+            ctx.lineWidth = this.handleBorderWidth(handle);
+            ctx.strokeStyle = '#7e6420';
+            ctx.stroke();
+            this.drawBootprintIcon(ctx, handle.radius * 1.65, '#7e6420');
+            ctx.restore();
+        }
+
         drawRotateHandle(ctx, handle) {
             ctx.save();
             ctx.translate(handle.position.x, handle.position.y);
@@ -826,7 +1329,7 @@
             ctx.arc(0, 0, handle.radius, 0, Math.PI * 2);
             ctx.fillStyle = '#fff7dd';
             ctx.fill();
-            ctx.lineWidth = 2 / this.state.camera.scale;
+            ctx.lineWidth = this.handleBorderWidth(handle);
             ctx.strokeStyle = '#7e6420';
             ctx.stroke();
 
@@ -861,7 +1364,7 @@
             ctx.rect(-handle.radius, -handle.radius, size, size);
             ctx.fillStyle = '#fff7dd';
             ctx.fill();
-            ctx.lineWidth = 2 / this.state.camera.scale;
+            ctx.lineWidth = this.handleBorderWidth(handle);
             ctx.strokeStyle = '#7e6420';
             ctx.stroke();
 
@@ -886,7 +1389,7 @@
             ctx.rect(-handle.radius, -handle.radius, size, size);
             ctx.fillStyle = '#fff7dd';
             ctx.fill();
-            ctx.lineWidth = 2 / this.state.camera.scale;
+            ctx.lineWidth = this.handleBorderWidth(handle);
             ctx.strokeStyle = '#7e6420';
             ctx.stroke();
 
@@ -918,7 +1421,7 @@
             ctx.rect(-handle.radius, -handle.radius, size, size);
             ctx.fillStyle = '#fff7dd';
             ctx.fill();
-            ctx.lineWidth = 2 / this.state.camera.scale;
+            ctx.lineWidth = this.handleBorderWidth(handle);
             ctx.strokeStyle = '#7e6420';
             ctx.stroke();
 

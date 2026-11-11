@@ -119,6 +119,30 @@
             this.notifyController();
         }
 
+        hasLegalMoveRemaining() {
+            if (this.state.phase !== 'move' || this.state.remainingMoves < 0) {
+                return false;
+            }
+            const moves = this.state.remainingMoves;
+            const playerId = this.state.activePlayerId;
+            const boardUnits = (this.state.units || []).filter((unit) => (
+                this.getUnitPlayerId(unit) === playerId
+                && !unit.movedThisTurn
+                && !unit.inReserve
+            ));
+            if (boardUnits.some((unit) => rules.getMoveCost(unit) <= moves)) {
+                return true;
+            }
+            const reserveUnits = typeof this.getReserveUnits === 'function' ? this.getReserveUnits() : [];
+            return reserveUnits.some((unit) => {
+                if (this.getUnitPlayerId(unit) !== playerId) {
+                    return false;
+                }
+                const cost = typeof this.unitMoveCost === 'function' ? this.unitMoveCost(unit) : 1;
+                return cost <= moves;
+            });
+        }
+
         endMovePhase() {
             if (this.state.mode !== 'game' || this.state.phase !== 'move') {
                 return;
@@ -184,12 +208,125 @@
                 if (phase !== 'shooting' && phase !== 'melee') {
                     this.state.combatResolution = null;
                 }
+                this.queuePhaseAnnouncement();
                 return;
             }
             this.state.phase = phase;
         }
 
+        getPhaseLabel(phase) {
+            if (phase === 'form-up') {
+                return 'Form Up Phase';
+            }
+            if (phase === 'shooting') {
+                return 'Shooting Phase';
+            }
+            if (phase === 'melee') {
+                return 'Melee Phase';
+            }
+            if (phase === 'move') {
+                return 'Move Phase';
+            }
+            return phase ? `${phase} Phase` : '';
+        }
+
+        queuePhaseAnnouncement() {
+            if (this.state.mode !== 'game' || this.state.setupStage !== 'game') {
+                return;
+            }
+            this._pendingPhaseAnnouncement = {
+                phase: this.state.phase,
+                playerId: this.state.activePlayerId
+            };
+            if (this._phaseAnnouncementQueued) {
+                return;
+            }
+            this._phaseAnnouncementQueued = true;
+            const deliver = () => {
+                this._phaseAnnouncementQueued = false;
+                const pending = this._pendingPhaseAnnouncement;
+                this._pendingPhaseAnnouncement = null;
+                if (!pending || this.state.mode !== 'game' || this.state.setupStage !== 'game') {
+                    return;
+                }
+                this.showPhaseBanner(pending.playerId, pending.phase);
+            };
+            if (typeof queueMicrotask === 'function') {
+                queueMicrotask(deliver);
+                return;
+            }
+            Promise.resolve().then(deliver);
+        }
+
+        phaseInkColor(colors) {
+            const stroke = colors?.stroke || '#20456f';
+            const hex = String(stroke).replace('#', '');
+            if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+                return stroke;
+            }
+            const red = parseInt(hex.slice(0, 2), 16);
+            const green = parseInt(hex.slice(2, 4), 16);
+            const blue = parseInt(hex.slice(4, 6), 16);
+            const luminance = ((0.2126 * red) + (0.7152 * green) + (0.0722 * blue)) / 255;
+            return luminance > 0.72 ? '#2a261f' : stroke;
+        }
+
+        showPhaseBanner(playerId, phase) {
+            const banner = this.ui?.phaseBanner;
+            if (!banner) {
+                return;
+            }
+            const colors = this.getPlayerColors(playerId);
+            const phaseLabel = this.getPhaseLabel(phase);
+            const playerLabel = this.getPlayerSelectLabel(playerId);
+            const token = `${playerId}:${phase}`;
+            banner.hidden = false;
+            if (banner.dataset) {
+                banner.dataset.phaseToken = token;
+            }
+            const title = typeof banner.querySelector === 'function'
+                ? banner.querySelector('.phase-banner-title')
+                : null;
+            const player = typeof banner.querySelector === 'function'
+                ? banner.querySelector('.phase-banner-player')
+                : null;
+            if (title) {
+                title.textContent = phaseLabel;
+            }
+            if (player) {
+                player.textContent = playerLabel;
+            }
+            if (!title && !player) {
+                banner.textContent = `${phaseLabel}\n${playerLabel}`;
+            }
+            if (banner.style && typeof banner.style.setProperty === 'function') {
+                banner.style.setProperty('--phase-ink', this.phaseInkColor(colors));
+            }
+            if (banner.classList) {
+                banner.classList.remove('is-showing');
+                if (typeof banner.offsetWidth === 'number') {
+                    void banner.offsetWidth;
+                }
+                banner.classList.add('is-showing');
+            }
+            if (this._phaseBannerTimer) {
+                clearTimeout(this._phaseBannerTimer);
+            }
+            this._phaseBannerTimer = setTimeout(() => {
+                if (banner.dataset && banner.dataset.phaseToken !== token) {
+                    return;
+                }
+                banner.hidden = true;
+                if (banner.classList) {
+                    banner.classList.remove('is-showing');
+                }
+            }, 2400);
+        }
+
         initializeShootingPhase() {
+            this.state.units.forEach((unit) => {
+                unit.attackedThisTurn = false;
+            });
             this.state.shooting = {
                 focusedAttackerId: null,
                 validTargetIds: [],
@@ -244,13 +381,23 @@
             ));
         }
 
+        getShootingAssignmentProgress() {
+            const attacks = this.state.shooting?.attacksByAttacker || {};
+            const assigned = Object.keys(attacks).length;
+            const undeclared = this.state.units.filter((unit) => this.needsShootingDeclaration(unit)).length;
+            return {
+                assigned,
+                total: assigned + undeclared
+            };
+        }
+
         advanceToNextTurn() {
             this.state.formUp = null;
             this.state.shooting = null;
             this.state.melee = null;
             this.state.combatResolution = null;
             this.state.selectedIds = [];
-            if (this.checkVictoryAtTurnEnd()) {
+            if (this.state.victory || this.checkVictoryAtTurnEnd()) {
                 this.syncUiFromState();
                 return;
             }
@@ -259,6 +406,9 @@
             this.clearMoveTurnState();
             this.resetMovedFlags(this.state.activePlayerId);
             this.setPhase('move');
+            if (typeof this.captureLocalTurnCheckpoint === 'function') {
+                this.captureLocalTurnCheckpoint();
+            }
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             this.updateStatus(`Turn passes to ${this.getPlayerLabel(this.state.activePlayerId)}. ${this.state.remainingMoves} moves available.`);
@@ -358,7 +508,8 @@
             }
             if (shooting.focusedAttackerId && shooting.validTargetIds.includes(unit.id)) {
                 const attacker = this.getUnitById(shooting.focusedAttackerId);
-                const declareCost = rules.getAttackDeclareCost(attacker);
+                const alreadyDeclared = Boolean(shooting.attacksByAttacker[shooting.focusedAttackerId]);
+                const declareCost = alreadyDeclared ? 0 : rules.getAttackDeclareCost(attacker);
                 if (declareCost > 0 && this.state.remainingMoves < declareCost) {
                     this.updateStatus(`Declaring a ${attacker.type} attack requires ${declareCost} moves.`);
                     return;
@@ -373,7 +524,7 @@
                 this.state.selectedIds = [shooting.focusedAttackerId];
                 this.syncUiFromState();
                 this.requestRender();
-                this.updateStatus('Shooting attack declared.');
+                this.updateStatus(alreadyDeclared ? 'Shooting target changed.' : 'Shooting attack declared.');
                 return;
             }
             if (rules.isRangedUnit(unit)) {
@@ -385,24 +536,31 @@
                     this.updateStatus('Only the active side can declare shooting attacks.');
                     return;
                 }
-                if (!rules.canUnitShoot(unit, this.state.activePlayerId)) {
+                const alreadyDeclared = Boolean(shooting.attacksByAttacker[unit.id]);
+                if (!rules.canUnitShoot(unit, this.state.activePlayerId, { allowAlreadyAttacked: alreadyDeclared })) {
                     shooting.focusedAttackerId = null;
                     shooting.validTargetIds = [];
                     this.state.selectedIds = [];
                     this.syncUiFromState();
                     this.requestRender();
-                    const status = rules.isMagicianUnit(unit) && unit.attackedThisTurn
+                    const status = rules.isMagicianUnit(unit) && unit.attackedThisTurn && !alreadyDeclared
                         ? `${unit.type} has already attacked this turn.`
                         : `${unit.type} cannot shoot after moving this turn.`;
                     this.updateStatus(status);
                     return;
                 }
-                const declareCost = rules.getAttackDeclareCost(unit);
+                const declareCost = alreadyDeclared ? 0 : rules.getAttackDeclareCost(unit);
                 if (declareCost > 0 && this.state.remainingMoves < declareCost) {
                     this.updateStatus(`Declaring a ${unit.type} attack requires ${declareCost} moves.`);
                     return;
                 }
-                const validTargetIds = rules.getValidShootingTargets(unit, this.state.units, this.state.terrain, this.state.activePlayerId);
+                const validTargetIds = rules.getValidShootingTargets(
+                    unit,
+                    this.state.units,
+                    this.state.terrain,
+                    this.state.activePlayerId,
+                    { allowAlreadyAttacked: alreadyDeclared }
+                );
                 if (validTargetIds.length === 0) {
                     shooting.focusedAttackerId = null;
                     shooting.validTargetIds = [];
@@ -415,7 +573,9 @@
                 shooting.focusedAttackerId = unit.id;
                 shooting.validTargetIds = validTargetIds;
                 this.state.selectedIds = [unit.id];
-                this.updateStatus(`${unit.type} selected for shooting.`);
+                this.updateStatus(alreadyDeclared
+                    ? `${unit.type} selected. Choose a new target.`
+                    : `${unit.type} selected for shooting.`);
                 return;
             }
             if (!shooting.focusedAttackerId) {
@@ -468,9 +628,11 @@
                 phase,
                 ghostSnapshot,
                 destroyedIds,
+                ensorcelledIds,
                 recycledUnits: (result.destroyedUnits || []).filter((unit) => this.isReserveRecycleType(unit)),
                 ensorcelledUnits: result.ensorcelledUnits || [],
                 movedUnitIds: Object.keys(ghostSnapshot),
+                attacksByAttacker: null,
                 results: result.results.map((entry) => ({
                     ...entry,
                     attackerIds: entry.attackerIds ? [...entry.attackerIds] : undefined,
@@ -605,6 +767,7 @@
                 return;
             }
             const snapshot = geometry.snapshotPositions(this.state.units.map((unit) => unit.id), this.state.units);
+            const declaredAttacks = { ...(shooting.attacksByAttacker || {}) };
             const result = rules.resolveShooting(
                 this.state.units,
                 shooting.attacksByAttacker,
@@ -615,10 +778,15 @@
             this.state.units = result.units;
             this.recordLosses(result.destroyedUnits);
             this.state.combatResolution = this.buildCombatResolution(snapshot, result, 'shooting');
+            this.state.combatResolution.attacksByAttacker = declaredAttacks;
             this.settleEnsorcelledUnits(result.ensorcelledUnits);
             this.logCombatResults(result, 'shooting');
             this.state.selectedIds = [];
             this.state.shooting = null;
+            if (result.baseFellPlayerId && this.declareVictory(result.baseFellPlayerId, 'base-lost')) {
+                this.notifyController();
+                return;
+            }
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             const ensorcelledCount = (result.ensorcelledUnits || []).length;
@@ -630,7 +798,7 @@
             if (ensorcelledCount > 0) {
                 summary.push(`${ensorcelledCount} ensorcelled`);
             }
-            this.updateStatus(`Shooting resolved${summary.length ? `: ${summary.join(', ')}` : ''}. Review the aftermath, then click Acknowledged.`);
+            this.updateStatus(`Shooting resolved${summary.length ? `: ${summary.join(', ')}` : ''}. Review the aftermath, then click Acknowledge Shooting.`);
             this.notifyController();
         }
 
@@ -647,9 +815,13 @@
             this.logCombatResults(result, 'melee');
             this.state.selectedIds = [];
             this.state.melee = null;
+            if (result.baseFellPlayerId && this.declareVictory(result.baseFellPlayerId, 'base-lost')) {
+                this.notifyController();
+                return;
+            }
             this.updateSelectionAnalysis();
             this.syncUiFromState();
-            this.updateStatus(`Melee resolved: ${result.destroyedUnits.length} units destroyed. Review the aftermath, then click Acknowledged.`);
+            this.updateStatus(`Melee resolved: ${result.destroyedUnits.length} units destroyed. Review the aftermath, then click Acknowledge Melee.`);
             this.notifyController();
         }
 
@@ -699,6 +871,9 @@
         }
 
         beginFormUpPhase() {
+            if (typeof this.captureEndMoveCheckpoint === 'function') {
+                this.captureEndMoveCheckpoint();
+            }
             this.clearMoveTurnState();
             const activeUnits = this.state.units.filter((unit) => this.getUnitPlayerId(unit) === this.state.activePlayerId);
             const activeIds = activeUnits.map((unit) => unit.id);
@@ -733,15 +908,34 @@
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             if (result.movedUnitIds.length > 0) {
-                this.updateStatus('Form up applied automatically. Review the ghosted original positions, then click Acknowledged.');
+                this.updateStatus('Form up applied automatically. Review the ghosted original positions, then click Acknowledge Forming Up.');
                 this.notifyController();
                 return;
             }
-            this.updateStatus('No units qualified to form up. Click Acknowledged to continue to shooting.');
+            this.updateStatus('No units qualified to form up. Click Acknowledge Forming Up to continue to shooting.');
             this.notifyController();
         }
 
+        acknowledgeButtonLabel() {
+            if (this.state.victory && this.state.victoryModalDismissed) {
+                return 'Victory';
+            }
+            if (this.state.phase === 'form-up') {
+                return 'Acknowledge Forming Up';
+            }
+            if (this.state.phase === 'melee' || this.state.combatResolution?.phase === 'melee') {
+                return 'Acknowledge Melee';
+            }
+            return 'Acknowledge Shooting';
+        }
+
         acknowledgePhase() {
+            if (this.state.victory) {
+                if (this.state.victoryModalDismissed) {
+                    this.reopenVictoryModal();
+                }
+                return;
+            }
             if (this.state.mode !== 'game') {
                 return;
             }

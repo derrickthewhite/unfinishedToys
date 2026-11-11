@@ -1,10 +1,13 @@
 (function (root, factory) {
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = factory();
+        module.exports = factory(root);
         return;
     }
-    root.HordesData = factory();
-}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+    root.HordesData = factory(root);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
+    const baseFootprints = (typeof module !== 'undefined' && module.exports)
+        ? require('./base-footprints.js')
+        : root.HordesBaseFootprints;
     const BOARD_SIZE = 600;
     const UNIT_WIDTH = 40;
     const MM_GRID = 40;
@@ -44,6 +47,12 @@
     const ENSORCELLED_RETURN_MOVE_COST = 6;
     const MAGICIAN_ENSORCELLED_RETURN_PACES = 250;
     const ENSORCELLABLE_TYPES = Object.freeze(['Hero', 'Magician']);
+    const BASE_MAX_WIDTH = 180;
+    const BASE_MAX_DEPTH = 140;
+    const BASE_FRONT_CLEARANCE = 120;
+    const BASE_EDGE_CLEARANCE_PACES = 400;
+    const BASE_EDGE_CLEARANCE = BASE_EDGE_CLEARANCE_PACES * MM_PER_PACE;
+    const BASE_CONTACT_FUZZ = 2;
 
     const PLAYER_IDS = Object.freeze(['player-1', 'player-2']);
     const CONTROLLER_TYPES = Object.freeze(['local', 'computer', 'remote']);
@@ -156,7 +165,7 @@
 
     const DEFAULT_PLAYERS = Object.freeze({
         'player-1': { id: 'player-1', colorId: 'blue', faction: 'Panda', controller: 'local' },
-        'player-2': { id: 'player-2', colorId: 'red', faction: 'Undead', controller: 'local' }
+        'player-2': { id: 'player-2', colorId: 'red', faction: 'Undead', controller: 'computer' }
     });
 
     const RANDOM_PLAYER_COLOR = Object.freeze({
@@ -215,7 +224,15 @@
         },
         Beasts: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 400, good: 400, bad: 400, water: 100 }, strength: { infantry: 3, mounted: 4 }, combat: { ignoresBadGoingPenalty: true } },
         Flyers: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 1200, good: 1200, bad: 1200, water: 1200 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false }, movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 } },
-        Behemoth: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 400, good: 300, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } }
+        Behemoth: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 400, good: 300, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } },
+        Base: {
+            value: 0,
+            depth: 100,
+            troopClass: 'infantry',
+            moves: { road: 0, good: 0, bad: 0, water: 0 },
+            strength: { infantry: 6, mounted: 6 },
+            combat: { ignoresBadGoingPenalty: false, stationary: true, lossEndsGame: true, unpurchasable: true }
+        }
     };
 
     const AUTO_DEPLOY_MAX_RANK = 4;
@@ -332,18 +349,47 @@
         };
     }
 
+    function getBaseFootprint(faction) {
+        return baseFootprints.getBaseFootprint(faction);
+    }
+
+    function baseHomeEdgePose(footprint) {
+        const points = footprint?.points || [];
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        points.forEach((point) => {
+            minX = Math.min(minX, point.x);
+            maxX = Math.max(maxX, point.x);
+            maxY = Math.max(maxY, point.y);
+        });
+        if (!Number.isFinite(minX)) {
+            return { x: (BOARD_SIZE - (footprint?.width || 0)) / 2, y: BOARD_SIZE - (footprint?.depth || 0), rotation: 0 };
+        }
+        return {
+            x: (BOARD_SIZE / 2) - ((minX + maxX) / 2),
+            y: BOARD_SIZE - maxY,
+            rotation: 0
+        };
+    }
+
     function createUnit(type, playerId, faction, pose, allocateUnitId) {
         const template = UNIT_TYPES[type];
         if (!template) {
             throw new Error('Unknown unit type: ' + type);
+        }
+        const footprint = type === 'Base' ? getBaseFootprint(faction) : null;
+        if (type === 'Base' && !footprint) {
+            throw new Error('No base artwork for faction: ' + faction);
         }
         return {
             id: allocateUnitId(),
             type,
             playerId,
             faction,
-            width: UNIT_WIDTH,
-            depth: template.depth,
+            width: footprint ? footprint.width : UNIT_WIDTH,
+            depth: footprint ? footprint.depth : template.depth,
+            outline: footprint ? footprint.points.map((point) => ({ x: point.x, y: point.y })) : null,
             x: pose.x,
             y: pose.y,
             rotation: pose.rotation,
@@ -422,6 +468,12 @@
         ENSORCELLED_RETURN_MOVE_COST,
         MAGICIAN_ENSORCELLED_RETURN_PACES,
         ENSORCELLABLE_TYPES,
+        BASE_MAX_WIDTH,
+        BASE_MAX_DEPTH,
+        BASE_FRONT_CLEARANCE,
+        BASE_EDGE_CLEARANCE_PACES,
+        BASE_EDGE_CLEARANCE,
+        BASE_CONTACT_FUZZ,
         ARMY_POINT_TARGET,
         FACTIONS,
         FACTION_ROSTERS,
@@ -447,6 +499,8 @@
         AUTO_DEPLOY_MAX_RANK,
         DEPLOYMENT_MATCHUP_BONUSES,
         getDeploymentMatchupScore,
+        getBaseFootprint,
+        baseHomeEdgePose,
         createTerrainOffer,
         pacesToMm,
         convertMovesToMm,

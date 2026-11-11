@@ -174,7 +174,7 @@ function createAppHarness(overrides) {
     };
     app.maybeAutoAdvanceCombatPhase = () => false;
     app.initializeShootingPhase = () => {
-        app.state.shooting = { focusedAttackerId: null, validTargetIds: [], attacksByAttacker: {} };
+        HordesPrototype.prototype.initializeShootingPhase.call(app);
     };
     app.initializeMeleePhase = () => {
         app.state.melee = { combats: [], combatants: [], participantIds: new Set() };

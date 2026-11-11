@@ -14,7 +14,8 @@
         normalizePlayerId,
         getPlayerId,
         getSideByName,
-        sharesFormationContact
+        sharesFormationContact,
+        isStationaryUnit
     } = core;
 
     const {
@@ -25,7 +26,7 @@
     function resolveAutomaticFormUp(units, activePlayerId, terrain) {
         const normalizedActivePlayerId = normalizePlayerId(activePlayerId);
         const mutableUnits = units.map((unit) => ({ ...unit }));
-        const activeUnits = mutableUnits.filter((unit) => getPlayerId(unit) === normalizedActivePlayerId);
+        const activeUnits = mutableUnits.filter((unit) => getPlayerId(unit) === normalizedActivePlayerId && !isStationaryUnit(unit));
         const groups = buildFormationGroups(activeUnits);
         const movedUnitIds = [];
 
@@ -205,11 +206,150 @@
         if (severityFromTerrain(sampleUnitTerrain(unit, terrain)) === TERRAIN_SEVERITY.impassable) {
             return false;
         }
-        return blockers.every((otherUnit) => !geometry.polygonsOverlap(geometry.getUnitCorners(unit), geometry.getUnitCorners(otherUnit)));
+        return blockers.every((otherUnit) => !geometry.unitsOverlap(unit, otherUnit));
+    }
+
+
+    function closestPointOnPolygon(point, polygon) {
+        let bestPoint = polygon[0];
+        let bestDistance = Infinity;
+        for (let index = 0; index < polygon.length; index += 1) {
+            const start = polygon[index];
+            const end = polygon[(index + 1) % polygon.length];
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const lengthSq = (dx * dx) + (dy * dy);
+            let t = 0;
+            if (lengthSq > 1e-9) {
+                t = (((point.x - start.x) * dx) + ((point.y - start.y) * dy)) / lengthSq;
+                t = Math.max(0, Math.min(1, t));
+            }
+            const closest = { x: start.x + (dx * t), y: start.y + (dy * t) };
+            const distance = geometry.distance(point, closest);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestPoint = closest;
+            }
+        }
+        return { point: bestPoint, distance: bestDistance };
+    }
+
+
+    function nearestFrontCornerOutlineDistance(unit, enemy) {
+        const polygon = geometry.getUnitFootprintPoints(enemy);
+        const corners = geometry.getUnitCorners(unit);
+        return Math.min(
+            closestPointOnPolygon(corners.frontLeft, polygon).distance,
+            closestPointOnPolygon(corners.frontRight, polygon).distance
+        );
+    }
+
+
+    function groupCenter(units) {
+        const centers = units.map((unit) => geometry.getUnitCenter(unit));
+        return {
+            x: centers.reduce((sum, center) => sum + center.x, 0) / centers.length,
+            y: centers.reduce((sum, center) => sum + center.y, 0) / centers.length
+        };
+    }
+
+
+    function outlineFacingRotation(from, enemy) {
+        const closest = closestPointOnPolygon(from, geometry.getUnitFootprintPoints(enemy)).point;
+        return Math.atan2(closest.x - from.x, -(closest.y - from.y));
+    }
+
+
+    function outlineSlideLimit(units) {
+        const reach = Math.max(...units.map((unit) => Math.hypot(unit.width, unit.depth)));
+        return data.FORM_UP_DISTANCE + reach;
+    }
+
+
+    function slideToOutlineContact(units, enemy, blockers, terrain, forward, maxSlide) {
+        const poseAt = (distance) => translateUnits(units, { x: forward.x * distance, y: forward.y * distance });
+        const legal = (distance) => isLegalFormUpPosition(poseAt(distance), blockers.concat([enemy]), terrain);
+        let bestDistance = null;
+        const lowStart = legal(0) ? 0 : -maxSlide;
+        const highStart = legal(0) ? maxSlide : 0;
+        let low = lowStart;
+        let high = highStart;
+        for (let iteration = 0; iteration < 24; iteration += 1) {
+            const mid = (low + high) / 2;
+            if (legal(mid)) {
+                bestDistance = mid;
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        if (bestDistance === null) {
+            return null;
+        }
+        const posed = poseAt(bestDistance);
+        const gap = Math.min(...posed.map((unit) => geometry.unitsMinDistance(unit, enemy)));
+        if (gap > data.COLLISION_EPSILON + 0.05) {
+            return null;
+        }
+        return { units: posed, slide: bestDistance };
+    }
+
+
+    function findOutlineGroupFormUp(groupUnits, enemy, blockers, terrain) {
+        let triggerDistance = Infinity;
+        let triggerUnit = null;
+        groupUnits.forEach((unit) => {
+            const distance = nearestFrontCornerOutlineDistance(unit, enemy);
+            if (distance < triggerDistance) {
+                triggerDistance = distance;
+                triggerUnit = unit;
+            }
+        });
+        if (!triggerUnit || triggerDistance > data.FORM_UP_DISTANCE + 0.5) {
+            return null;
+        }
+        const targetRotation = outlineFacingRotation(groupCenter(groupUnits), enemy);
+        const oriented = geometry.rotateUnitsAroundCenter(groupUnits, targetRotation);
+        const forward = geometry.getForwardVector(targetRotation);
+        const slid = slideToOutlineContact(oriented, enemy, blockers, terrain, forward, outlineSlideLimit(groupUnits));
+        if (!slid) {
+            return null;
+        }
+        const movedIds = slid.units
+            .filter((unit, index) => !geometry.sameFootprint(groupUnits[index], unit))
+            .map((unit) => unit.id);
+        const formedTrigger = slid.units.find((unit) => unit.id === triggerUnit.id);
+        return {
+            approachPenalty: 0,
+            movedCount: movedIds.length,
+            triggerDistance,
+            translationDistance: geometry.distance(geometry.getUnitCenter(triggerUnit), geometry.getUnitCenter(formedTrigger)),
+            unitIds: movedIds,
+            units: slid.units
+        };
     }
 
 
     function findBestSingleUnitFormUpCandidate(unit, enemyUnit, option, blockers, terrain, maxTriggerDistance, maxTranslationDistance) {
+        if (geometry.hasOutline(enemyUnit)) {
+            const triggerLimit = Number.isFinite(maxTriggerDistance) ? maxTriggerDistance : data.FORM_UP_DISTANCE + 0.5;
+            const triggerDistance = nearestFrontCornerOutlineDistance(unit, enemyUnit);
+            if (triggerDistance > triggerLimit) {
+                return null;
+            }
+            const targetRotation = outlineFacingRotation(geometry.getUnitCenter(unit), enemyUnit);
+            const oriented = geometry.rotateUnitsAroundCenter([unit], targetRotation);
+            const forward = geometry.getForwardVector(targetRotation);
+            const slid = slideToOutlineContact(oriented, enemyUnit, blockers, terrain, forward, outlineSlideLimit([unit]));
+            if (!slid) {
+                return null;
+            }
+            return {
+                unit: slid.units[0],
+                triggerDistance,
+                translationDistance: geometry.distance(geometry.getUnitCenter(unit), geometry.getUnitCenter(slid.units[0]))
+            };
+        }
         const currentFriendlyCorners = geometry.getUnitCorners(unit);
         const currentOriginCorners = [currentFriendlyCorners.frontLeft, currentFriendlyCorners.frontRight];
         const orientedUnit = geometry.rotateUnitsAroundCenter([unit], option.targetRotation)[0];
@@ -263,7 +403,7 @@
             if (getLineAngleDelta(unit.rotation, enemyUnit.rotation) <= data.FORM_UP_SPLIT_ANGLE) {
                 return;
             }
-            if (!geometry.polygonsOverlap(geometry.getUnitCorners(unit), geometry.getUnitCorners(enemyUnit))) {
+            if (!geometry.unitsOverlap(unit, enemyUnit)) {
                 return;
             }
             const preferredApproach = getPreferredFormUpApproach(unit, enemyUnit);
@@ -297,7 +437,7 @@
     function getEligibleProjectedCollisionEnemies(unit, enemyUnits) {
         return enemyUnits.filter((enemyUnit) => (
             getLineAngleDelta(unit.rotation, enemyUnit.rotation) > data.FORM_UP_SPLIT_ANGLE
-            && geometry.polygonsOverlap(geometry.getUnitCorners(unit), geometry.getUnitCorners(enemyUnit))
+            && geometry.unitsOverlap(unit, enemyUnit)
         ));
     }
 
@@ -730,6 +870,25 @@
         let best = null;
 
         enemyUnits.forEach((enemyUnit) => {
+            if (geometry.hasOutline(enemyUnit)) {
+                const outlineCandidate = findOutlineGroupFormUp(groupUnits, enemyUnit, otherUnits, terrain);
+                if (!outlineCandidate) {
+                    return;
+                }
+                if (!best
+                    || outlineCandidate.movedCount > (best.movedCount || 0)
+                    || (outlineCandidate.movedCount === (best.movedCount || 0) && (
+                        outlineCandidate.approachPenalty < best.approachPenalty
+                        || (outlineCandidate.approachPenalty === best.approachPenalty && (
+                            outlineCandidate.triggerDistance < best.triggerDistance - data.COLLISION_EPSILON
+                            || (Math.abs(outlineCandidate.triggerDistance - best.triggerDistance) <= data.COLLISION_EPSILON
+                                && outlineCandidate.translationDistance < best.translationDistance - data.COLLISION_EPSILON)
+                        ))
+                    ))) {
+                    best = outlineCandidate;
+                }
+                return;
+            }
             const splitFormUpForEnemy = shouldUseSplitFormUp(groupUnits[0].rotation, enemyUnit.rotation)
                 && !areOpposingLines(groupUnits[0].rotation, enemyUnit.rotation);
             groupUnits.forEach((groupUnit) => {
@@ -822,7 +981,7 @@
     function isLegalFormUpPosition(groupUnits, otherUnits, terrain) {
         for (let index = 0; index < groupUnits.length; index += 1) {
             for (let inner = index + 1; inner < groupUnits.length; inner += 1) {
-                if (geometry.polygonsOverlap(geometry.getUnitCorners(groupUnits[index]), geometry.getUnitCorners(groupUnits[inner]))) {
+                if (geometry.unitsOverlap(groupUnits[index], groupUnits[inner])) {
                     return false;
                 }
             }
@@ -830,7 +989,7 @@
                 return false;
             }
             for (const otherUnit of otherUnits) {
-                if (geometry.polygonsOverlap(geometry.getUnitCorners(groupUnits[index]), geometry.getUnitCorners(otherUnit))) {
+                if (geometry.unitsOverlap(groupUnits[index], otherUnit)) {
                     return false;
                 }
             }

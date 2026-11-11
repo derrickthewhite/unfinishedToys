@@ -91,7 +91,7 @@ test('computer vs computer auto-acks combat aftermath; mixed matches still wait'
     assert.deepEqual(app.getPendingControllerDecision(), { kind: 'ack-combat', playerId: 'player-1' });
 });
 
-test('random army identity resolves without color or faction clashes', () => {
+test('random army identity resolves without color clashes', () => {
     const app = createAppHarness({
         state: {
             setupStage: 'army-builder',
@@ -113,7 +113,8 @@ test('random army identity resolves without color or faction clashes', () => {
     assert.notEqual(app.state.players['player-1'].colorId, data.RANDOM_IDENTITY);
     assert.notEqual(app.state.players['player-2'].colorId, data.RANDOM_IDENTITY);
     assert.notEqual(app.state.players['player-1'].colorId, app.state.players['player-2'].colorId);
-    assert.notEqual(app.state.players['player-1'].faction, app.state.players['player-2'].faction);
+    assert.equal(app.state.players['player-1'].faction, data.FACTIONS[0]);
+    assert.equal(app.state.players['player-2'].faction, data.FACTIONS[0]);
     assert.equal(app.getArmyValue('player-1'), data.ARMY_POINT_TARGET);
     assert.equal(app.getArmyValue('player-2'), data.ARMY_POINT_TARGET);
     assert.equal(app.isArmyRandom('player-1'), false);
@@ -160,6 +161,38 @@ test('handleShootingClick still allows a local shooter on the opposing turn', ()
 
     assert.equal(app.state.shooting.focusedAttackerId, 's1');
     assert.deepEqual(app.state.shooting.validTargetIds, ['t1']);
+});
+
+test('computer move applies a draft against a local opponent', async () => {
+    const units = [
+        createBlade('u1', 400, 580, 'player-2'),
+        { ...createBlade('r1', 400, 100, 'player-1'), rotation: Math.PI }
+    ];
+    const app = createAppHarness({
+        state: {
+            setupStage: 'game',
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-2',
+            remainingMoves: 3,
+            units,
+            terrain: { roads: [], features: [] },
+            homeEdgeByPlayerId: { 'player-1': 'top', 'player-2': 'bottom' }
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+    app._skipControllerDelay = true;
+    app.resetControllerRuntime();
+    wireDraftValidation(app);
+    const startY = units[0].y;
+
+    const result = await app.playComputerMove();
+
+    assert.equal(result, 'moved');
+    assert.equal(units[0].movedThisTurn, true);
+    assert.ok(units[0].y < startY);
+    app.resetControllerRuntime();
 });
 
 test('computer move applies a draft in an all-computer match', async () => {

@@ -31,7 +31,9 @@
 
     const {
         getCombatModifiers,
+        getExtraShooterPenalty,
         getMinorLossResolution,
+        resolveCombatLoss,
         getUnitStrengthAgainst,
         choosePrimaryAttacker,
         sumModifiers
@@ -52,6 +54,9 @@
 
 
     function getMoveCost(unit) {
+        if (unit?.combat?.stationary) {
+            return Infinity;
+        }
         return unit?.combat?.moveCost || 1;
     }
 
@@ -70,10 +75,7 @@
 
 
     function getBaseEdgeDistance(left, right) {
-        return geometry.minDistanceBetweenPolygons(
-            geometry.getUnitCorners(left),
-            geometry.getUnitCorners(right)
-        );
+        return geometry.unitsMinDistance(left, right);
     }
 
 
@@ -169,7 +171,14 @@
                 ? geometry.midpoint(attackerArea.nearLeft, attackerArea.nearRight)
                 : geometry.getUnitCenter(attacker);
         }
-        return getUnitSides(target).reduce((best, side) => {
+        const sides = geometry.hasOutline(target)
+            ? geometry.getUnitFootprintPoints(target).map((start, index, points) => ({
+                name: 'outline',
+                start,
+                end: points[(index + 1) % points.length]
+            }))
+            : getUnitSides(target);
+        return sides.reduce((best, side) => {
             const distance = geometry.distancePointToSegment(origin, side.start, side.end);
             if (!best || distance < best.distance) {
                 return { ...side, distance };
@@ -276,7 +285,7 @@
 
     function isSightLineBlocked(start, end, attacker, target, units, terrain) {
         const ignoreIds = new Set([attacker.id, target.id]);
-        const blockingUnit = units.find((unit) => !ignoreIds.has(unit.id) && geometry.segmentIntersectsPolygon(start, end, geometry.getUnitCorners(unit)));
+        const blockingUnit = units.find((unit) => !ignoreIds.has(unit.id) && geometry.segmentIntersectsPolygon(start, end, geometry.getUnitFootprintPoints(unit)));
         if (blockingUnit) {
             return true;
         }
@@ -360,14 +369,47 @@
     }
 
 
-    function getValidShootingTargets(attacker, units, terrain, activePlayerId) {
-        if (!canUnitShoot(attacker, activePlayerId)) {
+    function getValidShootingTargets(attacker, units, terrain, activePlayerId, options) {
+        if (!canUnitShoot(attacker, activePlayerId, options)) {
             return [];
         }
         return units
             .filter((unit) => getPlayerId(unit) !== getPlayerId(attacker))
-            .filter((unit) => isValidShootingAttack(attacker, unit, units, terrain, activePlayerId))
+            .filter((unit) => isValidShootingAttack(attacker, unit, units, terrain, activePlayerId, options))
             .map((unit) => unit.id);
+    }
+
+
+    function buildShootingExchanges(attacksByTarget) {
+        const exchanges = [];
+        const consumed = new Set();
+        attacksByTarget.forEach((attackerIds, targetId) => {
+            if (consumed.has(targetId)) {
+                return;
+            }
+            const partnerId = attackerIds.find((attackerId) => (attacksByTarget.get(attackerId) || []).includes(targetId));
+            if (!partnerId) {
+                exchanges.push({
+                    mutual: false,
+                    attackerIds: [...attackerIds],
+                    defenderId: targetId,
+                    returnShooterIds: [],
+                    returnTargetId: null
+                });
+                consumed.add(targetId);
+                return;
+            }
+            exchanges.push({
+                mutual: true,
+                attackerIds: [...attackerIds],
+                defenderId: targetId,
+                returnShooterIds: [...(attacksByTarget.get(partnerId) || [])],
+                returnTargetId: partnerId
+            });
+            consumed.add(targetId);
+            consumed.add(partnerId);
+        });
+        return exchanges;
     }
 
 
@@ -386,41 +428,68 @@
             attacksByTarget.get(targetId).push(attackerId);
         });
 
+        const exchanges = buildShootingExchanges(attacksByTarget);
         const results = [];
         const recoilDestructions = [];
-        attacksByTarget.forEach((attackerIds, targetId) => {
-            const defender = baseUnits.find((unit) => unit.id === targetId);
-            const attackers = attackerIds
+        exchanges.forEach((exchange) => {
+            const defender = baseUnits.find((unit) => unit.id === exchange.defenderId);
+            const attackers = exchange.attackerIds
                 .map((attackerId) => baseUnits.find((unit) => unit.id === attackerId))
+                .filter(Boolean);
+            const returnShooters = exchange.returnShooterIds
+                .map((shooterId) => baseUnits.find((unit) => unit.id === shooterId))
                 .filter(Boolean);
             if (!defender || attackers.length === 0) {
                 return;
             }
             const primaryAttacker = choosePrimaryAttacker(attackers, defender);
+            const returnOpponent = exchange.mutual
+                ? (baseUnits.find((unit) => unit.id === exchange.returnTargetId) || primaryAttacker)
+                : primaryAttacker;
+            const returnPrimary = exchange.mutual
+                ? choosePrimaryAttacker(returnShooters, returnOpponent)
+                : defender;
             const attackerModifiers = getCombatModifiers({
                 phase: 'shooting',
                 role: 'attacker',
                 unit: primaryAttacker,
                 opponent: defender,
                 attackers,
-                terrain
+                terrain,
+                shotAtUnit: exchange.mutual ? returnOpponent : null
             });
             const defenderModifiers = getCombatModifiers({
                 phase: 'shooting',
                 role: 'defender',
-                unit: defender,
-                opponent: primaryAttacker,
+                unit: exchange.mutual ? returnPrimary : defender,
+                opponent: exchange.mutual ? returnOpponent : primaryAttacker,
                 attackers,
-                terrain
+                terrain,
+                shotAtUnit: defender
             });
-            const attackerRoll = rollDie({ role: 'attacker', attackerIds, primaryAttackerId: primaryAttacker.id, defenderId: defender.id });
-            const defenderRoll = rollDie({ role: 'defender', attackerIds, primaryAttackerId: primaryAttacker.id, defenderId: defender.id });
+            if (exchange.mutual && returnShooters.length > 1) {
+                const penalty = getExtraShooterPenalty(returnShooters.length);
+                if (penalty > 0) {
+                    const extras = returnShooters.filter((unit) => unit.id !== returnPrimary.id).slice(0, penalty);
+                    attackerModifiers.push({
+                        id: 'multiple-shooters',
+                        value: -penalty,
+                        label: 'Multiple shooters',
+                        sources: extras.map((unit) => ({ unitId: unit.id, value: -1 }))
+                    });
+                }
+            }
+            const attackerRoll = rollDie({ role: 'attacker', attackerIds: exchange.attackerIds, primaryAttackerId: primaryAttacker.id, defenderId: defender.id });
+            const defenderRoll = rollDie({ role: 'defender', attackerIds: exchange.attackerIds, primaryAttackerId: primaryAttacker.id, defenderId: returnPrimary.id });
             const attackerTotal = attackerRoll + getUnitStrengthAgainst(primaryAttacker, defender) + sumModifiers(attackerModifiers);
-            const defenderTotal = defenderRoll + getUnitStrengthAgainst(defender, primaryAttacker) + sumModifiers(defenderModifiers);
+            const defenderTotal = defenderRoll + getUnitStrengthAgainst(returnPrimary, exchange.mutual ? returnOpponent : primaryAttacker) + sumModifiers(defenderModifiers);
             const result = {
-                attackerIds,
+                attackerIds: exchange.attackerIds,
                 primaryAttackerId: primaryAttacker.id,
                 defenderId: defender.id,
+                returnPrimaryId: returnPrimary.id,
+                mutual: exchange.mutual,
+                returnTargetId: exchange.returnTargetId,
                 attackerRoll,
                 defenderRoll,
                 attackerModifiers,
@@ -436,24 +505,20 @@
                 return;
             }
             const attackerWon = attackerTotal > defenderTotal;
-            const highTotal = Math.max(attackerTotal, defenderTotal);
-            const lowTotal = Math.min(attackerTotal, defenderTotal);
-            const winner = attackerWon ? primaryAttacker : defender;
-            const loser = attackerWon ? defender : primaryAttacker;
-            if (!attackerWon) {
+            if (!attackerWon && !exchange.mutual) {
                 result.outcome = 'no-effect';
                 results.push(result);
                 return;
             }
+            const highTotal = Math.max(attackerTotal, defenderTotal);
+            const lowTotal = Math.min(attackerTotal, defenderTotal);
+            const winner = attackerWon ? primaryAttacker : returnPrimary;
+            const loser = attackerWon
+                ? defender
+                : (baseUnits.find((unit) => unit.id === exchange.returnTargetId) || primaryAttacker);
             result.loserId = loser.id;
             result.winnerId = winner.id;
-            if (highTotal >= lowTotal * 2) {
-                result.outcome = 'destroy';
-                result.destructionRule = 'Double total destroys the loser.';
-                results.push(result);
-                return;
-            }
-            const lossResolution = getMinorLossResolution(winner, loser, 'shooting', terrain);
+            const lossResolution = resolveCombatLoss(winner, loser, 'shooting', terrain, highTotal >= lowTotal * 2);
             result.outcome = lossResolution.outcome;
             result.destructionRule = lossResolution.destructionRule;
             results.push(result);
@@ -462,12 +527,17 @@
         const destroyedIds = new Set();
         const ensorcelledIds = new Map();
         const recoils = [];
+        let baseFellPlayerId = null;
         results.forEach((result) => {
             if (!result.loserId) {
                 return;
             }
-            if (result.outcome === 'destroy') {
+            if (result.outcome === 'destroy' || result.outcome === 'base-fall') {
                 destroyedIds.add(result.loserId);
+                if (result.outcome === 'base-fall') {
+                    const loser = baseUnits.find((unit) => unit.id === result.loserId);
+                    baseFellPlayerId = loser ? getPlayerId(loser) : baseFellPlayerId;
+                }
                 return;
             }
             if (result.outcome === 'ensorcel') {
@@ -482,6 +552,13 @@
             const attacker = baseUnits.find((unit) => unit.id === result.primaryAttackerId);
             if (attacker?.type === 'Magician' && result.attackerRoll === 1) {
                 ensorcelledIds.set(attacker.id, null);
+            }
+            if (!result.mutual) {
+                return;
+            }
+            const returnShooter = baseUnits.find((unit) => unit.id === result.defenderId);
+            if (returnShooter?.type === 'Magician' && result.defenderRoll === 1) {
+                ensorcelledIds.set(returnShooter.id, null);
             }
         });
 
@@ -533,6 +610,7 @@
             ensorcelledUnits,
             results,
             recoilDestructions,
+            baseFellPlayerId,
             attacksByTarget: Object.fromEntries(Array.from(attacksByTarget.entries()).map(([targetId, attackerIds]) => [targetId, [...attackerIds]]))
         };
     }

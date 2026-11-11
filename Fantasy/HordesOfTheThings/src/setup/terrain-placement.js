@@ -43,8 +43,13 @@
             initializeTerrainPlacement(random = Math.random) {
                 const terrain = this.createTerrainSetup(random);
                 terrain.defenderPlayerId = random() < 0.5 ? 'player-1' : 'player-2';
+                terrain.baseSelected = true;
                 this.state.setup.terrain = terrain;
                 this.state.terrain = { roads: [], features: [] };
+                terrain.base = this.createDefenderBasePlacement(
+                    terrain.defenderPlayerId,
+                    this.getPlayer(terrain.defenderPlayerId)?.faction
+                );
                 delete this.state.setupCameras?.terrain;
                 this.createTerrainOffers(random);
                 return terrain;
@@ -56,7 +61,11 @@
 
             isTerrainReady() {
                 const terrain = this.getTerrainSetup();
-                return Boolean(terrain) && this.getPlacedTerrainCount() === terrain.terrainCount;
+                const base = this.basePlacementToUnit(terrain?.base);
+                return Boolean(terrain)
+                    && Boolean(base)
+                    && geometry.baseMeetsEdgeClearance(base)
+                    && this.getPlacedTerrainCount() === terrain.terrainCount;
             },
 
             setTerrainCount(value) {
@@ -120,8 +129,114 @@
             },
 
             canPlaceTerrainPiece(piece) {
+                if (this.terrainPieceOverlapsBase(piece)) {
+                    return false;
+                }
                 return ![...this.state.terrain.roads, ...this.state.terrain.features]
                     .some((placed) => this.terrainPiecesOverlap(piece, placed));
+            },
+
+            createDefenderBasePlacement(playerId, faction) {
+                const footprint = data.getBaseFootprint(faction);
+                if (!footprint) {
+                    throw new Error('No base artwork for faction: ' + faction);
+                }
+                const pose = data.baseHomeEdgePose(footprint);
+                const placement = geometry.positionBaseOnHomeEdge({
+                    playerId,
+                    faction,
+                    x: pose.x,
+                    y: pose.y,
+                    rotation: pose.rotation,
+                    width: footprint.width,
+                    depth: footprint.depth,
+                    outline: footprint.points.map((point) => ({ x: point.x, y: point.y }))
+                });
+                return {
+                    playerId,
+                    faction,
+                    x: placement.x,
+                    y: placement.y,
+                    rotation: placement.rotation,
+                    width: footprint.width,
+                    depth: footprint.depth,
+                    outline: placement.outline
+                };
+            },
+
+            basePlacementToUnit(base) {
+                if (!base) {
+                    return null;
+                }
+                return {
+                    x: base.x,
+                    y: base.y,
+                    rotation: base.rotation || 0,
+                    width: base.width,
+                    depth: base.depth,
+                    outline: base.outline
+                };
+            },
+
+            getDefenderBase() {
+                return this.getTerrainSetup()?.base || null;
+            },
+
+            terrainPieceOverlapsBase(piece) {
+                const unit = this.basePlacementToUnit(this.getDefenderBase());
+                if (!unit || !piece) {
+                    return false;
+                }
+                const points = geometry.getUnitFootprintPoints(unit);
+                if (piece.kind === 'road') {
+                    return points.some((point) => (
+                        piece.orientation === 'horizontal'
+                            ? Math.abs(point.y - piece.position) <= piece.width / 2
+                            : Math.abs(point.x - piece.position) <= piece.width / 2
+                    ));
+                }
+                if (points.some((point) => geometry.pointInBlob(point, piece))) {
+                    return true;
+                }
+                return geometry.getTerrainFeaturePoints(piece).some((point) => geometry.pointInPolygon(point, points));
+            },
+
+            getBaseRotationHandle(base) {
+                const unit = this.basePlacementToUnit(base);
+                const center = geometry.getUnitCenter(unit);
+                const forward = geometry.getForwardVector(unit.rotation || 0);
+                return geometry.add(center, geometry.scaleVector(forward, (Math.max(unit.width, unit.depth) / 2) + 28));
+            },
+
+            drawPlacementBase(ctx, base, selected) {
+                const unit = this.basePlacementToUnit(base);
+                if (!unit) {
+                    return;
+                }
+                const points = geometry.getUnitFootprintPoints(unit);
+                const colors = this.getPlayerColors(base.playerId);
+                const scale = this.getSetupCamera('terrain').scale || 1;
+                ctx.save();
+                ctx.beginPath();
+                geometry.tracePointPolygon(ctx, points);
+                ctx.fillStyle = colors.fill;
+                ctx.fill();
+                const image = typeof this.getUnitAsset === 'function'
+                    ? this.getUnitAsset({ type: 'Base', faction: base.faction })
+                    : null;
+                if (image) {
+                    ctx.save();
+                    ctx.translate(unit.x, unit.y);
+                    ctx.rotate(unit.rotation || 0);
+                    ctx.drawImage(image, 0, 0, unit.width, unit.depth);
+                    ctx.restore();
+                }
+                ctx.beginPath();
+                geometry.tracePointPolygon(ctx, points);
+                ctx.strokeStyle = selected ? '#f6dc73' : colors.stroke;
+                ctx.lineWidth = (selected ? 4 : 2) / scale;
+                ctx.stroke();
+                ctx.restore();
             },
 
             createRandomTerrainPiece(random = Math.random) {
@@ -199,7 +314,10 @@
                 if (this.state.setupStage !== 'terrain-placement') {
                     return;
                 }
-                if (event.button === 2) {
+                if (event.button === 1 || event.button === 2) {
+                    if (event.button === 1 && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
                     const camera = this.getSetupCamera('terrain');
                     this.ui.terrainCanvas.setPointerCapture(event.pointerId);
                     this.state.terrainInteraction = {
@@ -217,6 +335,38 @@
                     return;
                 }
                 const point = this.terrainScreenToWorld(event);
+                const terrainSetup = this.getTerrainSetup();
+                const base = terrainSetup?.base;
+                if (base && terrainSetup.baseSelected && geometry.distance(point, this.getBaseRotationHandle(base)) <= 16) {
+                    const unit = this.basePlacementToUnit(base);
+                    this.ui.terrainCanvas.setPointerCapture(event.pointerId);
+                    this.state.terrainInteraction = {
+                        kind: 'base',
+                        type: 'rotate',
+                        pointerId: event.pointerId,
+                        center: geometry.getUnitCenter(unit),
+                        startAngle: geometry.angleBetween(geometry.getUnitCenter(unit), point),
+                        baseUnit: unit,
+                        baseRotation: unit.rotation
+                    };
+                    this.renderTerrainPlacement();
+                    return;
+                }
+                if (base && geometry.pointInPolygon(point, geometry.getUnitFootprintPoints(this.basePlacementToUnit(base)))) {
+                    terrainSetup.baseSelected = true;
+                    terrainSetup.selectedTerrainId = null;
+                    this.ui.terrainCanvas.setPointerCapture(event.pointerId);
+                    this.state.terrainInteraction = {
+                        kind: 'base',
+                        type: 'move',
+                        pointerId: event.pointerId,
+                        start: point,
+                        baseUnit: this.basePlacementToUnit(base)
+                    };
+                    this.renderTerrainPlacement();
+                    return;
+                }
+                terrainSetup.baseSelected = false;
                 const rotationPiece = this.getTerrainRotationHandleHit(point);
                 if (rotationPiece) {
                     this.getTerrainSetup().selectedTerrainId = rotationPiece.id;
@@ -249,6 +399,47 @@
                 }
                 if (interaction.type === 'pan') {
                     this.panSetupCamera(interaction, event, 'terrain');
+                    this.renderTerrainPlacement();
+                    return;
+                }
+                if (interaction.kind === 'base') {
+                    const base = this.getDefenderBase();
+                    const point = this.terrainScreenToWorld(event);
+                    if (!base) {
+                        return;
+                    }
+                    if (interaction.type === 'rotate') {
+                        const currentAngle = geometry.angleBetween(interaction.center, point);
+                        const delta = geometry.normalizeAngle(currentAngle - interaction.startAngle);
+                        const rotated = geometry.buildUnitFromCenter(
+                            interaction.baseUnit,
+                            interaction.center,
+                            geometry.normalizeAngle(interaction.baseRotation + delta)
+                        );
+                        const fitted = geometry.translateUnitOntoBoard(rotated);
+                        if (!geometry.baseMeetsEdgeClearance(fitted)) {
+                            this.updateStatus('The base must keep a point within 400 paces of the center of the defended edge.');
+                            this.renderTerrainPlacement();
+                            return;
+                        }
+                        base.x = fitted.x;
+                        base.y = fitted.y;
+                        base.rotation = fitted.rotation;
+                    } else {
+                        const delta = geometry.subtract(point, interaction.start);
+                        const moved = geometry.translateUnitOntoBoard({
+                            ...interaction.baseUnit,
+                            x: interaction.baseUnit.x + delta.x,
+                            y: interaction.baseUnit.y + delta.y
+                        });
+                        if (!geometry.baseMeetsEdgeClearance(moved)) {
+                            this.updateStatus('The base must keep a point within 400 paces of the center of the defended edge.');
+                            this.renderTerrainPlacement();
+                            return;
+                        }
+                        base.x = moved.x;
+                        base.y = moved.y;
+                    }
                     this.renderTerrainPlacement();
                     return;
                 }
@@ -291,7 +482,10 @@
                 if (interaction.type === 'pan') {
                     return;
                 }
-                this.updateStatus(interaction.type === 'rotate' ? 'Terrain rotation updated.' : 'Terrain position updated.');
+                const movedBase = interaction.kind === 'base';
+                this.updateStatus(movedBase
+                    ? (interaction.type === 'rotate' ? 'Base rotation updated.' : 'Base position updated.')
+                    : (interaction.type === 'rotate' ? 'Terrain rotation updated.' : 'Terrain position updated.'));
             },
 
             getTerrainPieceCenter(piece) {
@@ -330,7 +524,22 @@
                     const scale = this.getSetupCamera('terrain').scale;
                     this.drawBoard(ctx);
                     this.drawTerrain(ctx);
-                    const selected = this.getTerrainPieceById(terrain.selectedTerrainId);
+                    if (terrain.base) {
+                        this.drawPlacementBase(ctx, terrain.base, terrain.baseSelected);
+                    }
+                    if (terrain.baseSelected && terrain.base) {
+                        const baseHandle = this.getBaseRotationHandle(terrain.base);
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(baseHandle.x, baseHandle.y, 11, 0, Math.PI * 2);
+                        ctx.fillStyle = '#f6dc73';
+                        ctx.strokeStyle = '#554420';
+                        ctx.lineWidth = 2 / scale;
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                    const selected = terrain.baseSelected ? null : this.getTerrainPieceById(terrain.selectedTerrainId);
                     if (!selected) {
                         return;
                     }
@@ -365,8 +574,8 @@
                     ctx.restore();
                 });
                 this.ui.terrainCountInput.value = String(terrain.terrainCount);
-                this.ui.terrainProgress.textContent = `${this.getPlacedTerrainCount()} / ${terrain.terrainCount} placed`;
-                this.ui.terrainDefender.textContent = `${this.getPlayerSelectLabel(terrain.defenderPlayerId)} is the defender. Place the agreed terrain, then confirm the board.`;
+                this.ui.terrainProgress.textContent = `Base placed · ${this.getPlacedTerrainCount()} / ${terrain.terrainCount} terrain`;
+                this.ui.terrainDefender.textContent = `${this.getPlayerSelectLabel(terrain.defenderPlayerId)} is the defender. Place the base within 400 paces of the center of your edge, then the agreed terrain. Drag the base to move it.`;
                 const computerDefender = typeof this.isComputerPlayer === 'function'
                     && this.isComputerPlayer(terrain.defenderPlayerId);
                 if (this.ui.terrainCountInput) this.ui.terrainCountInput.disabled = computerDefender;

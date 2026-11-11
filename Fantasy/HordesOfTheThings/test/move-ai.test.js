@@ -113,6 +113,88 @@ test('scoreFormationSupport rewards dressing a straggler into an existing rank',
     assert.ok(support.dress > 0);
 });
 
+test('line step rewards matching a friendly front and not stepping past it', () => {
+    const terrain = createEmptyTerrain();
+    const leader = createBlade('lead', 140, 150);
+    const trailer = createBlade('trail', 180, 200);
+    const level = createBlade('level', 100, 150);
+    const enemy = { ...createBlade('enemy', 200, 40), playerId: 'player-2', rotation: Math.PI };
+    const before = [leader, trailer, level, enemy];
+    const matched = moveAi.scoreCandidate(
+        before,
+        [leader, { ...trailer, y: 150 }, level, enemy],
+        'player-1',
+        'player-2',
+        getPlayerId,
+        ['trail'],
+        terrain,
+        { moveKind: 'forward', distance: 50, remainingMoves: 4 }
+    );
+    const steppedPast = moveAi.scoreCandidate(
+        before,
+        [leader, trailer, { ...level, y: 100 }, enemy],
+        'player-1',
+        'player-2',
+        getPlayerId,
+        ['level'],
+        terrain,
+        { moveKind: 'forward', distance: 50, remainingMoves: 4 }
+    );
+
+    assert.ok(matched.breakdown.lineStep > 0.3, `expected a line-step bonus, got ${matched.breakdown.lineStep}`);
+    assert.equal(steppedPast.breakdown.lineStep, 0);
+    assert.ok(matched.total > steppedPast.total);
+});
+
+test('line step is withheld when catching up loses the fight', () => {
+    const terrain = createEmptyTerrain();
+    const leader = createBlade('lead', 60, 180);
+    const horde = {
+        ...createBlade('horde', 100, 240),
+        type: 'Horde',
+        depth: 40,
+        strength: { infantry: 2, mounted: 2 }
+    };
+    const enemy = { ...createSpear('spear', 140, 180), playerId: 'player-2', rotation: Math.PI };
+    const before = [leader, horde, enemy];
+    const after = [leader, { ...horde, y: 180 }, enemy];
+    const scored = moveAi.scoreCandidate(
+        before,
+        after,
+        'player-1',
+        'player-2',
+        getPlayerId,
+        ['horde'],
+        terrain,
+        { moveKind: 'forward', distance: 70, remainingMoves: 4 }
+    );
+
+    assert.ok(scored.breakdown.fight < 0, `expected a losing fight, got ${scored.breakdown.fight}`);
+    assert.equal(scored.breakdown.lineStep, 0);
+});
+
+test('a trailing element matches the step ahead of a further bound', () => {
+    const leader = createBlade('lead', 140, 150);
+    const trailer = createBlade('trail', 180, 200);
+    const enemy = { ...createBlade('enemy', 220, 40), playerId: 'player-2', rotation: Math.PI };
+    const suggestion = moveAi.findBestAutoMove({
+        units: [leader, trailer, enemy],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 4,
+        getPlayerId
+    });
+
+    assert.ok(suggestion, 'expected a move');
+    assert.deepEqual(suggestion.unitIds, ['trail']);
+    assert.equal(suggestion.moveKind, 'forward');
+    assert.ok(suggestion.breakdown.lineStep > 0);
+});
+
+test('move benefit cutoff accepts a modest formation step', () => {
+    assert.equal(moveAi.MIN_BENEFIT, 0.2);
+});
+
 test('scoreFormationSupport penalizes breaking an existing stacked combat', () => {
     const terrain = createEmptyTerrain();
     const blade = {
@@ -875,7 +957,7 @@ test('findBestAutoMoveAsync wheels a Magician out of water when forward stays we
     );
 });
 
-test('findBestAutoMoveAsync sidesteps a Blade when forward combat is unfavorable', () => {
+test('a blade steps up to a friendly front instead of sidestepping off the line', () => {
     const { snapshot } = require('./fixtures/stuck-move-save.json');
     const { collectExtendedMoveCandidates } = require('../src/ai/move-candidates.js');
     const { simulateMoveCandidate } = require('../src/ai/move-simulate.js');
@@ -889,15 +971,36 @@ test('findBestAutoMoveAsync sidesteps a Blade when forward combat is unfavorable
         reserveUnits: snapshot.reserveUnits || [],
         getHomeEdge: (playerId) => snapshot.homeEdgeByPlayerId[playerId]
     };
-    const candidate = collectExtendedMoveCandidates(context).find((entry) => (
+    const forward = collectExtendedMoveCandidates(context).find((entry) => (
         entry.unitIds.length === 1
         && entry.unitIds[0] === 'unit-11'
-        && entry.moveKind === 'sidestep-left'
+        && entry.moveKind === 'forward'
+        && entry.moveParam == null
     ));
-    assert.ok(candidate, 'expected a sidestep-left candidate for the blade');
-    const scored = simulateMoveCandidate(context, candidate, new Map());
-    assert.ok(scored, 'expected sidestep to be legal');
-    assert.ok(scored.score >= 0.25, `expected sidestep score >= 0.25, got ${scored.score}`);
+    assert.ok(forward, 'expected a forward candidate for the blade');
+    const scored = simulateMoveCandidate(context, forward, new Map());
+    assert.ok(scored, 'expected the forward step to be legal');
+    assert.ok(scored.breakdown.lineStep > 0, `expected a line-step bonus, got ${scored.breakdown.lineStep}`);
+    assert.ok(scored.score >= moveAi.MIN_BENEFIT, `expected the step to clear the cutoff, got ${scored.score}`);
+});
+
+test('sidestep keeps the stuck bonus when a lone forward step stays weak', () => {
+    const blade = createBlade('b1', 200, 320);
+    const neighbor = createBlade('b2', 280, 320);
+    const enemy = { ...createBlade('e1', 200, 40), playerId: 'player-2', rotation: Math.PI };
+    const context = {
+        units: [blade, neighbor, enemy],
+        terrain: createEmptyTerrain(),
+        activePlayerId: 'player-1',
+        remainingMoves: 3,
+        getPlayerId
+    };
+    const candidate = moveAi.collectExtendedMoveCandidates(context).find((entry) => (
+        entry.unitIds[0] === 'b1' && entry.moveKind === 'sidestep-left'
+    ));
+    assert.ok(candidate, 'expected a sidestep candidate');
+    const scored = moveAi.simulateMoveCandidate(context, candidate, new Map());
+    assert.ok(scored, 'expected the sidestep to be legal');
     assert.ok(
         scored.breakdown.lateralReposition >= 0.4,
         `expected stuck-forward sidestep bonus, got lateral ${scored.breakdown.lateralReposition}`
@@ -937,7 +1040,7 @@ test('findBestAutoMoveAsync sidesteps Panda Knights out of water', async () => {
     );
 });
 
-test('findBestAutoMoveAsync repositions a stuck Blade when other hordes already moved', async () => {
+test('findBestAutoMoveAsync steps a blade up to the line when the rest have already moved', async () => {
     const { snapshot } = require('./fixtures/stuck-move-save.json');
     const units = snapshot.units.map((unit) => ({ ...unit }));
     units.forEach((unit) => {
@@ -959,8 +1062,9 @@ test('findBestAutoMoveAsync repositions a stuck Blade when other hordes already 
     assert.equal(result.cancelled, false);
     assert.ok(result.suggestion, 'expected a move suggestion');
     assert.equal(result.suggestion.unitIds[0], 'unit-11');
+    assert.equal(result.suggestion.moveKind, 'forward');
     assert.ok(
-        result.suggestion.moveKind.startsWith('sidestep'),
-        `expected blade sidestep, got ${result.suggestion.moveKind}`
+        result.suggestion.breakdown.lineStep > 0,
+        `expected the blade to close up on the line, got lineStep ${result.suggestion.breakdown.lineStep}`
     );
 });

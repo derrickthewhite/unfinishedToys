@@ -47,12 +47,23 @@
 
             getDeploymentZoneBounds(playerId) {
                 const zone = this.getDeploymentZone(playerId);
+                if (zone !== 'bottom' && zone !== 'top') {
+                    return null;
+                }
                 if (zone === 'bottom') {
+                    let minY = data.BOARD_SIZE * 0.75;
+                    const base = (this.state.units || []).find((unit) => (
+                        unit.combat?.lossEndsGame && this.getUnitPlayerId(unit) === playerId
+                    ));
+                    if (base) {
+                        const frontY = Math.min(...geometry.getUnitFootprintPoints(base).map((point) => point.y));
+                        minY = Math.min(minY, Math.max(data.BOARD_SIZE * 0.5, frontY - data.BASE_FRONT_CLEARANCE));
+                    }
                     return {
                         zone,
-                        minY: data.BOARD_SIZE * 0.75,
+                        minY,
                         maxY: data.BOARD_SIZE,
-                        midY: data.BOARD_SIZE * 0.875
+                        midY: (minY + data.BOARD_SIZE) / 2
                     };
                 }
                 return {
@@ -344,10 +355,7 @@
                         return false;
                     }
                     for (let otherIndex = 0; otherIndex < index; otherIndex += 1) {
-                        if (geometry.polygonsOverlap(
-                            geometry.getUnitCorners(unit),
-                            geometry.getUnitCorners(units[otherIndex])
-                        )) {
+                        if (geometry.unitsOverlap(unit, units[otherIndex])) {
                             return false;
                         }
                     }
@@ -518,7 +526,7 @@
 
             getEnemyDeploymentLine(playerId) {
                 return this.state.units
-                    .filter((unit) => this.getUnitPlayerId(unit) !== playerId)
+                    .filter((unit) => this.getUnitPlayerId(unit) !== playerId && !unit.combat?.stationary)
                     .map((unit) => ({
                         type: unit.type,
                         x: geometry.getUnitCenter(unit).x
@@ -640,7 +648,7 @@
                 const enemyLine = this.getEnemyDeploymentLine(activePlayerId);
                 const isAttacker = activePlayerId === deployment.attackerPlayerId;
                 const occupiedFrontAnchors = this.describeAutoDeployOccupied(
-                    this.state.units.filter((unit) => this.getUnitPlayerId(unit) === activePlayerId),
+                    this.state.units.filter((unit) => this.getUnitPlayerId(unit) === activePlayerId && !unit.combat?.stationary),
                     1
                 );
                 let placedCount = 0;

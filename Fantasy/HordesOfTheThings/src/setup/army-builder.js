@@ -46,18 +46,8 @@
                 const playerOne = this.getArmyIdentity('player-1');
                 const playerTwo = this.getArmyIdentity('player-2');
                 const sameColor = !playerOne.randomColor && !playerTwo.randomColor && playerOne.colorId === playerTwo.colorId;
-                const sameFaction = !playerOne.randomFaction
-                    && !playerTwo.randomFaction
-                    && Boolean(playerOne.faction)
-                    && playerOne.faction === playerTwo.faction;
-                if (sameColor && sameFaction) {
-                    return 'Each army needs its own color and faction.';
-                }
                 if (sameColor) {
                     return 'Each army needs its own color.';
-                }
-                if (sameFaction) {
-                    return 'Each army needs its own faction.';
                 }
                 return null;
             },
@@ -68,7 +58,7 @@
             },
 
             getAllowedUnitTypes(playerId) {
-                const types = Object.keys(data.UNIT_TYPES);
+                const types = Object.keys(data.UNIT_TYPES).filter((type) => !data.UNIT_TYPES[type].combat?.unpurchasable);
                 if (!this.areFactionRostersLimited()) {
                     return types;
                 }
@@ -151,9 +141,8 @@
                             || player.colorId;
                     }
                     if (player.faction === data.RANDOM_IDENTITY) {
-                        const blocked = opponent?.faction !== data.RANDOM_IDENTITY ? opponent?.faction : null;
-                        player.faction = this.pickRandomDistinct([...data.FACTIONS], blocked, random)
-                            || player.faction;
+                        const factions = [...data.FACTIONS];
+                        player.faction = factions[Math.floor(random() * factions.length)] || player.faction;
                         this.pruneArmyToAllowedTypes(playerId);
                     }
                 });
@@ -197,7 +186,7 @@
             randomizeArmyPresentation(playerId, random = Math.random) {
                 const opponent = this.getPlayer(this.getOpponentPlayerId(playerId));
                 const colorIds = Object.keys(data.PLAYER_COLORS).filter((colorId) => colorId !== opponent?.colorId);
-                const factions = data.FACTIONS.filter((faction) => faction !== opponent?.faction);
+                const factions = [...data.FACTIONS];
                 this.state.players[playerId].colorId = colorIds[Math.floor(random() * colorIds.length)] || this.state.players[playerId].colorId;
                 this.state.players[playerId].faction = factions[Math.floor(random() * factions.length)] || this.state.players[playerId].faction;
                 this.syncUiFromState();
@@ -236,7 +225,7 @@
                     const factionOptions = [
                         `<option value="${data.RANDOM_IDENTITY}"${player.faction === data.RANDOM_IDENTITY ? ' selected' : ''}>Random</option>`,
                         ...data.FACTIONS.map((faction) => (
-                            `<option value="${faction}"${faction === player.faction ? ' selected' : ''}${faction === opponent?.faction && opponent?.faction !== data.RANDOM_IDENTITY ? ' disabled' : ''}>${faction}</option>`
+                            `<option value="${faction}"${faction === player.faction ? ' selected' : ''}>${faction}</option>`
                         ))
                     ].join('');
                     const previewFaction = player.faction === data.RANDOM_IDENTITY ? data.FACTIONS[0] : player.faction;

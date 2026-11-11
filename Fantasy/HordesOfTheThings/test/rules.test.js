@@ -1583,6 +1583,90 @@ test('resolveShooting applies multiple-shooter defender penalty and bad-going co
     assert.equal(result.results[0].defenderTotal, 2 + 5 - 2 - 1);
 });
 
+test('a target shot at in a wood gains +2 and swamp does not', () => {
+    const shooter = {
+        id: 'shooter',
+        type: 'Shooter',
+        playerId: 'player-1',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 220,
+        rotation: 0,
+        ranged: { phase: 'shooting', range: 80, width: 120 },
+        moves: { road: 100, good: 75, bad: 75, water: 25 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const target = {
+        ...cloneUnit(shooter),
+        id: 'target',
+        playerId: 'player-2',
+        y: 170,
+        rotation: Math.PI
+    };
+    const woods = { roads: [], features: [{ kind: 'forest', cx: 100, cy: 160, rx: 28, ry: 8, wobble: 0 }] };
+    const swamp = { roads: [], features: [{ kind: 'swamp', cx: 100, cy: 160, rx: 28, ry: 8, wobble: 0 }] };
+    const inWoods = rules.resolveShooting([shooter, target], { shooter: 'target' }, woods, () => 3, 'player-1');
+    const inSwamp = rules.resolveShooting([shooter, target], { shooter: 'target' }, swamp, () => 3, 'player-1');
+
+    assert.deepEqual(inWoods.results[0].defenderModifiers.map((modifier) => modifier.id), ['shot-in-cover']);
+    assert.equal(inWoods.results[0].defenderModifiers[0].value, 2);
+    assert.equal(inWoods.results[0].defenderModifiers[0].terrainKind, 'forest');
+    assert.equal(inWoods.results[0].defenderTotal, 3 + 3 + 2);
+    assert.equal(inSwamp.results[0].defenderModifiers.some((modifier) => modifier.id === 'shot-in-cover' || modifier.id === 'bad-going'), false);
+});
+
+test('two units shooting each other resolve as one exchange', () => {
+    const blue = {
+        id: 'blue',
+        type: 'Shooter',
+        playerId: 'player-1',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 220,
+        rotation: 0,
+        ranged: { phase: 'shooting', range: 80, width: 120 },
+        moves: { road: 100, good: 75, bad: 75, water: 25 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const red = {
+        id: 'red',
+        type: 'Shooter',
+        playerId: 'player-2',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 170,
+        rotation: Math.PI,
+        ranged: { phase: 'shooting', range: 80, width: 120 },
+        moves: { road: 100, good: 75, bad: 75, water: 25 },
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const rolls = [];
+    const result = rules.resolveShooting(
+        [blue, red],
+        { blue: 'red', red: 'blue' },
+        { roads: [], features: [] },
+        () => {
+            rolls.push(rolls.length === 0 ? 6 : 1);
+            return rolls[rolls.length - 1];
+        },
+        'player-1'
+    );
+
+    assert.equal(result.results.length, 1);
+    assert.equal(rolls.length, 2);
+    assert.equal(result.results[0].loserId, 'red');
+    assert.equal(result.results[0].outcome, 'destroy');
+});
+
 test('resolveShooting destroys a recoiling defender that would recoil into water', () => {
     const shooter = {
         id: 's1',
@@ -2160,6 +2244,156 @@ test('resolveMelee turns a singly engaged side-contact combatant to face the ene
     assert.equal(result.combats[0].edgesOnRight.includes('front'), true);
 });
 
+function frontsMatch(left, right) {
+    const leftCorners = geometry.getUnitCorners(left);
+    const rightCorners = geometry.getUnitCorners(right);
+    const sameDirection = geometry.distance(leftCorners.frontLeft, rightCorners.frontLeft) < 0.05
+        && geometry.distance(leftCorners.frontRight, rightCorners.frontRight) < 0.05;
+    const swapped = geometry.distance(leftCorners.frontLeft, rightCorners.frontRight) < 0.05
+        && geometry.distance(leftCorners.frontRight, rightCorners.frontLeft) < 0.05;
+    return sameDirection || swapped;
+}
+
+test('a side-contacted unit turns onto the enemy front and does all the sliding', () => {
+    const hero = {
+        id: 'hero',
+        type: 'Hero',
+        playerId: 'player-1',
+        troopClass: 'mounted',
+        width: 40,
+        depth: 40,
+        x: 223,
+        y: 313,
+        rotation: Math.PI,
+        moves: { road: 125, good: 125, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 5 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const riders = {
+        id: 'riders',
+        type: 'Riders',
+        playerId: 'player-2',
+        troopClass: 'mounted',
+        width: 40,
+        depth: 30,
+        x: 223,
+        y: 313,
+        rotation: Math.PI / 2,
+        moves: { road: 125, good: 125, bad: 50, water: 25 },
+        strength: { infantry: 3, mounted: 5 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+
+    const result = rules.resolveMelee([hero, riders], { roads: [], features: [] }, () => 3);
+    const resolvedHero = result.units.find((unit) => unit.id === 'hero');
+    const resolvedRiders = result.units.find((unit) => unit.id === 'riders');
+
+    assert.equal(resolvedHero.x, hero.x);
+    assert.equal(resolvedHero.y, hero.y);
+    assert.equal(resolvedHero.rotation, hero.rotation);
+    assert.ok(Math.abs(geometry.normalizeAngle(resolvedRiders.rotation)) < 0.001);
+    assert.equal(frontsMatch(resolvedHero, resolvedRiders), true);
+});
+
+test('a full-depth unit hit on the side still does all the moving to match fronts', () => {
+    const hero = {
+        id: 'hero',
+        type: 'Hero',
+        playerId: 'player-1',
+        troopClass: 'mounted',
+        width: 40,
+        depth: 40,
+        x: 100,
+        y: 200,
+        rotation: 0,
+        moves: { road: 125, good: 125, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 5 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const blade = {
+        id: 'blade',
+        type: 'Blade',
+        playerId: 'player-2',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 100,
+        y: 200,
+        rotation: Math.PI / 2,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 5 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+
+    const result = rules.resolveMelee([hero, blade], { roads: [], features: [] }, () => 3);
+    const resolvedHero = result.units.find((unit) => unit.id === 'hero');
+    const resolvedBlade = result.units.find((unit) => unit.id === 'blade');
+
+    assert.equal(resolvedBlade.x, blade.x);
+    assert.equal(resolvedBlade.y, blade.y);
+    assert.equal(resolvedBlade.rotation, blade.rotation);
+    assert.ok(Math.abs(geometry.normalizeAngle(resolvedHero.rotation + (Math.PI / 2))) < 0.001);
+    assert.equal(frontsMatch(resolvedHero, resolvedBlade), true);
+});
+
+test('two units touching one enemy make one attack led by the frontal unit', () => {
+    const riders = {
+        id: 'riders',
+        type: 'Riders',
+        playerId: 'player-2',
+        troopClass: 'mounted',
+        width: 40,
+        depth: 30,
+        x: 223,
+        y: 313,
+        rotation: Math.PI / 2,
+        moves: { road: 125, good: 125, bad: 50, water: 25 },
+        strength: { infantry: 3, mounted: 3 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const hero = {
+        id: 'hero',
+        type: 'Hero',
+        playerId: 'player-1',
+        troopClass: 'mounted',
+        width: 40,
+        depth: 40,
+        x: 223,
+        y: 313,
+        rotation: Math.PI,
+        moves: { road: 125, good: 125, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 5 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+    const blade = {
+        id: 'blade',
+        type: 'Blade',
+        playerId: 'player-1',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 20,
+        x: 223,
+        y: 353,
+        rotation: -Math.PI / 2,
+        moves: { road: 100, good: 50, bad: 50, water: 25 },
+        strength: { infantry: 5, mounted: 3 },
+        combat: { ignoresBadGoingPenalty: false }
+    };
+
+    const previews = rules.previewMeleeCombats([riders, hero, blade], { roads: [], features: [] });
+
+    assert.equal(previews.length, 1);
+    const fighterIds = [previews[0].left.primaryId, previews[0].right.primaryId];
+    assert.equal(fighterIds.includes('blade'), true);
+    assert.equal(fighterIds.includes('riders'), true);
+    assert.equal(fighterIds.includes('hero'), false);
+    const ridersSide = previews[0].left.primaryId === 'riders' ? previews[0].left : previews[0].right;
+    assert.equal(ridersSide.modifiers.some((modifier) => modifier.id === 'flank-attacked'), true);
+    assert.equal(ridersSide.modifiers.some((modifier) => modifier.id === 'overlapped'), false);
+    const flank = ridersSide.modifiers.find((modifier) => modifier.id === 'flank-attacked');
+    assert.deepEqual(flank.sources, [{ unitId: 'hero', value: -1 }]);
+});
+
 test('resolveMelee applies stacked and flank modifiers', () => {
     const frontSpear = {
         id: 'b1',
@@ -2204,15 +2438,16 @@ test('resolveMelee applies stacked and flank modifiers', () => {
     };
 
     const result = rules.resolveMelee([frontSpear, rearSpear, red, redFlanker], data.createDefaultTerrain(), () => 3);
-    const frontCombat = result.results.find((entry) => entry.rightPrimaryId === 'r1');
-    const flankCombat = result.results.find((entry) => entry.rightPrimaryId === 'r2');
 
-    assert.ok(frontCombat);
-    assert.ok(flankCombat);
-    const frontSpearModifiers = frontCombat.leftPrimaryId === 'b1' ? frontCombat.leftModifiers : frontCombat.rightModifiers;
-    const flankSpearModifiers = flankCombat.leftPrimaryId === 'b1' ? flankCombat.leftModifiers : flankCombat.rightModifiers;
-    assert.equal(frontSpearModifiers.some((modifier) => modifier.id === 'stacked'), true);
-    assert.equal(flankSpearModifiers.some((modifier) => modifier.id === 'flank-attacked'), true);
+    assert.equal(result.results.length, 1);
+    const combat = result.results[0];
+    const spearModifiers = combat.leftUnitIds.includes('b1') ? combat.leftModifiers : combat.rightModifiers;
+    const fighterIds = [combat.leftPrimaryId, combat.rightPrimaryId];
+    assert.equal(fighterIds.includes('r1'), true);
+    assert.equal(fighterIds.includes('r2'), false);
+    assert.equal([...combat.leftUnitIds, ...combat.rightUnitIds].includes('r2'), true);
+    assert.equal(spearModifiers.some((modifier) => modifier.id === 'stacked'), true);
+    assert.equal(spearModifiers.some((modifier) => modifier.id === 'flank-attacked'), true);
 });
 
 test('resolveMelee applies overlap modifier for an idle enemy on the fighter flank', () => {
@@ -2267,6 +2502,65 @@ test('resolveMelee applies overlap modifier for an idle enemy on the fighter fla
     assert.equal(blueModifiers.some((modifier) => modifier.id === 'overlapped' && modifier.value === -1), true);
 });
 
+test('a rank that extends past an enemy overlaps that enemy', () => {
+    const hero = {
+        id: 'hero',
+        type: 'Hero',
+        playerId: 'player-1',
+        troopClass: 'mounted',
+        width: 40,
+        depth: 40,
+        x: 100,
+        y: 200,
+        rotation: 0,
+        strength: { infantry: 5, mounted: 5 },
+        combat: {}
+    };
+    const beast = {
+        id: 'beast',
+        type: 'Beasts',
+        playerId: 'player-2',
+        troopClass: 'mounted',
+        width: 40,
+        depth: 30,
+        x: 140,
+        y: 200,
+        rotation: Math.PI,
+        strength: { infantry: 3, mounted: 4 },
+        combat: { ignoresBadGoingPenalty: true }
+    };
+    const spearTemplate = {
+        id: 'spear',
+        type: 'Heavy-Spear',
+        playerId: 'player-2',
+        troopClass: 'infantry',
+        width: 40,
+        depth: 30,
+        x: 180,
+        y: 200,
+        rotation: Math.PI,
+        strength: { infantry: 5, mounted: 5 },
+        combat: {}
+    };
+    const heroOverlap = (spear) => {
+        const previews = rules.previewMeleeCombats([hero, beast, spear], { roads: [], features: [] });
+        const heroSide = previews[0].left.primaryId === 'hero' ? previews[0].left : previews[0].right;
+        return heroSide.modifiers.find((modifier) => modifier.id === 'overlapped');
+    };
+
+    const flush = heroOverlap(spearTemplate);
+    const gapped = heroOverlap({ ...spearTemplate, x: 186 });
+    const stepped = heroOverlap({ ...spearTemplate, y: 192 });
+    const detected = rules.detectMeleeCombats([hero, beast, spearTemplate]);
+
+    assert.equal(detected.combats.length, 1);
+    assert.equal(detected.participantIds.has('spear'), false);
+    assert.equal(flush.value, -1);
+    assert.deepEqual(flush.sources, [{ unitId: 'spear', value: -1 }]);
+    assert.equal(gapped.value, -1);
+    assert.equal(stepped.value, -1);
+});
+
 test('new unit templates use the requested stats and special profiles', () => {
     assert.deepEqual(data.UNIT_TYPES.Beasts, {
         value: 2,
@@ -2305,6 +2599,33 @@ test('Beasts ignore bad-going combat penalties and lose melee to mounted troops'
     assert.equal(modifiers.some((modifier) => modifier.id === 'bad-going'), false);
     assert.equal(rules.getMinorLossResolution(createUnit('Knights', 'red', 140, 220, Math.PI), beasts, 'melee', terrain).outcome, 'destroy');
     assert.equal(rules.getMinorLossResolution(createUnit('Knights', 'red', 140, 220, Math.PI), beasts, 'shooting', terrain).outcome, 'recoil');
+});
+
+test('a unit standing in bad going takes the terrain penalty once', () => {
+    const terrain = { roads: [], features: [{ kind: 'swamp', cx: 120, cy: 220, rx: 90, ry: 40, wobble: 0 }] };
+    const knights = createUnit('Knights', 'blue', 100, 220, 0);
+    const blade = createUnit('Blade', 'red', 140, 220, Math.PI);
+    const both = rules.getCombatModifiers({
+        phase: 'melee',
+        role: 'attacker',
+        unit: knights,
+        opponent: blade,
+        terrain
+    });
+
+    assert.deepEqual(both.map((modifier) => modifier.id), ['bad-going']);
+    assert.equal(both[0].terrainKind, 'swamp');
+
+    const clearKnights = createUnit('Knights', 'blue', 100, 40, 0);
+    const mountedOnly = rules.getCombatModifiers({
+        phase: 'melee',
+        role: 'attacker',
+        unit: clearKnights,
+        opponent: blade,
+        terrain
+    });
+    assert.deepEqual(mountedOnly.map((modifier) => modifier.id), ['mounted-into-bad-going']);
+    assert.equal(mountedOnly[0].terrainKind, 'swamp');
 });
 
 test('unengaged Flyers ignore terrain and all unit collisions during movement', () => {
@@ -2348,7 +2669,7 @@ test('engaged Flyers must withdraw 20 mm before continuing their move', () => {
     assert.equal(continuedMove.invalidIds.size, 0);
 });
 
-test('Flyers recoil then flee 600 paces after losing shooting or melee', () => {
+test('Flyers recoil and do not flee after a minor loss in shooting or melee', () => {
     const terrain = { roads: [], features: [] };
     const artillery = createUnit('Artillery', 'blue', 100, 220, 0);
     const shootingFlyer = createUnit('Flyers', 'red', 100, 170, Math.PI);
@@ -2365,10 +2686,37 @@ test('Flyers recoil then flee 600 paces after losing shooting or melee', () => {
     const meleeRolls = [1, 1];
     const melee = rules.resolveMelee([meleeFlyer, blade], terrain, () => meleeRolls.shift());
 
-    assert.equal(shooting.results[0].outcome, 'flee');
-    assert.equal(shooting.units.find((unit) => unit.id === shootingFlyer.id).y, -10);
-    assert.equal(melee.results[0].outcome, 'flee');
-    assert.equal(melee.units.find((unit) => unit.id === meleeFlyer.id).y, 400);
+    assert.equal(shooting.results[0].outcome, 'recoil');
+    assert.equal(shooting.units.find((unit) => unit.id === shootingFlyer.id).y, 140);
+    assert.equal(melee.results[0].outcome, 'recoil');
+    assert.equal(melee.units.find((unit) => unit.id === meleeFlyer.id).y, 250);
+});
+
+test('Flyers are destroyed only by a double from a Hero, Magician, Flyers, or Shooters', () => {
+    const terrain = { roads: [], features: [] };
+    const flyer = createUnit('Flyers', 'blue', 100, 220, 0);
+    ['Hero', 'Magician', 'Flyers', 'Shooter'].forEach((type) => {
+        const winner = createUnit(type, 'red', 140, 220, Math.PI);
+        assert.equal(rules.resolveCombatLoss(winner, flyer, 'melee', terrain, false).outcome, 'recoil');
+        assert.equal(rules.resolveCombatLoss(winner, flyer, 'shooting', terrain, true).outcome, 'destroy');
+    });
+    ['Blade', 'Artillery', 'Knights', 'Behemoth'].forEach((type) => {
+        const winner = createUnit(type, 'red', 140, 220, Math.PI);
+        assert.equal(rules.resolveCombatLoss(winner, flyer, 'melee', terrain, false).outcome, 'recoil');
+        assert.equal(rules.resolveCombatLoss(winner, flyer, 'melee', terrain, true).outcome, 'flee');
+    });
+
+    const blade = createUnit('Blade', 'red', 140, 220, Math.PI);
+    const doubledByBlade = rules.resolveMelee([flyer, blade], terrain, (info) => (info.leftPrimaryId === flyer.id
+        ? (info.role === 'left' ? 1 : 6)
+        : (info.role === 'left' ? 6 : 1)));
+    const hero = createUnit('Hero', 'red', 140, 220, Math.PI);
+    const doubledByHero = rules.resolveMelee([createUnit('Flyers', 'blue', 100, 220, 0), hero], terrain, () => 1);
+
+    assert.equal(doubledByBlade.results[0].outcome, 'flee');
+    assert.equal(doubledByBlade.units.find((unit) => unit.id === flyer.id).y, 400);
+    assert.equal(doubledByHero.results[0].outcome, 'destroy');
+    assert.equal(doubledByHero.units.some((unit) => unit.type === 'Flyers'), false);
 });
 
 test('Behemoths flee from Artillery by the shallowest legal heading', () => {

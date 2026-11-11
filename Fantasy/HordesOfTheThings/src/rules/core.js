@@ -58,8 +58,13 @@
             ranged: unit.ranged ? { ...unit.ranged } : null,
             movement: unit.movement ? { ...unit.movement } : {},
             combat: unit.combat ? { ...unit.combat } : {},
+            outline: Array.isArray(unit.outline) ? unit.outline.map((point) => ({ x: point.x, y: point.y })) : null,
             ensorcelledByUnitId: unit.ensorcelledByUnitId
         };
+    }
+
+    function isStationaryUnit(unit) {
+        return Boolean(unit?.combat?.stationary);
     }
 
 
@@ -91,6 +96,9 @@
 
 
     function sharesFormationContact(left, right) {
+        if (isStationaryUnit(left) || isStationaryUnit(right)) {
+            return false;
+        }
         if (getPlayerId(left) !== getPlayerId(right)) {
             return false;
         }
@@ -122,6 +130,7 @@
         sideMidpoint,
         hasMeaningfulSharedEdge,
         cloneUnit,
+        isStationaryUnit,
         isEnsorcellableType,
         buildEnsorcelledUnit,
         translateUnit,

@@ -24,7 +24,7 @@
     const {
         formatBreakdownValue
     } = score;
-    const MIN_BENEFIT = 0.25;
+    const MIN_BENEFIT = 0.2;
 
     function describeCandidateGroup(unitIds, units) {
         const selected = unitIds
@@ -462,6 +462,7 @@
             formatBreakdownValue('reserve', suggestion.breakdown.reserveEntry),
             formatBreakdownValue('ensorcel', suggestion.breakdown.ensorcelledReturn),
             formatBreakdownValue('advance', suggestion.breakdown.advance),
+            formatBreakdownValue('line', suggestion.breakdown.lineStep),
             formatBreakdownValue('cohesion', suggestion.breakdown.cohesion),
             formatBreakdownValue('terrain', suggestion.breakdown.terrain)
         ].filter(Boolean);
@@ -581,7 +582,7 @@
                     this.state.selectedIds = [...suggestion.unitIds];
                     this.updateSelectionAnalysis();
                 }
-                if (!this.ensureDraft(suggestion.unitIds)) {
+                if (!this.ensureDraft(suggestion.unitIds, { allowComputer: computerActive })) {
                     this.updateStatus('Auto Move: could not start the suggested draft.');
                     return false;
                 }
@@ -648,6 +649,14 @@
                 this._computerMoveCancelToken = cancelToken;
                 this.cancelDraft(false);
 
+                if (typeof this.setComputerThinking === 'function') {
+                    this.setComputerThinking(this.state.activePlayerId, 'Gathering candidate moves…', {
+                        current: 0,
+                        total: 0,
+                        showMoveProgress: true
+                    });
+                }
+
                 const searchContext = {
                     units: this.state.units,
                     terrain: this.state.terrain,
@@ -663,13 +672,33 @@
                     yieldEvery: 1,
                     onProgress: (info) => {
                         if (typeof this.setComputerThinking === 'function') {
-                            this.setComputerThinking(this.state.activePlayerId, info.message);
+                            this.setComputerThinking(this.state.activePlayerId, info.message, {
+                                current: info.current,
+                                total: info.total,
+                                showMoveProgress: true
+                            });
                         }
                     }
                 });
                 this._computerMoveCancelToken = null;
                 if (searchResult.cancelled || this.state.controllerPaused) {
+                    if (this.state.controllerPaused) {
+                        if (this.state.controllerThinking?.showMoveProgress) {
+                            this.syncAiMoveOverlay?.();
+                        } else if (typeof this.setComputerThinking === 'function') {
+                            this.setComputerThinking(this.state.activePlayerId, 'Paused.', {
+                                current: 0,
+                                total: 0,
+                                showMoveProgress: true
+                            });
+                        }
+                    } else if (typeof this.clearComputerThinking === 'function') {
+                        this.clearComputerThinking();
+                    }
                     return 'paused';
+                }
+                if (typeof this.clearComputerThinking === 'function') {
+                    this.clearComputerThinking();
                 }
                 if (!searchResult.suggestion) {
                     return 'end-phase';

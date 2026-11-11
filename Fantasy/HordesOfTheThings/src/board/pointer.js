@@ -15,8 +15,12 @@
         onPointerDown(event) {
             const world = this.screenToWorld(event.clientX, event.clientY);
             const shiftKey = event.shiftKey;
+            this.state.hover = null;
             this.canvas.setPointerCapture(event.pointerId);
-            if (event.button === 2) {
+            if (event.button === 1 || event.button === 2) {
+                if (event.button === 1 && typeof event.preventDefault === 'function') {
+                    event.preventDefault();
+                }
                 this.state.interaction = {
                     type: 'pan',
                     pointerId: event.pointerId,
@@ -40,16 +44,13 @@
             }
 
             let handleHit = this.getHandleHit(world);
-            if (handleHit && typeof this.canManipulateSelection === 'function' && !this.canManipulateSelection()) {
+            if (handleHit
+                && handleHit.kind !== 'finish-move'
+                && typeof this.canManipulateSelection === 'function'
+                && !this.canManipulateSelection()) {
                 handleHit = null;
             }
-            let unitHit = this.pickUnit(world);
-            if (this.state.setupStage === 'unit-deployment') {
-                const activePlayerId = this.getDeploymentSetup()?.activePlayerId;
-                if (unitHit && this.getUnitPlayerId(unitHit) !== activePlayerId) {
-                    unitHit = null;
-                }
-            }
+            const unitHit = this.pickUnit(world);
             this.state.interaction = {
                 type: 'click',
                 pointerId: event.pointerId,
@@ -66,6 +67,11 @@
 
             if (handleHit) {
                 if (this.state.mode === 'game' && this.state.phase !== 'move') {
+                    return;
+                }
+                if (handleHit.kind === 'finish-move') {
+                    this.state.interaction.suppressClick = true;
+                    this.finishDraft();
                     return;
                 }
                 if (handleHit.kind === 'formation-reverse' || handleHit.kind === 'single-reverse') {
@@ -221,6 +227,7 @@
         onPointerMove(event) {
             const interaction = this.state.interaction;
             if (!interaction || interaction.pointerId !== event.pointerId) {
+                this.updatePointerHover(event);
                 return;
             }
             const world = this.screenToWorld(event.clientX, event.clientY);
@@ -410,6 +417,9 @@
         onPointerUp(event) {
             const interaction = this.state.interaction;
             if (!interaction || interaction.pointerId !== event.pointerId) {
+                if (event.type === 'pointerleave') {
+                    this.clearHover();
+                }
                 return;
             }
             const world = this.screenToWorld(event.clientX, event.clientY);
@@ -436,7 +446,81 @@
                 this.canvas.releasePointerCapture(event.pointerId);
             }
             this.state.interaction = null;
+            if (event.type === 'pointerleave') {
+                this.clearHover();
+            } else {
+                this.updatePointerHover(event);
+            }
             this.requestRender();
+        }
+
+
+        clearHover() {
+            if (!this.state.hover) {
+                return;
+            }
+            this.state.hover = null;
+            this.requestRender();
+        }
+
+
+        updatePointerHover(event) {
+            if (!event || this.state.interaction || typeof this.screenToWorld !== 'function') {
+                return;
+            }
+            const world = this.screenToWorld(event.clientX, event.clientY);
+            const handle = typeof this.getHandleHit === 'function' ? this.getHandleHit(world) : null;
+            let unitId = null;
+            if (!handle && typeof this.pickUnit === 'function') {
+                const unit = this.pickUnit(world);
+                if (unit && this.canCurrentlySelectUnit(unit)) {
+                    unitId = unit.id;
+                }
+            }
+            const handleKind = handle ? handle.kind : null;
+            const previous = this.state.hover;
+            if ((previous?.handleKind || null) === handleKind && (previous?.unitId || null) === unitId) {
+                return;
+            }
+            this.state.hover = handleKind || unitId ? { handleKind, unitId } : null;
+            this.requestRender();
+        }
+
+
+        canCurrentlySelectUnit(unit) {
+            if (!unit) {
+                return false;
+            }
+            if (this.state.mode === 'game' && typeof this.isGameOver === 'function' && this.isGameOver()) {
+                return false;
+            }
+            if (this.state.setupStage === 'unit-deployment') {
+                const activePlayerId = this.getDeploymentSetup()?.activePlayerId;
+                if (!activePlayerId) {
+                    return false;
+                }
+                if (typeof this.isComputerPlayer === 'function' && this.isComputerPlayer(activePlayerId)) {
+                    return false;
+                }
+                return true;
+            }
+            if (this.state.mode === 'edit') {
+                return true;
+            }
+            if (this.state.mode !== 'game') {
+                return false;
+            }
+            if (this.state.phase === 'shooting') {
+                if (this.state.combatResolution) {
+                    return false;
+                }
+                const shooting = this.state.shooting;
+                if (shooting?.focusedAttackerId && (shooting.validTargetIds || []).includes(unit.id)) {
+                    return true;
+                }
+                return rules.isRangedUnit(unit);
+            }
+            return true;
         }
 
 
@@ -469,9 +553,6 @@
                 return;
             }
             if (unitHit) {
-                if (this.state.setupStage === 'unit-deployment' && this.getUnitPlayerId(unitHit) !== this.getDeploymentSetup()?.activePlayerId) {
-                    return;
-                }
                 if (this.isUnitInReserve(unitHit.id)) {
                     if (this.state.mode === 'game' && this.state.phase === 'move') {
                         this.beginReserveDeploy(unitHit, world.x);
@@ -483,10 +564,19 @@
                     return;
                 }
                 const unitPlayerId = this.getUnitPlayerId(unitHit);
-                const isEnemyInGame = this.state.mode === 'game'
+                const activeDeployerId = this.state.setupStage === 'unit-deployment'
+                    ? this.getDeploymentSetup()?.activePlayerId
+                    : null;
+                const isInspectOnlyEnemy = (
+                    this.state.mode === 'game'
                     && this.state.setupStage !== 'unit-deployment'
-                    && unitPlayerId !== this.state.activePlayerId;
-                if (isEnemyInGame) {
+                    && unitPlayerId !== this.state.activePlayerId
+                ) || (
+                    this.state.setupStage === 'unit-deployment'
+                    && Boolean(activeDeployerId)
+                    && unitPlayerId !== activeDeployerId
+                );
+                if (isInspectOnlyEnemy) {
                     if (interaction.shiftKey) {
                         return;
                     }
@@ -608,14 +698,14 @@
         pickUnit(world) {
             for (let index = this.state.units.length - 1; index >= 0; index -= 1) {
                 const unit = this.state.units[index];
-                if (geometry.pointInPolygon(world, geometry.getUnitCorners(unit))) {
+                if (geometry.pointInPolygon(world, geometry.getUnitFootprintPoints(unit))) {
                     return unit;
                 }
             }
             const reserveUnits = this.getReserveUnits();
             for (let index = reserveUnits.length - 1; index >= 0; index -= 1) {
                 const unit = reserveUnits[index];
-                if (geometry.pointInPolygon(world, geometry.getUnitCorners(unit))) {
+                if (geometry.pointInPolygon(world, geometry.getUnitFootprintPoints(unit))) {
                     return unit;
                 }
             }

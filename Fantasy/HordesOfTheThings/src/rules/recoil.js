@@ -74,7 +74,7 @@
                 ? 'recoil path enters water'
                 : 'recoil path enters impassable terrain';
         }
-        const blockingUnit = units.find((otherUnit) => !movingIds.has(otherUnit.id) && geometry.polygonsOverlap(geometry.getUnitCorners(unit), geometry.getUnitCorners(otherUnit)));
+        const blockingUnit = units.find((otherUnit) => !movingIds.has(otherUnit.id) && geometry.unitsOverlap(unit, otherUnit));
         if (blockingUnit) {
             return `recoil path is blocked by ${getPlayerId(blockingUnit)} ${blockingUnit.type} ${blockingUnit.id}`;
         }
@@ -154,7 +154,7 @@
         }
         const enemyBlocker = units.find((unit) => unit.id !== fleeingUnitId
             && getPlayerId(unit) !== getPlayerId(candidate)
-            && geometry.polygonsOverlap(geometry.getUnitCorners(candidate), geometry.getUnitCorners(unit)));
+            && geometry.unitsOverlap(candidate, unit));
         if (enemyBlocker) {
             return `flee path is blocked by ${getPlayerId(enemyBlocker)} ${enemyBlocker.type} ${enemyBlocker.id}`;
         }
@@ -173,7 +173,7 @@
         const finalUnit = translateUnit(unit, direction, fleeDistance);
         return !units.some((otherUnit) => otherUnit.id !== unit.id
             && getPlayerId(otherUnit) === getPlayerId(unit)
-            && geometry.polygonsOverlap(geometry.getUnitCorners(finalUnit), geometry.getUnitCorners(otherUnit)));
+            && geometry.unitsOverlap(finalUnit, otherUnit));
     }
 
 

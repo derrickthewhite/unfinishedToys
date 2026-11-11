@@ -8,6 +8,16 @@
     class BoardInputMethods {
         bindCanvas() {
             this.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+            this.canvas.addEventListener('mousedown', (event) => {
+                if (event.button === 1) {
+                    event.preventDefault();
+                }
+            });
+            this.canvas.addEventListener('auxclick', (event) => {
+                if (event.button === 1) {
+                    event.preventDefault();
+                }
+            });
             this.canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
             this.canvas.addEventListener('pointermove', (event) => this.onPointerMove(event));
             this.canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
@@ -22,6 +32,16 @@
             this.ui.terrainCanvas.addEventListener('pointerup', (event) => this.onTerrainPointerUp(event));
             this.ui.terrainCanvas.addEventListener('pointerleave', (event) => this.onTerrainPointerUp(event));
             this.ui.terrainCanvas.addEventListener('contextmenu', (event) => event.preventDefault());
+            this.ui.terrainCanvas.addEventListener('mousedown', (event) => {
+                if (event.button === 1) {
+                    event.preventDefault();
+                }
+            });
+            this.ui.terrainCanvas.addEventListener('auxclick', (event) => {
+                if (event.button === 1) {
+                    event.preventDefault();
+                }
+            });
             this.ui.terrainCanvas.addEventListener('wheel', (event) => {
                 event.preventDefault();
                 this.zoomSetupAt(event, 'terrain', this.ui.terrainCanvas);

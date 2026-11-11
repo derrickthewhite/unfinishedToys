@@ -9,7 +9,7 @@
         if (!target) {
             return -Infinity;
         }
-        let score = target.value || 0;
+        let score = target.combat?.lossEndsGame ? 100 : (target.value || 0);
         if (target.type === 'Hero' || target.type === 'Magician' || target.type === 'Behemoth') {
             score += 2;
         }

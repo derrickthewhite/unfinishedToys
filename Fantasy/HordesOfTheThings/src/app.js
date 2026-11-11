@@ -122,6 +122,7 @@
                 gameThinkingText: document.getElementById('gameThinkingText'),
                 gameBar: document.querySelector('.game-bar'),
                 endMovePhaseButton: document.getElementById('endMovePhaseButton'),
+                endMovePhasePrompt: document.getElementById('endMovePhasePrompt'),
                 stepMoveButton: document.getElementById('stepMoveButton'),
                 snapCheckbox: document.getElementById('snapCheckbox'),
                 snapLabel: document.getElementById('snapLabel'),
@@ -139,6 +140,7 @@
                 cancelMoveButton: document.getElementById('cancelMoveButton'),
                 undoMoveButton: document.getElementById('undoMoveButton'),
                 acknowledgedButton: document.getElementById('acknowledgedButton'),
+                phaseBanner: document.getElementById('phaseBanner'),
                 storageButton: document.getElementById('storageButton'),
                 storageModal: document.getElementById('storageModal'),
                 storageBackdrop: document.getElementById('storageBackdrop'),
@@ -147,11 +149,18 @@
                 saveStorageButton: document.getElementById('saveStorageButton'),
                 storageList: document.getElementById('storageList'),
                 newGameButton: document.getElementById('newGameButton'),
+                exportJsonButton: document.getElementById('exportJsonButton'),
                 openGameSettingsButton: document.getElementById('openGameSettingsButton'),
                 gameSettingsModal: document.getElementById('gameSettingsModal'),
                 gameSettingsBackdrop: document.getElementById('gameSettingsBackdrop'),
                 closeGameSettingsButton: document.getElementById('closeGameSettingsButton'),
                 limitFactionRostersCheckbox: document.getElementById('limitFactionRostersCheckbox'),
+                checkpointGameStartButton: document.getElementById('checkpointGameStartButton'),
+                checkpointGameStartHint: document.getElementById('checkpointGameStartHint'),
+                checkpointLastTurnButton: document.getElementById('checkpointLastTurnButton'),
+                checkpointLastTurnHint: document.getElementById('checkpointLastTurnHint'),
+                checkpointEndMoveButton: document.getElementById('checkpointEndMoveButton'),
+                checkpointEndMoveHint: document.getElementById('checkpointEndMoveHint'),
                 terrainSettingsList: document.getElementById('terrainSettingsList'),
                 playerOneLosses: document.getElementById('playerOneLosses'),
                 playerTwoLosses: document.getElementById('playerTwoLosses'),
@@ -172,7 +181,13 @@
                 victoryWinnerSide: document.getElementById('victoryWinnerSide'),
                 victoryLoserSide: document.getElementById('victoryLoserSide'),
                 reviewVictoryButton: document.getElementById('reviewVictoryButton'),
-                victoryNewGameButton: document.getElementById('victoryNewGameButton')
+                victoryNewGameButton: document.getElementById('victoryNewGameButton'),
+                aiMoveOverlay: document.getElementById('aiMoveOverlay'),
+                aiMoveOverlayTitle: document.getElementById('aiMoveOverlayTitle'),
+                aiMoveOverlayBar: document.getElementById('aiMoveOverlayBar'),
+                aiMoveOverlayDetail: document.getElementById('aiMoveOverlayDetail'),
+                aiMoveOverlayPercent: document.getElementById('aiMoveOverlayPercent'),
+                aiMoveOverlayPauseButton: document.getElementById('aiMoveOverlayPauseButton')
             };
         }
 
@@ -309,7 +324,7 @@
             this.state.setup.confirmation = null;
             this.initializeTerrainPlacement();
             this.state.setupStage = 'terrain-placement';
-            this.updateStatus(`${this.getPlayerLabel(this.getTerrainSetup().defenderPlayerId)} is the defender and places terrain first.`);
+            this.updateStatus(`${this.getPlayerLabel(this.getTerrainSetup().defenderPlayerId)} is the defender and places the base and terrain first.`);
             this.scheduleControllerAction();
         }
 
@@ -408,7 +423,7 @@
                 this.ui.victoryBackdrop.addEventListener('click', () => this.dismissVictoryModal());
             }
             if (this.ui.victoryNewGameButton) {
-                this.ui.victoryNewGameButton.addEventListener('click', () => this.openVictoryNewGameConfirmation());
+                this.ui.victoryNewGameButton.addEventListener('click', () => this.startNewGame());
             }
             this.ui.terrainCountInput.addEventListener('change', () => this.setTerrainCount(this.ui.terrainCountInput.value));
             this.ui.autoPlaceTerrainButton.addEventListener('click', () => this.autoPlaceTerrain());
@@ -469,7 +484,13 @@
             if (this.ui.gamePauseControllerButton) {
                 this.ui.gamePauseControllerButton.addEventListener('click', () => this.toggleControllerPaused());
             }
+            if (this.ui.aiMoveOverlayPauseButton) {
+                this.ui.aiMoveOverlayPauseButton.addEventListener('click', () => this.toggleControllerPaused());
+            }
             this.ui.endMovePhaseButton.addEventListener('click', () => this.endMovePhase());
+            if (this.ui.endMovePhasePrompt) {
+                this.ui.endMovePhasePrompt.addEventListener('click', () => this.endMovePhase());
+            }
             this.ui.stepMoveButton.addEventListener('click', () => this.stepSingleDraft());
             this.ui.snapCheckbox.addEventListener('change', () => {
                 this.state.snapEnabled = this.ui.snapCheckbox.checked;
@@ -513,12 +534,24 @@
             this.ui.storageBackdrop.addEventListener('click', () => this.closeStorageModal());
             this.ui.saveStorageButton.addEventListener('click', () => this.saveCurrentGame());
             this.ui.newGameButton.addEventListener('click', () => this.openNewGameConfirmation());
+            if (this.ui.exportJsonButton) {
+                this.ui.exportJsonButton.addEventListener('click', () => this.exportGameJson());
+            }
             this.ui.openGameSettingsButton.addEventListener('click', () => this.openGameSettingsModal());
             this.ui.closeGameSettingsButton.addEventListener('click', () => this.closeGameSettingsModal());
             this.ui.gameSettingsBackdrop.addEventListener('click', () => this.closeGameSettingsModal());
             this.ui.limitFactionRostersCheckbox.addEventListener('change', () => {
                 this.setLimitFactionRosters(this.ui.limitFactionRostersCheckbox.checked);
             });
+            if (this.ui.checkpointGameStartButton) {
+                this.ui.checkpointGameStartButton.addEventListener('click', () => this.loadCheckpoint('gameStart'));
+            }
+            if (this.ui.checkpointLastTurnButton) {
+                this.ui.checkpointLastTurnButton.addEventListener('click', () => this.loadCheckpoint('lastTurn'));
+            }
+            if (this.ui.checkpointEndMoveButton) {
+                this.ui.checkpointEndMoveButton.addEventListener('click', () => this.loadCheckpoint('endMove'));
+            }
             this.ui.cancelMoveButton.addEventListener('click', () => this.cancelDraft(true));
             this.ui.acknowledgedButton.addEventListener('click', () => this.acknowledgePhase());
             this.ui.undoMoveButton.addEventListener('click', () => {
@@ -665,7 +698,7 @@
         }
 
         populateUnitTypes() {
-            Object.keys(data.UNIT_TYPES).forEach((name) => {
+            Object.keys(data.UNIT_TYPES).filter((name) => !data.UNIT_TYPES[name].combat?.unpurchasable).forEach((name) => {
                 const option = document.createElement('option');
                 option.value = name;
                 option.textContent = name;
@@ -855,15 +888,29 @@
             const showMeleeResolve = this.state.mode === 'game'
                 && this.state.phase === 'melee'
                 && !this.state.combatResolution
-                && localActive;
+                && localActive
+                && this.getMeleeState().combats.length > 0;
+            const showEndMovePrompt = this.state.mode === 'game'
+                && this.state.phase === 'move'
+                && localActive
+                && !this.isComputerMatch()
+                && !this.state.draft
+                && !this.hasLegalMoveRemaining();
+            if (this.ui.endMovePhasePrompt) {
+                this.ui.endMovePhasePrompt.hidden = !showEndMovePrompt;
+                this.ui.endMovePhasePrompt.disabled = false;
+            }
             this.ui.resolveShootingButton.hidden = !showShootingResolve && !showMeleeResolve;
             this.ui.cancelMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move' || !localActive;
-            this.ui.acknowledgedButton.hidden = this.state.mode !== 'game'
+            const showVictoryReturn = Boolean(this.state.victory && this.state.victoryModalDismissed);
+            this.ui.acknowledgedButton.hidden = !showVictoryReturn && (
+                this.state.mode !== 'game'
                 || this.isComputerMatch()
                 || (
                     !(this.state.phase === 'form-up' && localActive)
                     && !this.state.combatResolution
-                );
+                )
+            );
             this.ui.undoMoveButton.hidden = this.state.mode === 'game' && (this.state.phase !== 'move' || !localActive);
             this.ui.finishMoveButton.disabled = this.state.mode !== 'game' || this.state.phase !== 'move' || !this.state.draft;
             if (this.ui.autoMoveButton) {
@@ -895,7 +942,12 @@
             this.ui.rangedAreaCheckbox.checked = this.state.showRangedArea;
             this.ui.moveErrorsCheckbox.checked = this.state.showMoveErrors;
             this.ui.battleStatsCheckbox.checked = this.state.showBattleStats;
-            this.ui.resolveShootingButton.textContent = this.state.phase === 'melee' ? 'Resolve Melee' : 'Resolve Shooting';
+            if (this.state.phase === 'melee') {
+                this.ui.resolveShootingButton.textContent = 'Resolve Melee';
+            } else {
+                const progress = this.getShootingAssignmentProgress();
+                this.ui.resolveShootingButton.textContent = `Resolve Shooting ${progress.assigned}/${progress.total}`;
+            }
             this.ui.resolveShootingButton.disabled = this.state.mode !== 'game'
                 || (this.state.phase !== 'shooting' && this.state.phase !== 'melee')
                 || Boolean(this.state.combatResolution)
@@ -904,7 +956,10 @@
             this.ui.undoMoveButton.disabled = this.state.mode === 'edit'
                 ? this.state.editHistory.length === 0
                 : (!this.state.draft && (!this.state.moveHistory || this.state.moveHistory.length === 0));
-            this.ui.acknowledgedButton.disabled = this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution);
+            this.ui.acknowledgedButton.textContent = this.acknowledgeButtonLabel();
+            this.ui.acknowledgedButton.disabled = showVictoryReturn
+                ? false
+                : (this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution));
             this.ui.storageModal.hidden = !this.state.storageModalOpen;
             if (this.ui.gameSettingsModal) this.ui.gameSettingsModal.hidden = !this.state.gameSettingsModalOpen;
             if (this.ui.saveStorageButton) this.ui.saveStorageButton.disabled = false;
@@ -930,9 +985,12 @@
                 this.ui.endMovePhaseButton.disabled = true;
                 this.ui.stepMoveButton.disabled = true;
                 this.ui.resolveShootingButton.disabled = true;
+                if (this.ui.endMovePhasePrompt) {
+                    this.ui.endMovePhasePrompt.disabled = true;
+                }
                 this.ui.cancelMoveButton.disabled = true;
                 this.ui.undoMoveButton.disabled = true;
-                this.ui.acknowledgedButton.disabled = true;
+                this.ui.acknowledgedButton.disabled = !showVictoryReturn;
                 this.ui.deleteUnitButton.disabled = true;
                 this.ui.destroyUnitButton.disabled = true;
             } else if (canRemoveSelection) {

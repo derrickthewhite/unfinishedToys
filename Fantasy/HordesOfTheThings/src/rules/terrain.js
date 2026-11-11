@@ -43,7 +43,9 @@
         const center = geometry.getUnitCenter(unit);
         const frontMid = geometry.midpoint(corners.frontLeft, corners.frontRight);
         const backMid = geometry.midpoint(corners.backLeft, corners.backRight);
-        const samplePoints = [corners.frontLeft, corners.frontRight, corners.backLeft, corners.backRight, center, frontMid, backMid];
+        const samplePoints = geometry.hasOutline(unit)
+            ? geometry.getUnitFootprintPoints(unit).concat([center])
+            : [corners.frontLeft, corners.frontRight, corners.backLeft, corners.backRight, center, frontMid, backMid];
         const terrainTypes = new Set();
         samplePoints.forEach((point) => terrainTypes.add(getTerrainTypeAt(point, terrain)));
         return terrainTypes;

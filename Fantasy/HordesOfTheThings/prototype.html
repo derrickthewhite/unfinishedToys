@@ -60,9 +60,7 @@
                 <button id="endMovePhaseButton" type="button">End Move Phase</button>
                 <button id="stepMoveButton" type="button">Step</button>
                 <button id="cancelMoveButton" type="button">Cancel Move</button>
-                <button id="resolveShootingButton" type="button" hidden>Resolve Shooting</button>
                 <button id="undoMoveButton" type="button">Undo</button>
-                <button id="acknowledgedButton" type="button" hidden>Acknowledged</button>
                 <button id="gamePauseControllerButton" type="button" hidden>Pause</button>
             </div>
             <div class="bar-group status-group">
@@ -100,6 +98,28 @@
         <main class="board-shell">
             <div class="board-stage">
                 <canvas id="boardCanvas"></canvas>
+                <div id="phaseBanner" class="phase-banner" hidden aria-live="polite">
+                    <div class="phase-banner-rule"></div>
+                    <div class="phase-banner-title"></div>
+                    <div class="phase-banner-player"></div>
+                    <div class="phase-banner-rule"></div>
+                </div>
+                <div class="acknowledge-overlay">
+                    <button id="endMovePhasePrompt" class="acknowledge-button" type="button" hidden>End Move Phase</button>
+                    <button id="resolveShootingButton" class="acknowledge-button" type="button" hidden>Resolve Shooting</button>
+                    <button id="acknowledgedButton" class="acknowledge-button" type="button" hidden>Acknowledge Forming Up</button>
+                </div>
+                <div id="aiMoveOverlay" class="ai-move-overlay" hidden>
+                    <div class="ai-move-overlay-card">
+                        <p id="aiMoveOverlayTitle" class="ai-move-overlay-title">Calculating Moves</p>
+                        <div class="ai-move-overlay-track" aria-hidden="true">
+                            <div id="aiMoveOverlayBar" class="ai-move-overlay-bar"></div>
+                        </div>
+                        <p id="aiMoveOverlayPercent" class="ai-move-overlay-percent">0%</p>
+                        <p id="aiMoveOverlayDetail" class="ai-move-overlay-detail"></p>
+                        <button id="aiMoveOverlayPauseButton" class="ai-move-overlay-pause" type="button">Pause</button>
+                    </div>
+                </div>
             </div>
             <aside id="selectionPanel" class="selection-panel is-empty" aria-live="polite">
                 <div id="selectionPanelPortrait" class="selection-panel-portrait" hidden>
@@ -125,7 +145,7 @@
                 <header class="setup-header">
                     <p class="setup-kicker">Battle Setup · 1 of 3</p>
                     <h1 id="armyBuilderTitle">Build the Armies</h1>
-                    <p>Choose who controls each army, then pick color, faction, and force — or leave any of those random. Both armies must total 24 AP (or be marked random), and they cannot share a color or faction.</p>
+                    <p>Choose who controls each army, then pick color, faction, and force — or leave any of those random. Both armies must total 24 AP (or be marked random). They may share a faction, and they cannot share a color.</p>
                 </header>
                 <div id="armyColumns" class="army-columns"></div>
                 <footer class="setup-actions">
@@ -180,7 +200,7 @@
         </main>
         <footer class="help-bar">
             <span>Left drag: interact or marquee select</span>
-            <span>Right drag: pan</span>
+            <span>Right drag or middle drag: pan</span>
             <span>Wheel: zoom at cursor</span>
             <span>Shift+click or Shift+drag: add to selection</span>
             <span>N: toggle snapping</span>
@@ -233,6 +253,7 @@
             </header>
             <div class="modal-utility-row">
                 <button id="newGameButton" type="button">New Game</button>
+                <button id="exportJsonButton" type="button">Export JSON</button>
                 <button id="openGameSettingsButton" type="button">Game Settings</button>
             </div>
             <div class="modal-save-row">
@@ -264,6 +285,24 @@
                 </div>
                 <p id="editModeSettingsHint" class="settings-hint" hidden>Edit mode is active. Use Game Mode in the toolbar to return to normal play.</p>
                 <p id="aiEvaluationSettingsHint" class="settings-hint" hidden>AI Evaluation is active. Select one friendly unmoved unit during the move phase to see scored candidate shadows on the board.</p>
+            </section>
+            <section class="game-settings-section" aria-labelledby="checkpointSettingsTitle">
+                <h3 id="checkpointSettingsTitle">Checkpoints</h3>
+                <p>Return to the opening position, the start of your last turn, or the end of the latest move phase.</p>
+                <div class="checkpoint-list">
+                    <div class="checkpoint-row">
+                        <button id="checkpointGameStartButton" class="settings-action-button" type="button" disabled>Start of game</button>
+                        <p id="checkpointGameStartHint" class="settings-hint">Not saved yet.</p>
+                    </div>
+                    <div class="checkpoint-row">
+                        <button id="checkpointLastTurnButton" class="settings-action-button" type="button" disabled>Last turn</button>
+                        <p id="checkpointLastTurnHint" class="settings-hint">Not saved yet.</p>
+                    </div>
+                    <div class="checkpoint-row">
+                        <button id="checkpointEndMoveButton" class="settings-action-button" type="button" disabled>End of move</button>
+                        <p id="checkpointEndMoveHint" class="settings-hint">Not saved yet.</p>
+                    </div>
+                </div>
             </section>
             <section class="game-settings-section" aria-labelledby="armySettingsTitle">
                 <h3 id="armySettingsTitle">Armies</h3>
@@ -316,6 +355,7 @@
             </div>
         </section>
     </div>
+    <script src="src/base-footprints.js"></script>
     <script src="src/data.js"></script>
     <script src="src/geometry.js"></script>
     <script src="src/rules/core.js"></script>

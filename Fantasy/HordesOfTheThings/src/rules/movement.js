@@ -214,7 +214,7 @@
                     if (unitIsUnengagedFlyer || otherIsUnengagedFlyer) {
                         return;
                     }
-                    if (geometry.polygonsOverlap(geometry.getUnitCorners(sample), geometry.getUnitCorners(otherUnit))) {
+                    if (geometry.unitsOverlap(sample, otherUnit)) {
                         setInvalid(invalidIds, reasonById, unit.id, 'Move collides with another unit.');
                     }
                 });
@@ -258,7 +258,7 @@
                 if (leftIsUnengagedFlyer || rightIsUnengagedFlyer) {
                     continue;
                 }
-                if (geometry.polygonsOverlap(geometry.getUnitCorners(selectedUnits[index]), geometry.getUnitCorners(selectedUnits[inner]))) {
+                if (geometry.unitsOverlap(selectedUnits[index], selectedUnits[inner])) {
                     setInvalid(invalidIds, reasonById, selectedUnits[index].id, 'Formation overlaps itself.');
                     setInvalid(invalidIds, reasonById, selectedUnits[inner].id, 'Formation overlaps itself.');
                 }
