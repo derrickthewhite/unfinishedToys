@@ -136,6 +136,9 @@
                 moveErrorsLabel: document.getElementById('moveErrorsLabel'),
                 battleStatsCheckbox: document.getElementById('battleStatsCheckbox'),
                 battleStatsLabel: document.getElementById('battleStatsLabel'),
+                statusCheckbox: document.getElementById('statusCheckbox'),
+                statusLabel: document.getElementById('statusLabel'),
+                statusGroup: document.getElementById('statusGroup'),
                 resolveShootingButton: document.getElementById('resolveShootingButton'),
                 cancelMoveButton: document.getElementById('cancelMoveButton'),
                 undoMoveButton: document.getElementById('undoMoveButton'),
@@ -227,6 +230,7 @@
                 showRangedArea: false,
                 showMoveErrors: false,
                 showBattleStats: false,
+                showStatus: true,
                 aiEvaluationMode: false,
                 moveEvaluation: null,
                 selectedBattleId: null,
@@ -239,6 +243,7 @@
                 editHistory: [],
                 moveHistory: [],
                 autoMoveGhost: null,
+                computerMoveReview: null,
                 autoMoveModalOpen: false,
                 autoMoveInProgress: false,
                 autoMoveAwaitingAck: false,
@@ -521,6 +526,10 @@
                     this.syncUiFromState();
                 }
                 this.requestRender();
+            });
+            this.ui.statusCheckbox.addEventListener('change', () => {
+                this.state.showStatus = this.ui.statusCheckbox.checked;
+                this.syncUiFromState();
             });
             this.ui.resolveShootingButton.addEventListener('click', () => {
                 if (this.state.phase === 'melee') {
@@ -881,6 +890,7 @@
             this.ui.rangedAreaLabel.hidden = false;
             this.ui.moveErrorsLabel.hidden = false;
             this.ui.battleStatsLabel.hidden = false;
+            this.ui.statusLabel.hidden = false;
             const showShootingResolve = this.state.mode === 'game'
                 && this.state.phase === 'shooting'
                 && !this.state.combatResolution
@@ -903,7 +913,11 @@
             this.ui.resolveShootingButton.hidden = !showShootingResolve && !showMeleeResolve;
             this.ui.cancelMoveButton.hidden = this.state.mode !== 'game' || this.state.phase !== 'move' || !localActive;
             const showVictoryReturn = Boolean(this.state.victory && this.state.victoryModalDismissed);
-            this.ui.acknowledgedButton.hidden = !showVictoryReturn && (
+            const showComputerMoveAck = this.state.mode === 'game'
+                && this.state.phase === 'move'
+                && Boolean(this.state.computerMoveReview?.awaitingAck)
+                && this.hasLocalHuman();
+            this.ui.acknowledgedButton.hidden = !showVictoryReturn && !showComputerMoveAck && (
                 this.state.mode !== 'game'
                 || this.isComputerMatch()
                 || (
@@ -942,6 +956,8 @@
             this.ui.rangedAreaCheckbox.checked = this.state.showRangedArea;
             this.ui.moveErrorsCheckbox.checked = this.state.showMoveErrors;
             this.ui.battleStatsCheckbox.checked = this.state.showBattleStats;
+            this.ui.statusCheckbox.checked = this.state.showStatus !== false;
+            this.ui.statusGroup.hidden = this.state.showStatus === false;
             if (this.state.phase === 'melee') {
                 this.ui.resolveShootingButton.textContent = 'Resolve Melee';
             } else {
@@ -957,7 +973,7 @@
                 ? this.state.editHistory.length === 0
                 : (!this.state.draft && (!this.state.moveHistory || this.state.moveHistory.length === 0));
             this.ui.acknowledgedButton.textContent = this.acknowledgeButtonLabel();
-            this.ui.acknowledgedButton.disabled = showVictoryReturn
+            this.ui.acknowledgedButton.disabled = showVictoryReturn || showComputerMoveAck
                 ? false
                 : (this.state.mode !== 'game' || (this.state.phase !== 'form-up' && !this.state.combatResolution));
             this.ui.storageModal.hidden = !this.state.storageModalOpen;

@@ -647,6 +647,10 @@ test('playComputerMove deploys a Horde from reserve onto the home edge', async (
     assert.equal(deployed.y, data.BOARD_SIZE - deployed.depth);
     assert.equal(deployed.movedThisTurn, true);
     assert.equal(app.state.remainingMoves, 1);
+    const arrows = app.getComputerMoveArrows();
+    assert.equal(arrows.length, 1);
+    assert.ok(arrows[0].from.y > data.BOARD_SIZE);
+    assert.ok(arrows[0].to.y < data.BOARD_SIZE);
     app.resetControllerRuntime();
 });
 

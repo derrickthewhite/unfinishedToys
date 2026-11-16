@@ -143,6 +143,23 @@
             });
         }
 
+        finishComputerMovePhase() {
+            const review = this.state.computerMoveReview;
+            if (review?.entries?.length && typeof this.hasLocalHuman === 'function' && this.hasLocalHuman()) {
+                review.awaitingAck = true;
+                this.updateStatus('Review the move, then click Acknowledge Move.');
+                this.syncUiFromState();
+                this.requestRender();
+                return;
+            }
+            this.endMovePhase();
+        }
+
+        acknowledgeComputerMove() {
+            this.state.computerMoveReview = null;
+            this.endMovePhase();
+        }
+
         endMovePhase() {
             if (this.state.mode !== 'game' || this.state.phase !== 'move') {
                 return;
@@ -156,6 +173,7 @@
         clearMoveTurnState() {
             this.state.moveHistory = [];
             this.state.autoMoveGhost = null;
+            this.state.computerMoveReview = null;
         }
 
         undoFinishedMove() {
@@ -632,6 +650,7 @@
                 recycledUnits: (result.destroyedUnits || []).filter((unit) => this.isReserveRecycleType(unit)),
                 ensorcelledUnits: result.ensorcelledUnits || [],
                 movedUnitIds: Object.keys(ghostSnapshot),
+                recoilDestructions: (result.recoilDestructions || []).filter((entry) => entry.kind !== 'flee'),
                 attacksByAttacker: null,
                 results: result.results.map((entry) => ({
                     ...entry,
@@ -920,6 +939,9 @@
             if (this.state.victory && this.state.victoryModalDismissed) {
                 return 'Victory';
             }
+            if (this.state.computerMoveReview?.awaitingAck) {
+                return 'Acknowledge Move';
+            }
             if (this.state.phase === 'form-up') {
                 return 'Acknowledge Forming Up';
             }
@@ -937,6 +959,10 @@
                 return;
             }
             if (this.state.mode !== 'game') {
+                return;
+            }
+            if (this.state.computerMoveReview?.awaitingAck) {
+                this.acknowledgeComputerMove();
                 return;
             }
             if (this.state.phase === 'form-up') {

@@ -63,7 +63,7 @@
                 <button id="undoMoveButton" type="button">Undo</button>
                 <button id="gamePauseControllerButton" type="button" hidden>Pause</button>
             </div>
-            <div class="bar-group status-group">
+            <div class="bar-group status-group" id="statusGroup">
                 <span id="gameThinkingText" class="thinking-pill thinking-pill-status" hidden></span>
                 <div id="statusText">Edit mode: place, drag, marquee-select, or rotate units.</div>
                 <div id="selectionText">No units selected.</div>
@@ -92,6 +92,10 @@
                 <label id="battleStatsLabel">
                     <input id="battleStatsCheckbox" type="checkbox">
                     Battle Stats
+                </label>
+                <label id="statusLabel">
+                    <input id="statusCheckbox" type="checkbox" checked>
+                    Status
                 </label>
             </div>
         </header>

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
     HordesPrototype,
     data,
+    geometry,
     createBlade,
     createAppHarness,
     rules
@@ -192,6 +193,14 @@ test('computer move applies a draft against a local opponent', async () => {
     assert.equal(result, 'moved');
     assert.equal(units[0].movedThisTurn, true);
     assert.ok(units[0].y < startY);
+    assert.equal(app.state.autoMoveGhost, null);
+    assert.equal(app.state.computerMoveReview.entries.length, 1);
+    const arrows = app.getComputerMoveArrows();
+    assert.equal(arrows.length, 1);
+    assert.equal(arrows[0].color, app.getPlayerColors('player-2').fill);
+    assert.ok(arrows[0].from.y > arrows[0].to.y);
+    const ghosts = app.collectGhostUnits();
+    assert.ok(ghosts.some((unit) => unit.id === 'u1' && unit.y === startY));
     app.resetControllerRuntime();
 });
 
@@ -250,6 +259,79 @@ test('computer move with no useful action ends the move phase', async () => {
     app.endMovePhase();
     assert.notEqual(app.state.phase, 'move');
     app.resetControllerRuntime();
+});
+
+test('a computer move waits for the local player to acknowledge', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'game',
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-2',
+            units: [createBlade('u1', 100, 200, 'player-2')]
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+    app.state.computerMoveReview = {
+        entries: [{
+            unitIds: ['u1'],
+            ghostSnapshot: { u1: { ...app.state.units[0], y: 240 } }
+        }],
+        awaitingAck: false
+    };
+
+    app.finishComputerMovePhase();
+
+    assert.equal(app.state.phase, 'move');
+    assert.equal(app.state.computerMoveReview.awaitingAck, true);
+    assert.equal(app.acknowledgeButtonLabel(), 'Acknowledge Move');
+    assert.equal(app.getPendingControllerDecision(), null);
+
+    app.acknowledgeComputerMove();
+    assert.equal(app.state.computerMoveReview, null);
+    assert.notEqual(app.state.phase, 'move');
+});
+
+test('two computers auto-acknowledge a finished move', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'game',
+            mode: 'game',
+            phase: 'move',
+            units: []
+        }
+    });
+    app.state.players['player-1'].controller = 'computer';
+    app.state.players['player-2'].controller = 'computer';
+    app.state.computerMoveReview = {
+        entries: [{ unitIds: ['u1'], ghostSnapshot: {} }],
+        awaitingAck: false
+    };
+
+    app.finishComputerMovePhase();
+
+    assert.equal(app.state.computerMoveReview, null);
+    assert.notEqual(app.state.phase, 'move');
+});
+
+test('a turn in place still gets a move arrow', () => {
+    const turned = createBlade('u1', 100, 220, 'player-2');
+    const before = { ...turned, rotation: 0 };
+    const after = { ...turned, rotation: Math.PI / 2 };
+    const app = createAppHarness({
+        state: {
+            units: [after],
+            computerMoveReview: {
+                entries: [{ unitIds: ['u1'], ghostSnapshot: { u1: before } }],
+                awaitingAck: true
+            }
+        }
+    });
+
+    const arrows = app.getComputerMoveArrows();
+    assert.equal(arrows.length, 1);
+    assert.ok(geometry.distance(arrows[0].from, arrows[0].to) >= 9);
 });
 
 test('driver stays idle when the active side is local', async () => {

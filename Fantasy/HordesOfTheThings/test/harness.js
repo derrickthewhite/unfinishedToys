@@ -97,6 +97,7 @@ function createAppHarness(overrides) {
         showRangedArea: false,
         showMoveErrors: false,
         showBattleStats: false,
+        showStatus: true,
         selectedBattleId: null,
         losses: { 'player-1': [], 'player-2': [] },
         reserveUnits: [],

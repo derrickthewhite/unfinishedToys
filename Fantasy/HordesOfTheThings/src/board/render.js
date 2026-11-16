@@ -64,6 +64,7 @@
             this.drawGhostUnits(ctx);
             this.drawShootingOverlays(ctx);
             this.drawUnits(ctx);
+            this.drawComputerMoveArrows(ctx);
             this.drawCornerTravelViolations(ctx);
             this.drawSelectionHandles(ctx);
             this.drawBattleStatOverlays(ctx);
@@ -509,9 +510,17 @@
 
         drawCombatOutcomeMarks(ctx, resolution) {
             const destroyedIds = resolution.destroyedIds || new Set();
+            const recoilDestroyedIds = new Set(
+                (resolution.recoilDestructions || [])
+                    .filter((entry) => entry.kind !== 'flee')
+                    .map((entry) => entry.unitId)
+            );
             const ensorcelledIds = resolution.ensorcelledIds
                 || new Set((resolution.ensorcelledUnits || []).map((unit) => unit.id));
             destroyedIds.forEach((unitId) => {
+                if (recoilDestroyedIds.has(unitId)) {
+                    return;
+                }
                 const unit = this.getCombatPoseUnit(resolution, unitId);
                 if (unit) {
                     this.drawDestroyedMark(ctx, unit);
@@ -540,6 +549,24 @@
                 }
                 this.drawPushbackArrow(ctx, geometry.getUnitCenter(before), geometry.getUnitCenter(after));
             });
+            (resolution.recoilDestructions || []).forEach((entry) => {
+                if (entry.kind === 'flee') {
+                    return;
+                }
+                const before = resolution.ghostSnapshot?.[entry.unitId];
+                if (!before) {
+                    return;
+                }
+                const destination = this.getRecoilDestructionPoint(before, entry.rotation);
+                this.drawPushbackArrow(ctx, geometry.getUnitCenter(before), destination);
+                this.drawRecoiledDestroyedMark(ctx, destination);
+            });
+        }
+
+        getRecoilDestructionPoint(unit, rotation) {
+            const facing = rotation == null ? (unit.rotation || 0) : rotation;
+            const backward = geometry.scaleVector(geometry.getForwardVector(facing), -(unit.depth || 0));
+            return geometry.add(geometry.getUnitCenter(unit), backward);
         }
 
         drawDestroyedMark(ctx, unit) {
@@ -549,6 +576,22 @@
             ctx.translate(center.x, center.y);
             ctx.strokeStyle = 'rgba(196, 28, 28, 0.92)';
             ctx.lineWidth = Math.max(4, size * 0.14) / this.state.camera.scale;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(-size / 2, -size / 2);
+            ctx.lineTo(size / 2, size / 2);
+            ctx.moveTo(size / 2, -size / 2);
+            ctx.lineTo(-size / 2, size / 2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        drawRecoiledDestroyedMark(ctx, point) {
+            const size = 7;
+            ctx.save();
+            ctx.translate(point.x, point.y);
+            ctx.strokeStyle = 'rgba(196, 28, 28, 0.92)';
+            ctx.lineWidth = 2.2 / this.state.camera.scale;
             ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(-size / 2, -size / 2);
@@ -586,13 +629,54 @@
             ctx.restore();
         }
 
-        drawPushbackArrow(ctx, from, to) {
+        getComputerMoveArrows() {
+            const entries = this.state.computerMoveReview?.entries || [];
+            const arrows = [];
+            entries.forEach((entry) => {
+                entry.unitIds.forEach((unitId) => {
+                    const before = entry.ghostSnapshot?.[unitId];
+                    const after = this.getUnitById(unitId);
+                    if (!before || !after) {
+                        return;
+                    }
+                    const from = geometry.getUnitCenter(before);
+                    const to = geometry.getUnitCenter(after);
+                    const distance = geometry.distance(from, to);
+                    let end = to;
+                    if (distance < 0.5) {
+                        const turn = geometry.subtract(
+                            geometry.getForwardVector(after.rotation || 0),
+                            geometry.getForwardVector(before.rotation || 0)
+                        );
+                        const direction = geometry.distance({ x: 0, y: 0 }, turn) > 0.05
+                            ? geometry.normalize(turn)
+                            : geometry.getForwardVector(after.rotation || 0);
+                        end = geometry.add(from, geometry.scaleVector(direction, 10));
+                    }
+                    arrows.push({
+                        from,
+                        to: end,
+                        color: this.getPlayerColors(this.getUnitPlayerId(after)).fill
+                    });
+                });
+            });
+            return arrows;
+        }
+
+        drawComputerMoveArrows(ctx) {
+            this.getComputerMoveArrows().forEach((arrow) => {
+                this.drawPushbackArrow(ctx, arrow.from, arrow.to, arrow.color);
+            });
+        }
+
+        drawPushbackArrow(ctx, from, to, color) {
             const delta = geometry.subtract(to, from);
             const distance = geometry.distance(from, to);
             if (distance < 0.5) {
                 return;
             }
             const direction = geometry.normalize(delta);
+            const shaftColor = color || 'rgba(196, 92, 18, 0.96)';
             const desiredHead = Math.min(16, Math.max(10, distance * 0.28)) / this.state.camera.scale;
             const headLength = Math.min(desiredHead, distance * 0.42);
             const headWidth = headLength * 0.72;
@@ -609,8 +693,8 @@
             ctx.moveTo(from.x, from.y);
             ctx.lineTo(base.x, base.y);
             ctx.stroke();
-            ctx.strokeStyle = 'rgba(196, 92, 18, 0.96)';
-            ctx.fillStyle = 'rgba(196, 92, 18, 0.96)';
+            ctx.strokeStyle = shaftColor;
+            ctx.fillStyle = shaftColor;
             ctx.lineWidth = shaftWidth;
             ctx.beginPath();
             ctx.moveTo(from.x, from.y);
@@ -960,6 +1044,9 @@
             if (this.state.autoMoveGhost) {
                 pushSnapshot(this.state.autoMoveGhost.ghostSnapshot, this.state.autoMoveGhost.unitIds);
             }
+            (this.state.computerMoveReview?.entries || []).forEach((entry) => {
+                pushSnapshot(entry.ghostSnapshot, entry.unitIds);
+            });
             const interaction = this.state.interaction;
             if (interaction && interaction.dragBase && interaction.draftIds) {
                 pushSnapshot(interaction.dragBase, interaction.draftIds);

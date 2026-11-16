@@ -646,6 +646,9 @@ test('keyboard shortcut toggles form-up preview and persists the checkbox state 
             moveErrorsCheckbox: { checked: false },
             battleStatsLabel: { hidden: false },
             battleStatsCheckbox: { checked: false },
+            statusLabel: { hidden: false },
+            statusCheckbox: { checked: true },
+            statusGroup: { hidden: false },
             resolveShootingButton: { hidden: false, textContent: '', disabled: false },
             cancelMoveButton: { hidden: false, disabled: false },
             undoMoveButton: { hidden: false, disabled: false },
@@ -666,6 +669,145 @@ test('keyboard shortcut toggles form-up preview and persists the checkbox state 
 
     assert.equal(app.state.showFormUpPreview, true);
     assert.equal(app.ui.formUpPreviewCheckbox.checked, true);
+});
+
+test('Acknowledge Move stays enabled while a computer move is waiting', () => {
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-2',
+            setupStage: 'game',
+            computerMoveReview: {
+                entries: [{ unitIds: ['u1'], ghostSnapshot: {} }],
+                awaitingAck: true
+            }
+        },
+        ui: {
+            modeGroup: { hidden: true },
+            editModeSettingsButton: { hidden: false },
+            editModeSettingsHint: { hidden: true },
+            gameModeButton: { classList: { toggle() {} } },
+            editGroup: { hidden: false },
+            actionGroup: { hidden: false },
+            activePlayerSelect: { value: '' },
+            remainingMovesInput: { value: '' },
+            phaseSelect: { value: '' },
+            newUnitTypeSelect: { value: '' },
+            placementPlayerSelect: { value: '' },
+            placeUnitButton: { textContent: '', disabled: false },
+            deleteUnitButton: { hidden: false, disabled: false },
+            destroyUnitButton: { hidden: false, disabled: false },
+            finishMoveButton: { hidden: false, disabled: false },
+            endMovePhaseButton: { hidden: false, disabled: false },
+            stepMoveButton: { hidden: false, disabled: false },
+            snapLabel: { hidden: false },
+            snapCheckbox: { checked: false },
+            formUpPreviewLabel: { hidden: false },
+            formUpPreviewCheckbox: { checked: false },
+            cornerRotationLabel: { hidden: false },
+            cornerRotationCheckbox: { checked: false },
+            rangedAreaLabel: { hidden: false },
+            rangedAreaCheckbox: { checked: false },
+            moveErrorsLabel: { hidden: false },
+            moveErrorsCheckbox: { checked: false },
+            battleStatsLabel: { hidden: false },
+            battleStatsCheckbox: { checked: false },
+            statusLabel: { hidden: false },
+            statusCheckbox: { checked: true },
+            statusGroup: { hidden: false },
+            resolveShootingButton: { hidden: false, textContent: '', disabled: false },
+            cancelMoveButton: { hidden: false, disabled: false },
+            undoMoveButton: { hidden: false, disabled: false },
+            acknowledgedButton: { hidden: true, disabled: true, textContent: '' },
+            storageModal: { hidden: true },
+            playerOneLosses: { textContent: '', title: '' },
+            playerTwoLosses: { textContent: '', title: '' },
+            statusText: { textContent: '' },
+            selectionText: { textContent: '' }
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+    app.syncUiFromState = HordesPrototype.prototype.syncUiFromState;
+    app.renderSelectionInfo = () => {};
+    app.getMeleeState = () => ({ combats: [] });
+    app.getLossSummary = () => ({ points: 0, title: 'No losses.' });
+
+    app.syncUiFromState();
+
+    assert.equal(app.ui.acknowledgedButton.hidden, false);
+    assert.equal(app.ui.acknowledgedButton.disabled, false);
+    assert.equal(app.ui.acknowledgedButton.textContent, 'Acknowledge Move');
+});
+
+test('status checkbox shows and hides the status group', () => {
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            showStatus: true
+        },
+        ui: {
+            modeGroup: { hidden: true },
+            editModeSettingsButton: { hidden: false },
+            editModeSettingsHint: { hidden: true },
+            gameModeButton: { classList: { toggle() {} } },
+            editGroup: { hidden: false },
+            actionGroup: { hidden: false },
+            activePlayerSelect: { value: '' },
+            remainingMovesInput: { value: '' },
+            phaseSelect: { value: '' },
+            newUnitTypeSelect: { value: '' },
+            placementPlayerSelect: { value: '' },
+            placeUnitButton: { textContent: '', disabled: false },
+            deleteUnitButton: { hidden: false, disabled: false },
+            destroyUnitButton: { hidden: false, disabled: false },
+            finishMoveButton: { hidden: false, disabled: false },
+            endMovePhaseButton: { hidden: false, disabled: false },
+            stepMoveButton: { hidden: false, disabled: false },
+            snapLabel: { hidden: false },
+            snapCheckbox: { checked: false },
+            formUpPreviewLabel: { hidden: false },
+            formUpPreviewCheckbox: { checked: false },
+            cornerRotationLabel: { hidden: false },
+            cornerRotationCheckbox: { checked: false },
+            rangedAreaLabel: { hidden: false },
+            rangedAreaCheckbox: { checked: false },
+            moveErrorsLabel: { hidden: false },
+            moveErrorsCheckbox: { checked: false },
+            battleStatsLabel: { hidden: false },
+            battleStatsCheckbox: { checked: false },
+            statusLabel: { hidden: false },
+            statusCheckbox: { checked: false },
+            statusGroup: { hidden: true },
+            resolveShootingButton: { hidden: false, textContent: '', disabled: false },
+            cancelMoveButton: { hidden: false, disabled: false },
+            undoMoveButton: { hidden: false, disabled: false },
+            acknowledgedButton: { hidden: false, disabled: false },
+            storageModal: { hidden: true },
+            playerOneLosses: { textContent: '', title: '' },
+            playerTwoLosses: { textContent: '', title: '' },
+            statusText: { textContent: '' },
+            selectionText: { textContent: '' }
+        }
+    });
+    app.syncUiFromState = HordesPrototype.prototype.syncUiFromState;
+    app.renderSelectionInfo = () => {};
+    app.getMeleeState = () => ({ combats: [] });
+    app.getLossSummary = () => ({ points: 0, title: 'No losses.' });
+
+    app.syncUiFromState();
+
+    assert.equal(app.ui.statusCheckbox.checked, true);
+    assert.equal(app.ui.statusGroup.hidden, false);
+    assert.equal(app.ui.statusLabel.hidden, false);
+
+    app.state.showStatus = false;
+    app.syncUiFromState();
+
+    assert.equal(app.ui.statusGroup.hidden, true);
+    assert.equal(app.ui.statusCheckbox.checked, false);
 });
 
 test('player chrome uses chosen colors instead of fixed Blue and Red sides', () => {
@@ -719,6 +861,9 @@ test('player chrome uses chosen colors instead of fixed Blue and Red sides', () 
             moveErrorsCheckbox: { checked: false },
             battleStatsLabel: { hidden: false },
             battleStatsCheckbox: { checked: false },
+            statusLabel: { hidden: false },
+            statusCheckbox: { checked: true },
+            statusGroup: { hidden: false },
             resolveShootingButton: { hidden: false, textContent: '', disabled: false },
             cancelMoveButton: { hidden: false, disabled: false },
             undoMoveButton: { hidden: false, disabled: false },
@@ -1264,7 +1409,8 @@ test('saveCurrentGame stores named snapshots in local storage', () => {
                 snapEnabled: false,
                 showFormUpPreview: true,
                 singleRotationMode: 'front-corner',
-                showRangedArea: true
+                showRangedArea: true,
+                showStatus: false
             },
             nextUnitId: 12,
             ui: {
@@ -1281,6 +1427,7 @@ test('saveCurrentGame stores named snapshots in local storage', () => {
         assert.equal(records[0].snapshot.losses.blue[0].type, 'Blade');
         assert.equal(records[0].snapshot.snapEnabled, false);
         assert.equal(records[0].snapshot.showFormUpPreview, true);
+        assert.equal(records[0].snapshot.showStatus, false);
         assert.equal(records[0].snapshot.singleRotationMode, 'front-corner');
         assert.equal(records[0].snapshot.nextUnitId, 12);
     } finally {
@@ -1365,6 +1512,7 @@ test('loadGame restores saved state from local storage', () => {
         assert.equal(app.state.showFormUpPreview, true);
         assert.equal(app.state.singleRotationMode, 'front-corner');
         assert.equal(app.state.showRangedArea, true);
+        assert.equal(app.state.showStatus, true);
         assert.equal(app.nextUnitId, 9);
         assert.ok(app.state.shooting);
         assert.equal(app.state.storageModalOpen, false);
@@ -2362,6 +2510,54 @@ test('drawCombatResolutionOverlays marks destroyed, ensorcelled, and pushed unit
         set textBaseline(value) {}
     });
     assert.deepEqual(calls, ['destroyed', 'ensorcelled', 'pushback']);
+});
+
+test('a recoil destruction draws the recoil arrow and a small x at its end', () => {
+    const dead = createBlade('dead', 100, 220);
+    const app = createAppHarness({
+        state: {
+            units: [],
+            combatResolution: {
+                phase: 'melee',
+                participantIds: new Set(['dead']),
+                destroyedIds: new Set(['dead']),
+                ensorcelledIds: new Set(),
+                recoilDestructions: [{ unitId: 'dead', kind: 'recoil' }],
+                ghostSnapshot: { dead: { ...dead } },
+                movedUnitIds: ['dead'],
+                results: []
+            }
+        }
+    });
+    const calls = [];
+    app.drawDestroyedMark = () => calls.push('destroyed');
+    app.drawEnsorcelledMark = () => calls.push('ensorcelled');
+    app.drawPushbackArrow = (ctx, from, to) => calls.push(['arrow', from, to]);
+    app.drawRecoiledDestroyedMark = (ctx, point) => calls.push(['small', point]);
+    app.drawCombatResolutionOverlays({
+        save() {},
+        restore() {},
+        beginPath() {},
+        roundRect() {},
+        fill() {},
+        stroke() {},
+        fillText() {},
+        set fillStyle(value) {},
+        set strokeStyle(value) {},
+        set lineWidth(value) {},
+        set font(value) {},
+        set textAlign(value) {},
+        set textBaseline(value) {}
+    });
+
+    const arrow = calls.find((call) => call[0] === 'arrow');
+    const small = calls.find((call) => call[0] === 'small');
+    assert.equal(calls.includes('destroyed'), false);
+    assert.ok(arrow);
+    assert.ok(small);
+    assert.deepEqual(small[1], arrow[2]);
+    assert.ok(arrow[2].y > arrow[1].y);
+    assert.ok(Math.abs((arrow[2].y - arrow[1].y) - dead.depth) < 0.01);
 });
 
 test('shooting recoil aftermath draws a centerline pushback arrow', () => {

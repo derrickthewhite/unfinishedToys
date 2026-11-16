@@ -225,6 +225,12 @@
                     return null;
                 }
                 if (this.state.phase === 'move') {
+                    if (this.state.computerMoveReview?.awaitingAck) {
+                        if (this.isComputerMatch()) {
+                            return { kind: 'ack-computer-move', playerId: this.state.activePlayerId };
+                        }
+                        return null;
+                    }
                     if (this.isLocalPlayer(this.state.activePlayerId)) {
                         return null;
                     }
@@ -376,11 +382,20 @@
                         return;
                     }
                     if (result === 'end-phase') {
-                        this.endMovePhase();
+                        this.finishComputerMovePhase();
                     }
                     this.markComputerAction();
                     this.syncUiFromState();
                     this.requestRender();
+                    return;
+                }
+                if (decision.kind === 'ack-computer-move') {
+                    this.setComputerThinking(decision.playerId, `${label} reviews its move.`);
+                    if (!this.isControllerActionCurrent(await this.waitForComputerDelay(startedAt))) {
+                        return;
+                    }
+                    this.acknowledgeComputerMove();
+                    this.markComputerAction();
                     return;
                 }
                 if (decision.kind === 'ack-form-up') {

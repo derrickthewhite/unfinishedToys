@@ -1558,6 +1558,8 @@
                 recoil.destroyedIds.forEach((unitId) => {
                     recoilDestructions.push({
                         unitId,
+                        kind: 'recoil',
+                        rotation: entry.targetRotation ?? null,
                         reason: recoil.destructionReasons[unitId] || 'recoil destruction reason unavailable'
                     });
                 });
@@ -1574,6 +1576,7 @@
                 flee.destroyedIds.forEach((unitId) => {
                     recoilDestructions.push({
                         unitId,
+                        kind: 'flee',
                         reason: flee.destructionReasons[unitId] || 'flee destruction reason unavailable'
                     });
                 });

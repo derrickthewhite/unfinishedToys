@@ -539,12 +539,31 @@
                 this.updateAutoMoveProgress({ message: 'Cancelling…' });
             },
 
+            appendComputerMoveReview(unitIds, ghostSnapshot) {
+                if (!this.state.computerMoveReview) {
+                    this.state.computerMoveReview = { entries: [], awaitingAck: false };
+                }
+                this.state.computerMoveReview.entries.push({
+                    unitIds: [...unitIds],
+                    ghostSnapshot
+                });
+            },
+
             applyAutoMoveSuggestion(suggestion) {
                 if (!suggestion) {
                     return false;
                 }
+                const computerActive = typeof this.canLocallyControl === 'function'
+                    && !this.canLocallyControl(this.state.activePlayerId);
                 if (suggestion.moveKind === 'reserve-deploy' || suggestion.moveKind === 'ensorcelled-return') {
                     const reserveUnit = this.getReserveUnits().find((entry) => entry.id === suggestion.reserveUnitId);
+                    let reserveGhost = null;
+                    if (computerActive && reserveUnit && typeof this.getReserveSlotPose === 'function') {
+                        const pose = this.getReserveSlotPose(this.getUnitPlayerId(reserveUnit), reserveUnit.reserveSlot || 0);
+                        reserveGhost = geometry.buildUnitFromCenter(reserveUnit, pose, pose.rotation);
+                        delete reserveGhost.inReserve;
+                        delete reserveGhost.reserveSlot;
+                    }
                     const deployX = suggestion.moveKind === 'ensorcelled-return' && suggestion.localReturn
                         ? this.getDefaultReserveDeployWorldX()
                         : suggestion.moveParam;
@@ -568,12 +587,13 @@
                         }
                     }
                     this.finishDraft();
+                    if (computerActive && reserveGhost) {
+                        this.appendComputerMoveReview(suggestion.unitIds, { [reserveGhost.id]: reserveGhost });
+                    }
                     this.updateStatus(formatAutoMoveStatus(suggestion, this.state.units));
                     return true;
                 }
 
-                const computerActive = typeof this.canLocallyControl === 'function'
-                    && !this.canLocallyControl(this.state.activePlayerId);
                 if (computerActive) {
                     this.state.selectionAnalysis = suggestion.analysis || rules.analyzeSelection(
                         suggestion.unitIds.map((unitId) => this.getUnitById(unitId)).filter(Boolean)
@@ -626,10 +646,14 @@
                 }
 
                 this.finishDraft();
-                this.state.autoMoveGhost = {
-                    unitIds: [...suggestion.unitIds],
-                    ghostSnapshot
-                };
+                if (computerActive) {
+                    this.appendComputerMoveReview(suggestion.unitIds, ghostSnapshot);
+                } else {
+                    this.state.autoMoveGhost = {
+                        unitIds: [...suggestion.unitIds],
+                        ghostSnapshot
+                    };
+                }
                 this.updateStatus(formatAutoMoveStatus(suggestion, this.state.units));
                 return true;
             },
