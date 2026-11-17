@@ -293,6 +293,81 @@ test('a computer move waits for the local player to acknowledge', () => {
     assert.notEqual(app.state.phase, 'move');
 });
 
+test('a computer last-PIP move keeps every review entry until acknowledged', () => {
+    const unit = createBlade('u1', 100, 200, 'player-2');
+    const app = createAppHarness({
+        state: {
+            setupStage: 'game',
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-2',
+            remainingMoves: 1,
+            units: [unit],
+            computerMoveReview: {
+                entries: [{
+                    unitIds: ['prior'],
+                    ghostSnapshot: {}
+                }],
+                awaitingAck: false
+            }
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+    app.updateSelectionAnalysis = () => {};
+    app.state.draft = {
+        kind: 'move',
+        unitIds: ['u1'],
+        initialOrigin: { u1: { ...unit, y: 240 } },
+        origin: { u1: { ...unit, y: 240 } },
+        history: [],
+        invalidIds: new Set()
+    };
+    app.state.selectionAnalysis = { type: 'single' };
+
+    app.finishDraft();
+
+    assert.equal(app.state.phase, 'move');
+    assert.equal(app.state.remainingMoves, 0);
+    assert.equal(app.state.computerMoveReview.entries.length, 1);
+
+    app.appendComputerMoveReview(['u1'], { u1: { ...unit, y: 240 } });
+    app.finishComputerMovePhase();
+
+    assert.equal(app.state.phase, 'move');
+    assert.equal(app.state.computerMoveReview.awaitingAck, true);
+    assert.equal(app.state.computerMoveReview.entries.length, 2);
+    assert.equal(app.acknowledgeButtonLabel(), 'Acknowledge Move');
+});
+
+test('a local last-PIP move still begins form-up immediately', () => {
+    const unit = createBlade('u1', 100, 200);
+    const app = createAppHarness({
+        state: {
+            setupStage: 'game',
+            mode: 'game',
+            phase: 'move',
+            activePlayerId: 'player-1',
+            remainingMoves: 1,
+            units: [unit]
+        }
+    });
+    app.updateSelectionAnalysis = () => {};
+    app.state.draft = {
+        kind: 'move',
+        unitIds: ['u1'],
+        initialOrigin: { u1: { ...unit, y: 240 } },
+        origin: { u1: { ...unit, y: 240 } },
+        history: [],
+        invalidIds: new Set()
+    };
+    app.state.selectionAnalysis = { type: 'single' };
+
+    app.finishDraft();
+
+    assert.notEqual(app.state.phase, 'move');
+});
+
 test('two computers auto-acknowledge a finished move', () => {
     const app = createAppHarness({
         state: {

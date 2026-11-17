@@ -730,7 +730,10 @@
                 const applied = this.applyAutoMoveSuggestion(searchResult.suggestion);
                 this.syncUiFromState();
                 this.requestRender();
-                return applied ? 'moved' : 'end-phase';
+                if (!applied || this.state.remainingMoves <= 0) {
+                    return 'end-phase';
+                }
+                return 'moved';
             },
 
             maybeClearAutoMoveGhost() {

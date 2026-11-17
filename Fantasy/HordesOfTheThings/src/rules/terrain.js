@@ -98,6 +98,85 @@
     }
 
 
+    function getUnitLurkFeatureKey(unit, terrain) {
+        if (!unit || !terrain) {
+            return null;
+        }
+        const corners = geometry.getUnitCorners(unit);
+        const center = geometry.getUnitCenter(unit);
+        const samplePoints = [
+            corners.frontLeft,
+            corners.frontRight,
+            corners.backLeft,
+            corners.backRight,
+            center,
+            geometry.midpoint(corners.frontLeft, corners.frontRight),
+            geometry.midpoint(corners.backLeft, corners.backRight)
+        ];
+        const features = terrain.features || [];
+        for (let index = 0; index < features.length; index += 1) {
+            const feature = features[index];
+            if (feature.kind !== 'forest' && feature.kind !== 'swamp') {
+                continue;
+            }
+            if (samplePoints.some((point) => geometry.pointInBlob(point, feature))) {
+                return `${index}:${feature.kind}:${Math.round(feature.cx)}:${Math.round(feature.cy)}`;
+            }
+        }
+        return null;
+    }
+
+
+    function collectLurkerOccupancy(units, terrain) {
+        const occupancy = {};
+        (units || []).forEach((unit) => {
+            occupancy[unit.id] = getUnitLurkFeatureKey(unit, terrain);
+        });
+        return occupancy;
+    }
+
+
+    function distanceToNearestBadGoing(unit, terrain) {
+        if (!unit || !terrain) {
+            return Infinity;
+        }
+        if (isUnitInBadGoing(unit, terrain)) {
+            return 0;
+        }
+        const center = geometry.getUnitCenter(unit);
+        let best = Infinity;
+        (terrain.features || []).forEach((feature) => {
+            if (feature.kind !== 'forest' && feature.kind !== 'swamp') {
+                return;
+            }
+            const radius = Math.min(feature.rx || 0, feature.ry || 0);
+            const gap = geometry.distance(center, { x: feature.cx, y: feature.cy }) - radius;
+            best = Math.min(best, Math.max(0, gap));
+        });
+        return best;
+    }
+
+
+    function isLurkerIsolated(unit, units, terrain) {
+        if (!data.isLurkerType(unit?.type)) {
+            return false;
+        }
+        const limit = data.pacesToMm(data.LURKER_ISOLATION_PACES);
+        const playerId = unit.playerId;
+        return !(units || []).some((other) => {
+            if (!other || other.id === unit.id || other.playerId === playerId || other.type === 'Base') {
+                return false;
+            }
+            return geometry.unitsMinDistance(unit, other) <= limit;
+        });
+    }
+
+
+    function findIsolatedLurkers(units, terrain) {
+        return (units || []).filter((unit) => isLurkerIsolated(unit, units, terrain));
+    }
+
+
     return {
         ROUGH_TERRAIN_TYPES,
         TERRAIN_SEVERITY,
@@ -106,6 +185,11 @@
         severityFromTerrain,
         combineMoveSeverity,
         movementAllowanceForSeverity,
-        isUnitInBadGoing
+        isUnitInBadGoing,
+        getUnitLurkFeatureKey,
+        collectLurkerOccupancy,
+        distanceToNearestBadGoing,
+        isLurkerIsolated,
+        findIsolatedLurkers
     };
 }));

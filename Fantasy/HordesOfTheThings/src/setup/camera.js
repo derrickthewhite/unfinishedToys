@@ -27,7 +27,7 @@
                 return this.state.setupCameras[key];
             },
 
-            setupScreenToWorld(event, key, canvas) {
+            setupScreenToView(event, key, canvas) {
                 const rect = canvas.getBoundingClientRect();
                 const camera = this.getSetupCamera(key);
                 return {
@@ -36,12 +36,20 @@
                 };
             },
 
+            setupScreenToWorld(event, key, canvas) {
+                const view = this.setupScreenToView(event, key, canvas);
+                if (key === 'deployment' && typeof this.viewToWorld === 'function') {
+                    return this.viewToWorld(view);
+                }
+                return view;
+            },
+
             zoomSetupAt(event, key, canvas) {
                 const camera = this.getSetupCamera(key);
                 const factor = event.deltaY > 0 ? 0.9 : 1.1;
-                const before = this.setupScreenToWorld(event, key, canvas);
+                const before = this.setupScreenToView(event, key, canvas);
                 camera.scale = geometry.clamp(camera.scale * factor, camera.minScale, camera.maxScale);
-                const after = this.setupScreenToWorld(event, key, canvas);
+                const after = this.setupScreenToView(event, key, canvas);
                 camera.x += before.x - after.x;
                 camera.y += before.y - after.y;
             },
@@ -71,6 +79,9 @@
                 ctx.scale(camera.scale, camera.scale);
                 ctx.translate(-camera.x, -camera.y);
                 this.state.camera = camera;
+                if (key === 'deployment' && typeof this.applyBoardViewRotation === 'function') {
+                    this.applyBoardViewRotation(ctx);
+                }
                 try {
                     draw();
                 } finally {

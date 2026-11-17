@@ -376,3 +376,98 @@ test('resolving shooting asks for confirmation when undeclared shooters remain',
     assert.equal(app.state.confirmation, null);
     assert.notEqual(app.state.phase, 'shooting');
 });
+
+test('magician hold-shot spends 2 PIPs now and makes the later declare free', () => {
+    const magician = createUnit('Magician', 'player-1', 280, 520, 0, 'mag');
+    const hero = createUnit('Hero', 'player-2', 280, 400, Math.PI, 'hero');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            remainingMoves: 4,
+            units: [magician, hero],
+            selectedIds: ['mag']
+        }
+    });
+    app.updateSelectionAnalysis();
+    const hold = app.getSelectionHandles().find((handle) => handle.kind === 'hold-shot');
+    assert.ok(hold);
+
+    app.holdMagicianShot();
+    assert.equal(magician.heldShot, true);
+    assert.equal(app.state.remainingMoves, 2);
+    assert.equal(app.getSelectionHandles().some((handle) => handle.kind === 'release-shot'), true);
+
+    app.releaseMagicianShot();
+    assert.equal(magician.heldShot, false);
+    assert.equal(app.state.remainingMoves, 4);
+
+    app.holdMagicianShot();
+    app.endMovePhase();
+    assert.equal(app.state.phase, 'shooting');
+    assert.equal(app.state.remainingMoves, 2);
+    assert.equal(app.getShootingDeclareCost(magician, false), 0);
+    assert.equal(app.needsShootingDeclaration(magician), true);
+
+    app.handleShootingClick(magician);
+    app.handleShootingClick(hero);
+    assert.equal(app.state.shooting.attacksByAttacker.mag, 'hero');
+    assert.equal(app.state.remainingMoves, 2);
+});
+
+test('selected magicians keep a lower-right shoot handle in a mixed formation', () => {
+    const magician = createUnit('Magician', 'player-1', 200, 520, 0, 'mag');
+    const blade = createUnit('Blade', 'player-1', 240, 520, 0, 'blade');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            remainingMoves: 4,
+            units: [magician, blade],
+            selectedIds: ['mag', 'blade']
+        }
+    });
+    app.updateSelectionAnalysis();
+    const holds = app.getSelectionHandles().filter((handle) => handle.kind === 'hold-shot');
+    assert.equal(holds.length, 1);
+    assert.equal(holds[0].unitId, 'mag');
+    const center = geometry.getUnitCenter(magician);
+    const right = geometry.getRightVector(magician.rotation);
+    const forward = geometry.getForwardVector(magician.rotation);
+    const expected = geometry.add(
+        geometry.add(center, geometry.scaleVector(right, magician.width * 0.28)),
+        geometry.scaleVector(forward, -(magician.depth * 0.18))
+    );
+    assert.deepEqual(holds[0].position, expected);
+
+    app.holdMagicianShot('mag');
+    assert.equal(magician.heldShot, true);
+    assert.equal(app.state.remainingMoves, 2);
+    assert.ok(app.getSelectionHandles().some((handle) => handle.kind === 'release-shot' && handle.unitId === 'mag'));
+});
+
+test('each selected magician gets its own shoot handle', () => {
+    const magA = createUnit('Magician', 'player-1', 200, 520, 0, 'mag-a');
+    const magB = createUnit('Magician', 'player-1', 240, 520, 0, 'mag-b');
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            remainingMoves: 4,
+            units: [magA, magB],
+            selectedIds: ['mag-a', 'mag-b']
+        }
+    });
+    app.updateSelectionAnalysis();
+    const holds = app.getSelectionHandles().filter((handle) => handle.kind === 'hold-shot');
+    assert.equal(holds.length, 2);
+    assert.deepEqual(holds.map((handle) => handle.unitId).sort(), ['mag-a', 'mag-b']);
+
+    app.holdMagicianShot('mag-a');
+    assert.equal(magA.heldShot, true);
+    assert.ok(!magB.heldShot);
+    assert.equal(app.state.remainingMoves, 2);
+    const after = app.getSelectionHandles();
+    assert.ok(after.some((handle) => handle.kind === 'release-shot' && handle.unitId === 'mag-a'));
+    assert.ok(after.some((handle) => handle.kind === 'hold-shot' && handle.unitId === 'mag-b'));
+});

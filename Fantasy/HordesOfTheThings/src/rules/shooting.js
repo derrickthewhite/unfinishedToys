@@ -526,6 +526,7 @@
 
         const destroyedIds = new Set();
         const ensorcelledIds = new Map();
+        const lurkerReturnedIds = new Set();
         const recoils = [];
         let baseFellPlayerId = null;
         results.forEach((result) => {
@@ -542,6 +543,10 @@
             }
             if (result.outcome === 'ensorcel') {
                 ensorcelledIds.set(result.loserId, result.winnerId);
+                return;
+            }
+            if (result.outcome === 'lurk-return') {
+                lurkerReturnedIds.add(result.loserId);
                 return;
             }
             if (result.outcome === 'recoil' || result.outcome === 'flee') {
@@ -562,7 +567,9 @@
             }
         });
 
-        let mutableUnits = units.map(cloneUnit).filter((unit) => !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id));
+        let mutableUnits = units.map(cloneUnit).filter((unit) => (
+            !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id) && !lurkerReturnedIds.has(unit.id)
+        ));
         recoils.forEach((entry) => {
             const unitId = entry.unitId;
             if (destroyedIds.has(unitId)) {
@@ -606,10 +613,17 @@
             const unit = units.find((entry) => entry.id === unitId);
             return unit ? buildEnsorcelledUnit(unit, ensorcelledByUnitId) : null;
         }).filter(Boolean);
+        const lurkerReturnedUnits = [...lurkerReturnedIds].map((unitId) => {
+            const unit = units.find((entry) => entry.id === unitId);
+            return unit ? { ...cloneUnit(unit), lurkerReturnReason: 'combat' } : null;
+        }).filter(Boolean);
         return {
-            units: mutableUnits.filter((unit) => !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id)),
+            units: mutableUnits.filter((unit) => (
+                !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id) && !lurkerReturnedIds.has(unit.id)
+            )),
             destroyedUnits,
             ensorcelledUnits,
+            lurkerReturnedUnits,
             results,
             recoilDestructions,
             baseFellPlayerId,

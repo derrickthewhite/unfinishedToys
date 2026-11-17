@@ -1925,6 +1925,16 @@ test('resolveShooting does not make the shooting attacker lose the exchange', ()
     assert.equal(result.units.find((unit) => unit.id === 's1').y, 220);
 });
 
+test('artillery destroys a Hero on a minor win in shooting or melee', () => {
+    const artillery = createUnit('Artillery', 'red', 140, 220, Math.PI);
+    const hero = createUnit('Hero', 'blue', 100, 220, 0);
+    const terrain = { roads: [], features: [] };
+
+    assert.equal(rules.getMinorLossResolution(artillery, hero, 'shooting', terrain).outcome, 'destroy');
+    assert.equal(rules.getMinorLossResolution(artillery, hero, 'melee', terrain).outcome, 'destroy');
+    assert.equal(rules.getMinorLossResolution(createUnit('Blade', 'red', 140, 220, Math.PI), hero, 'melee', terrain).outcome, 'recoil');
+});
+
 test('artillery is destroyed on a minor melee loss', () => {
     const winner = {
         type: 'Blade',
@@ -2573,6 +2583,7 @@ test('new unit templates use the requested stats and special profiles', () => {
     assert.equal(data.UNIT_TYPES.Flyers.moves.good, 1200);
     assert.equal(data.UNIT_TYPES.Flyers.depth, 30);
     assert.equal(data.UNIT_TYPES.Flyers.movement.ignoresTerrain, true);
+    assert.equal(data.UNIT_TYPES.Flyers.combat.moveCost, 2);
     assert.equal(data.UNIT_TYPES.Behemoth.value, 4);
     assert.deepEqual(data.UNIT_TYPES.Behemoth.strength, { infantry: 4, mounted: 5 });
     assert.deepEqual(data.UNIT_TYPES['Heavy-Spear'].strength, { infantry: 5, mounted: 5 });
@@ -2591,14 +2602,40 @@ test('heavy spear and heavy warband inherit combat loss rules without stacking',
     assert.equal(rules.getMinorLossResolution(createUnit('Knights', 'red', 0, 0, 0), heavySpear, 'melee', { roads: [], features: [] }).outcome, 'destroy');
 });
 
-test('Beasts ignore bad-going combat penalties and lose melee to mounted troops', () => {
+test('quick-kill summaries follow the combat table', () => {
+    const magician = rules.getTypeQuickKillInfo('Magician');
+    const heroKill = magician.kills.find((entry) => entry.label === 'Hero');
+    assert.equal(heroKill.note, 'ensorcelled, not destroyed');
+    assert.equal(magician.killed.find((entry) => entry.label === 'Hero').note, 'in melee');
+
+    const beasts = rules.getTypeQuickKillInfo('Beasts');
+    assert.ok(beasts.killed.some((entry) => entry.label === 'Mounted' && entry.note.includes('good going')));
+
+    const warband = rules.getTypeQuickKillInfo('Warband');
+    assert.ok(warband.killed.some((entry) => entry.label === 'Behemoth' && entry.note.includes('melee')));
+    assert.ok(rules.getTypeQuickKillInfo('Behemoth').kills.some((entry) => entry.label === 'Warband'));
+
+    const hero = rules.getTypeQuickKillInfo('Hero');
+    assert.ok(hero.killed.some((entry) => entry.label === 'Artillery'));
+    const bladeKilled = rules.getTypeQuickKillInfo('Blade').killed.filter((entry) => entry.label === 'Warband');
+    assert.equal(bladeKilled.length, 1);
+    assert.equal(bladeKilled[0].note, '');
+
+    const flyers = rules.getTypeQuickKillInfo('Flyers');
+    assert.ok(flyers.killed.some((entry) => entry.label === 'Hero' && entry.note === 'when doubled'));
+});
+
+test('Beasts ignore bad-going combat penalties and are not destroyed by mounted in bad going', () => {
     const beasts = createUnit('Beasts', 'blue', 100, 220, 0);
-    const terrain = { roads: [], features: [{ kind: 'swamp', cx: 100, cy: 220, rx: 30, ry: 30, wobble: 0 }] };
-    const modifiers = rules.getCombatModifiers({ phase: 'melee', role: 'attacker', unit: beasts, opponent: createUnit('Blade', 'red', 140, 220, Math.PI), terrain });
+    const swamp = { roads: [], features: [{ kind: 'swamp', cx: 100, cy: 220, rx: 30, ry: 30, wobble: 0 }] };
+    const open = { roads: [], features: [] };
+    const knights = createUnit('Knights', 'red', 140, 220, Math.PI);
+    const modifiers = rules.getCombatModifiers({ phase: 'melee', role: 'attacker', unit: beasts, opponent: createUnit('Blade', 'red', 140, 220, Math.PI), terrain: swamp });
 
     assert.equal(modifiers.some((modifier) => modifier.id === 'bad-going'), false);
-    assert.equal(rules.getMinorLossResolution(createUnit('Knights', 'red', 140, 220, Math.PI), beasts, 'melee', terrain).outcome, 'destroy');
-    assert.equal(rules.getMinorLossResolution(createUnit('Knights', 'red', 140, 220, Math.PI), beasts, 'shooting', terrain).outcome, 'recoil');
+    assert.equal(rules.getMinorLossResolution(knights, beasts, 'melee', swamp).outcome, 'recoil');
+    assert.equal(rules.getMinorLossResolution(knights, beasts, 'melee', open).outcome, 'destroy');
+    assert.equal(rules.getMinorLossResolution(knights, beasts, 'shooting', swamp).outcome, 'recoil');
 });
 
 test('a unit standing in bad going takes the terrain penalty once', () => {
@@ -2759,4 +2796,22 @@ test('Behemoths flee only when Artillery wins the combat', () => {
     assert.equal(melee.results[0].outcome, 'flee');
     assert.equal(melee.units.find((unit) => unit.id === behemoth.id).y, 410);
     assert.equal(rules.getMinorLossResolution(createUnit('Blade', 'red', 140, 220, Math.PI), behemoth, 'melee', terrain).outcome, 'recoil');
+});
+
+test('Behemoths destroy Warbands on a minor melee win', () => {
+    const terrain = { roads: [], features: [] };
+    const behemoth = createUnit('Behemoth', 'red', 140, 220, Math.PI);
+    const warband = createUnit('Warband', 'blue', 100, 220, 0);
+    const heavyWarband = createUnit('Heavy-Warband', 'blue', 100, 220, 0);
+
+    assert.equal(rules.getMinorLossResolution(behemoth, warband, 'melee', terrain).outcome, 'destroy');
+    assert.equal(rules.getMinorLossResolution(behemoth, heavyWarband, 'melee', terrain).outcome, 'destroy');
+    assert.equal(rules.getMinorLossResolution(behemoth, warband, 'shooting', terrain).outcome, 'recoil');
+    assert.equal(rules.getMinorLossResolution(createUnit('Blade', 'red', 140, 220, Math.PI), warband, 'melee', terrain).outcome, 'recoil');
+});
+
+test('Flyers cost 2 PIPs to move', () => {
+    const flyer = createUnit('Flyers', 'blue', 100, 220, 0);
+    assert.equal(rules.getMoveCost(flyer), 2);
+    assert.equal(rules.getDraftMoveCost([flyer.id], [flyer]), 2);
 });

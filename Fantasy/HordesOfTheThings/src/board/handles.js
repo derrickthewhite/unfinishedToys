@@ -17,7 +17,7 @@
             if (selectedUnits.length === 0) {
                 return false;
             }
-            if (selectedUnits.some((unit) => unit.combat?.stationary)) {
+            if (selectedUnits.some((unit) => unit.combat?.stationary || unit.lockedInPlace)) {
                 return false;
             }
             if (this.state.setupStage === 'unit-deployment') {
@@ -58,7 +58,13 @@
 
 
         getSelectionHandles() {
-            return this.withFinishMoveHandle(this.getBaseSelectionHandles());
+            const handles = this.withFinishMoveHandle(this.getBaseSelectionHandles());
+            handles.push(...this.getHoldIntentHandles());
+            const step = this.getStepMoveHandle();
+            if (step) {
+                handles.push(step);
+            }
+            return handles;
         }
 
 
@@ -269,6 +275,109 @@
                 kind: 'finish-move',
                 radius,
                 position: geometry.add(center, geometry.scaleVector(forward, -backOffset)),
+                rotation: Math.atan2(forward.y, forward.x)
+            };
+        }
+
+
+        getHoldIntentKind(unit) {
+            if (!unit) {
+                return null;
+            }
+            if (unit.type === 'Magician') {
+                if (unit.heldShot) {
+                    return 'release-shot';
+                }
+                if (this.state.remainingMoves < data.MAGICIAN_ATTACK_DECLARE_COST) {
+                    return null;
+                }
+                if (this.state.draft) {
+                    return null;
+                }
+                return 'hold-shot';
+            }
+            if (unit.type === 'Artillery') {
+                if (unit.lockedInPlace) {
+                    return 'unlock-unit';
+                }
+                if (this.state.draft) {
+                    return null;
+                }
+                return 'lock-unit';
+            }
+            return null;
+        }
+
+        getHoldIntentHandle() {
+            return this.getHoldIntentHandles()[0] || null;
+        }
+
+        getHoldIntentHandles() {
+            if (this.state.mode !== 'game' || this.state.phase !== 'move' || this.state.setupStage === 'unit-deployment') {
+                return [];
+            }
+            if (typeof this.canLocallyControl === 'function' && !this.canLocallyControl(this.state.activePlayerId)) {
+                return [];
+            }
+            return this.getSelectedUnits().flatMap((unit) => {
+                if (this.getUnitPlayerId(unit) !== this.state.activePlayerId || this.isUnitInReserve(unit.id)) {
+                    return [];
+                }
+                const kind = this.getHoldIntentKind(unit);
+                if (!kind) {
+                    return [];
+                }
+                const center = geometry.getUnitCenter(unit);
+                const right = geometry.getRightVector(unit.rotation);
+                const forward = geometry.getForwardVector(unit.rotation);
+                const onUnit = geometry.add(
+                    geometry.add(center, geometry.scaleVector(right, unit.width * 0.28)),
+                    geometry.scaleVector(forward, -(unit.depth * 0.18))
+                );
+                return [{
+                    kind,
+                    unitId: unit.id,
+                    radius: data.HANDLE_RADIUS,
+                    position: onUnit,
+                    rotation: Math.atan2(forward.y, forward.x)
+                }];
+            });
+        }
+
+
+        shouldShowStepMoveHandle() {
+            const draft = this.state.draft;
+            if (!draft || this.state.mode !== 'game' || this.state.phase !== 'move' || this.state.setupStage === 'unit-deployment') {
+                return false;
+            }
+            if (typeof this.canLocallyControl === 'function' && !this.canLocallyControl(this.state.activePlayerId)) {
+                return false;
+            }
+            if (draft.kind === 'reserve-deploy' || draft.kind === 'lurker-ambush' || this.isReserveDeployDraft()) {
+                return false;
+            }
+            if (this.state.selectionAnalysis.type !== 'single' || draft.invalidIds.size > 0) {
+                return false;
+            }
+            return true;
+        }
+
+
+        getStepMoveHandle() {
+            if (!this.shouldShowStepMoveHandle()) {
+                return null;
+            }
+            const unit = this.getUnitById(this.state.selectedIds[0] || this.state.draft?.unitIds?.[0]);
+            if (!unit) {
+                return null;
+            }
+            const center = geometry.getUnitCenter(unit);
+            const forward = geometry.getForwardVector(unit.rotation);
+            return {
+                kind: 'step-move',
+                unitId: unit.id,
+                radius: data.HANDLE_RADIUS,
+                position: geometry.add(center, geometry.scaleVector(forward, -((unit.depth / 2) + 36))),
                 rotation: Math.atan2(forward.y, forward.x)
             };
         }

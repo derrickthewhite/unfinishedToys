@@ -94,12 +94,16 @@
         }
 
 
-        snapSelection(unitIds) {
+            snapSelection(unitIds) {
             if (!this.state.snapEnabled) {
                 return;
             }
             const movingUnits = unitIds.map((unitId) => this.getUnitById(unitId)).filter(Boolean);
             if (movingUnits.length === 0) {
+                return;
+            }
+            if (this.state.draft?.kind === 'lurker-ambush' && typeof this.snapLurkerAmbush === 'function') {
+                this.snapLurkerAmbush(movingUnits[0]);
                 return;
             }
             const movingIdSet = new Set(unitIds);
@@ -159,6 +163,10 @@
             }
             if (selectedUnits.some((unit) => unit.movedThisTurn)) {
                 this.updateStatus('One or more selected units have already moved this turn.');
+                return false;
+            }
+            if (selectedUnits.some((unit) => unit.lockedInPlace)) {
+                this.updateStatus('Unlock this unit before moving it.');
                 return false;
             }
             if (this.state.remainingMoves <= 0) {
@@ -338,7 +346,7 @@
                 this.syncUiFromState();
                 return;
             }
-            if (this.isReserveDeployDraft()) {
+            if (this.isReserveDeployDraft() || this.state.draft.kind === 'lurker-ambush') {
                 const draftKind = this.state.draft.kind;
                 this.restoreReserveDeploy(this.state.draft);
                 this.state.draft = null;
@@ -348,7 +356,9 @@
                 if (showStatus) {
                     this.updateStatus(draftKind === 'ensorcelled-return'
                         ? 'Ensorcelled return cancelled.'
-                        : 'Reserve deployment cancelled.');
+                        : draftKind === 'lurker-ambush'
+                            ? 'Lurker ambush cancelled.'
+                            : 'Reserve deployment cancelled.');
                 }
                 return;
             }

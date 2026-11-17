@@ -220,3 +220,35 @@ test('isGameOver blocks further victory checks after the first declaration', () 
     endTurn(app);
     assert.equal(app.state.victory.winnerPlayerId, 'player-2');
 });
+
+test('the result window says Defeat when the only local human lost', () => {
+    const app = createAppHarness({
+        ui: {
+            victoryModal: { hidden: true },
+            victoryTitle: { textContent: '' },
+            victorySubtitle: { textContent: '' },
+            victoryReason: { textContent: '' }
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+    app.state.victory = {
+        reasonId: 'casualty-lead',
+        winnerPlayerId: 'player-2',
+        loserPlayerId: 'player-1',
+        loserLostPoints: 12,
+        winnerLostPoints: 2,
+        loserStartingValue: 24,
+        winnerStartingValue: 24,
+        representatives: {}
+    };
+
+    app.renderVictoryModal();
+    assert.equal(app.ui.victoryTitle.textContent, 'Defeat');
+    assert.equal(app.ui.victorySubtitle.textContent, 'The field is lost.');
+
+    app.state.players['player-2'].controller = 'local';
+    app.renderVictoryModal();
+    assert.equal(app.ui.victoryTitle.textContent, 'Red Undead Wins');
+    assert.equal(app.ui.victorySubtitle.textContent, 'The field is theirs.');
+});

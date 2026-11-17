@@ -55,6 +55,30 @@
             return Math.round(distanceMm / data.MM_PER_PACE) + 'p';
         }
 
+        formatMm(distanceMm) {
+            return `${Math.round(distanceMm)} mm`;
+        }
+
+        escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        statTip(label, tip) {
+            const text = this.escapeHtml(label);
+            if (!tip) {
+                return text;
+            }
+            return `<span class="stat-tip" data-tip="${this.escapeHtml(tip)}" tabindex="0">${text}</span>`;
+        }
+
+        joinStatItems(items) {
+            return items.map((item) => this.statTip(item.label, item.note)).join(', ');
+        }
+
         getSelectedBattleMarker() {
             if (!this.state.selectedBattleId || typeof this.getBattleStatMarkers !== 'function') {
                 return null;
@@ -71,73 +95,157 @@
                 const opponent = index === 0 ? marker.opponent : marker.active;
                 const playerLabel = this.getPlayerLabel(side.playerId);
                 const support = side.unitTypes.filter((_, unitIndex) => side.unitIds[unitIndex] !== side.primaryId);
-                details.push({
-                    label: `${playerLabel} ${side.primaryType}`,
-                    value: `Strength ${side.strength} vs ${opponent.troopClass}${support.length ? `; with ${support.join(', ')}` : ''}`
-                });
-                if (side.modifiers.length === 0) {
-                    details.push({
-                        label: `${playerLabel} bonuses`,
-                        value: 'None'
-                    });
-                } else {
-                    side.modifiers.forEach((modifier) => {
-                        details.push({
-                            label: `${playerLabel} ${modifier.label || modifier.id}`,
-                            value: modifier.detail
-                                ? `${rules.formatSignedModifier(modifier.value)} from ${modifier.detail}`
-                                : rules.formatSignedModifier(modifier.value)
-                        });
-                    });
-                }
-                details.push({
-                    label: `${playerLabel} factor`,
-                    value: String(side.factor)
-                });
+                const mods = side.modifiers.length
+                    ? side.modifiers.map((modifier) => (
+                        modifier.detail
+                            ? `${rules.formatSignedModifier(modifier.value)} ${modifier.label || modifier.id} from ${modifier.detail}`
+                            : `${rules.formatSignedModifier(modifier.value)} ${modifier.label || modifier.id}`
+                    )).join('; ')
+                    : 'no bonuses';
+                details.push(this.escapeHtml(
+                    `${playerLabel} ${side.primaryType} · ${side.strength} vs ${opponent.troopClass}`
+                    + `${support.length ? ` with ${support.join(', ')}` : ''} · factor ${side.factor} · ${mods}`
+                ));
             });
             const delta = marker.relative;
-            const leader = delta === 0
+            details.push(this.escapeHtml(delta === 0
                 ? 'Even before dice'
-                : `${this.getPlayerLabel(delta > 0 ? marker.active.playerId : marker.opponent.playerId)} ${rules.formatSignedModifier(Math.abs(delta))} before dice`;
-            details.push({
-                label: 'Relative',
-                value: leader
-            });
+                : `${this.getPlayerLabel(delta > 0 ? marker.active.playerId : marker.opponent.playerId)} ${rules.formatSignedModifier(Math.abs(delta))} before dice`));
             return details;
+        }
+
+        getSelectedUnitTags(unit) {
+            const tags = [];
+            if (rules.isMagicianUnit(unit)) {
+                tags.push({
+                    label: 'Ensorcellment',
+                    note: 'Self-ensorcels on a shooting roll of 1. Ensorcelled units may return to the battlefield for 6 PIPs.'
+                });
+            }
+            const moveCost = rules.getMoveCost(unit);
+            if (Number.isFinite(moveCost) && moveCost > 1) {
+                tags.push({
+                    label: `${moveCost} PIP move`,
+                    note: `This unit requires ${moveCost} PIPs for each move.`
+                });
+            }
+            if (unit.combat?.ignoresBadGoingPenalty) {
+                tags.push({
+                    label: 'Ignores bad going',
+                    note: 'No −2 combat penalty in forest or swamp.'
+                });
+            }
+            if (unit.movement?.ignoresTerrain) {
+                tags.push({
+                    label: 'Ignores terrain',
+                    note: 'Moves through all terrain, including water and impassable.'
+                });
+            }
+            if (unit.movement?.ignoresUnitsWhenUnengaged) {
+                tags.push({
+                    label: 'Non-blocking',
+                    note: 'Unengaged, this Flyer and other units may overlap.'
+                });
+            }
+            if (data.RESERVE_RECYCLE_TYPES.includes(unit.type)) {
+                tags.push({
+                    label: 'Returns to reserve',
+                    note: 'Destroyed Hordes go to reserve and may redeploy from the home edge.'
+                });
+            }
+            if (data.isLurkerType(unit.type)) {
+                tags.push({
+                    label: 'Lurker',
+                    note: 'Starts in reserve. Ambush an enemy that entered forest or swamp, then stay in bad going. A minor loss or isolation at 600 paces sends them back to reserve.'
+                });
+            }
+            if (unit.type === 'Spear' || unit.type === 'Warband') {
+                tags.push({
+                    label: 'Can stack',
+                    note: 'Two same-type elements can stack for +1 in melee.'
+                });
+            }
+            if (unit.combat?.stationary) {
+                tags.push({
+                    label: 'Stationary',
+                    note: 'This unit cannot move.'
+                });
+            }
+            if (unit.combat?.lossEndsGame) {
+                tags.push({
+                    label: 'Loss ends the battle',
+                    note: 'If this base loses a conflict, its army loses immediately.'
+                });
+            }
+            return tags;
+        }
+
+        formatTroopClass(troopClass) {
+            if (!troopClass) {
+                return '';
+            }
+            return troopClass.charAt(0).toUpperCase() + troopClass.slice(1);
+        }
+
+        selectionMoveCell(label, distanceMm, tip) {
+            return `
+                <div class="selection-move-cell">
+                    <span class="selection-move-label">${this.escapeHtml(label)}</span>
+                    ${this.statTip(this.formatPaces(distanceMm), tip)}
+                </div>`;
+        }
+
+        selectionMatchupRow(kind, label, items) {
+            const body = items.length ? this.joinStatItems(items) : '—';
+            return `
+                <div class="selection-matchup-row ${kind}">
+                    <span class="selection-matchup-label">${this.escapeHtml(label)}</span>
+                    <span>${body}</span>
+                </div>`;
         }
 
         getSelectedUnitDetails(unit) {
             if (!unit) {
-                return [];
+                return '';
             }
-            const movement = unit.combat?.stationary
-                ? 'Stationary'
-                : [
-                    `Road ${this.formatPaces(unit.moves.road)}`,
-                    `Good ${this.formatPaces(unit.moves.good)}`,
-                    `Bad ${this.formatPaces(unit.moves.bad)}`,
-                    `Water ${this.formatPaces(unit.moves.water)}`
-                ].join(' / ');
-            const ranged = unit.ranged
-                ? `${this.formatPaces(unit.ranged.range)} range, ${unit.ranged.width || data.SHOOTING_BOX_WIDTH}mm frontage`
-                : 'None';
-            const details = [
-                { label: 'Player', value: this.getPlayerLabel(this.getUnitPlayerId(unit)) },
-                { label: 'Class', value: unit.troopClass },
-                { label: 'AP', value: String(unit.value) },
-                { label: 'Strength', value: `Infantry ${unit.strength.infantry}, Mounted ${unit.strength.mounted}` },
-                { label: 'Move', value: movement },
-                { label: 'Ranged', value: ranged },
-                { label: 'Bad Going', value: unit.combat?.ignoresBadGoingPenalty ? 'Ignores penalty' : 'Normal penalty' }
-            ];
-            if (unit.combat?.lossEndsGame) {
-                details.push({ label: 'Base', value: 'Losing a conflict loses the battle' });
+            const troopClass = this.formatTroopClass(unit.troopClass);
+            const combat = unit.strength
+                ? `${this.statTip(`+${unit.strength.infantry}`, 'vs infantry')} / ${this.statTip(`+${unit.strength.mounted}`, 'vs mounted')}`
+                : '';
+            let rangeRow = '';
+            if (unit.ranged) {
+                const range = this.formatPaces(unit.ranged.range);
+                if (unit.ranged.magician) {
+                    rangeRow = `
+                        <div class="selection-combat-row">
+                            <span>Range</span>
+                            <span class="selection-combat-val">${this.statTip(range, 'Casters may target in any direction. Costs 2 PIPs to shoot.')} caster</span>
+                        </div>`;
+                } else {
+                    const width = unit.ranged.width || data.SHOOTING_BOX_WIDTH;
+                    const shotTip = unit.ranged.requiresStationary
+                        ? `Own turn only, and only if it did not move. ${width}mm firing box.`
+                        : `${width}mm firing box. Shooters may fire in each shooting phase.`;
+                    rangeRow = `
+                        <div class="selection-combat-row">
+                            <span>Range</span>
+                            <span class="selection-combat-val">${this.statTip(range, shotTip)}</span>
+                        </div>`;
+                }
             }
-            if (rules.isMagicianUnit(unit)) {
-                details.push({
-                    label: 'Action cost',
-                    value: `${rules.getMoveCost(unit)} moves to move, ${rules.getAttackDeclareCost(unit)} to declare an attack`
-                });
+            const moveGrid = unit.combat?.stationary || !unit.moves
+                ? '<div class="selection-stationary">Stationary</div>'
+                : `<div class="selection-move-grid">
+                    ${this.selectionMoveCell('Road', unit.moves.road, `on roads, ${this.formatMm(unit.moves.road)}`)}
+                    ${this.selectionMoveCell('Good', unit.moves.good, `on good going, ${this.formatMm(unit.moves.good)}`)}
+                    ${this.selectionMoveCell('Bad', unit.moves.bad, `on bad going, ${this.formatMm(unit.moves.bad)}`)}
+                    ${this.selectionMoveCell('Water', unit.moves.water, `in water, ${this.formatMm(unit.moves.water)}`)}
+                </div>`;
+            const quick = rules.getTypeQuickKillInfo(unit.type);
+            const tags = this.getSelectedUnitTags(unit);
+            let extra = '';
+            if (tags.length) {
+                extra += this.selectionMatchupRow('tags', 'Tags:', tags);
             }
             if (unit.ensorcelledByUnitId !== undefined) {
                 let ensorcellerLabel;
@@ -149,9 +257,26 @@
                         ? `${ensorceller.type} (${this.getPlayerLabel(this.getUnitPlayerId(ensorceller))})`
                         : 'Unknown (destroyed or in reserve)';
                 }
-                details.push({ label: 'Ensorcelled by', value: ensorcellerLabel });
+                extra += this.selectionMatchupRow('killed', 'Ensorcelled by', [{ label: ensorcellerLabel, note: '' }]);
             }
-            return details;
+            return `
+                <div class="selection-meta">
+                    <span>${this.statTip(`${unit.width}mm`, 'width')} × ${this.statTip(`${unit.depth}mm`, 'depth')}</span>
+                    <span>${this.statTip(troopClass, 'class')}</span>
+                </div>
+                <div class="selection-stats-box">
+                    <div class="selection-combat-row">
+                        <span>Combat Factor</span>
+                        <span class="selection-combat-val">${combat}</span>
+                    </div>
+                    ${rangeRow}
+                    ${moveGrid}
+                </div>
+                <div class="selection-matchups">
+                    ${this.selectionMatchupRow('kills', 'Quick Kills:', quick.kills)}
+                    ${this.selectionMatchupRow('killed', 'Quick Killed:', quick.killed)}
+                    ${extra}
+                </div>`;
         }
 
         renderSelectionInfo() {
@@ -168,9 +293,9 @@
             }
 
             const unit = battle ? null : this.getInspectedUnit();
-            const details = battle ? this.getSelectedBattleDetails(battle) : this.getSelectedUnitDetails(unit);
             const hasContent = Boolean(battle || unit);
             this.ui.selectionPanel.classList.toggle('is-empty', !hasContent);
+            this.ui.selectionPanel.classList.toggle('is-battle', Boolean(battle));
 
             if (this.ui.selectionPanelPortrait) {
                 this.ui.selectionPanelPortrait.hidden = !unit;
@@ -197,28 +322,36 @@
             if (this.ui.selectionPanelEyebrow) {
                 this.ui.selectionPanelEyebrow.textContent = battle
                     ? 'Battle stats'
-                    : (unit ? this.getPlayerLabel(this.getUnitPlayerId(unit)) + ' unit' : 'Selection');
+                    : (unit ? `${this.getPlayerLabel(this.getUnitPlayerId(unit))} Unit` : 'Selection');
             }
             if (this.ui.selectionPanelTitle) {
                 this.ui.selectionPanelTitle.textContent = battle
                     ? `${this.getPlayerLabel(battle.active.playerId)} ${battle.label}`
                     : (unit ? unit.type : 'No unit selected');
             }
+            if (this.ui.selectionPanelAp) {
+                this.ui.selectionPanelAp.hidden = !unit;
+                this.ui.selectionPanelAp.innerHTML = unit
+                    ? this.statTip(`${unit.value} AP`, 'army points')
+                    : '';
+            }
             if (this.ui.selectionPanelHint) {
+                this.ui.selectionPanelHint.hidden = Boolean(unit);
                 this.ui.selectionPanelHint.textContent = battle
                     ? 'Factors before dice. Active side listed first. Click another marker or a unit to change the inspect target.'
-                    : (unit
-                        ? `${unit.width}mm frontage, ${unit.depth}mm depth.`
-                        : 'Select a single unit to inspect its stats.');
+                    : (unit ? '' : 'Select a single unit to inspect its stats.');
             }
             if (this.ui.selectionPanelStats) {
                 this.ui.selectionPanelStats.hidden = !hasContent;
-                this.ui.selectionPanelStats.innerHTML = details.map((entry) => (`
-                    <div class="selection-stat">
-                        <dt>${entry.label}</dt>
-                        <dd>${entry.value}</dd>
-                    </div>
-                `)).join('');
+                if (battle) {
+                    this.ui.selectionPanelStats.innerHTML = this.getSelectedBattleDetails(battle).map((entry) => (
+                        `<p class="selection-stat-line">${entry}</p>`
+                    )).join('');
+                } else if (unit) {
+                    this.ui.selectionPanelStats.innerHTML = this.getSelectedUnitDetails(unit);
+                } else {
+                    this.ui.selectionPanelStats.innerHTML = '';
+                }
             }
         }
     }

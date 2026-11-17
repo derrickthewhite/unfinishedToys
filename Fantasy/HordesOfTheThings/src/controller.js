@@ -44,6 +44,11 @@
                 return data.PLAYER_IDS.some((playerId) => this.isLocalPlayer(playerId));
             },
 
+            getSoleLocalPlayerId() {
+                const locals = data.PLAYER_IDS.filter((playerId) => this.isLocalPlayer(playerId));
+                return locals.length === 1 ? locals[0] : null;
+            },
+
             hasComputerPlayer() {
                 return data.PLAYER_IDS.some((playerId) => this.isComputerPlayer(playerId));
             },

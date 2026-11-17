@@ -8,7 +8,7 @@ Project work. Intended rules that are not in the prototype yet are specified in 
 - [ ] Rivers as a distinct feature, including crossing and road/bridge precedence
 - [ ] Crooked and forked roads — check the current strip sampling before adding either shape
 - [ ] Retreat as a combat result (backward a specified distance, limited maneuver)
-- [ ] Lurkers as a reserve type
+- [x] Lurkers as a reserve type
 
 ## Prototype
 

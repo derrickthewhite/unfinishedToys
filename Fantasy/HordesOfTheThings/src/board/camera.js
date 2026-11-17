@@ -12,7 +12,49 @@
     root.HordesBoardCamera = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesFormation);
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, formation) {
     class Methods {
-        screenToWorld(screenX, screenY) {
+        getBoardViewCenter() {
+            return { x: data.BOARD_SIZE / 2, y: data.BOARD_SIZE / 2 };
+        }
+
+        rotateBoardViewPoint(point) {
+            const center = this.getBoardViewCenter();
+            return {
+                x: (center.x * 2) - point.x,
+                y: (center.y * 2) - point.y
+            };
+        }
+
+        viewToWorld(point) {
+            if (!this.isBoardViewFlipped()) {
+                return { x: point.x, y: point.y };
+            }
+            return this.rotateBoardViewPoint(point);
+        }
+
+        worldToView(point) {
+            return this.viewToWorld(point);
+        }
+
+        remapCameraForBoardFlip(camera) {
+            if (!camera) {
+                return;
+            }
+            const flipped = this.rotateBoardViewPoint(camera);
+            camera.x = flipped.x;
+            camera.y = flipped.y;
+        }
+
+        applyBoardViewRotation(ctx) {
+            if (!this.isBoardViewFlipped()) {
+                return;
+            }
+            const center = this.getBoardViewCenter();
+            ctx.translate(center.x, center.y);
+            ctx.rotate(Math.PI);
+            ctx.translate(-center.x, -center.y);
+        }
+
+        screenToView(screenX, screenY) {
             const rect = this.canvas.getBoundingClientRect();
             const localX = screenX - rect.left;
             const localY = screenY - rect.top;
@@ -22,21 +64,24 @@
             };
         }
 
+        screenToWorld(screenX, screenY) {
+            return this.viewToWorld(this.screenToView(screenX, screenY));
+        }
 
         worldToScreen(worldX, worldY) {
+            const view = this.worldToView({ x: worldX, y: worldY });
             const rect = this.canvas.getBoundingClientRect();
             return {
-                x: (worldX - this.state.camera.x) * this.state.camera.scale + rect.width / 2,
-                y: (worldY - this.state.camera.y) * this.state.camera.scale + rect.height / 2
+                x: (view.x - this.state.camera.x) * this.state.camera.scale + rect.width / 2,
+                y: (view.y - this.state.camera.y) * this.state.camera.scale + rect.height / 2
             };
         }
 
-
         zoomAt(screenX, screenY, factor) {
             const rect = this.canvas.getBoundingClientRect();
-            const before = this.screenToWorld(screenX + rect.left, screenY + rect.top);
+            const before = this.screenToView(screenX + rect.left, screenY + rect.top);
             this.state.camera.scale = geometry.clamp(this.state.camera.scale * factor, this.state.camera.minScale, this.state.camera.maxScale);
-            const after = this.screenToWorld(screenX + rect.left, screenY + rect.top);
+            const after = this.screenToView(screenX + rect.left, screenY + rect.top);
             this.state.camera.x += before.x - after.x;
             this.state.camera.y += before.y - after.y;
             this.requestRender();

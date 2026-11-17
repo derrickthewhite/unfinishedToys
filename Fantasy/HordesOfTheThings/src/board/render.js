@@ -10,6 +10,19 @@
     root.HordesBoardRender = factory(root.HordesData, root.HordesGeometry, root.HordesRules);
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules) {
     const EVAL_MIN_BENEFIT = 0.2;
+    const DEFAULT_FACTION_ART = Object.freeze({
+        background: '#cab88e',
+        bootPrints: 'dark'
+    });
+    const LIGHT_BOOT_FACTIONS = new Set(['Goblin', 'Undead']);
+    const MOVED_BOOT_COLORS = Object.freeze({
+        dark: { color: 'rgb(112, 112, 112)', alpha: 0.48 },
+        light: { color: 'rgb(200,200,200)', alpha: .72 }
+    });
+    const NO_MOVE_BOOT_COLORS = Object.freeze({
+        dark: { color: 'rgb(112, 112, 112)', alpha: 0.48 },
+        light: { color: 'rgb(200,200,200)', alpha: .72 }
+    });
 
     const UNIT_ASSET_PATHS = Object.freeze({
         Blade: 'assets/Blade.svg',
@@ -26,7 +39,8 @@
         Beasts: 'assets/Beasts.svg',
         Flyers: 'assets/Flyers.svg',
         Behemoth: 'assets/Behemoth.svg',
-        Artillery: 'assets/Artillery.svg'
+        Artillery: 'assets/Artillery.svg',
+        Lurkers: 'assets/dinosaurs/Lurkers.svg'
     });
 
     class BoardRenderMethods {
@@ -58,6 +72,9 @@
             ctx.translate(rect.width / 2, rect.height / 2);
             ctx.scale(this.state.camera.scale, this.state.camera.scale);
             ctx.translate(-this.state.camera.x, -this.state.camera.y);
+            if (typeof this.applyBoardViewRotation === 'function') {
+                this.applyBoardViewRotation(ctx);
+            }
             this.drawBoard(ctx);
             this.drawReserveZones(ctx);
             this.drawTerrain(ctx);
@@ -488,24 +505,86 @@
                 if (!leftUnit || !rightUnit) {
                     return;
                 }
+                const sides = this.orderCombatReportSides(leftUnit, leftTotal, rightUnit, rightTotal);
                 const labelPosition = geometry.midpoint(geometry.getUnitCenter(leftUnit), geometry.getUnitCenter(rightUnit));
+                const flipped = typeof this.isBoardViewFlipped === 'function' && this.isBoardViewFlipped();
                 ctx.save();
-                ctx.fillStyle = 'rgba(255, 249, 236, 0.94)';
+                if (flipped) {
+                    ctx.translate(labelPosition.x, labelPosition.y);
+                    ctx.rotate(Math.PI);
+                }
+                const originX = flipped ? 0 : labelPosition.x;
+                const originY = flipped ? 0 : labelPosition.y;
                 ctx.strokeStyle = 'rgba(55, 45, 36, 0.35)';
-                ctx.lineWidth = 1 / this.state.camera.scale;
-                const width = 42 / this.state.camera.scale;
-                const height = 14 / this.state.camera.scale;
+                ctx.lineWidth = 0.7;
+                const width = 22;
+                const height = 8;
+                const radius = 1.8;
                 ctx.beginPath();
-                ctx.roundRect(labelPosition.x - width / 2, labelPosition.y - height / 2, width, height, 4 / this.state.camera.scale);
+                ctx.roundRect(originX - width / 2, originY - height / 2, width, height, radius);
+                ctx.fillStyle = 'rgba(255, 247, 221, 0.9)';
+                ctx.fill();
+                ctx.fillStyle = this.getCombatReportFill(ctx, sides, { x: originX, y: originY }, width, height);
                 ctx.fill();
                 ctx.stroke();
-                ctx.font = `${10 / this.state.camera.scale}px Georgia`;
+                ctx.font = '5.6px Georgia';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = '#6e231c';
-                ctx.fillText(`${leftTotal} vs ${rightTotal}`, labelPosition.x, labelPosition.y);
+                ctx.fillText(`${sides.firstTotal} vs ${sides.secondTotal}`, originX, originY);
                 ctx.restore();
             });
+        }
+
+        orderCombatReportSides(leftUnit, leftTotal, rightUnit, rightTotal) {
+            const bottomPlayerId = typeof this.getBoardViewBottomPlayerId === 'function'
+                ? this.getBoardViewBottomPlayerId()
+                : 'player-1';
+            const leftPlayerId = this.getUnitPlayerId(leftUnit);
+            const rightPlayerId = this.getUnitPlayerId(rightUnit);
+            if (rightPlayerId === bottomPlayerId && leftPlayerId !== bottomPlayerId) {
+                return {
+                    firstTotal: rightTotal,
+                    secondTotal: leftTotal,
+                    firstPlayerId: rightPlayerId,
+                    secondPlayerId: leftPlayerId
+                };
+            }
+            return {
+                firstTotal: leftTotal,
+                secondTotal: rightTotal,
+                firstPlayerId: leftPlayerId,
+                secondPlayerId: rightPlayerId
+            };
+        }
+
+        getCombatReportFill(ctx, sides, labelPosition, width, height) {
+            const first = this.playerFillRgba(sides.firstPlayerId, 0.34);
+            const second = this.playerFillRgba(sides.secondPlayerId, 0.34);
+            if (typeof ctx.createLinearGradient !== 'function') {
+                return first;
+            }
+            const gradient = ctx.createLinearGradient(
+                labelPosition.x - width / 2,
+                labelPosition.y,
+                labelPosition.x + width / 2,
+                labelPosition.y
+            );
+            gradient.addColorStop(0, first);
+            gradient.addColorStop(1, second);
+            return gradient;
+        }
+
+        playerFillRgba(playerId, alpha) {
+            const fill = this.getPlayerColors(playerId)?.fill || '#cab88e';
+            const hex = String(fill).replace('#', '');
+            if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+                return `rgba(255, 249, 236, ${alpha})`;
+            }
+            const red = parseInt(hex.slice(0, 2), 16);
+            const green = parseInt(hex.slice(2, 4), 16);
+            const blue = parseInt(hex.slice(4, 6), 16);
+            return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
         }
 
         drawCombatOutcomeMarks(ctx, resolution) {
@@ -532,14 +611,26 @@
                     this.drawEnsorcelledMark(ctx, unit);
                 }
             });
+            const lurkerReturnedIds = resolution.lurkerReturnedIds
+                || new Set((resolution.lurkerReturnedUnits || []).map((unit) => unit.id));
+            lurkerReturnedIds.forEach((unitId) => {
+                const unit = this.getCombatPoseUnit(resolution, unitId);
+                if (!unit) {
+                    return;
+                }
+                const returned = (resolution.lurkerReturnedUnits || []).find((entry) => entry.id === unitId);
+                this.drawLurkerReturnMark(ctx, unit, returned?.lurkerReturnReason);
+            });
         }
 
         drawCombatPushbackArrows(ctx, resolution) {
             const destroyedIds = resolution.destroyedIds || new Set();
             const ensorcelledIds = resolution.ensorcelledIds
                 || new Set((resolution.ensorcelledUnits || []).map((unit) => unit.id));
+            const lurkerReturnedIds = resolution.lurkerReturnedIds
+                || new Set((resolution.lurkerReturnedUnits || []).map((unit) => unit.id));
             (resolution.movedUnitIds || []).forEach((unitId) => {
-                if (destroyedIds.has(unitId) || ensorcelledIds.has(unitId)) {
+                if (destroyedIds.has(unitId) || ensorcelledIds.has(unitId) || lurkerReturnedIds.has(unitId)) {
                     return;
                 }
                 const before = resolution.ghostSnapshot?.[unitId];
@@ -599,6 +690,33 @@
             ctx.moveTo(size / 2, -size / 2);
             ctx.lineTo(-size / 2, size / 2);
             ctx.stroke();
+            ctx.restore();
+        }
+
+        drawLurkerReturnMark(ctx, unit, reason) {
+            const center = geometry.getUnitCenter(unit);
+            const size = Math.min(unit.width, unit.depth) * 0.42;
+            ctx.save();
+            ctx.translate(center.x, center.y);
+            ctx.strokeStyle = 'rgba(46, 110, 72, 0.95)';
+            ctx.fillStyle = 'rgba(46, 110, 72, 0.95)';
+            ctx.lineWidth = Math.max(2.4, size * 0.18) / this.state.camera.scale;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0, -size);
+            ctx.lineTo(0, size * 0.35);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-size * 0.55, -size * 0.05);
+            ctx.lineTo(0, size * 0.55);
+            ctx.lineTo(size * 0.55, -size * 0.05);
+            ctx.closePath();
+            ctx.fill();
+            ctx.font = `${Math.max(7, 9 / this.state.camera.scale)}px Georgia`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(reason === 'isolation' ? 'isolated' : 'to reserve', 0, size * 0.7);
             ctx.restore();
         }
 
@@ -1044,6 +1162,16 @@
             if (this.state.autoMoveGhost) {
                 pushSnapshot(this.state.autoMoveGhost.ghostSnapshot, this.state.autoMoveGhost.unitIds);
             }
+            if (typeof this.getLurkerAmbushGhosts === 'function') {
+                this.getLurkerAmbushGhosts().forEach((ghost) => {
+                    const key = `${ghost.id}:${ghost.x.toFixed(2)}:${ghost.y.toFixed(2)}:${ghost.rotation.toFixed(3)}`;
+                    if (seen.has(key)) {
+                        return;
+                    }
+                    seen.add(key);
+                    ghosts.push({ ...ghost });
+                });
+            }
             (this.state.computerMoveReview?.entries || []).forEach((entry) => {
                 pushSnapshot(entry.ghostSnapshot, entry.unitIds);
             });
@@ -1094,11 +1222,57 @@
                 this.drawUnitArrow(ctx, unit);
                 this.drawUnitText(ctx, unit);
             }
+            if (!options.ghost) {
+                this.drawTerrainOccupancyBar(ctx, unit);
+            }
             if (!options.ghost && this.shouldMarkMovedUnit(unit)) {
                 this.drawMovedBoot(ctx, unit);
             } else if (!options.ghost && this.shouldMarkUnaffordableUnit(unit)) {
                 this.drawNoMoveMark(ctx, unit);
             }
+            if (!options.ghost) {
+                this.drawLurkerDeployCount(ctx, unit);
+            }
+            ctx.restore();
+        }
+
+        getUnitTerrainBarKind(unit) {
+            if (!unit || unit.type === 'Flyers' || unit.type === 'Base' || unit.movement?.ignoresTerrain) {
+                return null;
+            }
+            const sample = rules.sampleUnitTerrain(unit, this.state.terrain);
+            if (sample.has('water')) {
+                return 'water';
+            }
+            if (sample.has('forest') || sample.has('swamp')) {
+                return 'bad';
+            }
+            return null;
+        }
+
+        drawTerrainOccupancyBar(ctx, unit) {
+            const kind = this.getUnitTerrainBarKind(unit);
+            if (!kind) {
+                return;
+            }
+            const corners = geometry.getUnitCorners(unit);
+            const right = geometry.getRightVector(unit.rotation);
+            const forward = geometry.getForwardVector(unit.rotation);
+            const inset = 4;
+            const barDepth = 2.3;
+            const backLeft = geometry.add(corners.backLeft, geometry.scaleVector(right, inset));
+            const backRight = geometry.add(corners.backRight, geometry.scaleVector(right, -inset));
+            const frontLeft = geometry.add(backLeft, geometry.scaleVector(forward, barDepth));
+            const frontRight = geometry.add(backRight, geometry.scaleVector(forward, barDepth));
+            ctx.save();
+            ctx.fillStyle = kind === 'water' ? '#1a56cc' : '#1f9a38';
+            ctx.beginPath();
+            ctx.moveTo(backLeft.x, backLeft.y);
+            ctx.lineTo(backRight.x, backRight.y);
+            ctx.lineTo(frontRight.x, frontRight.y);
+            ctx.lineTo(frontLeft.x, frontLeft.y);
+            ctx.closePath();
+            ctx.fill();
             ctx.restore();
         }
 
@@ -1117,17 +1291,127 @@
 
         drawMovedBoot(ctx, unit) {
             const center = geometry.getUnitCenter(unit);
+            const style = this.getMovedBootStyle(unit);
             ctx.save();
             ctx.translate(center.x, center.y);
             ctx.rotate(Math.atan2(geometry.getForwardVector(unit.rotation).y, geometry.getForwardVector(unit.rotation).x));
-            ctx.globalAlpha = 0.48;
-            this.drawBootprintIcon(ctx, Math.min(unit.width, unit.depth) * 0.95, 'rgb(112, 112, 112)', 'boot', 'assets/boot-print.svg');
+            ctx.globalAlpha = style.alpha;
+            this.drawBootprintIcon(ctx, Math.min(unit.width, unit.depth) * 0.95, style.color, 'boot', 'assets/boot-print.svg');
             ctx.restore();
+        }
+
+        canonicalFactionName(faction) {
+            if (!faction) {
+                return null;
+            }
+            const wanted = String(faction).toLowerCase();
+            return data.FACTIONS.find((name) => name.toLowerCase() === wanted) || null;
+        }
+
+        getUnitFaction(unit) {
+            const fromUnit = this.canonicalFactionName(unit?.faction);
+            if (fromUnit) {
+                return fromUnit;
+            }
+            const player = typeof this.getPlayer === 'function'
+                ? this.getPlayer(this.getUnitPlayerId(unit))
+                : null;
+            return this.canonicalFactionName(player?.faction);
+        }
+
+        normalizeFactionArtConfig(raw) {
+            if (!raw || typeof raw !== 'object') {
+                return DEFAULT_FACTION_ART;
+            }
+            const background = typeof raw.background === 'string' && raw.background
+                ? raw.background
+                : DEFAULT_FACTION_ART.background;
+            const bootPrints = String(raw.bootPrints || '').toLowerCase() === 'light' ? 'light' : 'dark';
+            return { background, bootPrints };
+        }
+
+        fallbackFactionArt(faction) {
+            const name = this.canonicalFactionName(faction);
+            if (LIGHT_BOOT_FACTIONS.has(name)) {
+                return { background: '#808080', bootPrints: 'light' };
+            }
+            return DEFAULT_FACTION_ART;
+        }
+
+        getBootPrintFaction(unit) {
+            const path = typeof this.getUnitAssetPath === 'function' ? this.getUnitAssetPath(unit) : '';
+            const folder = String(path || '').split('/')[1] || '';
+            return this.canonicalFactionName(folder) || this.getUnitFaction(unit);
+        }
+
+        loadFactionArtConfig(faction) {
+            const name = this.canonicalFactionName(faction);
+            if (!name) {
+                return;
+            }
+            if (!this.factionArtConfigs) {
+                this.factionArtConfigs = new Map();
+            }
+            if (this.factionArtConfigs.has(name) || this.factionArtLoading?.has(name)) {
+                return;
+            }
+            if (typeof require === 'function' && typeof module !== 'undefined' && module.exports) {
+                try {
+                    this.factionArtConfigs.set(
+                        name,
+                        this.normalizeFactionArtConfig(require(`../../assets/${name}/art.json`))
+                    );
+                } catch (error) {
+                    this.factionArtConfigs.set(name, this.fallbackFactionArt(name));
+                }
+                return;
+            }
+            if (typeof fetch !== 'function') {
+                this.factionArtConfigs.set(name, this.fallbackFactionArt(name));
+                return;
+            }
+            this.factionArtLoading = this.factionArtLoading || new Set();
+            this.factionArtLoading.add(name);
+            fetch(`assets/${name.toLowerCase()}/art.json`, { cache: 'no-store' })
+                .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
+                .then((config) => {
+                    this.factionArtConfigs.set(name, this.normalizeFactionArtConfig(config));
+                    this.factionArtLoading.delete(name);
+                    this.requestRender();
+                })
+                .catch(() => {
+                    this.factionArtLoading.delete(name);
+                    this.factionArtConfigs.set(name, this.fallbackFactionArt(name));
+                    this.requestRender();
+                });
+        }
+
+        loadFactionArtConfigs() {
+            data.FACTIONS.forEach((faction) => this.loadFactionArtConfig(faction));
+        }
+
+        getFactionArtConfig(faction) {
+            const name = this.canonicalFactionName(faction);
+            if (!this.factionArtConfigs) {
+                this.factionArtConfigs = new Map();
+            }
+            if (name && !this.factionArtConfigs.has(name)) {
+                this.loadFactionArtConfig(name);
+            }
+            return (name && this.factionArtConfigs.get(name)) || this.fallbackFactionArt(name);
+        }
+
+        getMovedBootStyle(unit) {
+            const tone = this.getFactionArtConfig(this.getBootPrintFaction(unit)).bootPrints;
+            return MOVED_BOOT_COLORS[tone] || MOVED_BOOT_COLORS.dark;
         }
 
         unitMoveCost(unit) {
             if (unit.inReserve && typeof this.isEnsorcelledInReserve === 'function' && this.isEnsorcelledInReserve(unit)) {
                 return typeof this.getEnsorcelledReturnCost === 'function' ? this.getEnsorcelledReturnCost(unit) : 0;
+            }
+            if (unit.inReserve && data.isLurkerType(unit.type)) {
+                return data.getLurkerDeployCost(unit);
             }
             if (unit.inReserve) {
                 return 1;
@@ -1151,17 +1435,22 @@
             if (this.state.draft?.unitIds?.includes(unit.id)) {
                 return false;
             }
+            if (typeof this.isLurkerBlockedInReserve === 'function' && this.isLurkerBlockedInReserve(unit)) {
+                return true;
+            }
             const cost = this.unitMoveCost(unit);
             return cost > 0 && this.state.remainingMoves < cost;
         }
 
         drawNoMoveMark(ctx, unit) {
             const center = geometry.getUnitCenter(unit);
+            const tone = this.getFactionArtConfig(this.getBootPrintFaction(unit)).bootPrints;
+            const style = NO_MOVE_BOOT_COLORS[tone] || NO_MOVE_BOOT_COLORS.dark;
             ctx.save();
             ctx.translate(center.x, center.y);
             ctx.rotate(Math.atan2(geometry.getForwardVector(unit.rotation).y, geometry.getForwardVector(unit.rotation).x));
-            ctx.globalAlpha = 0.48;
-            this.drawBootprintIcon(ctx, Math.min(unit.width, unit.depth) * 0.95, 'rgb(72, 72, 72)', 'no-move', 'assets/noMove.svg', true);
+            ctx.globalAlpha = style.alpha;
+            this.drawBootprintIcon(ctx, Math.min(unit.width, unit.depth) * 0.95, style.color, 'no-move', 'assets/noMove.svg', true);
             ctx.restore();
         }
 
@@ -1228,8 +1517,12 @@
             ctx.strokeStyle = color;
             ctx.lineWidth = Math.max(length * 0.12, 1.5 / (this.state.camera?.scale || 1));
             ctx.beginPath();
-            ctx.ellipse(-length * 0.22, -length * 0.16, length * 0.28, length * 0.12, -0.35, 0, Math.PI * 2);
-            ctx.ellipse(length * 0.22, length * 0.16, length * 0.28, length * 0.12, -0.35, 0, Math.PI * 2);
+            if (assetKey === 'boot-single') {
+                ctx.ellipse(0, 0, length * 0.28, length * 0.12, -0.35, 0, Math.PI * 2);
+            } else {
+                ctx.ellipse(-length * 0.22, -length * 0.16, length * 0.28, length * 0.12, -0.35, 0, Math.PI * 2);
+                ctx.ellipse(length * 0.22, length * 0.16, length * 0.28, length * 0.12, -0.35, 0, Math.PI * 2);
+            }
             ctx.fill();
             if (crossed) {
                 ctx.beginPath();
@@ -1245,12 +1538,13 @@
                 return null;
             }
             const type = unit.type;
-            if (type === 'Base' && unit.faction && data.FACTIONS.includes(unit.faction)) {
-                return `assets/${unit.faction}/Base.svg`;
+            const factionName = this.canonicalFactionName(unit.faction);
+            if (type === 'Base' && factionName) {
+                return `assets/${factionName}/Base.svg`;
             }
             // Prefer faction-specific asset sets when available
-            if (unit.faction && data.FACTION_ROSTERS[unit.faction]?.includes(type)) {
-                return `assets/${String(unit.faction).toLowerCase()}/${type}.svg`;
+            if (factionName && data.FACTION_ROSTERS[factionName]?.includes(type)) {
+                return `assets/${factionName.toLowerCase()}/${type}.svg`;
             }
             // Fallback to generic asset path
             return UNIT_ASSET_PATHS[type] || null;
@@ -1370,6 +1664,15 @@
                     this.drawFinishMoveHandle(ctx, handle);
                     return;
                 }
+                if (handle.kind === 'step-move') {
+                    this.drawStepMoveHandle(ctx, handle);
+                    return;
+                }
+                if (handle.kind === 'hold-shot' || handle.kind === 'release-shot'
+                    || handle.kind === 'lock-unit' || handle.kind === 'unlock-unit') {
+                    this.drawHoldIntentHandle(ctx, handle);
+                    return;
+                }
                 if (handle.kind === 'formation-convert') {
                     this.drawConvertHandle(ctx, handle);
                     return;
@@ -1388,7 +1691,10 @@
         }
 
         handleBorderWidth(handle) {
-            const extra = this.state.hover?.handleKind === handle.kind ? 2.5 : 0;
+            const hover = this.state.hover;
+            const sameKind = hover?.handleKind === handle.kind;
+            const sameUnit = !handle.unitId || hover?.unitId === handle.unitId;
+            const extra = sameKind && sameUnit ? 2.5 : 0;
             return (2 + extra) / this.state.camera.scale;
         }
 
@@ -1408,12 +1714,99 @@
             ctx.restore();
         }
 
+        drawStepMoveHandle(ctx, handle) {
+            ctx.save();
+            ctx.translate(handle.position.x, handle.position.y);
+            ctx.rotate(handle.rotation || 0);
+            const size = handle.radius * 2;
+            ctx.beginPath();
+            ctx.rect(-handle.radius, -handle.radius, size, size);
+            ctx.fillStyle = '#fff7dd';
+            ctx.fill();
+            ctx.lineWidth = this.handleBorderWidth(handle);
+            ctx.strokeStyle = '#7e6420';
+            ctx.stroke();
+            this.drawBootprintIcon(
+                ctx,
+                handle.radius * 1.7,
+                '#7e6420',
+                'boot-single',
+                'assets/boot-print-single.svg'
+            );
+            ctx.restore();
+        }
+
+        drawLurkerDeployCount(ctx, unit) {
+            if (!data.isLurkerType(unit?.type)) {
+                return;
+            }
+            const count = unit.lurkerDeployments || 0;
+            if (count <= 0) {
+                return;
+            }
+            const center = geometry.getUnitCenter(unit);
+            const right = geometry.getRightVector(unit.rotation);
+            const forward = geometry.getForwardVector(unit.rotation);
+            const position = geometry.add(
+                geometry.add(center, geometry.scaleVector(right, unit.width * 0.28)),
+                geometry.scaleVector(forward, -(unit.depth * 0.18))
+            );
+            const radius = data.HANDLE_RADIUS;
+            ctx.save();
+            ctx.translate(position.x, position.y);
+            ctx.rotate(Math.atan2(forward.y, forward.x));
+            ctx.beginPath();
+            ctx.rect(-radius, -radius, radius * 2, radius * 2);
+            ctx.fillStyle = '#fff7dd';
+            ctx.fill();
+            ctx.lineWidth = 1.4 / this.state.camera.scale;
+            ctx.strokeStyle = '#7e6420';
+            ctx.stroke();
+            ctx.fillStyle = '#5a4314';
+            ctx.font = `${Math.max(8, 11 / this.state.camera.scale)}px Georgia`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.rotate(-Math.atan2(forward.y, forward.x));
+            ctx.fillText(String(count), 0, 0);
+            ctx.restore();
+        }
+
+        drawHoldIntentHandle(ctx, handle) {
+            if (handle.kind === 'release-shot' || handle.kind === 'unlock-unit') {
+                this.drawRotateHandle(ctx, handle);
+                return;
+            }
+            ctx.save();
+            ctx.translate(handle.position.x, handle.position.y);
+            ctx.rotate(handle.rotation || 0);
+            const size = handle.radius * 2;
+            ctx.beginPath();
+            ctx.rect(-handle.radius, -handle.radius, size, size);
+            ctx.fillStyle = '#fff7dd';
+            ctx.fill();
+            ctx.lineWidth = this.handleBorderWidth(handle);
+            ctx.strokeStyle = '#7e6420';
+            ctx.stroke();
+            this.drawBootprintIcon(
+                ctx,
+                handle.radius * 1.85,
+                '#7e6420',
+                'shoot',
+                'assets/shoot.svg'
+            );
+            ctx.restore();
+        }
+
         drawRotateHandle(ctx, handle) {
             ctx.save();
             ctx.translate(handle.position.x, handle.position.y);
             ctx.rotate(handle.rotation || 0);
             ctx.beginPath();
-            ctx.arc(0, 0, handle.radius, 0, Math.PI * 2);
+            if (handle.kind === 'release-shot' || handle.kind === 'unlock-unit') {
+                ctx.rect(-handle.radius, -handle.radius, handle.radius * 2, handle.radius * 2);
+            } else {
+                ctx.arc(0, 0, handle.radius, 0, Math.PI * 2);
+            }
             ctx.fillStyle = '#fff7dd';
             ctx.fill();
             ctx.lineWidth = this.handleBorderWidth(handle);

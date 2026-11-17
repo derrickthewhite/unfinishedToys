@@ -29,9 +29,13 @@
 
         captureStartingArmyValues() {
             this.state.startingArmyValueByPlayerId = data.PLAYER_IDS.reduce((values, playerId) => {
-                values[playerId] = this.state.units
+                const boardPoints = this.state.units
                     .filter((unit) => this.getUnitPlayerId(unit) === playerId)
                     .reduce((sum, unit) => sum + unit.value, 0);
+                const reservePoints = (typeof this.getReserveUnits === 'function' ? this.getReserveUnits() : [])
+                    .filter((unit) => this.getUnitPlayerId(unit) === playerId)
+                    .reduce((sum, unit) => sum + unit.value, 0);
+                values[playerId] = boardPoints + reservePoints;
                 return values;
             }, {});
         }
@@ -224,11 +228,14 @@
             if (!victory) {
                 return;
             }
+            const localDefeat = typeof this.isLocalDefeat === 'function' && this.isLocalDefeat();
             if (this.ui.victoryTitle) {
-                this.ui.victoryTitle.textContent = `${this.getArmyIdentity(victory.winnerPlayerId).label} Wins`;
+                this.ui.victoryTitle.textContent = localDefeat
+                    ? 'Defeat'
+                    : `${this.getArmyIdentity(victory.winnerPlayerId).label} Wins`;
             }
             if (this.ui.victorySubtitle) {
-                this.ui.victorySubtitle.textContent = 'The field is theirs.';
+                this.ui.victorySubtitle.textContent = localDefeat ? 'The field is lost.' : 'The field is theirs.';
             }
             if (this.ui.victoryReason) {
                 this.ui.victoryReason.textContent = this.describeVictoryReason(victory);

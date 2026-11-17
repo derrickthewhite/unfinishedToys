@@ -82,7 +82,10 @@
                 armies: this.cloneJson(setup.armies, this.createArmyDrafts()),
                 confirmation: setup.confirmation === 'armies' || setup.confirmation === 'terrain' ? setup.confirmation : null,
                 terrain: this.cloneJson(setup.terrain, null),
-                deployment
+                deployment,
+                defenderChoice: setup.defenderChoice === 'player-1' || setup.defenderChoice === 'player-2'
+                    ? setup.defenderChoice
+                    : 'coin-flip'
             };
         }
 
@@ -98,12 +101,16 @@
             const confirmation = source.confirmation === 'armies' || source.confirmation === 'terrain'
                 ? source.confirmation
                 : null;
+            const defenderChoice = source.defenderChoice === 'player-1' || source.defenderChoice === 'player-2'
+                ? source.defenderChoice
+                : 'coin-flip';
             if (setupStage === 'game') {
                 return {
                     armies: this.createArmyDrafts(),
                     confirmation: null,
                     terrain: null,
-                    deployment: null
+                    deployment: null,
+                    defenderChoice
                 };
             }
             const deployment = source.deployment
@@ -132,7 +139,8 @@
                 armies,
                 confirmation,
                 terrain,
-                deployment
+                deployment,
+                defenderChoice
             };
         }
 
@@ -169,6 +177,8 @@
                     victory: this.cloneJson(this.state.victory, null),
                     victoryModalDismissed: Boolean(this.state.victoryModalDismissed),
                     reserveUnits: this.cloneJson(this.getReserveUnits(), []),
+                    lurkerLastOccupancy: this.cloneJson(this.state.lurkerLastOccupancy, {}),
+                    lurkerStartOccupancy: this.cloneJson(this.state.lurkerStartOccupancy, {}),
                     homeEdgeByPlayerId: this.cloneJson(this.state.homeEdgeByPlayerId, this.getDefaultHomeEdges()),
                     snapEnabled: this.state.snapEnabled,
                     singleRotationMode: this.state.singleRotationMode,
@@ -357,7 +367,7 @@
                 ranged: unit.ranged ? { ...unit.ranged } : null,
                 combat: footprint
                     ? { ...(unit.combat || {}), stationary: true, lossEndsGame: true, unpurchasable: true }
-                    : (unit.combat ? { ...unit.combat } : {}),
+                    : { ...(data.UNIT_TYPES[unit.type]?.combat || {}), ...(unit.combat || {}) },
                 value: footprint ? 0 : normalized.value,
                 troopClass: footprint ? 'infantry' : normalized.troopClass
             };
@@ -426,6 +436,8 @@
             this.state.reserveUnits = Array.isArray(snapshot.reserveUnits)
                 ? snapshot.reserveUnits.map((unit) => this.normalizeSavedUnit(unit))
                 : [];
+            this.state.lurkerLastOccupancy = snapshot.lurkerLastOccupancy || {};
+            this.state.lurkerStartOccupancy = snapshot.lurkerStartOccupancy || {};
             this.state.homeEdgeByPlayerId = this.normalizeSavedHomeEdges(snapshot.homeEdgeByPlayerId);
             this.relayoutReserveUnits();
             this.state.losses = this.normalizeSavedLosses(snapshot.losses);
@@ -464,6 +476,8 @@
             if (setupStage === 'game' && this.state.phase === 'melee') {
                 this.initializeMeleePhase();
             }
+            this.state.boardViewFlipped = false;
+            this.state.boardViewFlipLocked = false;
             this.state.controllerPaused = false;
             this.state.controllerThinking = null;
             this.resetControllerRuntime();

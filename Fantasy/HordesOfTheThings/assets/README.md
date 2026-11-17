@@ -12,6 +12,8 @@ Each unit SVG is drawn in unit-local coordinates.
 
 Generic art lives at `assets/<UnitType>.svg`. Faction art lives at `assets/<Faction>/<UnitType>.svg`. If a faction file is missing, the prototype falls back to the generic SVG.
 
+Each faction folder has `art.json` with the main base `background` color and whether overlay boot prints should be `dark` (current grey) or `light` (chalky white, for contrast on dark or grey art). Goblin and Undead use `light`. The Magician/Artillery shooting handle uses `assets/shoot.svg`.
+
 ## Terrain
 
 Outlines live in `terrain/original/` and `terrain/waved/`, with point catalogs in `terrain/catalog.json`. Local coordinates are centered at the origin and typically span about `[-1, 1]`. Runtime loads the original outline, then applies the wave function so uploaded blocks can use the same pipeline.

@@ -43,9 +43,34 @@
                 return;
             }
 
+            const ambushGhostHit = typeof this.pickLurkerAmbushGhost === 'function'
+                ? this.pickLurkerAmbushGhost(world)
+                : null;
+            if (ambushGhostHit && this.state.mode === 'game' && this.state.phase === 'move') {
+                if (this.applyLurkerAmbushGhost(ambushGhostHit)) {
+                    this.state.interaction = {
+                        type: 'move-single',
+                        pointerId: event.pointerId,
+                        startWorld: world,
+                        startClientX: event.clientX,
+                        startClientY: event.clientY,
+                        shiftKey,
+                        unitHit: ambushGhostHit.id,
+                        handleHit: null,
+                        suppressClick: true,
+                        moved: false,
+                        dragBase: geometry.snapshotPositions([ambushGhostHit.id], this.state.units),
+                        draftIds: [ambushGhostHit.id],
+                        anchorWorld: world
+                    };
+                    return;
+                }
+            }
+
             let handleHit = this.getHandleHit(world);
+            const holdKinds = new Set(['finish-move', 'step-move', 'hold-shot', 'release-shot', 'lock-unit', 'unlock-unit']);
             if (handleHit
-                && handleHit.kind !== 'finish-move'
+                && !holdKinds.has(handleHit.kind)
                 && typeof this.canManipulateSelection === 'function'
                 && !this.canManipulateSelection()) {
                 handleHit = null;
@@ -72,6 +97,31 @@
                 if (handleHit.kind === 'finish-move') {
                     this.state.interaction.suppressClick = true;
                     this.finishDraft();
+                    return;
+                }
+                if (handleHit.kind === 'step-move') {
+                    this.state.interaction.suppressClick = true;
+                    this.stepSingleDraft();
+                    return;
+                }
+                if (handleHit.kind === 'hold-shot') {
+                    this.state.interaction.suppressClick = true;
+                    this.holdMagicianShot(handleHit.unitId);
+                    return;
+                }
+                if (handleHit.kind === 'release-shot') {
+                    this.state.interaction.suppressClick = true;
+                    this.releaseMagicianShot(handleHit.unitId);
+                    return;
+                }
+                if (handleHit.kind === 'lock-unit') {
+                    this.state.interaction.suppressClick = true;
+                    this.lockArtilleryInPlace(handleHit.unitId);
+                    return;
+                }
+                if (handleHit.kind === 'unlock-unit') {
+                    this.state.interaction.suppressClick = true;
+                    this.unlockArtilleryInPlace(handleHit.unitId);
                     return;
                 }
                 if (handleHit.kind === 'formation-reverse' || handleHit.kind === 'single-reverse') {
@@ -142,8 +192,8 @@
                 this.state.interaction.dragBase = geometry.snapshotPositions(draftIds, this.state.units);
                 this.state.interaction.draftIds = draftIds;
                 this.state.interaction.anchorWorld = world;
-                this.state.interaction.suppressClick = true;
                 if (this.state.setupStage !== 'unit-deployment') {
+                    this.state.interaction.suppressClick = true;
                     this.state.interaction.editSnapshot = this.createEditSnapshot();
                 }
                 return;
@@ -478,6 +528,9 @@
                 }
             }
             const handleKind = handle ? handle.kind : null;
+            if (handle) {
+                unitId = handle.unitId || null;
+            }
             const previous = this.state.hover;
             if ((previous?.handleKind || null) === handleKind && (previous?.unitId || null) === unitId) {
                 return;
@@ -550,6 +603,15 @@
             }
             if (this.state.mode === 'edit' && this.state.placingUnit && !unitHit) {
                 this.placeUnit(world);
+                return;
+            }
+            if (!unitHit) {
+                if (this.state.setupStage === 'unit-deployment') {
+                    this.clearSelection();
+                    if (typeof this.syncDeploymentSelection === 'function') {
+                        this.syncDeploymentSelection();
+                    }
+                }
                 return;
             }
             if (unitHit) {

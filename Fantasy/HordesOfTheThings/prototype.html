@@ -62,6 +62,7 @@
                 <button id="cancelMoveButton" type="button">Cancel Move</button>
                 <button id="undoMoveButton" type="button">Undo</button>
                 <button id="gamePauseControllerButton" type="button" hidden>Pause</button>
+                <button id="flipBoardButton" type="button">Flip Board</button>
             </div>
             <div class="bar-group status-group" id="statusGroup">
                 <span id="gameThinkingText" class="thinking-pill thinking-pill-status" hidden></span>
@@ -127,14 +128,17 @@
             </div>
             <aside id="selectionPanel" class="selection-panel is-empty" aria-live="polite">
                 <div id="selectionPanelPortrait" class="selection-panel-portrait" hidden>
-                    <img id="selectionPanelAsset" alt="" aria-hidden="true">
-                </div>
-                <div class="selection-panel-header">
                     <div id="selectionPanelEyebrow" class="selection-panel-eyebrow">Selection</div>
+                    <div class="selection-panel-graphic">
+                        <img id="selectionPanelAsset" alt="" aria-hidden="true">
+                    </div>
+                </div>
+                <div class="selection-panel-title-row">
                     <h2 id="selectionPanelTitle">No unit selected</h2>
+                    <span id="selectionPanelAp" class="selection-panel-ap" hidden></span>
                 </div>
                 <p id="selectionPanelHint" class="selection-panel-hint">Select a single unit to inspect its stats.</p>
-                <dl id="selectionPanelStats" class="selection-stats" hidden></dl>
+                <div id="selectionPanelStats" class="selection-stats" hidden></div>
             </aside>
         </main>
         <div class="global-utility">
@@ -149,11 +153,19 @@
                 <header class="setup-header">
                     <p class="setup-kicker">Battle Setup · 1 of 3</p>
                     <h1 id="armyBuilderTitle">Build the Armies</h1>
-                    <p>Choose who controls each army, then pick color, faction, and force — or leave any of those random. Both armies must total 24 AP (or be marked random). They may share a faction, and they cannot share a color.</p>
+                    <p>Choose who controls each army, then pick color, faction, and force — or leave any of those random. A random faction rolls the whole army. Both armies must total 24 AP (or be marked random). They may share a faction, and they cannot share a color. Choose who defends, or leave it to a coin flip.</p>
                 </header>
                 <div id="armyColumns" class="army-columns"></div>
                 <footer class="setup-actions">
                     <p id="armyIdentityHint" class="army-identity-hint" hidden></p>
+                    <label class="defender-choice">
+                        Defender
+                        <select id="defenderChoiceSelect">
+                            <option value="coin-flip">Coin flip</option>
+                            <option value="player-1">Blue Panda</option>
+                            <option value="player-2">Red Undead</option>
+                        </select>
+                    </label>
                     <button id="acceptArmiesButton" class="setup-primary-action" type="button" disabled>Accept Armies</button>
                 </footer>
             </section>
@@ -195,6 +207,7 @@
                             <div id="deploymentTray" class="deployment-tray"></div>
                             <button id="returnToTrayButton" type="button" disabled>Return to Tray</button>
                             <button id="autoDeployButton" type="button">Auto Deploy</button>
+                            <button id="flipDeploymentBoardButton" type="button">Flip Board</button>
                             <button id="finishDeploymentButton" class="setup-primary-action" type="button" disabled>Finish Deployment</button>
                         </aside>
                         <div id="deploymentSelectionHost" class="deployment-selection-host"></div>
@@ -359,6 +372,9 @@
             </div>
         </section>
     </div>
+    <div id="deploymentCursorToken" class="deployment-cursor-token" hidden>
+        <span class="deployment-unit-preview"><img alt="" aria-hidden="true" draggable="false"></span>
+    </div>
     <script src="src/base-footprints.js"></script>
     <script src="src/data.js"></script>
     <script src="src/geometry.js"></script>
@@ -386,6 +402,7 @@
     <script src="src/board/render.js"></script>
     <script src="src/game-flow.js"></script>
     <script src="src/reserve.js"></script>
+    <script src="src/lurkers.js"></script>
     <script src="src/setup/camera.js"></script>
     <script src="src/setup/unit-deployment.js"></script>
     <script src="src/ai/deploy.js"></script>

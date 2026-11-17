@@ -27,7 +27,8 @@
     const {
         isUnitInBadGoing,
         getTerrainTypeAt,
-        sampleUnitTerrain
+        sampleUnitTerrain,
+        findIsolatedLurkers
     } = terrain;
 
     const {
@@ -427,6 +428,12 @@
         const loserInBadGoing = isUnitInBadGoing(loser, terrain);
         const loserIsSpear = loser.type === 'Spear' || loser.type === 'Heavy-Spear';
         const winnerIsWarband = winner.type === 'Warband' || winner.type === 'Heavy-Warband';
+        if (data.isLurkerType(loser.type)) {
+            return {
+                outcome: 'lurk-return',
+                destructionRule: 'Lurkers return to reserve on a minor loss.'
+            };
+        }
         if (loser.type === 'Behemoth' && winner.type === 'Artillery') {
             return { outcome: 'flee', destructionRule: null };
         }
@@ -436,11 +443,17 @@
         if (winner.type === 'Magician' && (loser.type === 'Hero' || loser.type === 'Magician')) {
             return { outcome: 'ensorcel', destructionRule: 'Magicians ensorcel Heroes and Magicians on a minor win.' };
         }
+        if (loser.type === 'Hero' && winner.type === 'Artillery') {
+            return { outcome: 'destroy', destructionRule: 'Artillery destroys Heroes on a minor win.' };
+        }
         if (loser.type === 'Hero') {
             return { outcome: 'recoil', destructionRule: null };
         }
-        if (loser.type === 'Beasts' && phase === 'melee' && winner.troopClass === 'mounted') {
-            return { outcome: 'destroy', destructionRule: 'Mounted troops destroy Beasts when the Beasts lose melee.' };
+        if (loser.type === 'Beasts' && phase === 'melee' && winner.troopClass === 'mounted' && !loserInBadGoing) {
+            return { outcome: 'destroy', destructionRule: 'Mounted troops destroy Beasts when the Beasts lose melee in good going.' };
+        }
+        if ((loser.type === 'Warband' || loser.type === 'Heavy-Warband') && winner.type === 'Behemoth' && phase === 'melee') {
+            return { outcome: 'destroy', destructionRule: 'Behemoths destroy Warbands on a minor melee win.' };
         }
         if (loser.type === 'Artillery' && phase === 'melee') {
             return { outcome: 'destroy', destructionRule: 'Artillery is destroyed when it loses melee.' };
@@ -477,6 +490,245 @@
             return { outcome: 'recoil', destructionRule: null };
         }
         return { outcome: 'recoil', destructionRule: null };
+    }
+
+
+    const QUICK_KILL_SITUATIONS = [
+        { phase: 'melee', badGoing: false },
+        { phase: 'melee', badGoing: true },
+        { phase: 'shooting', badGoing: false },
+        { phase: 'shooting', badGoing: true }
+    ];
+    const OPEN_STAT_TERRAIN = { roads: [], features: [] };
+    const BAD_STAT_TERRAIN = {
+        roads: [],
+        features: [{ kind: 'swamp', cx: 100, cy: 100, rx: 200, ry: 200, wobble: 0 }]
+    };
+    let quickKillInfoByType = null;
+
+
+    function combatStatTypes() {
+        return Object.keys(data.UNIT_TYPES).filter((type) => type !== 'Base');
+    }
+
+
+    function makeStatDummy(type, playerId) {
+        const template = data.UNIT_TYPES[type];
+        return {
+            id: `${type}-${playerId}`,
+            type,
+            playerId,
+            width: data.UNIT_WIDTH,
+            depth: template.depth,
+            x: 100,
+            y: 100,
+            rotation: 0,
+            troopClass: template.troopClass,
+            combat: { ...(template.combat || {}) }
+        };
+    }
+
+
+    function specialMinorOutcome(resolution) {
+        if (resolution.outcome === 'destroy'
+            || resolution.outcome === 'ensorcel'
+            || resolution.outcome === 'flee'
+            || resolution.outcome === 'lurk-return') {
+            return resolution.outcome;
+        }
+        return null;
+    }
+
+
+    function situationKey(situation) {
+        return `${situation.phase}:${situation.badGoing ? 'bad' : 'good'}`;
+    }
+
+
+    function noteForSituations(hits, kind) {
+        const bits = [];
+        if (kind === 'ensorcel') {
+            bits.push('ensorcelled, not destroyed');
+        }
+        if (kind === 'flee') {
+            bits.push('flees, not destroyed');
+        }
+        if (kind === 'lurk-return') {
+            bits.push('returns to reserve, not destroyed');
+        }
+        if (hits.length && hits.length < QUICK_KILL_SITUATIONS.length) {
+            const meleeOnly = hits.every((hit) => hit.phase === 'melee');
+            const shootingOnly = hits.every((hit) => hit.phase === 'shooting');
+            const goodOnly = hits.every((hit) => !hit.badGoing);
+            const badOnly = hits.every((hit) => hit.badGoing);
+            if (meleeOnly) {
+                bits.push('in melee');
+            } else if (shootingOnly) {
+                bits.push('shooting');
+            }
+            if (goodOnly) {
+                bits.push('in good going');
+            } else if (badOnly) {
+                bits.push('in bad going');
+            }
+        }
+        return bits.join(', ');
+    }
+
+
+    function describeKillerSet(winners) {
+        const types = combatStatTypes();
+        if (winners.length === types.length) {
+            return 'Anyone';
+        }
+        const mounted = types.filter((type) => data.UNIT_TYPES[type].troopClass === 'mounted');
+        const infantry = types.filter((type) => data.UNIT_TYPES[type].troopClass === 'infantry');
+        const set = new Set(winners);
+        if (mounted.length && mounted.every((type) => set.has(type)) && winners.length === mounted.length) {
+            return 'Mounted';
+        }
+        if (infantry.length && infantry.every((type) => set.has(type)) && winners.length === infantry.length) {
+            return 'Infantry';
+        }
+        return null;
+    }
+
+
+    function buildQuickKillInfoByType() {
+        const types = combatStatTypes();
+        const killers = {};
+        types.forEach((loserType) => {
+            killers[loserType] = {};
+            QUICK_KILL_SITUATIONS.forEach((situation) => {
+                const key = situationKey(situation);
+                killers[loserType][key] = {};
+                const terrain = situation.badGoing ? BAD_STAT_TERRAIN : OPEN_STAT_TERRAIN;
+                types.forEach((winnerType) => {
+                    const kind = specialMinorOutcome(getMinorLossResolution(
+                        makeStatDummy(winnerType, 'winner'),
+                        makeStatDummy(loserType, 'loser'),
+                        situation.phase,
+                        terrain
+                    ));
+                    if (!kind) {
+                        return;
+                    }
+                    if (!killers[loserType][key][kind]) {
+                        killers[loserType][key][kind] = [];
+                    }
+                    killers[loserType][key][kind].push(winnerType);
+                });
+            });
+        });
+
+        function collectKillEntries(subjectType, asWinner) {
+            if (asWinner) {
+                const groups = new Map();
+                types.forEach((loserType) => {
+                    QUICK_KILL_SITUATIONS.forEach((situation) => {
+                        const kindMap = killers[loserType][situationKey(situation)];
+                        Object.keys(kindMap).forEach((kind) => {
+                            const winners = kindMap[kind];
+                            if (!winners.includes(subjectType) || winners.length === types.length) {
+                                return;
+                            }
+                            const groupKey = `${kind}::${loserType}`;
+                            if (!groups.has(groupKey)) {
+                                groups.set(groupKey, { kind, otherType: loserType, sits: [] });
+                            }
+                            groups.get(groupKey).sits.push(situation);
+                        });
+                    });
+                });
+                const entries = [];
+                groups.forEach((group) => {
+                    entries.push({ label: group.otherType, note: noteForSituations(group.sits, group.kind) });
+                });
+                entries.sort((left, right) => types.indexOf(left.label) - types.indexOf(right.label));
+                return entries;
+            }
+
+            const universal = {};
+            const leftover = {};
+            types.forEach((winnerType) => {
+                leftover[winnerType] = {};
+            });
+            QUICK_KILL_SITUATIONS.forEach((situation) => {
+                const kindMap = killers[subjectType][situationKey(situation)];
+                Object.keys(kindMap).forEach((kind) => {
+                    const winners = kindMap[kind];
+                    if (winners.length === types.length) {
+                        if (!universal[kind]) {
+                            universal[kind] = [];
+                        }
+                        universal[kind].push(situation);
+                        return;
+                    }
+                    winners.forEach((winnerType) => {
+                        if (!leftover[winnerType][kind]) {
+                            leftover[winnerType][kind] = [];
+                        }
+                        leftover[winnerType][kind].push(situation);
+                    });
+                });
+            });
+
+            const entries = [];
+            Object.keys(universal).forEach((kind) => {
+                entries.push({
+                    label: 'Anyone',
+                    note: noteForSituations(universal[kind], kind)
+                });
+            });
+            const leftoverGroups = new Map();
+            types.forEach((winnerType) => {
+                Object.keys(leftover[winnerType]).forEach((kind) => {
+                    const note = noteForSituations(leftover[winnerType][kind], kind);
+                    const groupKey = `${kind}::${note}`;
+                    if (!leftoverGroups.has(groupKey)) {
+                        leftoverGroups.set(groupKey, { kind, note, winners: [] });
+                    }
+                    leftoverGroups.get(groupKey).winners.push(winnerType);
+                });
+            });
+            leftoverGroups.forEach((group) => {
+                const collapsed = describeKillerSet(group.winners);
+                if (collapsed) {
+                    entries.push({ label: collapsed, note: group.note });
+                    return;
+                }
+                group.winners.forEach((winnerType) => {
+                    entries.push({ label: winnerType, note: group.note });
+                });
+            });
+            const order = ['Anyone', 'Mounted', 'Infantry', ...types];
+            entries.sort((left, right) => order.indexOf(left.label) - order.indexOf(right.label));
+            return entries;
+        }
+
+        const info = {};
+        types.forEach((type) => {
+            const killed = collectKillEntries(type, false);
+            if (type === 'Flyers') {
+                ['Hero', 'Magician', 'Flyers', 'Shooter'].forEach((label) => {
+                    killed.push({ label, note: 'when doubled' });
+                });
+            }
+            info[type] = {
+                kills: collectKillEntries(type, true),
+                killed
+            };
+        });
+        info.Base = { kills: [], killed: [] };
+        return info;
+    }
+
+
+    function getTypeQuickKillInfo(type) {
+        if (!quickKillInfoByType) {
+            quickKillInfoByType = buildQuickKillInfoByType();
+        }
+        return quickKillInfoByType[type] || { kills: [], killed: [] };
     }
 
 
@@ -1513,6 +1765,7 @@
 
         const destroyedIds = new Set();
         const ensorcelledIds = new Map();
+        const lurkerReturnedIds = new Map();
         const recoilQueue = [];
         let baseFellPlayerId = null;
         results.forEach((result) => {
@@ -1539,6 +1792,10 @@
                 });
                 return;
             }
+            if (result.outcome === 'lurk-return') {
+                loserCombatant.unitIds.forEach((unitId) => lurkerReturnedIds.set(unitId, 'combat'));
+                return;
+            }
             if (result.outcome === 'recoil' || result.outcome === 'flee') {
                 recoilQueue.push({
                     combatant: loserCombatant,
@@ -1548,7 +1805,9 @@
             }
         });
 
-        let mutableUnits = mutableStartingUnits.filter((unit) => !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id));
+        let mutableUnits = mutableStartingUnits.filter((unit) => (
+            !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id) && !lurkerReturnedIds.has(unit.id)
+        ));
         recoilQueue.forEach((entry) => {
             if (entry.combatant.unitIds.some((unitId) => destroyedIds.has(unitId))) {
                 return;
@@ -1587,15 +1846,31 @@
             mutableUnits = flee.units;
         });
 
+        const isolatedLurkers = findIsolatedLurkers(mutableUnits, terrain);
+        isolatedLurkers.forEach((unit) => {
+            if (!lurkerReturnedIds.has(unit.id)) {
+                lurkerReturnedIds.set(unit.id, 'isolation');
+            }
+        });
+        const lurkerReturnedUnits = [...lurkerReturnedIds.entries()].map(([unitId, reason]) => {
+            const unit = isolatedLurkers.find((entry) => entry.id === unitId)
+                || mutableStartingUnits.find((entry) => entry.id === unitId);
+            return unit ? { ...cloneUnit(unit), lurkerReturnReason: reason } : null;
+        }).filter(Boolean);
+        mutableUnits = mutableUnits.filter((unit) => !lurkerReturnedIds.has(unit.id));
+
         const destroyedUnits = mutableStartingUnits.filter((unit) => destroyedIds.has(unit.id)).map(cloneUnit);
         const ensorcelledUnits = [...ensorcelledIds.entries()].map(([unitId, ensorcelledByUnitId]) => {
             const unit = mutableStartingUnits.find((entry) => entry.id === unitId);
             return unit ? buildEnsorcelledUnit(unit, ensorcelledByUnitId) : null;
         }).filter(Boolean);
         return {
-            units: mutableUnits.filter((unit) => !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id)),
+            units: mutableUnits.filter((unit) => (
+                !destroyedIds.has(unit.id) && !ensorcelledIds.has(unit.id) && !lurkerReturnedIds.has(unit.id)
+            )),
             destroyedUnits,
             ensorcelledUnits,
+            lurkerReturnedUnits,
             results,
             recoilDestructions,
             baseFellPlayerId,
@@ -1614,6 +1889,7 @@
         formatSignedModifier,
         getExtraShooterPenalty,
         getMinorLossResolution,
+        getTypeQuickKillInfo,
         resolveCombatLoss,
         getUnitStrengthAgainst,
         choosePrimaryAttacker,

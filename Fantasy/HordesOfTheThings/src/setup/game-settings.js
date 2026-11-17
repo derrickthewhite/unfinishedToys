@@ -235,7 +235,8 @@
                         armies: this.createArmyDrafts(),
                         confirmation: null,
                         terrain: null,
-                        deployment: null
+                        deployment: null,
+                        defenderChoice: 'coin-flip'
                     };
                 }
                 this.state.setup.confirmation = 'new-game';

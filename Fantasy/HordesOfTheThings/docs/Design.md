@@ -25,7 +25,7 @@ This file is the living rules spec. How the browser prototype plays those rules 
 | Undead | Blade, Spear, Warband, Horde, Riders, Magician |
 | Goblin | Spear, Heavy-Warband, Shooter, Horde, Riders |
 | Gunpowder | Blade, Shooter, Artillery, Riders |
-| Dinosaurs | Heavy-Spear, Beasts, Flyers, Behemoth |
+| Dinosaurs | Heavy-Spear, Beasts, Flyers, Behemoth, Lurkers |
 
 ## Unit types
 
@@ -48,6 +48,7 @@ Name, class, value, depth, movement in paces (road / good / bad / water), streng
 | Beasts | Mounted | 2 | 30 mm | 400 | 400 | 400 | 100 | +3 | +4 |
 | Flyers | Mounted | 2 | 30 mm | 1200 | 1200 | 1200 | 1200 | +2 | +2 |
 | Behemoth | Mounted | 4 | 40 mm | 400 | 300 | 200 | 100 | +4 | +5 |
+| Lurkers | Infantry | 1 | 20 mm | 200 | 200 | 200 | 100 | +2 | +2 |
 | Base | Infantry | 0 | varies | 0 | 0 | 0 | 0 | +6 | +6 |
 
 Heavy-Spear and Heavy-Warband use their corresponding base type's combat-loss behavior. They cannot stack.
@@ -82,7 +83,7 @@ A base is a stationary stronghold, not an army-list purchase. Only the defender 
 - A single unit that starts in legal edge contact with a friendly formation may rotate out through that starting contact, but it still must end clear of all collisions.
 - Units may not move through each other or through impassable terrain.
 - Left and right corners are interchangeable within the front pair and within the back pair when measuring travel. Front and back remain distinct except for in-place reversals that keep the base footprint fixed.
-- Flyers ignore all terrain during movement, including water and impassable. An unengaged Flyer is non-blocking: it and other units may cross or end overlapping each other. A Flyer that begins in melee follows normal collision rules and must first move at least 20 mm generally backward, measured along its starting facing, before continuing the same move; lateral movement is allowed during that withdrawal.
+- Flyers ignore all terrain during movement, including water and impassable. An unengaged Flyer is non-blocking: it and other units may cross or end overlapping each other. A Flyer that begins in melee follows normal collision rules and must first move at least 20 mm generally backward, measured along its starting facing, before continuing the same move; lateral movement is allowed during that withdrawal. Moving a Flyer costs 2 PIPs.
 
 ## Formations
 
@@ -106,6 +107,16 @@ Opposing lines that are nearly parallel and face each other form up unit-by-unit
 Each player has a reserve lot off the left of the 600 mm board, aligned with their home edge (defender bottom, attacker top) and large enough for 24 Horde bases.
 
 Destroyed Hordes go to that player's reserve instead of being removed, and count as lost until they return. During the owner's move phase, placing a reserve Horde onto the rear board edge costs one move. The unit must sit fully on-board, not on impassable terrain, and not within 200 paces of an enemy. It counts as having moved.
+
+### Lurkers
+
+Lurkers are a 1 AP infantry reserve type. They are not placed during deployment; they begin in reserve and do not count as losses while there. Starting army value still includes them.
+
+They ignore the bad-going combat penalty and use their 200-pace allowance in forest and swamp (100 in water). They may not leave bad going. If they are already in the open, any move they make must be toward the nearest forest or swamp.
+
+Ambush: during the move phase, spend PIPs to place a Lurker from reserve into frontal contact with an enemy that is in forest or swamp now and was not in that same feature at the start of the previous turn. The enemy must not already be in melee. Placement ghosts sit in front of each eligible enemy, a little larger than a perfect fit so the piece does not need fussy rotation. The first ambush costs 1 PIP. Each later deployment costs 1 extra PIP per prior deployment.
+
+After melee, a Lurker with no enemy within 600 paces returns to reserve. That isolation return is shown on the melee report, counts as undoing a deployment, and heightens the next PIP cost. A minor combat loss also returns them to reserve without recording a casualty. Lurkers still in reserve are not lost.
 
 ## Recoil and flee
 
@@ -152,7 +163,7 @@ The shooting attacker does not suffer a loss result for losing its own ranged ex
 
 ### Combat modifiers
 
-- Forest and swamp are bad going for combat. A unit in bad going takes −2 unless its type ignores that penalty. Warbands, Heavy-Warbands, Shooters, and Beasts ignore it. A unit takes that terrain penalty at most once.
+- Forest and swamp are bad going for combat. A unit in bad going takes −2 unless its type ignores that penalty. Warbands, Heavy-Warbands, Shooters, Beasts, and Lurkers ignore it. A unit takes that terrain penalty at most once.
 - A mounted attacker in good going takes −2 when fighting an opponent in bad going. A mounted unit already standing in bad going does not take a second terrain penalty.
 - Melee-only: −1 for flank attack; −1 for rear attack when the rear attacker is not frontally engaged elsewhere; −1 per overlap on a flank. An idle enemy overlaps by touching that flank, or by standing in the fighting enemy's rank where that rank extends past the fighter. A gap or a step in the rank still counts. One overlap per side.
 
@@ -162,14 +173,17 @@ First matching row wins. Heavy-Spear counts as Spear; Heavy-Warband counts as Wa
 
 | Loser | Condition | Outcome |
 |---|---|---|
+| Lurkers | Minor loss | Return to reserve |
+| Lurkers | Double | Destroyed |
 | Flyers | Minor loss | Recoil |
 | Flyers | Double by Hero, Magician, Flyers, or Shooters | Destroyed |
 | Flyers | Double by any other unit | Recoil, then flee 600 paces |
 | Behemoth | Winner is Artillery | Recoil, then flee 600 paces |
 | Magician | Winner is Hero, melee | Destroyed |
 | Hero or Magician | Winner is Magician | Ensorcelled |
+| Hero | Winner is Artillery | Destroyed |
 | Hero | Other minor losses | Recoil |
-| Beasts | Melee, winner is mounted | Destroyed |
+| Beasts | Melee, winner is mounted, loser not in bad going | Destroyed |
 | Artillery | Melee | Destroyed |
 | Shooter | Shooting | Recoil |
 | Shooter | Melee, winner is mounted | Destroyed |
@@ -178,8 +192,9 @@ First matching row wins. Heavy-Spear counts as Spear; Heavy-Warband counts as Wa
 | Knights | Melee, winner is Shooter | Destroyed |
 | Spear, Blade, or Horde | Winner is Warband | Destroyed |
 | Spear, Blade, or Horde | Winner is Knights, loser not in bad going | Destroyed |
+| Warband | Winner is Behemoth, melee | Destroyed |
 
-Knights therefore lose their minor-win destruction against Spears, Blades, and Hordes when the loser is in bad going. Riders and Knights that lose in bad going are destroyed rather than recoiling.
+Knights therefore lose their minor-win destruction against Spears, Blades, and Hordes when the loser is in bad going. Riders and Knights that lose in bad going are destroyed rather than recoiling. Beasts recoil instead of being destroyed when they lose melee to mounted troops in bad going. Artillery destroys Heroes on a minor win. Behemoths destroy Warbands on a minor melee win. Lurkers flee to reserve on a minor loss rather than recoiling; a double still destroys them. A lurker can still recoil if another unit's recoil pushes it.
 
 ## Turn sequence
 
@@ -219,7 +234,3 @@ Implemented roads are one full-board horizontal or vertical strip. Crooked route
 ### Retreat
 
 Retreat is a combat movement result: the unit moves backward a specified distance, with limited maneuver allowed. It is not the same as recoil (one base depth, no maneuver) or Behemoth flee.
-
-### Lurkers
-
-Lurkers begin off-board or are removed from the board, then enter during play using reserve-style placement. They are a further reserve type alongside Hordes.

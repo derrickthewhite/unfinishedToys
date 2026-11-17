@@ -105,6 +105,43 @@ test('army builder random actions create an exact army and can clear it', () => 
     assert.equal(app.getArmyValue('player-1'), 0);
 });
 
+test('a random faction forces a random army and locks composition', () => {
+    const app = createAppHarness({
+        state: { setupStage: 'army-builder', setup: { armies: Object.create(HordesPrototype.prototype).createArmyDrafts(), confirmation: null } }
+    });
+
+    app.updateArmyPlayer('player-1', 'faction', data.RANDOM_IDENTITY);
+    assert.equal(app.isArmyFactionRandom('player-1'), true);
+    assert.equal(app.isArmyRandom('player-1'), true);
+    assert.equal(app.isArmyCompositionLocked('player-1'), true);
+
+    app.setArmyRandom('player-1', false);
+    assert.equal(app.isArmyRandom('player-1'), true);
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    assert.equal(app.getArmyDraft('player-1').counts.Blade, undefined);
+    app.clearArmy('player-1');
+    assert.equal(app.isArmyRandom('player-1'), true);
+
+    app.updateArmyPlayer('player-1', 'faction', 'Panda');
+    app.setArmyRandom('player-1', true);
+    assert.equal(app.isArmyCompositionLocked('player-1'), true);
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    assert.equal(app.getArmyDraft('player-1').counts.Blade, undefined);
+});
+
+test('an explicit defender choice overrides the coin flip', () => {
+    const app = createAppHarness({
+        state: { setup: { armies: Object.create(HordesPrototype.prototype).createArmyDrafts(), confirmation: null, defenderChoice: 'coin-flip' } }
+    });
+    const flipped = app.initializeTerrainPlacement(() => 0.99);
+    assert.equal(flipped.defenderPlayerId, 'player-2');
+
+    app.state.setup.defenderChoice = 'player-1';
+    const chosen = app.initializeTerrainPlacement(() => 0.99);
+    assert.equal(chosen.defenderPlayerId, 'player-1');
+    assert.equal(app.getDefenderChoice(), 'player-1');
+});
+
 test('the army builder offers about a dozen player colors', () => {
     assert.equal(Object.keys(data.PLAYER_COLORS).length, 12);
     assert.equal(data.PLAYER_COLORS.silver.label, 'Silver');
@@ -333,6 +370,7 @@ test('deployment tray selection reuses the battle selection panel stats', () => 
             },
             selectionPanelEyebrow: { textContent: '' },
             selectionPanelTitle: { textContent: '' },
+            selectionPanelAp: { textContent: '', hidden: true, innerHTML: '' },
             selectionPanelHint: { textContent: '' },
             selectionPanelStats: { hidden: true, innerHTML: '' },
             selectionPanelPortrait: { hidden: true, style: { setProperty() {} } },
@@ -347,7 +385,7 @@ test('deployment tray selection reuses the battle selection panel stats', () => 
 
     assert.equal(app.ui.selectionPanelTitle.textContent, 'Blade');
     assert.equal(app.ui.selectionPanelStats.hidden, false);
-    assert.match(app.ui.selectionPanelStats.innerHTML, /<dt>AP<\/dt>/);
+    assert.match(app.ui.selectionPanelAp.innerHTML, /2 AP/);
     assert.match(app.ui.selectionPanelAsset.src, /Blade\.svg$/);
 });
 
@@ -589,6 +627,82 @@ test('deployment shift-click and marquee select only the active player, without 
     assert.ok(singleHandles.some((handle) => handle.kind === 'single-forward'));
     assert.ok(singleHandles.some((handle) => handle.kind === 'single-reverse'));
     assert.equal(singleHandles.some((handle) => handle.kind === 'formation-convert'), false);
+});
+
+test('deployment click on empty table clears selection and a click isolates one unit from a group', () => {
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 2);
+    app.initializeUnitDeployment();
+    const trayIds = app.getDeploymentSetup().tray.map((entry) => entry.draftId);
+
+    app.selectDeploymentTrayUnit(trayIds[0]);
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 260, clientY: 550 });
+    app.selectDeploymentTrayUnit(trayIds[1]);
+    app.onDeploymentPointerDown({ pointerId: 2, clientX: 340, clientY: 550 });
+    app.onDeploymentPointerUp({ pointerId: 2, clientX: 340, clientY: 550 });
+
+    const [first, second] = app.state.units;
+    app.state.selectedIds = [first.id, second.id];
+    app.updateSelectionAnalysis();
+
+    app.onDeploymentPointerDown({ pointerId: 3, button: 0, clientX: first.x + 8, clientY: first.y + 4, shiftKey: false });
+    app.onDeploymentPointerUp({ pointerId: 3, clientX: first.x + 8, clientY: first.y + 4, shiftKey: false });
+    assert.deepEqual(app.state.selectedIds, [first.id]);
+
+    app.onDeploymentPointerDown({ pointerId: 4, button: 0, clientX: 120, clientY: 400, shiftKey: false });
+    app.onDeploymentPointerUp({ pointerId: 4, clientX: 120, clientY: 400, shiftKey: false });
+    assert.deepEqual(app.state.selectedIds, []);
+});
+
+test('an illegal deployment drop keeps the tray unit on the pointer', () => {
+    const tokenImg = { src: '', getAttribute(name) { return name === 'src' ? this.src : null; } };
+    const token = {
+        hidden: true,
+        style: {
+            left: '',
+            top: '',
+            setProperty() {}
+        },
+        querySelector() { return tokenImg; }
+    };
+    const app = createAppHarness({
+        state: {
+            setupStage: 'unit-deployment',
+            setup: {
+                armies: Object.create(HordesPrototype.prototype).createArmyDrafts(),
+                confirmation: null,
+                terrain: { defenderPlayerId: 'player-1' }
+            }
+        },
+        ui: {
+            deploymentCursorToken: token
+        }
+    });
+    app.adjustArmyUnit('player-1', 'Blade', 1);
+    app.initializeUnitDeployment();
+    const draftId = app.getDeploymentSetup().tray[0].draftId;
+
+    app.selectDeploymentTrayUnit(draftId);
+    app.onDeploymentArmedPointerMove({ clientX: 40, clientY: 80 });
+    assert.equal(token.hidden, false);
+    assert.equal(token.style.left, '40px');
+    assert.equal(token.style.top, '80px');
+
+    app.onDeploymentPointerDown({ pointerId: 1, clientX: 300, clientY: 40 });
+    app.onDeploymentPointerUp({ pointerId: 1, clientX: 300, clientY: 40 });
+    assert.equal(app.state.units.length, 0);
+    assert.equal(app.getDeploymentSetup().selectedTrayId, draftId);
+    assert.equal(token.hidden, false);
 });
 
 test('deployment returns selected units to the tray and can place by dragging from the tray', () => {

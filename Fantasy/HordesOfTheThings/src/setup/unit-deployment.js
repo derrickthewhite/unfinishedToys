@@ -28,7 +28,12 @@
                 if (!draft || !draft.counts) {
                     return 0;
                 }
-                return Object.values(draft.counts).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0);
+                return Object.entries(draft.counts).reduce((sum, [type, count]) => {
+                    if (data.isLurkerType(type)) {
+                        return sum;
+                    }
+                    return sum + Math.max(0, Number(count) || 0);
+                }, 0);
             },
 
             getDefaultDeploymentRotation(playerId) {
@@ -48,6 +53,9 @@
                     const draft = this.getArmyDraft(playerId);
                     const faction = this.getPlayer(playerId)?.faction;
                     Object.entries(draft?.counts || {}).forEach(([type, count]) => {
+                        if (data.isLurkerType(type)) {
+                            return;
+                        }
                         for (let index = 0; index < (count || 0); index += 1) {
                             tray.push({
                                 draftId: `${playerId}-${type}-${index + 1}`,
@@ -116,8 +124,12 @@
                         this.renderUnitDeployment();
                     }, { passive: false });
                 }
+                window.addEventListener('pointermove', (event) => this.onDeploymentArmedPointerMove(event));
                 if (this.ui.autoDeployButton) {
                     this.ui.autoDeployButton.addEventListener('click', () => this.autoDeployActiveArmy());
+                }
+                if (this.ui.flipDeploymentBoardButton) {
+                    this.ui.flipDeploymentBoardButton.addEventListener('click', () => this.toggleBoardView());
                 }
                 if (this.ui.returnToTrayButton) {
                     this.ui.returnToTrayButton.addEventListener('click', () => this.returnSelectedUnitsToTray());
@@ -361,7 +373,59 @@
                 deployment.selectedUnitId = null;
                 this.state.selectedIds = [];
                 this.updateSelectionAnalysis();
+                this.syncDeploymentCursorToken();
                 this.syncUiFromState();
+            },
+
+            onDeploymentArmedPointerMove(event) {
+                if (this.state.setupStage !== 'unit-deployment') {
+                    return;
+                }
+                const deployment = this.getDeploymentSetup();
+                if (!deployment?.selectedTrayId) {
+                    return;
+                }
+                this.syncDeploymentCursorToken(event.clientX, event.clientY);
+            },
+
+            syncDeploymentCursorToken(clientX, clientY) {
+                const token = this.ui.deploymentCursorToken;
+                if (!token) {
+                    return;
+                }
+                if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
+                    this._deploymentCursorClient = { x: clientX, y: clientY };
+                }
+                const deployment = this.getDeploymentSetup();
+                const trayEntry = deployment?.selectedTrayId
+                    ? deployment.tray.find((entry) => entry.draftId === deployment.selectedTrayId)
+                    : null;
+                const armed = this.state.setupStage === 'unit-deployment'
+                    && Boolean(trayEntry)
+                    && trayEntry.playerId === deployment.activePlayerId
+                    && (!this.isComputerPlayer || !this.isComputerPlayer(deployment.activePlayerId));
+                const point = this._deploymentCursorClient;
+                if (!armed || !point) {
+                    token.hidden = true;
+                    return;
+                }
+                const colors = this.getPlayerColors(trayEntry.playerId);
+                const depth = data.UNIT_TYPES[trayEntry.type]?.depth || data.UNIT_WIDTH;
+                token.hidden = false;
+                token.style.left = `${point.x}px`;
+                token.style.top = `${point.y}px`;
+                if (typeof token.style.setProperty === 'function') {
+                    token.style.setProperty('--player-fill', colors.fill);
+                    token.style.setProperty('--player-stroke', colors.stroke);
+                    token.style.setProperty('--unit-depth', String(depth));
+                }
+                const img = typeof token.querySelector === 'function' ? token.querySelector('img') : null;
+                if (img) {
+                    const assetPath = this.getUnitAssetPath(trayEntry);
+                    if (img.getAttribute('src') !== assetPath) {
+                        img.src = assetPath;
+                    }
+                }
             },
 
             markDeploymentTraySelection(draftId) {
@@ -388,19 +452,33 @@
                 this.state.selectedIds = [];
                 this.updateSelectionAnalysis();
                 if (captureTarget && typeof captureTarget.setPointerCapture === 'function') {
-                    captureTarget.setPointerCapture(event.pointerId);
+                    try {
+                        captureTarget.setPointerCapture(event.pointerId);
+                    } catch (error) {
+                        // Synthetic or already-released pointers cannot capture.
+                    }
                 }
+                const targetRect = captureTarget && typeof captureTarget.getBoundingClientRect === 'function'
+                    ? captureTarget.getBoundingClientRect()
+                    : null;
+                const clientX = Number.isFinite(event.clientX)
+                    ? event.clientX
+                    : (targetRect ? targetRect.left + (targetRect.width / 2) : null);
+                const clientY = Number.isFinite(event.clientY)
+                    ? event.clientY
+                    : (targetRect ? targetRect.top + (targetRect.height / 2) : null);
                 deployment.interaction = {
                     type: 'place-from-tray',
                     source,
                     pointerId: event.pointerId,
                     draftId: trayEntry.draftId,
                     point: this.deploymentScreenToWorld(event),
-                    startClientX: event.clientX,
-                    startClientY: event.clientY,
+                    startClientX: Number.isFinite(event.clientX) ? event.clientX : clientX,
+                    startClientY: Number.isFinite(event.clientY) ? event.clientY : clientY,
                     moved: false,
                     captureTarget: captureTarget || null
                 };
+                this.syncDeploymentCursorToken(clientX, clientY);
             },
 
             onDeploymentTrayPointerDown(event, draftId) {
@@ -449,6 +527,7 @@
                         trayInteraction.moved = true;
                     }
                     trayInteraction.point = this.deploymentScreenToWorld(event);
+                    this.syncDeploymentCursorToken(event.clientX, event.clientY);
                     this.paintUnitDeploymentCanvas();
                     return;
                 }
@@ -472,13 +551,20 @@
                 deployment.interaction = null;
                 if (interaction.source === 'tray' && !interaction.moved) {
                     this.updateStatus('Selected unit. Click the board to place it, or drag it onto the board.');
+                    this.syncDeploymentCursorToken(event.clientX, event.clientY);
                     this.syncUiFromState();
                     return;
                 }
-                if (this.isEventOverDeploymentTray(event)
-                    || (interaction.source === 'tray' && !this.isEventOverDeploymentCanvas(event))) {
+                if (this.isEventOverDeploymentTray(event)) {
                     deployment.selectedTrayId = null;
                     this.updateStatus('Placement cancelled.');
+                    this.syncDeploymentCursorToken(event.clientX, event.clientY);
+                    this.syncUiFromState();
+                    return;
+                }
+                if (!this.isEventOverDeploymentCanvas(event)) {
+                    this.updateStatus('Selected unit. Click the board to place it, or drag it onto the board.');
+                    this.syncDeploymentCursorToken(event.clientX, event.clientY);
                     this.syncUiFromState();
                     return;
                 }
@@ -486,6 +572,7 @@
                 const trayEntry = trayIndex >= 0 ? deployment.tray[trayIndex] : null;
                 if (!trayEntry || trayEntry.playerId !== deployment.activePlayerId) {
                     this.updateStatus('Select one of your undeployed units first.');
+                    this.syncDeploymentCursorToken(event.clientX, event.clientY);
                     this.syncUiFromState();
                     return;
                 }
@@ -493,11 +580,13 @@
                 this.snapDeploymentUnits([candidate], [candidate.id]);
                 if (!this.isUnitPlacementInZone(candidate, trayEntry.playerId)) {
                     this.updateStatus('Invalid deployment: every corner must remain on the board and inside your deployment quarter.');
+                    this.syncDeploymentCursorToken(event.clientX, event.clientY);
                     this.syncUiFromState();
                     return;
                 }
                 if (this.findDeploymentOverlap(candidate, null)) {
                     this.updateStatus('Invalid deployment: units cannot overlap.');
+                    this.syncDeploymentCursorToken(event.clientX, event.clientY);
                     this.syncUiFromState();
                     return;
                 }
@@ -509,6 +598,7 @@
                 this.state.selectedIds = [candidate.id];
                 this.updateSelectionAnalysis();
                 this.updateStatus(`${this.getPlayerLabel(trayEntry.playerId)} deployed ${trayEntry.type}.`);
+                this.syncDeploymentCursorToken(event.clientX, event.clientY);
                 this.syncUiFromState();
             },
 
@@ -555,6 +645,7 @@
                 const firstPlayerId = deployment.defenderPlayerId;
                 this.state.homeEdgeByPlayerId = { ...deployment.zoneByPlayerId };
                 this.state.reserveUnits = [];
+                this.spawnStartingLurkersToReserve();
                 this.state.setupStage = 'game';
                 this.state.mode = 'game';
                 this.state.setup.deployment = null;
@@ -569,6 +660,9 @@
                 this.state.combatResolution = null;
                 this.state.losses = { 'player-1': [], 'player-2': [] };
                 this.captureStartingArmyValues();
+                if (typeof this.captureLurkerOccupancy === 'function') {
+                    this.captureLurkerOccupancy({ initialize: true });
+                }
                 this.state.victory = null;
                 this.state.victoryModalDismissed = false;
                 this.state.editHistory = [];
@@ -636,22 +730,6 @@
                     this.drawSelectionHandles(ctx);
                     if (this.state.marquee) {
                         this.drawMarquee(ctx);
-                    }
-                    const interaction = deployment.interaction;
-                    if (interaction?.type === 'place-from-tray') {
-                        const trayEntry = deployment.tray.find((entry) => entry.draftId === interaction.draftId);
-                        if (trayEntry) {
-                            const preview = this.buildDeployedUnit(trayEntry, interaction.point, () => 'deployment-preview');
-                            this.snapDeploymentUnits([preview], [preview.id]);
-                            const invalid = !this.isUnitPlacementInZone(preview, trayEntry.playerId) || Boolean(this.findDeploymentOverlap(preview));
-                            this.drawUnitBase(ctx, preview, {
-                                selected: false,
-                                invalid,
-                                highlighted: false,
-                                needsShootingDeclaration: false,
-                                ghost: true
-                            });
-                        }
                     }
                 });
             },
@@ -733,6 +811,7 @@
                 this.paintUnitDeploymentCanvas();
                 this.syncDeploymentHud();
                 this.syncDeploymentTray();
+                this.syncDeploymentCursorToken();
             }
         });
     }

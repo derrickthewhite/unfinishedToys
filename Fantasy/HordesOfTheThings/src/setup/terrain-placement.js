@@ -42,7 +42,10 @@
 
             initializeTerrainPlacement(random = Math.random) {
                 const terrain = this.createTerrainSetup(random);
-                terrain.defenderPlayerId = random() < 0.5 ? 'player-1' : 'player-2';
+                const defenderChoice = typeof this.getDefenderChoice === 'function' ? this.getDefenderChoice() : 'coin-flip';
+                terrain.defenderPlayerId = defenderChoice === 'player-1' || defenderChoice === 'player-2'
+                    ? defenderChoice
+                    : (random() < 0.5 ? 'player-1' : 'player-2');
                 terrain.baseSelected = true;
                 this.state.setup.terrain = terrain;
                 this.state.terrain = { roads: [], features: [] };

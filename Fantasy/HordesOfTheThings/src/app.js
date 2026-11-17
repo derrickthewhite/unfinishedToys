@@ -14,6 +14,7 @@
             require('./board/render.js'),
             require('./game-flow.js'),
             require('./reserve.js'),
+            require('./lurkers.js'),
             require('./setup/camera.js'),
             require('./setup/unit-deployment.js'),
             require('./ai/deploy.js'),
@@ -26,8 +27,8 @@
         );
         return;
     }
-    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesMoveAi, root.HordesShootingAi, root.HordesAiEvaluation, root.HordesController, root.HordesSelectionPanel, root.HordesVictory);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, setupCamera, unitDeployment, ai, moveAi, shootingAi, aiEvaluation, controller, selectionPanel, victory) {
+    root.HordesPrototypeApp = factory(root.HordesData, root.HordesGeometry, root.HordesRules, root.HordesHistory, root.HordesTerrainPlacement, root.HordesArmyBuilder, root.HordesPersistence, root.HordesGameSettings, root.HordesBoardInput, root.HordesBoardInteraction, root.HordesBoardRender, root.HordesGameFlow, root.HordesReserve, root.HordesLurkers, root.HordesSetupCamera, root.HordesUnitDeployment, root.HordesAi, root.HordesMoveAi, root.HordesShootingAi, root.HordesAiEvaluation, root.HordesController, root.HordesSelectionPanel, root.HordesVictory);
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (data, geometry, rules, history, terrainPlacement, armyBuilder, persistence, gameSettings, boardInput, boardInteraction, boardRender, gameFlow, reserve, lurkers, setupCamera, unitDeployment, ai, moveAi, shootingAi, aiEvaluation, controller, selectionPanel, victory) {
     class HordesPrototype {
         constructor() {
             this.canvas = document.getElementById('boardCanvas');
@@ -52,6 +53,9 @@
                     }
                 });
             }
+            if (typeof this.loadFactionArtConfigs === 'function') {
+                this.loadFactionArtConfigs();
+            }
         }
 
         captureUi() {
@@ -72,6 +76,7 @@
                 armyBuilder: document.getElementById('armyBuilder'),
                 armyColumns: document.getElementById('armyColumns'),
                 armyIdentityHint: document.getElementById('armyIdentityHint'),
+                defenderChoiceSelect: document.getElementById('defenderChoiceSelect'),
                 acceptArmiesButton: document.getElementById('acceptArmiesButton'),
                 setupPending: document.getElementById('setupPending'),
                 setupPendingText: document.getElementById('setupPendingText'),
@@ -94,6 +99,8 @@
                 autoDeployButton: document.getElementById('autoDeployButton'),
                 returnToTrayButton: document.getElementById('returnToTrayButton'),
                 finishDeploymentButton: document.getElementById('finishDeploymentButton'),
+                flipDeploymentBoardButton: document.getElementById('flipDeploymentBoardButton'),
+                deploymentCursorToken: document.getElementById('deploymentCursorToken'),
                 confirmationModal: document.getElementById('confirmationModal'),
                 confirmationBackdrop: document.getElementById('confirmationBackdrop'),
                 confirmationTitle: document.getElementById('confirmationTitle'),
@@ -117,6 +124,7 @@
                 acknowledgeAutoMoveButton: document.getElementById('acknowledgeAutoMoveButton'),
                 pauseControllerButton: document.getElementById('pauseControllerButton'),
                 gamePauseControllerButton: document.getElementById('gamePauseControllerButton'),
+                flipBoardButton: document.getElementById('flipBoardButton'),
                 controllerHud: document.getElementById('controllerHud'),
                 controllerThinkingText: document.getElementById('controllerThinkingText'),
                 gameThinkingText: document.getElementById('gameThinkingText'),
@@ -174,6 +182,7 @@
                 selectionPanelAsset: document.getElementById('selectionPanelAsset'),
                 selectionPanelEyebrow: document.getElementById('selectionPanelEyebrow'),
                 selectionPanelTitle: document.getElementById('selectionPanelTitle'),
+                selectionPanelAp: document.getElementById('selectionPanelAp'),
                 selectionPanelHint: document.getElementById('selectionPanelHint'),
                 selectionPanelStats: document.getElementById('selectionPanelStats'),
                 victoryModal: document.getElementById('victoryModal'),
@@ -201,7 +210,8 @@
                     armies: this.createArmyDrafts(),
                     confirmation: null,
                     terrain: null,
-                    deployment: null
+                    deployment: null,
+                    defenderChoice: 'coin-flip'
                 },
                 setupCameras: {},
                 mode: 'edit',
@@ -239,6 +249,8 @@
                 victory: null,
                 victoryModalDismissed: false,
                 reserveUnits: [],
+                lurkerLastOccupancy: {},
+                lurkerStartOccupancy: {},
                 homeEdgeByPlayerId: this.getDefaultHomeEdges(),
                 editHistory: [],
                 moveHistory: [],
@@ -247,6 +259,8 @@
                 autoMoveModalOpen: false,
                 autoMoveInProgress: false,
                 autoMoveAwaitingAck: false,
+                boardViewFlipped: false,
+                boardViewFlipLocked: false,
                 controllerPaused: false,
                 controllerThinking: null,
                 computerShotsDeclared: null,
@@ -402,6 +416,44 @@
             return data.PLAYER_IDS.find((candidate) => candidate !== playerId) || null;
         }
 
+        getBoardViewFocusPlayerId() {
+            return this.getSoleLocalPlayerId() || 'player-1';
+        }
+
+        getBoardViewFocusEdge() {
+            const playerId = this.getBoardViewFocusPlayerId();
+            if (this.state.setupStage === 'unit-deployment' && typeof this.getDeploymentZone === 'function') {
+                return this.getDeploymentZone(playerId) || this.getHomeEdge(playerId);
+            }
+            return this.getHomeEdge(playerId);
+        }
+
+        shouldDefaultBoardFlip() {
+            return this.getBoardViewFocusEdge() === 'top';
+        }
+
+        isBoardViewFlipped() {
+            if (this.state.boardViewFlipLocked) {
+                return Boolean(this.state.boardViewFlipped);
+            }
+            return this.shouldDefaultBoardFlip();
+        }
+
+        getBoardViewBottomPlayerId() {
+            const wantEdge = this.isBoardViewFlipped() ? 'top' : 'bottom';
+            return data.PLAYER_IDS.find((playerId) => this.getHomeEdge(playerId) === wantEdge) || 'player-1';
+        }
+
+        toggleBoardView() {
+            const next = !this.isBoardViewFlipped();
+            this.remapCameraForBoardFlip(this.state.camera);
+            this.remapCameraForBoardFlip(this.state.setupCameras?.deployment);
+            this.state.boardViewFlipLocked = true;
+            this.state.boardViewFlipped = next;
+            this.syncUiFromState();
+            this.requestRender();
+        }
+
         bindUi() {
             this.populateUnitTypes();
             window.addEventListener('resize', () => this.resizeCanvas());
@@ -418,6 +470,12 @@
                 });
             }
             this.ui.acceptArmiesButton.addEventListener('click', () => this.openArmyConfirmation());
+            if (this.ui.defenderChoiceSelect) {
+                this.ui.defenderChoiceSelect.addEventListener('change', () => this.setDefenderChoice(this.ui.defenderChoiceSelect.value));
+            }
+            if (this.ui.flipBoardButton) {
+                this.ui.flipBoardButton.addEventListener('click', () => this.toggleBoardView());
+            }
             this.ui.cancelConfirmationButton.addEventListener('click', () => this.closeSetupConfirmation());
             this.ui.confirmationBackdrop.addEventListener('click', () => this.closeSetupConfirmation());
             this.ui.confirmSetupButton.addEventListener('click', () => this.confirmSetupStage());
@@ -835,6 +893,8 @@
             }
             if (this.state.setupStage === 'unit-deployment') {
                 this.renderUnitDeployment();
+            } else if (typeof this.syncDeploymentCursorToken === 'function') {
+                this.syncDeploymentCursorToken();
             }
             if (this.ui.modeGroup) {
                 this.ui.modeGroup.hidden = this.state.mode !== 'edit';
@@ -1026,6 +1086,7 @@
     boardRender.install(HordesPrototype);
     gameFlow.install(HordesPrototype);
     reserve.install(HordesPrototype);
+    lurkers.install(HordesPrototype);
     setupCamera.install(HordesPrototype);
     unitDeployment.install(HordesPrototype);
     ai.install(HordesPrototype);

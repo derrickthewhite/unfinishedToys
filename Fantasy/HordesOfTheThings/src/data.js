@@ -40,6 +40,11 @@
     const RESERVE_BOARD_GAP = 24;
     const RESERVE_CAPACITY = 24;
     const RESERVE_RECYCLE_TYPES = Object.freeze(['Horde']);
+    const LURKER_TYPES = Object.freeze(['Lurkers']);
+    const LURKER_ISOLATION_PACES = 600;
+    const LURKER_AMBUSH_GAP = 10;
+    const LURKER_AMBUSH_LATERAL = 12;
+    const LURKER_AMBUSH_FACING = Math.PI / 8;
     const RESERVE_ENEMY_CLEARANCE_PACES = 200;
     const MAGICIAN_MAX_RANGE_PACES = 600;
     const MAGICIAN_MOVE_COST = 2;
@@ -65,7 +70,7 @@
         Undead: Object.freeze(['Blade', 'Spear', 'Warband', 'Horde', 'Riders', 'Magician']),
         Goblin: Object.freeze(['Spear', 'Heavy-Warband', 'Shooter', 'Horde', 'Riders']),
         Gunpowder: Object.freeze(['Blade', 'Shooter', 'Artillery', 'Riders']),
-        Dinosaurs: Object.freeze(['Heavy-Spear', 'Beasts', 'Flyers', 'Behemoth'])
+        Dinosaurs: Object.freeze(['Heavy-Spear', 'Beasts', 'Flyers', 'Behemoth', 'Lurkers'])
     });
     const TERRAIN_OFFER_KINDS = Object.freeze(['forest', 'swamp', 'water', 'impassable', 'road']);
     const TERRAIN_FEATURE_KINDS = Object.freeze(['forest', 'swamp', 'water', 'impassable']);
@@ -223,8 +228,17 @@
             combat: { ignoresBadGoingPenalty: false, moveCost: MAGICIAN_MOVE_COST, attackDeclareCost: MAGICIAN_ATTACK_DECLARE_COST }
         },
         Beasts: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 400, good: 400, bad: 400, water: 100 }, strength: { infantry: 3, mounted: 4 }, combat: { ignoresBadGoingPenalty: true } },
-        Flyers: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 1200, good: 1200, bad: 1200, water: 1200 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false }, movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 } },
+        Flyers: { value: 2, depth: 30, troopClass: 'mounted', moves: { road: 1200, good: 1200, bad: 1200, water: 1200 }, strength: { infantry: 2, mounted: 2 }, combat: { ignoresBadGoingPenalty: false, moveCost: 2 }, movement: { ignoresTerrain: true, ignoresUnitsWhenUnengaged: true, disengageDistance: 20 } },
         Behemoth: { value: 4, depth: 40, troopClass: 'mounted', moves: { road: 400, good: 300, bad: 200, water: 100 }, strength: { infantry: 4, mounted: 5 }, combat: { ignoresBadGoingPenalty: false } },
+        Lurkers: {
+            value: 1,
+            depth: 20,
+            troopClass: 'infantry',
+            moves: { road: 200, good: 200, bad: 200, water: 100 },
+            strength: { infantry: 2, mounted: 2 },
+            combat: { ignoresBadGoingPenalty: true },
+            movement: { lurker: true, startsInReserve: true }
+        },
         Base: {
             value: 0,
             depth: 100,
@@ -373,6 +387,14 @@
         };
     }
 
+    function isLurkerType(type) {
+        return LURKER_TYPES.includes(type);
+    }
+
+    function getLurkerDeployCost(unit) {
+        return 1 + Math.max(0, Number(unit?.lurkerDeployments) || 0);
+    }
+
     function createUnit(type, playerId, faction, pose, allocateUnitId) {
         const template = UNIT_TYPES[type];
         if (!template) {
@@ -400,7 +422,8 @@
             movement: { ...(template.movement || {}) },
             value: template.value,
             strength: { ...template.strength },
-            combat: { ...(template.combat || {}) }
+            combat: { ...(template.combat || {}) },
+            ...(isLurkerType(type) ? { lurkerDeployments: 0 } : {})
         };
     }
 
@@ -461,6 +484,11 @@
         RESERVE_BOARD_GAP,
         RESERVE_CAPACITY,
         RESERVE_RECYCLE_TYPES,
+        LURKER_TYPES,
+        LURKER_ISOLATION_PACES,
+        LURKER_AMBUSH_GAP,
+        LURKER_AMBUSH_LATERAL,
+        LURKER_AMBUSH_FACING,
         RESERVE_ENEMY_CLEARANCE_PACES,
         MAGICIAN_MAX_RANGE_PACES,
         MAGICIAN_MOVE_COST,
@@ -506,6 +534,8 @@
         convertMovesToMm,
         convertRangedToMm,
         createUnit,
+        isLurkerType,
+        getLurkerDeployCost,
         createDefaultTerrain,
         createDefaultUnits
     };

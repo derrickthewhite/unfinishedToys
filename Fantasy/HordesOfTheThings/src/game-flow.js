@@ -27,6 +27,91 @@
             this.updateStatus('Single-unit move stepped.');
         }
 
+        getSelectedHoldUnit(unitId) {
+            const unit = this.getUnitById(unitId)
+                || (this.state.selectedIds.length === 1 ? this.getUnitById(this.state.selectedIds[0]) : null);
+            if (!unit || !this.state.selectedIds.includes(unit.id)) {
+                return null;
+            }
+            if (this.getUnitPlayerId(unit) !== this.state.activePlayerId) {
+                return null;
+            }
+            return unit;
+        }
+
+        getShootingDeclareCost(unit, alreadyDeclared) {
+            if (!unit || alreadyDeclared) {
+                return 0;
+            }
+            if (unit.heldShot) {
+                return 0;
+            }
+            return rules.getAttackDeclareCost(unit);
+        }
+
+        holdMagicianShot(unitId) {
+            const unit = this.getSelectedHoldUnit(unitId);
+            if (!unit || unit.type !== 'Magician' || this.state.mode !== 'game' || this.state.phase !== 'move') {
+                return;
+            }
+            if (this.state.draft) {
+                this.updateStatus('Finish or cancel the current move before reserving a shot.');
+                return;
+            }
+            if (unit.heldShot) {
+                return;
+            }
+            const cost = rules.getAttackDeclareCost(unit);
+            if (this.state.remainingMoves < cost) {
+                this.updateStatus(`Reserving a ${unit.type} shot requires ${cost} moves.`);
+                return;
+            }
+            this.state.remainingMoves -= cost;
+            unit.heldShot = true;
+            this.syncUiFromState();
+            this.requestRender();
+            this.updateStatus(`Reserved ${cost} moves for ${unit.type} shooting.`);
+        }
+
+        releaseMagicianShot(unitId) {
+            const unit = this.getSelectedHoldUnit(unitId);
+            if (!unit || !unit.heldShot || this.state.mode !== 'game' || this.state.phase !== 'move') {
+                return;
+            }
+            const cost = rules.getAttackDeclareCost(unit) || 2;
+            unit.heldShot = false;
+            this.state.remainingMoves += cost;
+            this.syncUiFromState();
+            this.requestRender();
+            this.updateStatus(`Released the reserved ${unit.type} shot.`);
+        }
+
+        lockArtilleryInPlace(unitId) {
+            const unit = this.getSelectedHoldUnit(unitId);
+            if (!unit || unit.type !== 'Artillery' || this.state.mode !== 'game' || this.state.phase !== 'move') {
+                return;
+            }
+            if (this.state.draft) {
+                this.updateStatus('Finish or cancel the current move before locking artillery.');
+                return;
+            }
+            unit.lockedInPlace = true;
+            this.syncUiFromState();
+            this.requestRender();
+            this.updateStatus(`${unit.type} locked in place.`);
+        }
+
+        unlockArtilleryInPlace(unitId) {
+            const unit = this.getSelectedHoldUnit(unitId);
+            if (!unit || !unit.lockedInPlace || this.state.mode !== 'game' || this.state.phase !== 'move') {
+                return;
+            }
+            unit.lockedInPlace = false;
+            this.syncUiFromState();
+            this.requestRender();
+            this.updateStatus(`${unit.type} unlocked.`);
+        }
+
         notifyController() {
             if (typeof this.scheduleControllerAction === 'function') {
                 this.scheduleControllerAction();
@@ -46,6 +131,8 @@
             let moveCost = 1;
             if (draft.kind === 'reserve-deploy') {
                 moveCost = 1;
+            } else if (draft.kind === 'lurker-ambush') {
+                moveCost = this.getLurkerDeployCost(this.getUnitById(draft.unitIds[0]));
             } else if (draft.kind === 'ensorcelled-return') {
                 moveCost = draft.returnCost || 0;
             } else {
@@ -69,10 +156,13 @@
                 unitIds: [...draft.unitIds],
                 positionsBefore,
                 movedThisTurnBefore,
-                moveCost
+                moveCost,
+                kind: draft.kind || null,
+                reserveRestore: draft.reserveRestore ? { ...draft.reserveRestore } : null
             });
             this.state.remainingMoves = Math.max(0, this.state.remainingMoves - moveCost);
             const reserveDeploy = draft.kind === 'reserve-deploy';
+            const lurkerAmbush = draft.kind === 'lurker-ambush';
             const ensorcelledReturn = draft.kind === 'ensorcelled-return';
             draft.unitIds.forEach((unitId) => {
                 const unit = this.getUnitById(unitId);
@@ -80,11 +170,14 @@
                 if (!unit) {
                     return;
                 }
-                if (reserveDeploy || ensorcelledReturn) {
+                if (reserveDeploy || lurkerAmbush || ensorcelledReturn) {
                     unit.movedThisTurn = true;
                     this.clearLossForUnit(unit.id);
                     delete unit.inReserve;
                     delete unit.reserveSlot;
+                    if (lurkerAmbush) {
+                        unit.lurkerDeployments = (unit.lurkerDeployments || 0) + 1;
+                    }
                     if (ensorcelledReturn) {
                         delete unit.ensorcelledByUnitId;
                         delete unit.ensorcelledFrom;
@@ -98,9 +191,10 @@
             const moveAnalysis = this.state.selectionAnalysis;
             const movedRankUnitIds = [...draft.unitIds];
             const wasReserveDeploy = draft.kind === 'reserve-deploy';
+            const wasLurkerAmbush = draft.kind === 'lurker-ambush';
             const wasEnsorcelledReturn = draft.kind === 'ensorcelled-return';
             this.state.draft = null;
-            if (!wasReserveDeploy && !wasEnsorcelledReturn && moveAnalysis.type === 'rank') {
+            if (!wasReserveDeploy && !wasLurkerAmbush && !wasEnsorcelledReturn && moveAnalysis.type === 'rank') {
                 const dressResult = rules.resolveRankFormationDress(
                     this.state.units,
                     movedRankUnitIds,
@@ -110,13 +204,18 @@
                 this.state.units = dressResult.units;
             }
             this.updateSelectionAnalysis();
-            if (this.state.phase === 'move' && this.state.remainingMoves === 0) {
+            if (this.state.phase === 'move' && this.state.remainingMoves === 0 && !this.shouldHoldComputerMoveReview()) {
                 this.beginFormUpPhase();
                 return;
             }
             this.syncUiFromState();
             this.updateStatus('Move finished. Remaining moves: ' + this.state.remainingMoves + '.');
             this.notifyController();
+        }
+
+        shouldHoldComputerMoveReview() {
+            return typeof this.canLocallyControl === 'function'
+                && !this.canLocallyControl(this.state.activePlayerId);
         }
 
         hasLegalMoveRemaining() {
@@ -136,6 +235,9 @@
             const reserveUnits = typeof this.getReserveUnits === 'function' ? this.getReserveUnits() : [];
             return reserveUnits.some((unit) => {
                 if (this.getUnitPlayerId(unit) !== playerId) {
+                    return false;
+                }
+                if (typeof this.isLurkerBlockedInReserve === 'function' && this.isLurkerBlockedInReserve(unit)) {
                     return false;
                 }
                 const cost = typeof this.unitMoveCost === 'function' ? this.unitMoveCost(unit) : 1;
@@ -182,14 +284,23 @@
                 this.updateStatus('No finished move to undo.');
                 return;
             }
-            geometry.restoreSnapshot(entry.positionsBefore, this.state.units);
-            entry.unitIds.forEach((unitId) => {
-                const unit = this.getUnitById(unitId);
-                if (!unit) {
-                    return;
-                }
-                unit.movedThisTurn = Boolean(entry.movedThisTurnBefore[unitId]);
-            });
+            if ((entry.kind === 'lurker-ambush' || entry.kind === 'reserve-deploy' || entry.kind === 'ensorcelled-return')
+                && entry.reserveRestore
+                && typeof this.restoreReserveDeploy === 'function') {
+                this.restoreReserveDeploy({ reserveRestore: entry.reserveRestore });
+            } else {
+                geometry.restoreSnapshot(entry.positionsBefore, this.state.units);
+                entry.unitIds.forEach((unitId) => {
+                    const unit = this.getUnitById(unitId);
+                    if (!unit) {
+                        return;
+                    }
+                    unit.movedThisTurn = Boolean(entry.movedThisTurnBefore[unitId]);
+                    if (entry.kind === 'lurker-ambush') {
+                        unit.lurkerDeployments = Math.max(0, (unit.lurkerDeployments || 1) - 1);
+                    }
+                });
+            }
             this.state.remainingMoves += entry.moveCost;
             if (this.state.autoMoveGhost && geometry.sameIdSet(this.state.autoMoveGhost.unitIds, entry.unitIds)) {
                 this.state.autoMoveGhost = null;
@@ -206,6 +317,8 @@
                 if (!playerId || this.getUnitPlayerId(unit) === playerId) {
                     unit.movedThisTurn = false;
                     unit.attackedThisTurn = false;
+                    unit.heldShot = false;
+                    unit.lockedInPlace = false;
                 }
             });
         }
@@ -376,7 +489,7 @@
             if (!unit || this.state.mode !== 'game') {
                 return false;
             }
-            const declareCost = rules.getAttackDeclareCost(unit);
+            const declareCost = this.getShootingDeclareCost(unit, false);
             if (declareCost > 0 && this.state.remainingMoves < declareCost) {
                 return false;
             }
@@ -424,6 +537,9 @@
             this.clearMoveTurnState();
             this.resetMovedFlags(this.state.activePlayerId);
             this.setPhase('move');
+            if (typeof this.captureLurkerOccupancy === 'function') {
+                this.captureLurkerOccupancy();
+            }
             if (typeof this.captureLocalTurnCheckpoint === 'function') {
                 this.captureLocalTurnCheckpoint();
             }
@@ -441,6 +557,10 @@
                 this.state.shooting = null;
                 this.setPhase('melee');
                 if (this.state.phase === 'melee' && this.getMeleeState().combats.length === 0) {
+                    if (rules.findIsolatedLurkers(this.state.units, this.state.terrain).length > 0) {
+                        this.resolveMeleePhase();
+                        return false;
+                    }
                     this.advanceToNextTurn();
                     return true;
                 }
@@ -450,6 +570,10 @@
                 return true;
             }
             if (this.state.phase === 'melee' && this.getMeleeState().combats.length === 0) {
+                if (rules.findIsolatedLurkers(this.state.units, this.state.terrain).length > 0) {
+                    this.resolveMeleePhase();
+                    return false;
+                }
                 this.advanceToNextTurn();
                 return true;
             }
@@ -527,7 +651,7 @@
             if (shooting.focusedAttackerId && shooting.validTargetIds.includes(unit.id)) {
                 const attacker = this.getUnitById(shooting.focusedAttackerId);
                 const alreadyDeclared = Boolean(shooting.attacksByAttacker[shooting.focusedAttackerId]);
-                const declareCost = alreadyDeclared ? 0 : rules.getAttackDeclareCost(attacker);
+                const declareCost = this.getShootingDeclareCost(attacker, alreadyDeclared);
                 if (declareCost > 0 && this.state.remainingMoves < declareCost) {
                     this.updateStatus(`Declaring a ${attacker.type} attack requires ${declareCost} moves.`);
                     return;
@@ -567,7 +691,7 @@
                     this.updateStatus(status);
                     return;
                 }
-                const declareCost = alreadyDeclared ? 0 : rules.getAttackDeclareCost(unit);
+                const declareCost = this.getShootingDeclareCost(unit, alreadyDeclared);
                 if (declareCost > 0 && this.state.remainingMoves < declareCost) {
                     this.updateStatus(`Declaring a ${unit.type} attack requires ${declareCost} moves.`);
                     return;
@@ -621,13 +745,19 @@
             const ghostSnapshot = {};
             const destroyedIds = new Set(result.destroyedUnits.map((unit) => unit.id));
             const ensorcelledIds = new Set((result.ensorcelledUnits || []).map((unit) => unit.id));
+            const lurkerReturnedIds = new Set((result.lurkerReturnedUnits || []).map((unit) => unit.id));
             allIds.forEach((unitId) => {
                 const before = snapshot[unitId];
                 const live = result.units.find((unit) => unit.id === unitId)
                     || result.destroyedUnits.find((unit) => unit.id === unitId)
                     || (result.ensorcelledUnits || []).find((unit) => unit.id === unitId)
+                    || (result.lurkerReturnedUnits || []).find((unit) => unit.id === unitId)
                     || null;
-                if (destroyedIds.has(unitId) || ensorcelledIds.has(unitId) || !live || this.hasUnitMoved(before, live)) {
+                if (destroyedIds.has(unitId)
+                    || ensorcelledIds.has(unitId)
+                    || lurkerReturnedIds.has(unitId)
+                    || !live
+                    || this.hasUnitMoved(before, live)) {
                     ghostSnapshot[unitId] = { ...before };
                     participantIds.add(unitId);
                 }
@@ -647,8 +777,10 @@
                 ghostSnapshot,
                 destroyedIds,
                 ensorcelledIds,
+                lurkerReturnedIds,
                 recycledUnits: (result.destroyedUnits || []).filter((unit) => this.isReserveRecycleType(unit)),
                 ensorcelledUnits: result.ensorcelledUnits || [],
+                lurkerReturnedUnits: result.lurkerReturnedUnits || [],
                 movedUnitIds: Object.keys(ghostSnapshot),
                 recoilDestructions: (result.recoilDestructions || []).filter((entry) => entry.kind !== 'flee'),
                 attacksByAttacker: null,
@@ -663,7 +795,8 @@
         }
 
         logCombatResults(result, phase) {
-            if (!result.results.length) {
+            const lurkerReturns = result.lurkerReturnedUnits || [];
+            if (!result.results.length && lurkerReturns.length === 0) {
                 console.info(`${phase} resolved with no combats.`);
                 return;
             }
@@ -708,6 +841,10 @@
                         : unit.ensorcelledByUnitId);
                 console.log(`ensorcelled: ${this.describeCombatUnits(result, [unit.id])} | ensorcelled by ${ensorceller}`);
             });
+            lurkerReturns.forEach((unit) => {
+                const why = unit.lurkerReturnReason === 'isolation' ? 'isolated at 600 paces' : 'minor loss';
+                console.log(`lurkers to reserve: ${this.describeCombatUnits(result, [unit.id])} | ${why}`);
+            });
             console.groupEnd();
         }
 
@@ -715,6 +852,7 @@
             return result.units.find((unit) => unit.id === unitId)
                 || result.destroyedUnits.find((unit) => unit.id === unitId)
                 || (result.ensorcelledUnits || []).find((unit) => unit.id === unitId)
+                || (result.lurkerReturnedUnits || []).find((unit) => unit.id === unitId)
                 || null;
         }
 
@@ -799,6 +937,7 @@
             this.state.combatResolution = this.buildCombatResolution(snapshot, result, 'shooting');
             this.state.combatResolution.attacksByAttacker = declaredAttacks;
             this.settleEnsorcelledUnits(result.ensorcelledUnits);
+            this.settleLurkerReturns(result.lurkerReturnedUnits);
             this.logCombatResults(result, 'shooting');
             this.state.selectedIds = [];
             this.state.shooting = null;
@@ -809,6 +948,7 @@
             this.updateSelectionAnalysis();
             this.syncUiFromState();
             const ensorcelledCount = (result.ensorcelledUnits || []).length;
+            const lurkerCount = (result.lurkerReturnedUnits || []).length;
             const destroyedCount = result.destroyedUnits.length;
             const summary = [];
             if (destroyedCount > 0) {
@@ -816,6 +956,9 @@
             }
             if (ensorcelledCount > 0) {
                 summary.push(`${ensorcelledCount} ensorcelled`);
+            }
+            if (lurkerCount > 0) {
+                summary.push(`${lurkerCount} lurkers to reserve`);
             }
             this.updateStatus(`Shooting resolved${summary.length ? `: ${summary.join(', ')}` : ''}. Review the aftermath, then click Acknowledge Shooting.`);
             this.notifyController();
@@ -831,6 +974,7 @@
             this.recordLosses(result.destroyedUnits);
             this.state.combatResolution = this.buildCombatResolution(snapshot, result, 'melee');
             this.settleEnsorcelledUnits(result.ensorcelledUnits);
+            this.settleLurkerReturns(result.lurkerReturnedUnits);
             this.logCombatResults(result, 'melee');
             this.state.selectedIds = [];
             this.state.melee = null;
@@ -840,7 +984,9 @@
             }
             this.updateSelectionAnalysis();
             this.syncUiFromState();
-            this.updateStatus(`Melee resolved: ${result.destroyedUnits.length} units destroyed. Review the aftermath, then click Acknowledge Melee.`);
+            const lurkerCount = (result.lurkerReturnedUnits || []).length;
+            const lurkerNote = lurkerCount > 0 ? `, ${lurkerCount} lurkers to reserve` : '';
+            this.updateStatus(`Melee resolved: ${result.destroyedUnits.length} units destroyed${lurkerNote}. Review the aftermath, then click Acknowledge Melee.`);
             this.notifyController();
         }
 
@@ -935,9 +1081,18 @@
             this.notifyController();
         }
 
+        isLocalDefeat() {
+            const victory = this.state.victory;
+            if (!victory || typeof this.isLocalPlayer !== 'function') {
+                return false;
+            }
+            const locals = ['player-1', 'player-2'].filter((playerId) => this.isLocalPlayer(playerId));
+            return locals.length === 1 && locals[0] === victory.loserPlayerId;
+        }
+
         acknowledgeButtonLabel() {
             if (this.state.victory && this.state.victoryModalDismissed) {
-                return 'Victory';
+                return this.isLocalDefeat() ? 'Defeat' : 'Victory';
             }
             if (this.state.computerMoveReview?.awaitingAck) {
                 return 'Acknowledge Move';
@@ -1024,6 +1179,16 @@
             if (this.state.draft.kind === 'ensorcelled-return') {
                 const unit = this.getUnitById(this.state.draft.unitIds[0]);
                 const result = this.validateEnsorcelledReturn(unit, this.state.units, this.state.terrain);
+                this.state.draft.invalidIds = result.invalid ? new Set(this.state.draft.unitIds) : new Set();
+                this.state.draft.reasonById = result.invalid
+                    ? new Map([[this.state.draft.unitIds[0], result.reason]])
+                    : new Map();
+                this.syncUiFromState();
+                return;
+            }
+            if (this.state.draft.kind === 'lurker-ambush') {
+                const unit = this.getUnitById(this.state.draft.unitIds[0]);
+                const result = this.validateLurkerAmbush(unit, this.state.units, this.state.terrain);
                 this.state.draft.invalidIds = result.invalid ? new Set(this.state.draft.unitIds) : new Set();
                 this.state.draft.reasonById = result.invalid
                     ? new Map([[this.state.draft.unitIds[0], result.reason]])

@@ -62,7 +62,9 @@
                     if (!targetId) {
                         return;
                     }
-                    const declareCost = rules.getAttackDeclareCost(unit);
+                    const declareCost = typeof this.getShootingDeclareCost === 'function'
+                        ? this.getShootingDeclareCost(unit, Boolean(shooting.attacksByAttacker[unit.id]))
+                        : rules.getAttackDeclareCost(unit);
                     if (declareCost > 0 && this.state.remainingMoves < declareCost) {
                         return;
                     }

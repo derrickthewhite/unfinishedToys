@@ -21,7 +21,9 @@
         sampleUnitTerrain,
         severityFromTerrain,
         combineMoveSeverity,
-        movementAllowanceForSeverity
+        movementAllowanceForSeverity,
+        isUnitInBadGoing,
+        distanceToNearestBadGoing
     } = terrain;
 
     const {
@@ -197,6 +199,12 @@
                 if (!ignoresTerrain && severity === TERRAIN_SEVERITY.impassable) {
                     setInvalid(invalidIds, reasonById, unit.id, 'Path enters impassable terrain.');
                 }
+                if (data.isLurkerType(unit.type)) {
+                    const originUnit = validationOrigin[unit.id] || pathOrigin[unit.id] || unit;
+                    if (isUnitInBadGoing(originUnit, terrain) && !sampleTerrain.has('forest') && !sampleTerrain.has('swamp')) {
+                        setInvalid(invalidIds, reasonById, unit.id, 'Lurkers may not leave bad going.');
+                    }
+                }
                 if (engagedFlyerIds.has(unit.id)) {
                     const originCenter = geometry.getUnitCenter(validationOrigin[unit.id]);
                     const displacement = geometry.subtract(geometry.getUnitCenter(sample), originCenter);
@@ -283,6 +291,19 @@
                 invalidIds.add(unit.id);
                 reasonById.set(unit.id, 'An engaged Flyer must first move 20 mm backward.');
                 return;
+            }
+            if (data.isLurkerType(unit.type)) {
+                const originUnit = validationOrigin[unit.id] || pathOrigin[unit.id] || unit;
+                const startedInBadGoing = isUnitInBadGoing(originUnit, terrain);
+                if (startedInBadGoing && !isUnitInBadGoing(unit, terrain)) {
+                    setInvalid(invalidIds, reasonById, unit.id, 'Lurkers may not leave bad going.');
+                } else if (!startedInBadGoing && !geometry.sameFootprint(originUnit, unit)) {
+                    const startDistance = distanceToNearestBadGoing(originUnit, terrain);
+                    const endDistance = distanceToNearestBadGoing(unit, terrain);
+                    if (!(endDistance < startDistance - 0.5)) {
+                        setInvalid(invalidIds, reasonById, unit.id, 'Lurkers outside bad going must move toward the nearest forest or swamp.');
+                    }
+                }
             }
             if (invalidIds.has(unit.id)) {
                 return;

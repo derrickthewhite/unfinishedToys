@@ -20,6 +20,47 @@
                 return Boolean(this.getArmyDraft(playerId).random);
             },
 
+            isArmyFactionRandom(playerId) {
+                return this.getPlayer(playerId)?.faction === data.RANDOM_IDENTITY;
+            },
+
+            isArmyCompositionLocked(playerId) {
+                return this.isArmyRandom(playerId) || this.isArmyFactionRandom(playerId);
+            },
+
+            getDefenderChoice() {
+                const choice = this.state.setup?.defenderChoice;
+                return choice === 'player-1' || choice === 'player-2' ? choice : 'coin-flip';
+            },
+
+            setDefenderChoice(value) {
+                if (!this.state.setup) {
+                    return;
+                }
+                this.state.setup.defenderChoice = value === 'player-1' || value === 'player-2' ? value : 'coin-flip';
+                this.syncUiFromState();
+            },
+
+            syncDefenderChoiceSelect() {
+                const select = this.ui.defenderChoiceSelect;
+                if (!select || !select.options) {
+                    return;
+                }
+                const options = [
+                    { value: 'coin-flip', label: 'Coin flip' },
+                    { value: 'player-1', label: this.getArmyIdentity('player-1').label },
+                    { value: 'player-2', label: this.getArmyIdentity('player-2').label }
+                ];
+                options.forEach((option, index) => {
+                    if (!select.options[index]) {
+                        return;
+                    }
+                    select.options[index].value = option.value;
+                    select.options[index].textContent = option.label;
+                });
+                select.value = this.getDefenderChoice();
+            },
+
             isArmyValid(playerId) {
                 return this.isArmyRandom(playerId) || this.getArmyValue(playerId) === data.ARMY_POINT_TARGET;
             },
@@ -85,10 +126,10 @@
             },
 
             adjustArmyUnit(playerId, type, delta) {
-                if (this.isArmyRandom(playerId)) {
-                return;
-            }
-            if (this.state.setupStage === 'army-builder'
+                if (this.isArmyCompositionLocked(playerId)) {
+                    return;
+                }
+                if (this.state.setupStage === 'army-builder'
                     && delta > 0
                     && !this.getAllowedUnitTypes(playerId).includes(type)) {
                     return;
@@ -113,13 +154,18 @@
                     return;
                 }
                 this.state.players[playerId][property] = value;
-                if (property === 'faction' && value !== data.RANDOM_IDENTITY) {
+                if (property === 'faction' && value === data.RANDOM_IDENTITY) {
+                    this.getArmyDraft(playerId).random = true;
+                } else if (property === 'faction') {
                     this.pruneArmyToAllowedTypes(playerId);
                 }
                 this.syncUiFromState();
             },
 
             setArmyRandom(playerId, random) {
+                if (this.isArmyFactionRandom(playerId) && !random) {
+                    return;
+                }
                 const draft = this.getArmyDraft(playerId);
                 draft.random = Boolean(random);
                 this.syncUiFromState();
@@ -193,6 +239,9 @@
             },
 
             clearArmy(playerId) {
+                if (this.isArmyFactionRandom(playerId)) {
+                    return;
+                }
                 this.getArmyDraft(playerId).counts = {};
                 this.getArmyDraft(playerId).random = false;
                 this.updateStatus(`${this.getArmyIdentity(playerId).label}'s army was cleared.`);
@@ -207,7 +256,9 @@
                     const colors = this.getPlayerColors(playerId);
                     const value = this.getArmyValue(playerId);
                     const randomArmy = this.isArmyRandom(playerId);
-                    const valueClass = randomArmy
+                    const factionRandom = this.isArmyFactionRandom(playerId);
+                    const compositionLocked = randomArmy || factionRandom;
+                    const valueClass = compositionLocked
                         ? 'is-exact'
                         : (value === data.ARMY_POINT_TARGET ? 'is-exact' : (value > data.ARMY_POINT_TARGET ? 'is-over' : 'is-under'));
                     const opponent = this.getPlayer(this.getOpponentPlayerId(playerId));
@@ -228,13 +279,15 @@
                             `<option value="${faction}"${faction === player.faction ? ' selected' : ''}>${faction}</option>`
                         ))
                     ].join('');
-                    const previewFaction = player.faction === data.RANDOM_IDENTITY ? data.FACTIONS[0] : player.faction;
-                    const rows = this.getAllowedUnitTypes(playerId).map((type) => {
-                        const unit = data.UNIT_TYPES[type];
-                        const count = this.getArmyDraft(playerId).counts[type] || 0;
-                        const assetPath = this.getUnitAssetPath({ type, faction: previewFaction });
-                        const disabled = randomArmy ? ' disabled' : '';
-                        return `
+                    const previewFaction = factionRandom ? data.FACTIONS[0] : player.faction;
+                    const rows = factionRandom
+                        ? ''
+                        : this.getAllowedUnitTypes(playerId).map((type) => {
+                            const unit = data.UNIT_TYPES[type];
+                            const count = this.getArmyDraft(playerId).counts[type] || 0;
+                            const assetPath = this.getUnitAssetPath({ type, faction: previewFaction });
+                            const disabled = randomArmy ? ' disabled' : '';
+                            return `
                             <div class="army-unit-row${randomArmy ? ' is-random' : ''}">
                                 <img class="army-unit-preview" src="${assetPath}" alt="${previewFaction} ${type}">
                                 <div>
@@ -247,13 +300,16 @@
                                     <button type="button" data-army-action="increment" data-player-id="${playerId}" data-unit-type="${type}" aria-label="Add ${type}"${disabled}>+</button>
                                 </div>
                             </div>`;
-                    }).join('');
+                        }).join('');
+                    const unitList = factionRandom
+                        ? '<p class="army-random-note">This army is rolled completely when you accept. Color and controller can still be chosen.</p>'
+                        : rows;
                     return `
                         <section class="army-player" style="--player-fill: ${colors.fill}; --player-stroke: ${colors.stroke};" aria-labelledby="armyPlayerTitle${playerIndex}">
                             <header class="army-player-header">
                                 <div class="army-player-heading">
                                     <h2 id="armyPlayerTitle${playerIndex}">${this.getArmyIdentity(playerId).label}</h2>
-                                    <output class="army-total ${valueClass}">${randomArmy ? 'Random' : `${value} / ${data.ARMY_POINT_TARGET} AP`}</output>
+                                    <output class="army-total ${valueClass}">${compositionLocked ? 'Random' : `${value} / ${data.ARMY_POINT_TARGET} AP`}</output>
                                 </div>
                                 <div class="army-player-options">
                                     <label>Controlled by
@@ -267,15 +323,15 @@
                                     </label>
                                 </div>
                             </header>
-                            <div class="army-unit-list">${rows}</div>
+                            <div class="army-unit-list">${unitList}</div>
                             <footer class="army-builder-actions">
                                 <label class="army-random-toggle">
-                                    <input type="checkbox" data-army-random-toggle="${playerId}"${randomArmy ? ' checked' : ''}>
+                                    <input type="checkbox" data-army-random-toggle="${playerId}"${compositionLocked ? ' checked' : ''}${factionRandom ? ' disabled' : ''}>
                                     Random army
                                 </label>
-                                <button type="button" data-army-builder-action="random-army" data-player-id="${playerId}">Random Army</button>
+                                <button type="button" data-army-builder-action="random-army" data-player-id="${playerId}"${compositionLocked ? ' disabled' : ''}>Random Army</button>
                                 <button type="button" data-army-builder-action="random-presentation" data-player-id="${playerId}">Random Color + Faction</button>
-                                <button type="button" data-army-builder-action="clear" data-player-id="${playerId}">Clear Army</button>
+                                <button type="button" data-army-builder-action="clear" data-player-id="${playerId}"${factionRandom ? ' disabled' : ''}>Clear Army</button>
                             </footer>
                         </section>`;
                 }).join('');
@@ -300,11 +356,17 @@
                 this.ui.armyColumns.querySelectorAll('[data-army-builder-action]').forEach((button) => {
                     button.addEventListener('click', () => {
                         const playerId = button.dataset.playerId;
-                        if (button.dataset.armyBuilderAction === 'random-army') this.chooseRandomArmy(playerId);
+                        if (button.dataset.armyBuilderAction === 'random-army') {
+                            if (!this.isArmyCompositionLocked(playerId)) {
+                                this.chooseRandomArmy(playerId);
+                            }
+                            return;
+                        }
                         if (button.dataset.armyBuilderAction === 'random-presentation') this.randomizeArmyPresentation(playerId);
                         if (button.dataset.armyBuilderAction === 'clear') this.clearArmy(playerId);
                     });
                 });
+                this.syncDefenderChoiceSelect();
             }
         });
     }

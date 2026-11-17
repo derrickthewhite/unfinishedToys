@@ -19,6 +19,8 @@ test('unit asset lookup includes generic artwork for the remaining unit types', 
     ['Heavy-Spear', 'Heavy-Warband', 'Beasts', 'Flyers', 'Behemoth'].forEach((type) => {
         assert.equal(app.getUnitAssetPath({ type, faction: 'Panda' }), `assets/${type}.svg`);
     });
+    assert.equal(app.getUnitAssetPath({ type: 'Lurkers', faction: 'Panda' }), 'assets/dinosaurs/Lurkers.svg');
+    assert.equal(app.getUnitAssetPath({ type: 'Lurkers', faction: 'Dinosaurs' }), 'assets/dinosaurs/Lurkers.svg');
     assert.equal(app.getUnitAssetPath({ type: 'Artillery', faction: 'Undead' }), 'assets/Artillery.svg');
     assert.equal(app.getUnitAssetPath({ type: 'Magician', faction: 'Undead' }), 'assets/undead/Magician.svg');
     assert.equal(app.getUnitAssetPath({ type: 'Spear', faction: 'Goblin' }), 'assets/goblin/Spear.svg');
@@ -893,12 +895,56 @@ test('zoomAt can reach the increased maximum zoom level', () => {
     const app = createAppHarness();
     app.zoomAt = HordesPrototype.prototype.zoomAt;
     app.screenToWorld = HordesPrototype.prototype.screenToWorld;
+    app.screenToView = HordesPrototype.prototype.screenToView;
     app.canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 600 });
     app.state.camera = { x: 300, y: 300, scale: 5.5, minScale: 0.6, maxScale: 6 };
 
     app.zoomAt(300, 300, 1.5);
 
     assert.equal(app.state.camera.scale, 6);
+});
+
+test('flipped screenToWorld maps the table top to the bottom of the canvas', () => {
+    const app = createAppHarness();
+    app.screenToView = HordesPrototype.prototype.screenToView;
+    app.screenToWorld = HordesPrototype.prototype.screenToWorld;
+    app.viewToWorld = HordesPrototype.prototype.viewToWorld;
+    app.rotateBoardViewPoint = HordesPrototype.prototype.rotateBoardViewPoint;
+    app.getBoardViewCenter = HordesPrototype.prototype.getBoardViewCenter;
+    app.isBoardViewFlipped = () => true;
+    app.canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 600, height: 600 });
+    app.state.camera = { x: 300, y: 300, scale: 1 };
+
+    const world = app.screenToWorld(300, 600);
+    assert.ok(Math.abs(world.x - 300) < 0.001);
+    assert.ok(Math.abs(world.y - 0) < 0.001);
+});
+
+test('flip board stays flipped after the active player changes', () => {
+    const app = createAppHarness({
+        state: {
+            homeEdgeByPlayerId: { 'player-1': 'bottom', 'player-2': 'top' }
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+    assert.equal(app.isBoardViewFlipped(), false);
+
+    app.toggleBoardView();
+    assert.equal(app.isBoardViewFlipped(), true);
+    app.state.activePlayerId = 'player-2';
+    assert.equal(app.isBoardViewFlipped(), true);
+});
+
+test('the local human attacker starts with the board flipped', () => {
+    const app = createAppHarness({
+        state: {
+            homeEdgeByPlayerId: { 'player-1': 'top', 'player-2': 'bottom' }
+        }
+    });
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+    assert.equal(app.isBoardViewFlipped(), true);
 });
 
 test('setup cameras preserve the cursor world point through zoom and pan independently', () => {
@@ -943,6 +989,7 @@ test('renderSelectionInfo shows single-unit details in the side panel', () => {
             },
             selectionPanelEyebrow: { textContent: '' },
             selectionPanelTitle: { textContent: '' },
+            selectionPanelAp: { textContent: '', hidden: true, innerHTML: '' },
             selectionPanelHint: { textContent: '' },
             selectionPanelStats: { hidden: true, innerHTML: '' },
             selectionPanelPortrait: { hidden: true, style: { setProperty() {} } },
@@ -960,14 +1007,63 @@ test('renderSelectionInfo shows single-unit details in the side panel', () => {
 
     assert.equal(app.ui.selectionText.textContent, '1 selected, Blade.');
     assert.equal(app.ui.selectionPanelTitle.textContent, 'Blade');
-    assert.equal(app.ui.selectionPanelHint.textContent, '40mm frontage, 20mm depth.');
+    assert.equal(app.ui.selectionPanelHint.hidden, true);
     assert.equal(app.ui.selectionPanelStats.hidden, false);
-    assert.match(app.ui.selectionPanelStats.innerHTML, /<dt>Strength<\/dt>/);
-    assert.match(app.ui.selectionPanelStats.innerHTML, /Infantry 5, Mounted 3/);
+    assert.match(app.ui.selectionPanelAp.innerHTML, /2 AP/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /data-tip="vs infantry"/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, />\+5</);
+    assert.match(app.ui.selectionPanelStats.innerHTML, />\+3</);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /Combat Factor/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /40mm/);
     assert.equal(app.ui.selectionPanelPortrait.hidden, false);
     assert.equal(app.ui.selectionPanelAsset.hidden, false);
     assert.match(app.ui.selectionPanelAsset.src, /Blade\.svg$/);
-    assert.deepEqual(app.ui.selectionPanel.toggled, [['is-empty', false]]);
+    assert.deepEqual(app.ui.selectionPanel.toggled, [['is-empty', false], ['is-battle', false]]);
+});
+
+test('renderSelectionInfo shows a compact Magician card with hover tips', () => {
+    const unit = data.createUnit('Magician', 'player-1', 'Undead', { x: 200, y: 520, rotation: 0 }, () => 'mag');
+    const app = createAppHarness({
+        state: {
+            mode: 'edit',
+            units: [unit],
+            selectedIds: ['mag'],
+            status: 'Ready'
+        },
+        ui: {
+            selectionText: { textContent: '' },
+            selectionPanel: {
+                toggled: [],
+                classList: {
+                    toggle(name, value) {
+                        this.owner.toggled.push([name, value]);
+                    },
+                    owner: null
+                }
+            },
+            selectionPanelEyebrow: { textContent: '' },
+            selectionPanelTitle: { textContent: '' },
+            selectionPanelAp: { textContent: '', hidden: true, innerHTML: '' },
+            selectionPanelHint: { textContent: '', hidden: false },
+            selectionPanelStats: { hidden: true, innerHTML: '' },
+            selectionPanelPortrait: { hidden: true, style: { setProperty() {} } },
+            selectionPanelAsset: { hidden: true, src: '', alt: '', removeAttribute() {} }
+        }
+    });
+    app.ui.selectionPanel.classList.owner = app.ui.selectionPanel;
+    app.updateSelectionAnalysis();
+    app.renderSelectionInfo();
+
+    assert.equal(app.ui.selectionPanelTitle.textContent, 'Magician');
+    assert.match(app.ui.selectionPanelAp.innerHTML, /4 AP/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /40mm/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /data-tip="vs infantry"/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /data-tip="on roads, 125 mm"/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /Quick Kills:/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /data-tip="ensorcelled, not destroyed"/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /caster/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /Ensorcellment/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /2 PIP move/);
 });
 
 test('battle stats markers list the active side first and fill the selection panel on click', () => {
@@ -1028,7 +1124,7 @@ test('battle stats markers list the active side first and fill the selection pan
     assert.equal(app.ui.selectionPanelTitle.textContent, 'Red 5 vs 5');
     assert.match(app.ui.selectionPanelStats.innerHTML, /Red Blade/);
     assert.match(app.ui.selectionPanelStats.innerHTML, /Blue Blade/);
-    assert.match(app.ui.selectionPanelStats.innerHTML, /None/);
+    assert.match(app.ui.selectionPanelStats.innerHTML, /no bonuses/);
     assert.equal(app.ui.selectionPanelPortrait.hidden, true);
 });
 
@@ -1540,6 +1636,7 @@ test('loadGame updates legacy Flyer depth to the current 30 mm template', () => 
         const app = createAppHarness();
         app.loadGame('save-flyers');
         assert.equal(app.state.units[0].depth, 30);
+        assert.equal(app.state.units[0].combat.moveCost, 2);
     } finally {
         global.window = previousWindow;
     }
@@ -2427,6 +2524,25 @@ test('acknowledge button names the phase it closes', () => {
     assert.equal(app.acknowledgeButtonLabel(), 'Victory');
 });
 
+test('acknowledge button says Defeat when the only local human lost', () => {
+    const app = createAppHarness();
+    app.state.players['player-1'].controller = 'local';
+    app.state.players['player-2'].controller = 'computer';
+    app.state.victory = { winnerPlayerId: 'player-2', loserPlayerId: 'player-1' };
+    app.state.victoryModalDismissed = true;
+    assert.equal(app.isLocalDefeat(), true);
+    assert.equal(app.acknowledgeButtonLabel(), 'Defeat');
+
+    app.state.victory = { winnerPlayerId: 'player-1', loserPlayerId: 'player-2' };
+    assert.equal(app.isLocalDefeat(), false);
+    assert.equal(app.acknowledgeButtonLabel(), 'Victory');
+
+    app.state.players['player-2'].controller = 'local';
+    app.state.victory = { winnerPlayerId: 'player-2', loserPlayerId: 'player-1' };
+    assert.equal(app.isLocalDefeat(), false);
+    assert.equal(app.acknowledgeButtonLabel(), 'Victory');
+});
+
 test('victory acknowledge button reopens the victory modal', () => {
     const app = createAppHarness({
         state: {
@@ -2788,7 +2904,7 @@ test('hover marks selectable units and handle buttons', () => {
     app.getHandleHit = () => reverse;
     app.updatePointerHover({ clientX: reverse.position.x, clientY: reverse.position.y });
     assert.equal(app.state.hover.handleKind, 'single-reverse');
-    assert.equal(app.state.hover.unitId, null);
+    assert.equal(app.state.hover.unitId, reverse.unitId);
     assert.equal(app.handleBorderWidth(reverse), 4.5);
 
     app.state.hover = null;
@@ -2858,4 +2974,216 @@ test('phase changes announce the phase the turn lands on in the active player co
     assert.equal(app.ui.phaseBanner.style['--phase-ink'], data.PLAYER_COLORS.red.stroke);
     assert.equal(classNames.has('is-showing'), true);
     clearTimeout(app._phaseBannerTimer);
+});
+
+test('artillery lock-unit blocks drafting until unlocked', () => {
+    const gun = createArtillery('gun', 120, 480);
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            remainingMoves: 4,
+            units: [gun],
+            selectedIds: ['gun']
+        }
+    });
+    app.updateSelectionAnalysis();
+    assert.ok(app.getSelectionHandles().some((handle) => handle.kind === 'lock-unit'));
+
+    app.lockArtilleryInPlace();
+    assert.equal(gun.lockedInPlace, true);
+    assert.equal(app.ensureDraft(['gun']), false);
+    assert.match(app.state.status, /Unlock this unit/);
+    assert.ok(app.getSelectionHandles().some((handle) => handle.kind === 'unlock-unit'));
+    assert.equal(app.getSelectionHandles().some((handle) => handle.kind === 'single-forward'), false);
+
+    app.unlockArtilleryInPlace();
+    assert.equal(gun.lockedInPlace, false);
+    assert.equal(app.ensureDraft(['gun']), true);
+});
+
+test('artillery lock handle sits on the unit lower-right in a mixed selection', () => {
+    const gun = createArtillery('gun', 120, 480);
+    const blade = createBlade('blade', 160, 480);
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            remainingMoves: 4,
+            units: [gun, blade],
+            selectedIds: ['gun', 'blade']
+        }
+    });
+    app.updateSelectionAnalysis();
+    const lock = app.getSelectionHandles().find((handle) => handle.kind === 'lock-unit');
+    assert.ok(lock);
+    assert.equal(lock.unitId, 'gun');
+    const center = geometry.getUnitCenter(gun);
+    const right = geometry.getRightVector(gun.rotation);
+    const forward = geometry.getForwardVector(gun.rotation);
+    const expected = geometry.add(
+        geometry.add(center, geometry.scaleVector(right, gun.width * 0.28)),
+        geometry.scaleVector(forward, -(gun.depth * 0.18))
+    );
+    assert.deepEqual(lock.position, expected);
+
+    app.lockArtilleryInPlace('gun');
+    assert.equal(gun.lockedInPlace, true);
+    assert.ok(app.getSelectionHandles().some((handle) => handle.kind === 'unlock-unit' && handle.unitId === 'gun'));
+});
+
+test('combat report lists the on-screen bottom side first and grows the label', () => {
+    const attacker = createBlade('u1', 100, 220);
+    const defender = createBlade('u2', 140, 220, 'player-2');
+    const app = createAppHarness({
+        state: {
+            units: [attacker, defender],
+            combatResolution: {
+                phase: 'shooting',
+                participantIds: new Set(['u1', 'u2']),
+                destroyedIds: new Set(),
+                ghostSnapshot: {},
+                movedUnitIds: [],
+                results: [{
+                    primaryAttackerId: 'u1',
+                    defenderId: 'u2',
+                    attackerIds: ['u1'],
+                    attackerTotal: 5,
+                    defenderTotal: 2
+                }]
+            }
+        }
+    });
+    const labels = [];
+    const fills = [];
+    const rects = [];
+    const ctx = {
+        save() {},
+        restore() {},
+        beginPath() {},
+        roundRect(x, y, width, height) {
+            rects.push({ width, height });
+        },
+        fill() {},
+        stroke() {},
+        translate() {},
+        rotate() {},
+        moveTo() {},
+        lineTo() {},
+        fillText(text) {
+            labels.push(text);
+        },
+        createLinearGradient() {
+            return {
+                addColorStop() {}
+            };
+        },
+        set fillStyle(value) {
+            fills.push(value);
+        },
+        set strokeStyle(value) {},
+        set lineWidth(value) {},
+        set lineCap(value) {},
+        set font(value) {},
+        set textAlign(value) {},
+        set textBaseline(value) {}
+    };
+
+    app.drawCombatResolutionOverlays(ctx);
+    assert.equal(labels[0], '5 vs 2');
+    assert.ok(Math.abs(rects[0].width - 22) < 0.01);
+    assert.ok(Math.abs(rects[0].height - 8) < 0.01);
+    assert.ok(fills.some((value) => value && typeof value === 'object'));
+    app.state.camera.scale = 3;
+    rects.length = 0;
+    app.drawCombatResolutionOverlays(ctx);
+    assert.ok(Math.abs(rects[0].width - 22) < 0.01);
+    assert.ok(Math.abs(rects[0].height - 8) < 0.01);
+
+    app.state.boardViewFlipLocked = true;
+    app.state.boardViewFlipped = true;
+    labels.length = 0;
+    app.drawCombatResolutionOverlays(ctx);
+    assert.equal(labels[0], '2 vs 5');
+});
+
+test('step-move boot sits behind the unit and commits a checkpoint', () => {
+    const unit = createBlade('u1', 100, 220);
+    const app = createAppHarness({
+        state: {
+            mode: 'game',
+            phase: 'move',
+            setupStage: 'game',
+            remainingMoves: 4,
+            units: [unit],
+            selectedIds: ['u1']
+        }
+    });
+    app.updateSelectionAnalysis();
+    assert.equal(app.ensureDraft(['u1']), true);
+    unit.y -= 10;
+    app.updateSelectionAnalysis();
+    const handles = app.getSelectionHandles();
+    const step = handles.find((handle) => handle.kind === 'step-move');
+    const reverse = handles.find((handle) => handle.kind === 'single-reverse');
+    const forward = geometry.getForwardVector(unit.rotation);
+    assert.ok(step);
+    assert.ok(reverse);
+    assert.ok(geometry.dot(geometry.subtract(step.position, reverse.position), forward) < -10);
+
+    app.onPointerDown({
+        pointerId: 4,
+        button: 0,
+        clientX: step.position.x,
+        clientY: step.position.y,
+        shiftKey: false
+    });
+    app.onPointerUp({ pointerId: 4, clientX: step.position.x, clientY: step.position.y });
+    assert.ok(app.state.draft);
+    assert.equal(app.state.draft.history.length, 1);
+    assert.equal(app.state.draft.origin.u1.y, unit.y);
+});
+
+test('ground units show a rear bar in water or bad going', () => {
+    const unit = createBlade('u1', 100, 220);
+    const flyer = {
+        ...createBlade('fly', 100, 220),
+        type: 'Flyers',
+        movement: { ignoresTerrain: true }
+    };
+    const app = createAppHarness({
+        state: {
+            units: [unit, flyer],
+            terrain: {
+                roads: [],
+                features: [{ kind: 'water', cx: 100, cy: 220, rx: 80, ry: 80, wobble: 0 }]
+            }
+        }
+    });
+    assert.equal(app.getUnitTerrainBarKind(unit), 'water');
+    assert.equal(app.getUnitTerrainBarKind(flyer), null);
+
+    app.state.terrain.features[0].kind = 'forest';
+    assert.equal(app.getUnitTerrainBarKind(unit), 'bad');
+    app.state.terrain.features = [];
+    assert.equal(app.getUnitTerrainBarKind(unit), null);
+});
+
+test('faction art.json chooses light moved boots for goblin and undead', () => {
+    const goblin = { ...createBlade('g1', 100, 220), faction: 'Goblin' };
+    const undead = { ...createBlade('u1', 160, 220), faction: 'Undead' };
+    const panda = { ...createBlade('p1', 220, 220), faction: 'Panda' };
+    const app = createAppHarness({
+        state: {
+            units: [goblin, undead, panda]
+        }
+    });
+
+    assert.equal(app.getFactionArtConfig('Goblin').bootPrints, 'light');
+    assert.equal(app.getFactionArtConfig('Undead').bootPrints, 'light');
+    assert.equal(app.getFactionArtConfig('undead').bootPrints, 'light');
+    assert.equal(app.getFactionArtConfig('Panda').bootPrints, 'dark');
+    assert.equal(app.getMovedBootStyle(goblin).color, app.getMovedBootStyle(undead).color);
+    assert.equal(app.getMovedBootStyle({ ...undead, faction: 'undead' }).color, app.getMovedBootStyle(undead).color);
+    assert.notEqual(app.getMovedBootStyle(undead).color, app.getMovedBootStyle(panda).color);
 });

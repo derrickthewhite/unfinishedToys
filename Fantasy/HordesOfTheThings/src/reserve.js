@@ -419,6 +419,9 @@
                 if (!unit || !this.isUnitInReserve(unit.id)) {
                     return false;
                 }
+                if (typeof this.isLurkerUnit === 'function' && this.isLurkerUnit(unit)) {
+                    return this.beginLurkerAmbush(unit);
+                }
                 if (this.isEnsorcelledInReserve(unit)) {
                     return this.beginEnsorcelledReturn(unit, worldX);
                 }
